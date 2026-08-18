@@ -476,13 +476,41 @@ const FX={
     }
     this.ring(pos.x-dir.x*0.4,pos.y+0.2,pos.z-dir.z*0.4,0x88e2ff,0.25,2.4);
   },
-  spawnDrop(pos,id,n){
+  /* ---------- DROP ITEM ----------
+     Konstanta jeda ambil: item yang jatuh dari tas pemain tidak bisa langsung
+     dipungut kembali. LOCAL_ID = id pemain lokal (nantinya multiplayer memakai
+     id berbeda sehingga pemain lain kena jeda lebih lama). */
+  LOCAL_ID:'player',DROP_LOCK_OWNER:3,DROP_LOCK_OTHER:5,
+  spawnDrop(pos,id,n,opts){
     if(n<=0)return;
-    const g=new THREE.BoxGeometry(0.26,0.26,0.26);
-    const m=new THREE.MeshLambertMaterial({color:DROP_COLOR[id]||0xffffff});
-    const mesh=new THREE.Mesh(g,m);mesh.position.copy(pos);
+    opts=opts||{};
+    /* item yang punya model 3D (makanan, dll) ditampilkan dengan model
+       aslinya, bukan kotak warna. Item lain memakai kotak berwarna. */
+    let mesh,isModel=false;
+    if(typeof HeldModels!=='undefined'&&HeldModels.MODELS&&HeldModels.MODELS[id]){
+      mesh=HeldModels.build(id);
+      mesh.rotation.set(0,0,0);
+      isModel=true;
+    }else{
+      const g=new THREE.BoxGeometry(0.26,0.26,0.26);
+      const m=new THREE.MeshLambertMaterial({color:DROP_COLOR[id]||0xffffff});
+      mesh=new THREE.Mesh(g,m);
+    }
+    mesh.position.copy(pos);
     this.group.add(mesh);
-    this.drops.push({mesh,id,n,t:0,vy:0});
+    const drop={mesh,id,n,t:0,vy:0,isModel};
+    /* drop milik pemain (dibuang dari tas) diberi jeda ambil: 3 detik untuk
+       yang membuang, 5 detik untuk pemain lain — tidak langsung tersedot balik. */
+    if(opts.owner){drop.ownerId=this.LOCAL_ID;drop.lockOwner=this.DROP_LOCK_OWNER;drop.lockOther=this.DROP_LOCK_OTHER;}
+    this.drops.push(drop);
+  },
+  /* lepas drop dari scene; geometri selalu dibuang, material hanya untuk kotak
+     (material model 3D dipakai bersama oleh HeldModels jadi tidak boleh dibuang) */
+  disposeDrop(mesh,isModel){
+    this.group.remove(mesh);
+    if(mesh.traverse)mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+    else if(mesh.geometry)mesh.geometry.dispose();
+    if(!isModel&&mesh.material)mesh.material.dispose();
   },
   addShake(v){this.shake=Math.min(1.2,this.shake+v);},
 
@@ -615,17 +643,21 @@ const FX={
       }else d.mesh.position.y=floor+Math.sin(d.t*4)*0.035;
       const dx=Player.pos.x-d.mesh.position.x,dz=Player.pos.z-d.mesh.position.z;
       const hd=Math.hypot(dx,dz);
-      if(d.t>0.35&&hd<3.2){
+      /* jeda ambil: drop milik pemain (dibuang dari tas) menunggu 3 detik untuk
+         yang membuang & 5 detik untuk pemain lain; drop biasa tanpa owner 0.35 dtk.
+         Nantinya multiplayer memakai d.ownerId != LOCAL_ID untuk pemain lain. */
+      const waitT=d.ownerId?(d.ownerId===this.LOCAL_ID?d.lockOwner:d.lockOther):0.35;
+      if(d.t>waitT&&hd<3.2){
         const pull=Math.min(1,dt*(hd<1.8?9:3));
         d.mesh.position.x+=dx*pull;d.mesh.position.z+=dz*pull;
       }
-      if(d.t>0.35&&hd<1.65&&Math.abs(Player.pos.y-d.mesh.position.y)<3.5){
+      if(d.t>waitT&&hd<1.65&&Math.abs(Player.pos.y-d.mesh.position.y)<3.5){
         const left=RPG.addItem(d.id,d.n);
         if(left>0){d.n=left;d.t=0;UI.toast('🎒 Tas penuh!');}
         else{
           UI.toast(`+${d.n} ${ITEMS[d.id].e} ${ITEMS[d.id].n}`);
           Sfx.pickup();
-          this.group.remove(d.mesh);d.mesh.geometry.dispose();d.mesh.material.dispose();
+          this.disposeDrop(d.mesh,d.isModel);
           this.drops.splice(i,1);
         }
       }

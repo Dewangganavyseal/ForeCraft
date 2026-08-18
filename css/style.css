@@ -212,6 +212,24 @@ body.touch #panel-bag .tip{font-size:10px}
 /* skill aktif punya ikon jurus yang menyala */
 .tnode.active .t-ico{filter:drop-shadow(0 0 5px rgba(255,179,60,.85))}
 
+/* ---------- tooltip skill (panel keterangan lengkap) ----------
+   Muncul saat hover node (desktop) atau tekan-lama (mobile), menampilkan
+   efek, syarat skill & proficiency, biaya, dan status tanpa terpotong. */
+#skill-tip{position:fixed;z-index:60;max-width:270px;background:rgba(14,20,14,.97);
+  border:1px solid rgba(159,215,127,.4);border-radius:10px;padding:10px 12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  pointer-events:none;font-size:12px;line-height:1.45;color:#e8f0d8}
+#skill-tip .st-nm{font-weight:700;color:#cfe8b8;margin-bottom:2px}
+#skill-tip .st-rk{font-size:11px;color:#ffd24d;margin-bottom:4px}
+#skill-tip .st-desc{opacity:.92;margin-bottom:6px}
+#skill-tip .st-line{font-size:11px;margin:2px 0}
+#skill-tip .st-line.ok{color:#8fe07a}
+#skill-tip .st-line.no{color:#ff8f7a}
+#skill-tip .st-status{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-weight:700}
+#skill-tip .st-type{font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;margin-left:4px}
+#skill-tip .st-type.act{background:rgba(255,179,60,.18);border:1px solid #ffb33c;color:#ffcf85}
+#skill-tip .st-type.pas{background:rgba(143,212,255,.14);border:1px solid #6fb6dd;color:#a9dcf5}
+
 /* ============ PROFICIENCY (belajar dengan melakukan) ============ */
 #prof-wrap{margin-top:14px;background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px}
 .prof-title{font-size:12px;text-align:center;color:#cfe8b8;margin-bottom:4px}

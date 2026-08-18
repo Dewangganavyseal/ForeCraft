@@ -177,10 +177,12 @@ const World={
 
   /* Jatuhkan item ke dunia supaya bisa dipungut kembali (dipakai saat tas
      penuh, item dibuang pemain, drop ikan, dll). Meneruskan ke sistem drop
-     FX yang sudah menangani jatuh, magnet ke pemain, dan pickup. */
-  dropItem(x,y,z,id,n){
+     FX yang sudah menangani jatuh, magnet ke pemain, dan pickup.
+     `opts.owner=true` memberi jeda ambil (item dari tas pemain tidak langsung
+     tersedot balik). */
+  dropItem(x,y,z,id,n,opts){
     if(n<=0||!ITEMS[id])return;
-    FX.spawnDrop(new THREE.Vector3(x,y,z),id,n);
+    FX.spawnDrop(new THREE.Vector3(x,y,z),id,n,opts);
   },
 
   /* ---------- streaming ----------

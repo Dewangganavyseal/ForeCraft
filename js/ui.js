@@ -201,10 +201,11 @@ const UI={
         const take=Math.min(n,cur.n);
         cur.n-=take;
         if(cur.n<=0)arr[i]=null;
-        /* jatuhkan di depan pemain supaya mudah dipungut kembali */
+        /* jatuhkan di depan pemain supaya mudah dipungut kembali; owner=true
+           memberi jeda ambil agar tidak langsung tersedot balik ke tas */
         const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
         const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
-        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take);
+        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,{owner:true});
         this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take}`);
         Sfx.click();
         this.renderBag();this.renderHotbar();
@@ -227,7 +228,7 @@ const UI={
         const take=Math.min(cnt,cur.n);
         cur.n-=take;
         if(cur.n<=0)n.bag[i]=null;
-        World.dropItem(n.pos.x,n.pos.y+0.6,n.pos.z,s.id,take);
+        World.dropItem(n.pos.x,n.pos.y+0.6,n.pos.z,s.id,take,{owner:true});
         this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari ${n.name}`);
         Sfx.click();
         this.renderNpcPanel();
@@ -662,7 +663,7 @@ const UI={
     const left=RPG.addItem(g.id,1);
     if(left>0){ /* tas penuh → koin dikembalikan, item jatuh ke tanah */
       RPG.coin+=g.price;
-      World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,g.id,1);
+      World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,g.id,1,{owner:true});
       this.toast('🎒 Tas penuh — item dijatuhkan, koin kembali');
     }else{
       g.n--;
@@ -1035,7 +1036,7 @@ const UI={
         const take=Math.min(cnt,cur.n);
         cur.n-=take;
         if(cur.n<=0)f.inv[i]=null;
-        World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,s.id,take);
+        World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,s.id,take,{owner:true});
         Furni.save();
         this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari peti`);
         Sfx.click();
@@ -1137,6 +1138,7 @@ const UI={
      (root di atas), lalu garis lengkung digambar lewat overlay SVG setelah
      layout terukur (requestAnimationFrame). */
   renderSkills(){
+    this.hideSkillTip();
     document.getElementById('sp-num').textContent=RPG.sp;
     const wrap=document.getElementById('branches');
     if(!wrap)return;
@@ -1207,22 +1209,77 @@ const UI={
     if(sk.active)cls+=' active';
     d.className=cls;
     d.dataset.id=sk.id;
-    /* tooltip lengkap: efek + syarat + biaya */
-    let tip=`${sk.name} · ${sk.active?'AKTIF':'Pasif'}\n${sk.desc}\n`;
-    if(sk.req){const p=SKILLS.find(s=>s.id===sk.req);tip+='Butuh: '+(p?p.name:sk.req)+'\n';}
-    if(sk.prof)tip+='📈 '+RPG.profReqText(sk)+'\n';
-    tip+=`Biaya: ${sk.cost} SP`;
-    d.title=tip;
     const badge=maxed?'✔ Maks':locked?(needProf?'📈 '+RPG.profReqText(sk):'🔒')
       :(sk.active?'⚡ ':'')+sk.cost+' SP';
     d.innerHTML=`<div class="t-ico">${sk.icon}</div>
       <div class="t-nm">${sk.name}</div>
       <div class="t-rk">Rank ${rank}/${sk.max}</div>
       <div class="t-badge">${badge}</div>`;
+    /* TOOLTIP LENGKAP: desktop = hover mouse, mobile = tekan-lama (~450ms).
+       Menggantikan teks node yang terpotong dengan panel keterangan penuh. */
+    d.addEventListener('mouseenter',()=>this.showSkillTip(sk,d));
+    d.addEventListener('mouseleave',()=>this.hideSkillTip());
+    let lpTimer=null,lpFired=false;
+    d.addEventListener('touchstart',()=>{
+      lpFired=false;
+      lpTimer=setTimeout(()=>{lpFired=true;this.showSkillTip(sk,d);},450);
+    },{passive:true});
+    const clearLP=()=>{if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}};
+    d.addEventListener('touchmove',clearLP,{passive:true});
+    d.addEventListener('touchend',()=>{clearLP();if(lpFired)setTimeout(()=>this.hideSkillTip(),1600);});
     if(learnable)
-      d.addEventListener('click',e=>{e.stopPropagation();RPG.learn(sk.id);});
+      d.addEventListener('click',e=>{e.stopPropagation();
+        if(lpFired){lpFired=false;return;}       // tekan-lama: jangan belajar
+        RPG.learn(sk.id);});
     return d;
   },
+  /* ---------- panel keterangan skill (tooltip) ---------- */
+  ensureSkillTip(){
+    if(this._skillTip)return this._skillTip;
+    const el=document.createElement('div');
+    el.id='skill-tip';el.className='hidden';
+    document.body.appendChild(el);
+    this._skillTip=el;
+    return el;
+  },
+  showSkillTip(sk,anchor){
+    const el=this.ensureSkillTip();
+    const rank=RPG.skillVal(sk.id);
+    const maxed=rank>=sk.max;
+    const reqMet=!sk.req||RPG.skillVal(sk.req)>0;
+    const afford=RPG.sp>=sk.cost;
+    const kind=sk.active?'<span class="st-type act">⚡ AKTIF</span>':'<span class="st-type pas">🔷 Pasif</span>';
+    let html=`<div class="st-nm">${sk.icon} ${sk.name} ${kind}</div>
+      <div class="st-rk">Rank ${rank}/${sk.max}</div>
+      <div class="st-desc">${sk.desc}</div>`;
+    if(sk.req){
+      const p=SKILLS.find(s=>s.id===sk.req);
+      html+=`<div class="st-line ${reqMet?'ok':'no'}">${reqMet?'✔':'🔒'} Butuh skill: ${p?p.name:sk.req}</div>`;
+    }
+    if(sk.prof&&typeof SUBSKILLS!=='undefined'&&typeof Prof!=='undefined'){
+      for(const id in sk.prof){
+        const s=SUBSKILLS[id];const have=Prof.level(id);const need=sk.prof[id];
+        const ok=have>=need;
+        html+=`<div class="st-line ${ok?'ok':'no'}">${ok?'✔':'📈'} ${s?s.icon+' '+s.name:id} Lv ${have}/${need}</div>`;
+      }
+    }
+    html+=`<div class="st-line ${afford?'ok':'no'}">💠 Biaya: ${sk.cost} SP (punya ${RPG.sp})</div>`;
+    const status=maxed?'✔ Sudah maksimal':(!reqMet)?'🔒 Terkunci — penuhi syarat dulu':
+      (afford?'✅ Klik untuk mempelajari':'⚠ Skill Point kurang');
+    html+=`<div class="st-status">${status}</div>`;
+    el.innerHTML=html;
+    el.classList.remove('hidden');
+    /* posisi: utamakan di atas node; turun bila tak muat; clamp di layar */
+    const r=anchor.getBoundingClientRect();
+    const tw=el.offsetWidth,th=el.offsetHeight;
+    let x=r.left+r.width/2-tw/2;
+    let y=r.top-th-8;
+    if(y<6)y=r.bottom+8;
+    x=clamp(x,6,Math.max(6,window.innerWidth-tw-6));
+    y=clamp(y,6,Math.max(6,window.innerHeight-th-6));
+    el.style.left=x+'px';el.style.top=y+'px';
+  },
+  hideSkillTip(){ if(this._skillTip)this._skillTip.classList.add('hidden'); },
   /* gambar garis lengkung penghubung antar node (parent req -> child) */
   drawTreeLinks(body,svg,sks,nodeEl){
     const crect=body.getBoundingClientRect();

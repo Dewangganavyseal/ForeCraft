@@ -364,8 +364,8 @@ const RPG={
     if(!id)return;
     this.equip[slot]=null;
     if(this.addItem(id,1)>0){
-      /* inventory penuh → jatuhkan ke tanah */
-      World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,id,1);
+      /* inventory penuh → jatuhkan ke tanah (jeda ambil agar tak langsung balik) */
+      World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,id,1,{owner:true});
       UI.toast('🎒 Tas penuh, item dijatuhkan');
     }else UI.toast(`${ITEMS[id].e} dilepas`);
     if(slot==='weapon')Player.refreshWeapon();
@@ -421,7 +421,7 @@ const RPG={
       const left=this.addItem(r.out,1);
       if(left>0){
         dropped+=left;
-        World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,r.out,left);
+        World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,r.out,left,{owner:true});
       }
       made++;
     }
