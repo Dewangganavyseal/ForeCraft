@@ -171,25 +171,56 @@ body.touch #panel-bag .tip{font-size:10px}
 
 #sp-info{font-size:14px;margin-bottom:12px}
 #sp-info b{color:#ffd24d;font-size:18px}
-#branches{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.branch{background:rgba(0,0,0,.3);border-radius:10px;padding:10px;min-width:150px}
-.branch h3{font-size:12px;text-align:center;margin-bottom:8px;color:#cfe8b8}
-.nodes{display:flex;flex-direction:column;gap:8px}
-.node{background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.14);border-radius:8px;padding:7px 9px;cursor:pointer;font-size:11px;line-height:1.35;position:relative}
-.node:hover{border-color:#9fd77f}
-.node.max{border-color:#ffd24d;background:rgba(255,210,77,.08)}
-.node.locked{opacity:.45;cursor:not-allowed}
-.node .nm{font-weight:700;color:#e8f0d8}
-.node .rk{position:absolute;top:5px;right:7px;font-size:10px;color:#ffd24d}
-.node .ds{opacity:.75;font-size:10px}
-/* label jenis skill: Aktif (punya tombol jurus) vs Pasif (bonus otomatis) */
-.node .s-type{font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;margin-left:4px;vertical-align:middle}
-.node .s-type.act{background:rgba(255,179,60,.18);border:1px solid #ffb33c;color:#ffcf85}
-.node .s-type.pas{background:rgba(143,212,255,.14);border:1px solid #6fb6dd;color:#a9dcf5}
-/* tombol pelajari: konfirmasi eksplisit agar SP tidak terpakai karena salah sentuh */
-.node .learn{margin-top:6px;width:100%;background:#3f6d3a;border:1px solid #6da55f;color:#fff;border-radius:6px;padding:5px 8px;font-weight:700;font-size:11px;cursor:pointer}
-.node .learn:hover:not(:disabled){background:#4d8446}
-.node .learn:disabled{opacity:.4;cursor:not-allowed}
+/* ============ SKILL TREE (pohon akar menyambung) ============ */
+#branches{display:flex;flex-direction:column;gap:16px}
+.branch.tree{background:rgba(0,0,0,.28);border-radius:12px;padding:12px;width:100%;box-sizing:border-box}
+.branch.tree h3{font-size:13px;text-align:center;margin-bottom:10px;color:#cfe8b8;letter-spacing:1px}
+.tree-body{position:relative;padding:4px 0 2px}
+.tree-row{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:30px;position:relative;z-index:1}
+.tree-row:last-child{margin-bottom:4px}
+/* overlay garis penghubung antar node */
+.tree-svg{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
+.tree-svg path.lk{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2}
+.tree-svg path.lk.avail{stroke:rgba(159,215,127,.65);stroke-width:2.5}
+.tree-svg path.lk.on{stroke:#ffd24d;stroke-width:3}
+.tree-svg path.lk.prof{stroke:rgba(170,130,255,.55);stroke-width:2}
+/* kartu node */
+.tnode{position:relative;z-index:1;width:122px;box-sizing:border-box;
+  background:rgba(22,30,22,.92);border:2px solid rgba(255,255,255,.16);
+  border-radius:11px;padding:9px 6px 8px;text-align:center;
+  transition:transform .12s,border-color .12s,box-shadow .12s}
+.tnode .t-ico{font-size:24px;line-height:1}
+.tnode .t-nm{font-size:10px;font-weight:700;color:#e8f0d8;margin:5px 0 2px;min-height:26px;line-height:1.25}
+.tnode .t-rk{font-size:10px;color:#ffd24d}
+.tnode .t-badge{margin:6px auto 0;display:inline-block;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:20px;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);color:#cfd8c8;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* bisa dipelajari */
+.tnode.can{cursor:pointer;border-color:#9fd77f;box-shadow:0 0 0 1px rgba(159,215,127,.35)}
+.tnode.can:hover{transform:translateY(-3px);box-shadow:0 4px 14px rgba(159,215,127,.45)}
+.tnode.can .t-badge{background:rgba(107,196,90,.2);border-color:#6da55f;color:#c8f0b0}
+/* sudah maksimal */
+.tnode.max{border-color:#ffd24d;background:rgba(255,210,77,.1)}
+.tnode.max .t-badge{background:rgba(255,210,77,.18);border-color:#ffd24d;color:#ffe9a8}
+/* terkunci */
+.tnode.locked{opacity:.5}
+.tnode.locked .t-badge{color:#aab3a6}
+/* terkunci khusus oleh proficiency */
+.tnode.proflock{border-color:rgba(170,130,255,.6)}
+.tnode.proflock .t-badge{background:rgba(170,130,255,.16);border-color:#aa82ff;color:#d6c2ff}
+/* skill aktif punya ikon jurus yang menyala */
+.tnode.active .t-ico{filter:drop-shadow(0 0 5px rgba(255,179,60,.85))}
+
+/* ============ PROFICIENCY (belajar dengan melakukan) ============ */
+#prof-wrap{margin-top:14px;background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px}
+.prof-title{font-size:12px;text-align:center;color:#cfe8b8;margin-bottom:4px}
+#prof-wrap .sub{font-size:10px;opacity:.7;text-align:center;margin-bottom:8px}
+.prof-row{margin:7px 0;font-size:11px}
+.prof-nm{display:flex;justify-content:space-between;align-items:center;color:#e8f0d8}
+.prof-nm b{color:#ffd24d;font-size:10px}
+.prof-track{height:8px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);border-radius:5px;overflow:hidden;margin-top:3px}
+.prof-track div{height:100%;background:linear-gradient(90deg,#9fd77f,#ffd24d);border-radius:5px;transition:width .2s}
 
 #recipes{display:flex;flex-direction:column;gap:8px}
 .recipe{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:8px 12px}

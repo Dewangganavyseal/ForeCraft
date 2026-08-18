@@ -492,6 +492,7 @@ const Player={
     if(this.dead)return;
     if(this.onGround){this.vel.y=CFG.PLAYER.jump;this.onGround=false;this.airJumped=false;
       Sfx.jump();
+      if(typeof Prof!=='undefined')Prof.gain('agility',2,1);
       if(this.inWater)FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2);}
     else if(this.inWater){this.vel.y=3.6;}
     /* LOMPAT GANDA (skill 'djump'): sekali lagi tekan lompat saat di udara,
@@ -516,6 +517,7 @@ const Player={
     this.dodge.active=true;this.dodge.t=0;this.dodge.dir.copy(dir);
     this.dodge.cd=RPG.dodgeCD();
     this.attack.active=false;
+    if(typeof Prof!=='undefined')Prof.gain('agility',5,1);
     Sfx.dash();
     if(this.inWater){FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2.6);Sfx.splash(false);}
   },
@@ -705,6 +707,9 @@ const Player={
       this.hitStop=Math.min(0.09,0.03+ci*0.012);
       if(ci===4)FX.shockwave(this.pos.x+Math.sin(this.facing)*1.3,this.pos.y+0.1,this.pos.z+Math.cos(this.facing)*1.3,0xff6b57,4.5);
     }
+    /* COMBO TERAKHIR (pukulan ke-5): gelombang blok menjalar ke arah depan */
+    if(ci===4&&typeof FX.groundWave==='function')
+      FX.groundWave(this.pos.x,this.pos.y,this.pos.z,{mode:'line',dir:this.facing,color:0xff6b57});
     /* ikan yang berenang di perairan bisa ditangkap dengan serangan biasa
        (sistem FishSys — porting fish.html) */
     if(typeof FishSys!=='undefined'&&FishSys.checkHit(reach,this.facing))
@@ -756,7 +761,14 @@ const Player={
           if(score<bestScore){bestScore=score;blkHit={x,y,z};}
         }
       }
-    if(blkHit)World.hitBlock(blkHit.x,blkHit.y,blkHit.z,1);
+    if(blkHit){
+      /* proficiency gathering mempercepat memecah blok: damage pukul blok
+         dinaikkan sesuai sub-skill bloknya (mis. Penambangan utk batu/bijih). */
+      const bid=World.getBlock(blkHit.x,blkHit.y,blkHit.z);
+      const bdef=(typeof BLOCK_PROF!=='undefined')?BLOCK_PROF[bid]:null;
+      const spd=(bdef&&typeof Prof!=='undefined')?Prof.speedBonus(bdef.sk):0;
+      World.hitBlock(blkHit.x,blkHit.y,blkHit.z,1+spd);
+    }
     /* perabot (meja/kursi/kasur/peti/perahu) juga ikut hancur bila dipukul */
     if(typeof Furni!=='undefined'&&Furni.hitNearest)
       Furni.hitNearest(this.pos,this.facing);
@@ -1009,6 +1021,12 @@ const Player={
       this.pos.y=ub;
       if(this.vel.y<0)this.vel.y=0;
       this.onGround=true;this.airJumped=false;
+    }
+    /* RIDE WAVE: pemain yang berdiri di atas blok tanah yang terangkat
+       gelombang ikut naik bersama bloknya */
+    if(typeof FX!=='undefined'&&FX.waveHeightAt){
+      const wh=FX.waveHeightAt(this.pos.x,this.pos.z);
+      if(wh>0.03&&this.pos.y<g+wh){this.pos.y=g+wh;if(this.vel.y<0)this.vel.y=0;this.onGround=true;this.airJumped=false;}
     }
     if(this.pos.y<-6)this.respawn();
 

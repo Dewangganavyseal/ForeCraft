@@ -3,7 +3,7 @@
 const FX={
   group:new THREE.Group(),
   debMesh:null,debData:[],DEB_MAX:240,debCursor:0,
-  rings:[],texts:[],trails:[],drops:[],shakes:[],shake:0,
+  rings:[],texts:[],trails:[],drops:[],shakes:[],waveFields:[],shake:0,
   dummy:new THREE.Object3D(),
 
   init(scene){
@@ -89,6 +89,94 @@ const FX={
       s.mesh.geometry.dispose();s.mesh.material.dispose();
       this.shakes.splice(i,1);
     }
+  },
+
+  /* ---------- GELOMBANG TANAH (ground wave) — BLOK NYATA TERANGKAT ----------
+     Bukan sekadar efek: blok-blok tanah di area gelombang benar-benar
+     terangkat halus lalu turun lagi, mengikuti sebuah "height-field" yang
+     menjalar. Warna blok meniru blok tanah aslinya sehingga tampak seperti
+     permukaan tanah yang naik. Tinggi gelombang di suatu titik bisa ditanya
+     lewat waveHeightAt(x,z) — dipakai physics monster/pemain/NPC supaya
+     makhluk yang berdiri di atas blok yang terangkat ikut naik bersamanya.
+       mode 'line'   -> gelombang menjalar ke arah `dir` (combo terakhir)
+       mode 'radial' -> melingkar dari tengah ke samping (whirl/slam)      */
+  groundWave(x,y,z,opts){
+    opts=opts||{};
+    const mode=opts.mode||'line';
+    const color=opts.color||0xd9b23a;
+    const speed=opts.speed||7.5;          // kecepatan front gelombang (blok/detik)
+    const amp=opts.amp||0.95;             // tinggi angkatan maksimum
+    const width=opts.width||1.15;         // lebar front (sigma gaussian)
+    const maxDist=opts.radius||(mode==='radial'?3.6:4.6);
+    const dur=maxDist/speed+0.55;         // umur total gelombang
+    const field={x,z,mode,dir:opts.dir||0,speed,amp,width,maxDist,t:0,dur,meshes:[]};
+
+    /* kumpulkan titik blok yang akan terangkat */
+    const pts=[];
+    if(mode==='radial'){
+      const R=maxDist;
+      for(let gx=-R;gx<=R;gx+=0.85)
+        for(let gz=-R;gz<=R;gz+=0.85){
+          const d=Math.hypot(gx,gz);
+          if(d>R||d<0.4)continue;
+          pts.push({x:x+gx,z:z+gz});
+        }
+    }else{
+      const dx=Math.sin(field.dir),dz=Math.cos(field.dir);
+      const rows=Math.ceil(maxDist/0.85);
+      for(let r=1;r<=rows;r++){
+        const w=0.8+r*0.5;
+        const cols=Math.max(1,Math.round(w*2));
+        for(let c=0;c<cols;c++){
+          const off=(c-(cols-1)/2)*0.85;
+          pts.push({x:x+dx*r*0.85+dz*off, z:z+dz*r*0.85-dx*off});
+        }
+      }
+    }
+
+    /* spawn blok tiruan berwarna tanah asli di tiap titik. Blok dibuat LEBIH
+       TINGGI (1.5) dan dipendam, sehingga saat terangkat yang terlihat adalah
+       permukaan tanah yang benar-benar NAIK setinggi `lift` (bukan balok
+       melayang). Puncak blok = gy+lift = persis tinggi physics waveHeightAt. */
+    for(const p of pts){
+      const gy=World.groundAt(p.x,p.z,y+2);
+      const blk=World.getBlock(Math.floor(p.x),Math.floor(gy)-1,Math.floor(p.z));
+      const info=(typeof BLOCK_INFO!=='undefined'&&BLOCK_INFO[blk])?BLOCK_INFO[blk]:null;
+      const baseC=info?info.color:0x8a8f98;
+      const c=new THREE.Color(baseC).lerp(new THREE.Color(color),0.32);
+      const geo=new THREE.BoxGeometry(0.98,1.5,0.98);
+      const mat=new THREE.MeshLambertMaterial({color:c,transparent:true,opacity:0.98});
+      const mesh=new THREE.Mesh(geo,mat);
+      mesh.position.set(p.x,gy-0.75,p.z);
+      mesh.visible=false;
+      mesh.renderOrder=2;
+      this.group.add(mesh);
+      field.meshes.push({mesh,base:gy,x:p.x,z:p.z});
+    }
+    this.waveFields.push(field);
+  },
+
+  /* tinggi gelombang di titik dunia (x,z) saat ini; 0 bila tidak ada.
+     Dipakai physics untuk mengangkat makhluk yang berdiri di atas blok
+     yang sedang terangkat. */
+  waveHeightAt(wx,wz){
+    let h=0;
+    for(const f of this.waveFields){
+      let dist;
+      if(f.mode==='radial'){
+        dist=Math.hypot(wx-f.x,wz-f.z);
+      }else{
+        const dx=Math.sin(f.dir),dz=Math.cos(f.dir);
+        dist=(wx-f.x)*dx+(wz-f.z)*dz;
+        const lat=Math.abs((wx-f.x)*dz-(wz-f.z)*dx);
+        if(lat>2.4)continue;
+      }
+      if(dist<0||dist>f.maxDist)continue;
+      const front=f.t*f.speed;
+      const dd=dist-front;
+      h=Math.max(h,f.amp*Math.exp(-(dd*dd)/(f.width*f.width)));
+    }
+    return h;
   },
 
   ring(x,y,z,color,life=0.6,scale1=3){
@@ -400,6 +488,35 @@ const FX={
         this.group.remove(s.mesh);
         s.mesh.geometry.dispose();s.mesh.material.dispose();
         this.shakes.splice(i,1);
+      }
+    }
+    /* gelombang tanah: front gaussian menjalar; tiap blok terangkat sesuai
+        tinggi field di posisinya lalu turun lagi saat front lewat */
+    for(let i=this.waveFields.length-1;i>=0;i--){
+      const f=this.waveFields[i];
+      f.t+=dt;
+      const front=f.t*f.speed;
+      for(const mb of f.meshes){
+        let dist;
+        if(f.mode==='radial')dist=Math.hypot(mb.x-f.x,mb.z-f.z);
+        else{
+          const dx=Math.sin(f.dir),dz=Math.cos(f.dir);
+          dist=(mb.x-f.x)*dx+(mb.z-f.z)*dz;
+        }
+        const dd=dist-front;
+        const lift=f.amp*Math.exp(-(dd*dd)/(f.width*f.width));
+        /* puncak blok tepat di gy+lift (sama dengan physics waveHeightAt) */
+        mb.mesh.position.y=mb.base+lift-0.75;
+        mb.mesh.visible=lift>0.03;
+        /* sedikit memudar di ujung umur supaya transisi hilangnya lembut */
+        mb.mesh.material.opacity=f.t>f.dur-0.3?Math.max(0,(f.dur-f.t)/0.3):0.98;
+      }
+      if(f.t>f.dur){
+        for(const mb of f.meshes){
+          this.group.remove(mb.mesh);
+          mb.mesh.geometry.dispose();mb.mesh.material.dispose();
+        }
+        this.waveFields.splice(i,1);
       }
     }
     /* rings */

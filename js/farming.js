@@ -267,10 +267,11 @@ const Farming={
   harvest(p){
     const def=this.CROPS[p.type];if(!def)return;
     const pos=new THREE.Vector3(p.x+0.5,p.y+1.2,p.z+0.5);
-    FX.spawnDrop(pos,def.crop,1+(Math.random()<0.5?1:0));
+    FX.spawnDrop(pos,def.crop,1+(Math.random()<0.5+Prof.yieldBonus('farming')+RPG.gatherBonus(def.crop)?1:0));
     FX.spawnDrop(pos.clone().add(new THREE.Vector3(0.2,0.1,0)),def.seed,1+(Math.random()<0.4?1:0));
     FX.debris(pos,0x9fe88a,8,2);
     Player.addXP(2);
+    Prof.gain('farming',8,1);
     if(typeof Sfx!=='undefined'&&Sfx.eat)Sfx.eat();
     this.remove(p,false);
     this.save();

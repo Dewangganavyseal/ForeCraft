@@ -474,7 +474,7 @@ const World={
           const dropZ=p.dz!==undefined?p.dz:p.z+0.5;
           const dp=new THREE.Vector3(dropX,
             this.groundAt(dropX,dropZ,p.y+1)+0.45,dropZ);
-          FX.spawnDrop(dp,p.drop,1+(Math.random()<RPG.harvestBonus()?1:0));
+          FX.spawnDrop(dp,p.drop,1+(Math.random()<RPG.harvestBonus()+RPG.gatherBonus(p.drop)?1:0));
           if(ITEMS.resin&&Math.random()<0.22)FX.spawnDrop(dp,'resin',1);
           Player.addXP(1);Sfx.chop();
           if(p.last)this.leafDecay(p.x,p.y,p.z);
@@ -546,11 +546,15 @@ const World={
     this.setBlock(wx,wy,wz,B.AIR);
     const info=BLOCK_INFO[id];
     FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),info.color,10,3.2);
-    const bonus=RPG.harvestBonus();
+    /* bonus hasil: skill Pemanen + proficiency sub-skill blok + skill GATHER per jenis drop */
+    const dropId=info.drop||((id===B.GRASS||id===B.DIRT)?'fiber':null);
+    const bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
     if(info.drop)FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,1+(Math.random()<bonus?1:0));
     else if((id===B.GRASS||id===B.DIRT)&&Math.random()<0.3+bonus)
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),'fiber',1);
     Player.addXP(1);
+    /* proficiency: jenis blok menentukan sub-skill yang naik (ala Durango) */
+    Prof.gainBlock(id);
     if(id===B.WOOD)this.fellTree(wx,wy,wz);
     this.leafDecay(wx,wy,wz);
     this.checkFlood(wx,wy,wz);
@@ -600,7 +604,7 @@ const World={
         hit=true;
         const drop=p.t===1?['fiber',1]:p.t===2?['fiber',Math.random()<0.5?1:0]:
           p.t===3?['fiber',Math.random()<0.5?1:0]:p.t===4?['berry',2]:['mush',1];
-        const extra=Math.random()<RPG.harvestBonus()?1:0;
+        const extra=Math.random()<RPG.harvestBonus()+Prof.yieldBonus('harvesting')+RPG.gatherBonus(drop[0])?1:0;
         if(drop[1]+extra>0)FX.spawnDrop(new THREE.Vector3(wx,p.y+0.4,wz),drop[0],drop[1]+extra);
         /* tanaman liar kadang menjatuhkan benih pertanian */
         if(typeof Farming!=='undefined'&&Math.random()<0.18)
@@ -608,6 +612,6 @@ const World={
         FX.debris(new THREE.Vector3(wx,p.y+0.4,wz),0x5d9e3f,4,1.5);
       }else keep.push(p);
     }
-    if(hit){c.plants=keep;this.markDirty(cx,cz);Player.addXP(1);}
+    if(hit){c.plants=keep;this.markDirty(cx,cz);Player.addXP(1);Prof.gain('harvesting',4,1);}
   },
 };

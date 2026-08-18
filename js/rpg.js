@@ -118,7 +118,8 @@ const RPG={
 
 
   skillVal(id){return this.skills[id]||0;},
-  dmgMult(){return (1+0.2*this.skillVal('dmg'))*(this.roarT>0?1.35:1);},
+  dmgMult(){return (1+0.2*this.skillVal('dmg'))*(this.roarT>0?1.35:1)
+    *(1+((typeof Prof!=='undefined')?Prof.combatDmg():0));},
   comboSpeedMult(){return 1+0.12*this.skillVal('combo');},
   comboWindowMult(){return 1+0.25*this.skillVal('combo');},
   slamMult(){return 1+0.4*this.skillVal('slam');},
@@ -141,8 +142,39 @@ const RPG={
   /* cooldown dodge tetap (skill 'roll' sudah dihapus) */
   dodgeCD(){return 1.2;},
   harvestBonus(){return 0.3*this.skillVal('harv');},
+  /* peluang hasil ekstra dari cabang GATHER; dipetakan per jenis drop.
+     Digabung dgn harvestBonus() (Pemanen) & Prof.yield di world.js/farming.js. */
+  gatherBonus(dropId){
+    let b=0.05*this.skillVal('groot')+0.25*this.skillVal('mgather');
+    if(dropId==='wood')b+=0.10*this.skillVal('logm');
+    else if(dropId==='stone'||dropId==='iron_ore'||dropId==='gold_ore'||dropId==='crystal')
+      b+=0.10*this.skillVal('minm');
+    else if(dropId==='fiber'||dropId==='berry'||dropId==='mush'||dropId==='resin')
+      b+=0.10*this.skillVal('wildm');
+    else if(dropId==='wheat'||dropId==='carrot'||dropId==='cabbage'||dropId==='tomato'||dropId==='watermelon')
+      b+=0.12*this.skillVal('greenthumb');
+    return b;
+  },
   cookBonus(){return this.skillVal('cook')>=2?1.25:1;},
-  canRecipe(r){return !r.skill||this.skillVal(r.skill)>0;},
+  /* resep terkunci oleh skill tree (r.skill) DAN/ATAU milestone proficiency
+     (r.prof) — "dua kunci" ala Durango. */
+  canRecipe(r){
+    if(r.skill&&this.skillVal(r.skill)<=0)return false;
+    if(r.prof&&typeof Prof!=='undefined')
+      for(const id in r.prof)if(Prof.level(id)<r.prof[id])return false;
+    return true;
+  },
+  /* teks syarat resep (untuk toast & label kunci di UI crafting) */
+  recipeReqText(r){
+    const parts=[];
+    if(r.skill){const s=SKILLS.find(x=>x.id===r.skill);parts.push('skill '+(s?s.name:r.skill));}
+    if(r.prof&&typeof SUBSKILLS!=='undefined')
+      for(const id in r.prof){
+        const s=SUBSKILLS[id];
+        parts.push('📈 '+(s?s.icon+' ':'')+(s?s.name:id)+' Lv '+r.prof[id]);
+      }
+    return parts.join(' · ');
+  },
   updateActive(dt){
     for(const id in this.activeCD)this.activeCD[id]=Math.max(0,this.activeCD[id]-dt);
     if(this.roarT>0)this.roarT=Math.max(0,this.roarT-dt);
@@ -178,6 +210,7 @@ const RPG={
       }
       FX.ring(P.x,P.y+.05,P.z,0xffb33c,.7,4.5);
       FX.shockwave(P.x,P.y,P.z,0xffd24d,5);
+      if(typeof FX.groundWave==='function')FX.groundWave(P.x,P.y,P.z,{mode:'radial',color:0xffb33c,radius:4.5});
       FX.addShake(.7);Sfx.hit();
       msg='💥 Hantam Bumi!';
     }
@@ -195,6 +228,8 @@ const RPG={
       FX.trail(up,Cam.yaw,false,2);
       FX.trail(up,Cam.yaw+Math.PI,false,3);
       FX.ring(P.x,P.y+.05,P.z,0x7dff9d,.55,4);
+      /* gelombang blok melingkar: terangkat dari tengah menjalar ke samping */
+      if(typeof FX.groundWave==='function')FX.groundWave(P.x,P.y,P.z,{mode:'radial',color:0x7dff9d,radius:3.6});
       FX.addShake(.5);Sfx.hit();
       msg='🌪️ Tebasan Angin Puyuh!';
     }
@@ -270,9 +305,10 @@ const RPG={
   },
   weaponReach(){return this.weapon().reach;},
   weaponSpeed(){return this.weapon().spd;},
-  /* peluang critical: dari pedang, sedikit dinaikkan oleh rarity */
+  /* peluang critical: dari pedang, dinaikkan rarity & proficiency bertarung */
   critChance(){
-    return Math.min(0.6,this.weapon().crit*this.rarityMul(this.weaponId()));
+    const profCrit=(typeof Prof!=='undefined')?Prof.combatCrit():0;
+    return Math.min(0.6,this.weapon().crit*this.rarityMul(this.weaponId())+profCrit);
   },
   /* daftar id efek aktif dari seluruh slot armor + senjata yang dipegang */
   gearEffects(){
@@ -372,6 +408,8 @@ const RPG={
   /* craft `count` item sekaligus (default 1). Hasil MASUK TAS; bila tas penuh
      sisanya dijatuhkan ke tanah (tidak hilang). Berhenti bila bahan habis. */
   craft(r,count){
+    /* penjaga awal: pesan jelas bila resep masih terkunci skill/proficiency */
+    if(!this.canRecipe(r)){UI.toast('🔒 Belum terbuka — butuh '+this.recipeReqText(r));return 0;}
     count=Math.max(1,Math.floor(count)||1);
     let made=0,dropped=0;
     for(let k=0;k<count;k++){
@@ -392,6 +430,10 @@ const RPG={
       UI.toast(`🔨 Membuat ${ITEMS[r.out].e} ${ITEMS[r.out].n} ×${made}`+
         (dropped?` (${dropped} jatuh, tas penuh)`:''));
       Player.addXP(3*made);
+      /* proficiency kriya; resep makanan sekaligus menaikkan memasak */
+      const al=r.skill?10:1;                 // resep lanjutan berharga lebih lama
+      Prof.gain('crafting',12*made,al);
+      if(ITEMS[r.out]&&ITEMS[r.out].food)Prof.gain('cooking',15*made,al);
     }else{
       UI.toast('🔨 Bahan tidak cukup');
     }
@@ -435,11 +477,27 @@ const RPG={
     if(!s)UI.toast('Pilih makanan di hotbar dulu!');
     else UI.toast('Itu bukan makanan!');
   },
+  /* true bila syarat proficiency skill (field `prof`) terpenuhi.
+     sk.prof = {subSkillId: minLevel}. Tanpa syarat = selalu true. */
+  meetsProf(sk){
+    if(!sk.prof||typeof Prof==='undefined')return true;
+    for(const id in sk.prof)if(Prof.level(id)<sk.prof[id])return false;
+    return true;
+  },
+  /* teks ringkas syarat proficiency, untuk alasan kunci di UI skill tree */
+  profReqText(sk){
+    if(!sk.prof)return '';
+    return Object.keys(sk.prof).map(id=>{
+      const s=(typeof SUBSKILLS!=='undefined')?SUBSKILLS[id]:null;
+      return `${s?s.icon+' ':''}${s?s.name:id} Lv ${sk.prof[id]}`;
+    }).join(', ');
+  },
   learn(id){
     const sk=SKILLS.find(s=>s.id===id);if(!sk)return;
     const rank=this.skillVal(id);
     if(rank>=sk.max)return;
     if(sk.req&&this.skillVal(sk.req)<=0){UI.toast('🔒 Butuh skill sebelumnya!');return;}
+    if(!this.meetsProf(sk)){UI.toast(`🔒 Butuh proficiency ${this.profReqText(sk)}`);return;}
     if(this.sp<sk.cost){UI.toast('Skill point kurang!');return;}
     this.sp-=sk.cost;this.skills[id]=rank+1;
     Sfx.craft();UI.toast(`${sk.icon} ${sk.name} → Rank ${rank+1}`);
@@ -454,6 +512,8 @@ const RPG={
         pos:[Player.pos.x,Player.pos.y,Player.pos.z],
         sp:this.sp,skills:this.skills,hotbar:this.hotbar,bag:this.bag,
         equip:this.equip,coin:this.coin,bagTier:this.bagTier,
+        /* proficiency "belajar dengan melakukan" (ala Durango) */
+        prof:Prof.serialize(),
         /* rekan yang sedang ikut; penduduk desa biasa tidak perlu disimpan
            karena akan dibangkitkan lagi oleh generator desa */
         team:(typeof NPCS!=='undefined'&&NPCS.serializeTeam)?NPCS.serializeTeam():[],

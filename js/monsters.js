@@ -312,6 +312,11 @@ const Monsters={
     if(this.isAnimal(m)&&src&&src!==Player&&src.role)return;
     /* siapa sumber serangan terakhir (untuk XP/drop & ternak kabur) */
     m.lastSrc=src;
+    /* akumulasi damage pemain untuk kontribusi XP saat monster mati.
+       src kosong = skill pemain (slam/whirl), bleed/venom senjata, atau
+       thorns — semuanya dihitung sebagai damage pemain. Damage dibatasi
+       HP tersisa supaya overkill tidak menggelembungkan kontribusi. */
+    if(!src||src===Player)m.pDmg=(m.pDmg||0)+Math.min(dmg,Math.max(0,m.hp));
     /* dipukul = otomatis waspada walau pemain di luar kerucut pandang */
     m.hp-=dmg;m.flash=0.18;m.state='chase';
     m.alert=Math.max(m.alert||0,6);m.seeT=CFG.MOB.MEM;
@@ -327,14 +332,25 @@ const Monsters={
   },
   kill(m){
     m.dead=true;m.deathT=0;
-    /* bila dibunuh monster lain (mis. predator membunuh sapi), pemain tidak
-       mendapat XP/kill credit — hanya bisa mengambil drop-nya */
-    const byMob=m.lastSrc&&m.lastSrc.type&&!m.lastSrc.role&&m.lastSrc!==Player;
-    if(!byMob){
+    /* XP & kill credit sebanding dengan kontribusi damage pemain.
+       contrib = porsi HP monster yang dihancurkan pemain (0..1).
+       Monster yang mati murni oleh rekan NPC / monster lain tanpa bantuan
+       pemain tidak memberi XP/proficiency — pemain hanya bisa ambil drop. */
+    const contrib=(m.pDmg>0&&m.maxhp>0)?clamp(m.pDmg/m.maxhp,0,1):0;
+    if(contrib>0){
       /* efek 'greed' (set emas) menambah XP yang diperoleh */
-      const xp=Math.round(m.xp*(RPG.xpMult?RPG.xpMult():1));
+      const xp=Math.max(1,Math.round(m.xp*contrib*(RPG.xpMult?RPG.xpMult():1)));
       Player.addXP(xp);Player.kills++;
-      FX.text(m.pos.clone().add(new THREE.Vector3(0,2.2,0)),`+${xp} XP`,'#8fd4ff');
+      FX.text(m.pos.clone().add(new THREE.Vector3(0,2.2,0)),
+        contrib>=0.999?`+${xp} XP`:`+${xp} XP (${Math.round(contrib*100)}%)`,'#8fd4ff');
+      /* proficiency bertarung ikut porsi kontribusi; monster kuat tetap
+         berharga walau level tinggi. typeof-guard supaya 3D Studio (yang
+         memuat monsters.js tanpa skills.js) tidak error bila memanggil kill(). */
+      if(typeof Prof!=='undefined'){
+        const al=(m.xp>=40)?30:(m.xp>=25)?20:(m.xp>=15)?10:1;
+        const base=6+Math.round((m.xp||10)*0.5);
+        Prof.gain('combat',Math.max(1,Math.round(base*contrib)),al);
+      }
     }
 
     const d=
@@ -359,9 +375,9 @@ const Monsters={
       FX.spawnDrop(m.pos.clone().add(new THREE.Vector3(rand(-0.4,0.4),0.6,rand(-0.4,0.4))),id,n);
     /* koin: peluang drop dari tiap monster (lebih besar utk mob kuat & boss).
        Koin langsung masuk kantong (bukan item dunia) agar tidak nyangkut.
-       Tidak dapat koin bila monster dibunuh monster lain. */
+       Hanya dapat koin bila pemain ikut berkontribusi damage. */
     const coinChance=m.boss?1:0.45;
-    if(!byMob&&Math.random()<coinChance){
+    if(contrib>0&&Math.random()<coinChance){
       const base=m.boss?18:Math.max(1,Math.round(m.xp/14));
       const coin=base+(Math.random()<0.3?1:0);
       RPG.addCoin(coin);
@@ -1065,6 +1081,12 @@ const Monsters={
     if(m.pos.y<=g){m.pos.y=g;if(m.vel.y<0)m.vel.y=0;m.onGround=true;}
     const mub=World.unburyY(m.pos.x,m.pos.z,m.pos.y);
     if(mub>m.pos.y){m.pos.y=mub;if(m.vel.y<0)m.vel.y=0;m.onGround=true;}
+    /* RIDE WAVE: monster yang berdiri di atas blok tanah yang sedang
+       terangkat oleh gelombang ikut naik mengikuti collision bloknya */
+    if(typeof FX!=='undefined'&&FX.waveHeightAt){
+      const wh=FX.waveHeightAt(m.pos.x,m.pos.z);
+      if(wh>0.03&&m.pos.y<g+wh){m.pos.y=g+wh;if(m.vel.y<0)m.vel.y=0;m.onGround=true;}
+    }
     /* naik satu blok: bila terhalang tapi ada pijakan setinggi 1 blok di
        depan, monster melompat kecil agar tidak tersangkut di tepi teras */
     if(m.onGround&&spd>0.6){

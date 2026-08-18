@@ -823,6 +823,37 @@ const NPCS={
     n.turnCd=0.60;
     return back;
   },
+
+  /* ---------- PINTU BANGUNAN ----------
+     Menghitung koordinat dunia pintu sebuah bangunan desa (b) beserta titik
+     tepat di LUAR pintu (pendekatan) dan titik di DALAM pintu. Dipakai NPC
+     supaya tahu jalan masuk rumah — tidak menabrak tembok saat mengikuti
+     pemain yang masuk ke dalam bangunan. b.ds = sisi pintu, b.dc = posisi
+     tengah pintu di sisi itu (lihat buildVillagePart di worldgen.js). */
+  doorOf(b){
+    const span=b.ds<2?b.w:b.d;
+    const dc2=b.dc+1<=span-2?b.dc+1:(b.dc-1>=1?b.dc-1:b.dc);
+    const mid=(b.dc+dc2)/2;
+    let dx,dz,ox,oz,ix,iz;
+    if(b.ds===0){        // pintu di sisi z maksimum (depan)
+      dx=b.x+mid; dz=b.z+b.d-0.5;
+      ox=dx; oz=b.z+b.d+0.7;
+      ix=dx; iz=b.z+b.d-2.5;
+    }else if(b.ds===1){  // pintu di sisi z minimum (belakang)
+      dx=b.x+mid; dz=b.z+0.5;
+      ox=dx; oz=b.z-0.7;
+      ix=dx; iz=b.z+2.5;
+    }else if(b.ds===2){  // pintu di sisi x maksimum (kanan)
+      dx=b.x+b.w-0.5; dz=b.z+mid;
+      ox=b.x+b.w+0.7; oz=dz;
+      ix=b.x+b.w-2.5; iz=dz;
+    }else{               // pintu di sisi x minimum (kiri)
+      dx=b.x+0.5; dz=b.z+mid;
+      ox=b.x-0.7; oz=dz;
+      ix=b.x+2.5; iz=dz;
+    }
+    return {x:dx,z:dz,ox,oz,ix,iz};
+  },
   /* =========================================================================
      TABRAKAN ANTAR-NPC
       -------------------------------------------------------------------------
@@ -1038,18 +1069,34 @@ const NPCS={
   /* rekan berjalan di belakang pemain, berhenti bila sudah cukup dekat.
      Hysteresis dipakai agar NPC tidak maju-mundur kecil di batas jarak. */
   aiFollow(n,dt){
-    const to=new THREE.Vector3().subVectors(Player.pos,n.pos).setY(0);
-    const d=to.length();
-    if(n._followMove===undefined)n._followMove=d>CFG.NPC.FOLLOW_R;
-    if(d>CFG.NPC.FOLLOW_R+0.5)n._followMove=true;
-    else if(d<CFG.NPC.FOLLOW_R-0.35)n._followMove=false;
+    const pdx=Player.pos.x-n.pos.x,pdz=Player.pos.z-n.pos.z;
+    const pd=Math.hypot(pdx,pdz);
+    if(n._followMove===undefined)n._followMove=pd>CFG.NPC.FOLLOW_R;
+    if(pd>CFG.NPC.FOLLOW_R+0.5)n._followMove=true;
+    else if(pd<CFG.NPC.FOLLOW_R-0.35)n._followMove=false;
 
     if(n._followMove){
-      /* arah lurus ke pemain, lalu dibelokkan bila terhalang pohon/tembok */
+      /* tujuan default = pemain. TAPI bila pemain di dalam bangunan sementara
+         NPC masih di luar, arahkan NPC ke pintu dulu (titik luar -> titik dalam)
+         supaya ia masuk lewat pintu, bukan menabrak tembok. */
+      let gx=Player.pos.x,gz=Player.pos.z;
+      if(typeof WGEN!=='undefined'&&WGEN.buildingAt){
+        const pb=WGEN.buildingAt(Player.pos.x,Player.pos.z,0);
+        const nb=WGEN.buildingAt(n.pos.x,n.pos.z,0);
+        if(pb&&nb!==pb){
+          const dr=this.doorOf(pb);
+          const dOut=Math.hypot(dr.ox-n.pos.x,dr.oz-n.pos.z);
+          if(dOut>1.15){gx=dr.ox;gz=dr.oz;}       // masih jauh -> menuju mulut pintu
+          else{gx=dr.ix;gz=dr.iz;}                 // sudah dekat -> lewat pintu masuk
+        }
+      }
+      const to=new THREE.Vector3(gx-n.pos.x,0,gz-n.pos.z);
+      const gd=to.length();
+      /* arah lurus ke tujuan, lalu dibelokkan bila terhalang pohon/tembok */
       const ang=this.steer(n,Math.atan2(to.x,to.z));
       n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*6);
       /* makin jauh makin cepat supaya tidak pernah tertinggal saat sprint */
-      const sp=n.speed*(n.inWater?0.5:1)*clamp(d/6,0.5,1.6);
+      const sp=n.speed*(n.inWater?0.5:1)*clamp(gd/6,0.5,1.6);
       n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
       n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
     }else{
@@ -1413,8 +1460,50 @@ const NPCS={
     if(n.pos.y<=g){n.pos.y=g;if(n.vel.y<0)n.vel.y=0;n.onGround=true;}
     const nub=World.unburyY(n.pos.x,n.pos.z,n.pos.y);
     if(nub>n.pos.y){n.pos.y=nub;if(n.vel.y<0)n.vel.y=0;n.onGround=true;}
+    /* RIDE WAVE: NPC yang berdiri di atas blok tanah terangkat ikut naik */
+    if(typeof FX!=='undefined'&&FX.waveHeightAt){
+      const wh=FX.waveHeightAt(n.pos.x,n.pos.z);
+      if(wh>0.03&&n.pos.y<g+wh){n.pos.y=g+wh;if(n.vel.y<0)n.vel.y=0;n.onGround=true;}
+    }
     n.vel.x*=Math.exp(-2*dt);n.vel.z*=Math.exp(-2*dt);
     this.separate(n,dt);                          // badan tidak saling menembus
+    this.unroof(n);                               // anti-nyangkut di atap/tembok rumah
+  },
+
+  /* =========================================================================
+     ANTI-STUCK ATAP RUMAH
+      -------------------------------------------------------------------------
+     unburyY mendorong NPC KE ATAS sepanjang kolom dinding bila kakinya
+     menembus blok dinding rumah, sehingga NPC bisa berakhir "berenang" di atas
+     genteng/tembok dan tidak bisa turun. Fungsi ini mendeteksi NPC yang berdiri
+     di dalam footprint bangunan desa tetapi kakinya jauh di atas lantai desa
+     (artinya ia di atas tembok/atap), lalu langsung memindahkannya ke titik
+     bebas terdekat di luar bangunan.
+     ========================================================================= */
+  unroof(n){
+    if(typeof WGEN==='undefined'||!WGEN.buildingAt)return;
+    const b=WGEN.buildingAt(n.pos.x,n.pos.z,0);
+    if(!b)return;
+    /* lantai desa = tanah tepat di samping bangunan (desa diratakan) */
+    const gy=World.groundAt(b.x-1.5,b.z-1.5,CFG.WORLD_H);
+    if(n.pos.y<=gy+1.2)return;                  // masih di lantai/ambang, aman
+    /* cari arah keluar dengan penetrasi tertipis, lalu melangkah keluar
+       footprint sampai benar-benar tidak di dalam bangunan mana pun */
+    const cx=n.pos.x,cz=n.pos.z;
+    const dl=cx-b.x, dr=(b.x+b.w)-cx, df=cz-b.z, db=(b.z+b.d)-cz;
+    const m=Math.min(dl,dr,df,db);
+    let dirx=0,dirz=0;
+    if(m===dl)dirx=-1; else if(m===dr)dirx=1; else if(m===df)dirz=-1; else dirz=1;
+    let tx=cx,tz=cz;
+    for(let k=0;k<10;k++){
+      tx+=dirx*1.5; tz+=dirz*1.5;
+      if(!WGEN.buildingAt(tx,tz,0))break;
+    }
+    const ty=World.groundAt(tx,tz,CFG.WORLD_H);
+    n.pos.set(tx,ty,tz);
+    n.vel.set(0,0,0);
+    n.onGround=true;n.stuckT=0;n.turnSide=0;n.detourT=0;
+    FX.debris(new THREE.Vector3(tx,ty+1,tz),0xd6c58f,5,1.4);
   },
 
   /* Animasi NPC: tiap arketipe kini punya animate() sendiri di

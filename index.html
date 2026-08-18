@@ -63,10 +63,14 @@
 <div class="panel" id="panel-skills">
   <h2>🌟 Skill Tree <button class="x" data-close="skills">✕</button></h2>
   <div id="sp-info">Skill Points: <b id="sp-num">0</b></div>
-  <div id="branches">
-    <div class="branch"><h3>⚔️ Combat</h3><div class="nodes" id="br-combat"></div></div>
-    <div class="branch"><h3>🏃 Movement</h3><div class="nodes" id="br-move"></div></div>
-    <div class="branch"><h3>🛠️ Crafting</h3><div class="nodes" id="br-craft"></div></div>
+  <!-- Pohon skill digambar dinamis oleh UI.renderSkills(): node per skill
+       yang saling terhubung garis akar sesuai prasyarat (req). -->
+  <div id="branches"></div>
+  <!-- PROFICIENCY: naik otomatis dengan melakukan aksi (ala Durango) -->
+  <div id="prof-wrap">
+    <h3 class="prof-title">📈 Proficiency</h3>
+    <div class="sub">Naik otomatis saat kamu melakukan aksinya. Makin tinggi, makin besar peluang hasil tambahan.</div>
+    <div id="prof-list"></div>
   </div>
 </div>
 
@@ -167,6 +171,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/config.js"></script>
+<!-- PROFICIENCY (belajar dengan melakukan): butuh clamp & B dari config.js,
+     dan harus dimuat sebelum world/monsters/rpg memanggil Prof.* -->
+<script src="js/skills.js"></script>
 <script src="js/noise.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/worldgen.js"></script>

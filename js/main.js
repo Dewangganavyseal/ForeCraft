@@ -151,6 +151,9 @@ const Game={
       RPG.addItem(RPG.START_WEAPON,1);
     }
 
+    /* proficiency: muat dari save, atau reset untuk permainan baru */
+    if(typeof Prof!=='undefined')Prof.load(save?save.prof:null);
+
     Player.refreshArmor();
 
     /* pre-generate data sekitar spawn */

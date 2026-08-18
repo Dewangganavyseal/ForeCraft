@@ -1125,32 +1125,149 @@ const UI={
     this.renderEquip();
   },
 
+  /* label & ikon tiap cabang untuk header pohon */
+  BRANCH_META:{
+    combat:{icon:'⚔️',name:'Combat'},
+    move:{icon:'🏃',name:'Movement'},
+    craft:{icon:'🛠️',name:'Crafting'},
+    gather:{icon:'🧺',name:'Gather'},
+  },
+  /* SKILL TREE berbentuk pohon-akar: tiap branch digambar sebagai node yang
+     saling terhubung garis sesuai prasyarat (req). Node disusun per "kedalaman"
+     (root di atas), lalu garis lengkung digambar lewat overlay SVG setelah
+     layout terukur (requestAnimationFrame). */
   renderSkills(){
     document.getElementById('sp-num').textContent=RPG.sp;
-    for(const br of['combat','move','craft']){
-      const el=document.getElementById('br-'+br);el.innerHTML='';
-      for(const sk of SKILLS.filter(s=>s.br===br)){
-        const rank=RPG.skillVal(sk.id);
-        const locked=sk.req&&RPG.skillVal(sk.req)<=0;
-        const maxed=rank>=sk.max;
-        const afford=RPG.sp>=sk.cost;
-        const d=document.createElement('div');
-        d.className='node'+(maxed?' max':'')+(locked?' locked':'');
-        /* label Aktif/Pasif supaya jelas skill mana yang punya tombol jurus */
-        const kind=sk.active
-          ? '<span class="s-type act">⚡ Aktif</span>'
-          : '<span class="s-type pas">🔷 Pasif</span>';
-        /* tombol "Pelajari" terpisah: mencegah SP terpakai karena salah sentuh */
-        const btnTxt=maxed?'✔ Maks':locked?'🔒 Terkunci':`Pelajari · ${sk.cost} SP`;
-        d.innerHTML=`<div class="nm">${sk.icon} ${sk.name} ${kind}</div>
-          <div class="rk">${rank}/${sk.max}</div>
-          <div class="ds">${sk.desc}<br>Biaya: ${sk.cost} SP${sk.req?' · Butuh: '+SKILLS.find(s=>s.id===sk.req).name:''}</div>
-          <button class="learn" ${maxed||locked||!afford?'disabled':''}>${btnTxt}</button>`;
-        const btn=d.querySelector('.learn');
-        if(!maxed&&!locked&&afford)
-          btn.addEventListener('click',e=>{e.stopPropagation();RPG.learn(sk.id);});
-        el.appendChild(d);
+    const wrap=document.getElementById('branches');
+    if(!wrap)return;
+    wrap.innerHTML='';
+    for(const br of['combat','move','craft','gather']){
+      const sks=SKILLS.filter(s=>s.br===br);
+      if(!sks.length)continue;
+      const meta=this.BRANCH_META[br]||{icon:'🌿',name:br};
+      const sec=document.createElement('div');
+      sec.className='branch tree';
+      sec.innerHTML=`<h3>${meta.icon} ${meta.name}</h3>`;
+      const body=document.createElement('div');
+      body.className='tree-body';
+
+      /* --- hitung kedalaman tiap node dari root (BFS lewat req) --- */
+      const ids=new Set(sks.map(s=>s.id));
+      const depth={};
+      for(const s of sks)if(!s.req||!ids.has(s.req))depth[s.id]=0; // root
+      let changed=true;
+      while(changed){
+        changed=false;
+        for(const s of sks){
+          if(depth[s.id]!==undefined)continue;
+          if(s.req&&depth[s.req]!==undefined){depth[s.id]=depth[s.req]+1;changed=true;}
+        }
       }
+      /* --- kelompokkan per baris kedalaman, lalu gambar node --- */
+      const maxD=sks.reduce((a,s)=>Math.max(a,depth[s.id]||0),0);
+      const nodeEl={};
+      for(let d=0;d<=maxD;d++){
+        const row=sks.filter(s=>(depth[s.id]||0)===d);
+        if(!row.length)continue;
+        const r=document.createElement('div');
+        r.className='tree-row';
+        for(const sk of row){
+          const card=this.makeTreeNode(sk);
+          nodeEl[sk.id]=card;
+          r.appendChild(card);
+        }
+        body.appendChild(r);
+      }
+      /* overlay SVG untuk garis penghubung (di belakang node) */
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('class','tree-svg');
+      body.appendChild(svg);
+      sec.appendChild(body);
+      wrap.appendChild(sec);
+      /* gambar garis setelah panel tampil & layout terukur */
+      requestAnimationFrame(()=>this.drawTreeLinks(body,svg,sks,nodeEl));
+    }
+    this.renderProficiency();
+  },
+  /* buat satu kartu node pohon (kompak); klik untuk mempelajari bila bisa */
+  makeTreeNode(sk){
+    const rank=RPG.skillVal(sk.id);
+    const needSkill=sk.req&&RPG.skillVal(sk.req)<=0;
+    const needProf=!RPG.meetsProf(sk);
+    const locked=needSkill||needProf;
+    const maxed=rank>=sk.max;
+    const afford=RPG.sp>=sk.cost;
+    const learnable=!locked&&!maxed&&afford;
+    const d=document.createElement('div');
+    let cls='tnode';
+    if(maxed)cls+=' max';
+    if(locked)cls+=' locked';
+    if(needProf&&!needSkill&&!maxed)cls+=' proflock';
+    if(learnable)cls+=' can';
+    if(sk.active)cls+=' active';
+    d.className=cls;
+    d.dataset.id=sk.id;
+    /* tooltip lengkap: efek + syarat + biaya */
+    let tip=`${sk.name} · ${sk.active?'AKTIF':'Pasif'}\n${sk.desc}\n`;
+    if(sk.req){const p=SKILLS.find(s=>s.id===sk.req);tip+='Butuh: '+(p?p.name:sk.req)+'\n';}
+    if(sk.prof)tip+='📈 '+RPG.profReqText(sk)+'\n';
+    tip+=`Biaya: ${sk.cost} SP`;
+    d.title=tip;
+    const badge=maxed?'✔ Maks':locked?(needProf?'📈 '+RPG.profReqText(sk):'🔒')
+      :(sk.active?'⚡ ':'')+sk.cost+' SP';
+    d.innerHTML=`<div class="t-ico">${sk.icon}</div>
+      <div class="t-nm">${sk.name}</div>
+      <div class="t-rk">Rank ${rank}/${sk.max}</div>
+      <div class="t-badge">${badge}</div>`;
+    if(learnable)
+      d.addEventListener('click',e=>{e.stopPropagation();RPG.learn(sk.id);});
+    return d;
+  },
+  /* gambar garis lengkung penghubung antar node (parent req -> child) */
+  drawTreeLinks(body,svg,sks,nodeEl){
+    const crect=body.getBoundingClientRect();
+    if(!crect.width)return;                 // panel belum tampil
+    const W=body.scrollWidth,H=body.scrollHeight;
+    svg.setAttribute('width',W);svg.setAttribute('height',H);
+    svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+    svg.innerHTML='';
+    for(const sk of sks){
+      if(!sk.req||!nodeEl[sk.req]||!nodeEl[sk.id])continue;
+      const p=nodeEl[sk.req].getBoundingClientRect();
+      const c=nodeEl[sk.id].getBoundingClientRect();
+      const x1=p.left+p.width/2-crect.left, y1=p.bottom-crect.top-3;
+      const x2=c.left+c.width/2-crect.left, y2=c.top-crect.top+3;
+      const learned=RPG.skillVal(sk.id)>0;
+      const parentDone=RPG.skillVal(sk.req)>0;
+      const profOk=RPG.meetsProf(sk);
+      let cls='lk';
+      if(learned)cls+=' on';
+      else if(parentDone&&profOk)cls+=' avail';
+      else if(!profOk)cls+=' prof';
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      const my=(y1+y2)/2;
+      path.setAttribute('d',`M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
+      path.setAttribute('class',cls);
+      svg.appendChild(path);
+    }
+  },
+  /* PROFICIENCY (ala Durango): bar level per sub-skill, naik otomatis dari
+     melakukan aksi. Digambar ulang saat panel skill dibuka & saat naik level. */
+  renderProficiency(){
+    const el=document.getElementById('prof-list');
+    if(!el||typeof Prof==='undefined'||typeof SUBSKILLS==='undefined')return;
+    el.innerHTML='';
+    for(const id in SUBSKILLS){
+      const s=SUBSKILLS[id];
+      const lv=Prof.level(id),xp=Prof.xp[id]||0,need=Prof.need(id);
+      const maxed=lv>=s.max;
+      const pct=maxed?100:Math.min(100,Math.round(100*xp/need));
+      const d=document.createElement('div');
+      d.className='prof-row';
+      d.innerHTML=`<div class="prof-nm"><span>${s.icon} ${s.name}</span>`+
+        `<b>${maxed?'Lv MAX':'Lv '+lv}</b></div>`+
+        `<div class="prof-track"><div style="width:${pct}%"></div></div>`;
+      el.appendChild(d);
     }
   },
   /* kategori resep: kelompokkan berdasarkan jenis item hasil */
@@ -1222,9 +1339,9 @@ const UI={
         /* input jumlah + tombol Buat. Jumlah maksimum = perkiraan dari bahan
            yang paling terbatas (dihitung saat klik agar selalu akurat). */
         d.innerHTML=`<div class="out">${unlocked?ITEMS[r.out].e:'🔒'}</div>
-          <div class="info"><div class="nm">${r.name}${unlocked?'':' — butuh skill '+SKILLS.find(s=>s.id===r.skill).name}</div>
+          <div class="info"><div class="nm">${r.name}${unlocked?'':' — butuh '+RPG.recipeReqText(r)}</div>
           ${statStr}
-          <div class="need">${unlocked?needStr:'Buka di Skill Tree 🛠️'}</div></div>
+          <div class="need">${unlocked?needStr:'🔒 '+RPG.recipeReqText(r)}</div></div>
           ${unlocked?'<input type="number" class="craft-qty" min="1" max="64" value="1">':''}
           <button ${can?'':'disabled'}>${unlocked?'Buat':'🔒'}</button>`;
         if(unlocked)d.querySelector('.out').title=this.itemTip(r.out);

@@ -360,9 +360,9 @@ const RECIPES=[
   {out:'cmeat',need:{meat:1,wood:1},name:'Daging Panggang'},
   {out:'cfish',need:{fish:1,wood:1},name:'Ikan Bakar'},
   {out:'bread',need:{fiber:3},name:'Roti'},
-  {out:'salad',need:{berry:2,mush:1},skill:'cook',name:'Salad Buah'},
+  {out:'salad',need:{berry:2,mush:1},skill:'cook',prof:{cooking:3},name:'Salad Buah'},
   {out:'bandage',need:{fiber:2,mush:1},skill:'alchem',name:'Perban'},
-  {out:'pie',need:{berry:3,fiber:2},skill:'gourmet',name:'Pai Beri'},
+  {out:'pie',need:{berry:3,fiber:2},skill:'gourmet',prof:{cooking:6},name:'Pai Beri'},
   {out:'leather',need:{gel:2,fiber:2},name:'Kulit'},
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
   {out:'hoe',need:{wood:3,stone:2},name:'Cangkul'},
@@ -374,38 +374,41 @@ const RECIPES=[
   {out:'cap_leather',need:{leather:2,fiber:2},name:'Topi Kulit'},
   {out:'vest_leather',need:{leather:4,fiber:3,resin:1},name:'Rompi Kulit'},
   {out:'boots_leather',need:{leather:2,fiber:1},name:'Sepatu Kulit'},
-  {out:'helm_iron',need:{stone:5,wood:1,resin:1},skill:'smith',name:'Helm Besi'},
-  {out:'plate_iron',need:{stone:8,wood:2,leather:2},skill:'smith',name:'Zirah Besi'},
-  {out:'greaves_iron',need:{stone:5,leather:1},skill:'smith',name:'Pelindung Kaki Besi'},
+  /* tempa besi: butuh pengalaman menambang (proficiency mining) — "dua kunci"
+     ala Durango: skill tree membuka resepnya, proficiency membuka tier-nya. */
+  {out:'helm_iron',need:{stone:5,wood:1,resin:1},skill:'smith',prof:{mining:5},name:'Helm Besi'},
+  {out:'plate_iron',need:{stone:8,wood:2,leather:2},skill:'smith',prof:{mining:5},name:'Zirah Besi'},
+  {out:'greaves_iron',need:{stone:5,leather:1},skill:'smith',prof:{mining:5},name:'Pelindung Kaki Besi'},
   /* ---------- peleburan bijih hasil menambang ---------- */
   {out:'iron_ingot',need:{iron_ore:2,wood:1},name:'Batang Besi'},
   {out:'gold_ingot',need:{gold_ore:2,wood:2},name:'Batang Emas'},
   /* ---------- tempa set emas (butuh Pandai Besi) ---------- */
-  {out:'helm_gold',need:{gold_ingot:2,leather:1},skill:'smith',name:'Helm Emas'},
-  {out:'plate_gold',need:{gold_ingot:4,iron_ingot:2},skill:'smith',name:'Zirah Emas'},
-  {out:'greaves_gold',need:{gold_ingot:2,iron_ingot:1},skill:'smith',name:'Pelindung Kaki Emas'},
+  {out:'helm_gold',need:{gold_ingot:2,leather:1},skill:'smith',prof:{mining:12},name:'Helm Emas'},
+  {out:'plate_gold',need:{gold_ingot:4,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Zirah Emas'},
+  {out:'greaves_gold',need:{gold_ingot:2,iron_ingot:1},skill:'smith',prof:{mining:12},name:'Pelindung Kaki Emas'},
   /* ---------- tempa set kristal: butuh inti boss ---------- */
-  {out:'helm_crystal',need:{crystal:3,iron_ingot:2,boss_core:1},skill:'smith',name:'Helm Kristal'},
-  {out:'plate_crystal',need:{crystal:5,gold_ingot:2,boss_core:1},skill:'smith',name:'Zirah Kristal'},
-  {out:'greaves_crystal',need:{crystal:3,iron_ingot:1,boss_core:1},skill:'smith',name:'Pelindung Kaki Kristal'},
+  {out:'helm_crystal',need:{crystal:3,iron_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Helm Kristal'},
+  {out:'plate_crystal',need:{crystal:5,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Zirah Kristal'},
+  {out:'greaves_crystal',need:{crystal:3,iron_ingot:1,boss_core:1},skill:'smith',prof:{mining:18},name:'Pelindung Kaki Kristal'},
 
   /* ================= TEMPA PEDANG =================
      Rantai progresi: kayu (tanpa skill) → besi → badai → racun → beku → titan.
      Pedang tier atas memakai pedang tier bawah sebagai bahan supaya
-     pemain merasakan urutan upgrade yang jelas. */
+     pemain merasakan urutan upgrade yang jelas. Tier logam juga menuntut
+     proficiency menambang yang makin tinggi. */
   {out:'sword_wood',need:{wood:4,fiber:2},name:'Pedang Kayu'},
-  {out:'sword_iron',need:{sword_wood:1,iron_ingot:3,leather:1},skill:'smith',name:'Bilah Besi Bergerigi'},
-  {out:'sword_storm',need:{sword_iron:1,gold_ingot:2,crystal:2},skill:'smith',name:'Pedang Badai'},
-  {out:'sword_venom',need:{sword_storm:1,venom:4,iron_ingot:2},skill:'smith',name:'Taring Racun'},
-  {out:'sword_frost',need:{sword_storm:1,crystal:6,boss_core:1},skill:'smith',name:'Pedang Fajar Beku'},
-  {out:'sword_titan',need:{sword_venom:1,gold_ingot:4,boss_core:2},skill:'smith',name:'Penghancur Titan'},
+  {out:'sword_iron',need:{sword_wood:1,iron_ingot:3,leather:1},skill:'smith',prof:{mining:5},name:'Bilah Besi Bergerigi'},
+  {out:'sword_storm',need:{sword_iron:1,gold_ingot:2,crystal:2},skill:'smith',prof:{mining:10},name:'Pedang Badai'},
+  {out:'sword_venom',need:{sword_storm:1,venom:4,iron_ingot:2},skill:'smith',prof:{mining:15},name:'Taring Racun'},
+  {out:'sword_frost',need:{sword_storm:1,crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Pedang Fajar Beku'},
+  {out:'sword_titan',need:{sword_venom:1,gold_ingot:4,boss_core:2},skill:'smith',prof:{mining:22},name:'Penghancur Titan'},
 
   /* ================= TEMPA EQUIPMENT EFEK ================= */
   {out:'cloak_swift',need:{pelt:3,fiber:4,resin:1},name:'Mantel Angin'},
-  {out:'helm_guard',need:{iron_ingot:3,leather:2},skill:'smith',name:'Helm Penjaga'},
-  {out:'boots_greed',need:{gold_ingot:3,pelt:2},skill:'smith',name:'Sepatu Pemburu Harta'},
-  {out:'plate_regen',need:{crystal:4,gold_ingot:2,boss_core:1},skill:'smith',name:'Zirah Nadi Kristal'},
-  {out:'helm_thorns',need:{crystal:3,venom:5,boss_core:2},skill:'smith',name:'Mahkota Duri Titan'},
+  {out:'helm_guard',need:{iron_ingot:3,leather:2},skill:'smith',prof:{mining:12},name:'Helm Penjaga'},
+  {out:'boots_greed',need:{gold_ingot:3,pelt:2},skill:'smith',prof:{mining:12},name:'Sepatu Pemburu Harta'},
+  {out:'plate_regen',need:{crystal:4,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Zirah Nadi Kristal'},
+  {out:'helm_thorns',need:{crystal:3,venom:5,boss_core:2},skill:'smith',prof:{mining:18},name:'Mahkota Duri Titan'},
 ];
 
 
@@ -420,21 +423,21 @@ const SKILLS=[
   {id:'dmg',br:'combat',icon:'⚔️',name:'Bilah Tajam',desc:'+20% damage / rank',max:3,cost:1},
   {id:'combo',br:'combat',icon:'🌀',name:'Aliran Combo',desc:'Serangan 12% lebih cepat / rank',max:2,cost:1,req:'dmg'},
   {id:'slam',br:'combat',icon:'💥',name:'Hantaman Kuat',desc:'Hit ke-5 +40% damage / rank · membuka Hantam Bumi',max:2,cost:1,req:'dmg',active:true,cd:10},
-  {id:'vamp',br:'combat',icon:'🩸',name:'Bilah Vampir',desc:'Pulihkan HP 8% dari damage',max:1,cost:2,req:'combo'},
+  {id:'vamp',br:'combat',icon:'🩸',name:'Bilah Vampir',desc:'Pulihkan HP 8% dari damage',max:1,cost:2,req:'combo',prof:{combat:15}},
   /* aktif baru: tebasan berputar 360° mengenai semua musuh sekeliling */
   {id:'whirl',br:'combat',icon:'🌪️',name:'Tebasan Angin Puyuh',
     desc:'Berputar menebas semua musuh di sekeliling (radius 3.6) · 30 stamina',
-    max:2,cost:2,req:'combo',active:true,cd:12},
+    max:2,cost:2,req:'combo',prof:{combat:8},active:true,cd:12},
   /* aktif baru: teriakan perang menakuti monster & menaikkan damage sesaat */
   {id:'roar',br:'combat',icon:'🦁',name:'Teriakan Perang',
     desc:'Monster sekitar mundur ketakutan · +35% damage 8 detik',
-    max:1,cost:2,req:'dmg',active:true,cd:26},
+    max:1,cost:2,req:'dmg',prof:{combat:12},active:true,cd:26},
   /* ---------- MOVEMENT ---------- */
   {id:'run',br:'move',icon:'🏃',name:'Pelari',desc:'+6% kecepatan / rank',max:3,cost:1},
   {id:'stam',br:'move',icon:'⚡',name:'Daya Tahan',desc:'Konsumsi stamina -15% / rank',max:3,cost:1},
   /* skill aktif 'roll' (Guling Cepat) DIHAPUS — dodge kini memakai animasi dash
      bawaan tanpa perlu skill. */
-  {id:'swim',br:'move',icon:'🏊',name:'Perenang',desc:'Berenang jauh lebih cepat',max:1,cost:2,req:'stam'},
+  {id:'swim',br:'move',icon:'🏊',name:'Perenang',desc:'Berenang jauh lebih cepat',max:1,cost:2,req:'stam',prof:{agility:8}},
   /* skill aktif 'leap' (Lompatan Rusa) DIHAPUS — digantikan penuh oleh skill
      pasif Lompat Ganda di bawah: cukup dipelajari dari skill tree, lalu tekan
      lompat dua kali kapan saja tanpa cooldown. */
@@ -442,18 +445,36 @@ const SKILLS=[
      di udara sehingga bisa mencapai ketinggian ~3 blok. Tanpa cooldown. */
   {id:'djump',br:'move',icon:'🪽',name:'Lompat Ganda',
     desc:'Tekan lompat sekali lagi di udara untuk melompat kedua · capai ~3 blok · tanpa cooldown',
-    max:1,cost:2,req:'run'},
+    max:1,cost:2,req:'run',prof:{agility:4}},
   /* ---------- CRAFTING / SURVIVAL ---------- */
   {id:'harv',br:'craft',icon:'🌿',name:'Pemanen',desc:'+30% hasil panen / rank',max:3,cost:1},
   {id:'axe',br:'craft',icon:'🪓',name:'Penebang',desc:'Tebang pohon +35% cepat & +1 kayu / rank',max:3,cost:1},
-  {id:'cook',br:'craft',icon:'🍳',name:'Koki',desc:'Buka Salad · makanan +25% hunger',max:2,cost:1,req:'harv'},
-  {id:'smith',br:'craft',icon:'🔧',name:'Pandai Besi',desc:'Buka set armor besi',max:1,cost:2,req:'axe'},
-  {id:'gourmet',br:'craft',icon:'👨‍🍳',name:'Juru Rasa',desc:'Buka Pai Beri (buff lari)',max:1,cost:2,req:'cook'},
-  {id:'alchem',br:'craft',icon:'⚗️',name:'Tabib',desc:'Buka Perban penyembuh',max:1,cost:1,req:'harv'},
+  {id:'cook',br:'craft',icon:'🍳',name:'Koki',desc:'Buka Salad · makanan +25% hunger',max:2,cost:1,req:'harv',prof:{cooking:3}},
+  {id:'smith',br:'craft',icon:'🔧',name:'Pandai Besi',desc:'Buka set armor besi',max:1,cost:2,req:'axe',prof:{mining:5}},
+  {id:'gourmet',br:'craft',icon:'👨‍🍳',name:'Juru Rasa',desc:'Buka Pai Beri (buff lari)',max:1,cost:2,req:'cook',prof:{cooking:8}},
+  {id:'alchem',br:'craft',icon:'⚗️',name:'Tabib',desc:'Buka Perban penyembuh',max:1,cost:1,req:'harv',prof:{harvesting:5}},
   /* aktif baru: penyembuhan instan dari ramuan herbal */
   {id:'herb',br:'craft',icon:'🌱',name:'Ramuan Herbal',
     desc:'Pulihkan 35 HP seketika tanpa memakai item',
-    max:2,cost:2,req:'alchem',active:true,cd:30},
+    max:2,cost:2,req:'alchem',prof:{harvesting:10},active:true,cd:30},
+  /* ---------- GATHER (terhubung PROFICIENCY) ----------
+     Cabang ini "dikunci" oleh level proficiency (field `prof`): untuk
+     membukanya pemain harus benar-benar sering melakukan aksi gathering
+     (menebang/menambang/memanen/bertani) — inti rasa ala Durango. Efeknya
+     menambah peluang hasil ekstra, dihitung RPG.gatherBonus(dropId). */
+  {id:'groot',br:'gather',icon:'🧺',name:'Naluri Pengumpul',
+    desc:'Pembuka jalur pengumpul · +5% hasil semua gathering',max:1,cost:1},
+  {id:'logm',br:'gather',icon:'🪓',name:'Penebang Terampil',
+    desc:'+10% peluang kayu ekstra / rank',max:3,cost:1,req:'groot',prof:{logging:5}},
+  {id:'minm',br:'gather',icon:'⛏️',name:'Penambang Terampil',
+    desc:'+10% peluang batu & bijih ekstra / rank',max:3,cost:1,req:'groot',prof:{mining:5}},
+  {id:'wildm',br:'gather',icon:'🌿',name:'Pemanen Terampil',
+    desc:'+10% peluang serat, berry & jamur ekstra / rank',max:3,cost:1,req:'groot',prof:{harvesting:5}},
+  {id:'greenthumb',br:'gather',icon:'🌾',name:'Tangan Hijau',
+    desc:'+12% peluang hasil ladang ekstra / rank',max:2,cost:1,req:'groot',prof:{farming:5}},
+  {id:'mgather',br:'gather',icon:'🌳',name:'Penguasa Alam',
+    desc:'+25% hasil semua gathering',max:1,cost:3,req:'groot',
+    prof:{logging:15,mining:15,harvesting:15}},
 ];
 /* label kategori skill untuk ditampilkan di sudut kiri atas kartu skill */
 const SKILL_KIND={
