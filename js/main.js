@@ -28,6 +28,7 @@ const Game={
     Furni.init(this.scene);
     Dungeon.init();
     SaveGame.init();
+    Music.initUI();
     Player.buildModel();
     Cam.init();
     Input.init();
@@ -185,6 +186,8 @@ const Game={
       window.addEventListener('beforeunload',()=>RPG.save());
     }
     Sfx.init();
+    /* musik latar: mulai pelan-pelan sesudah gestur pengguna (klik mulai) */
+    Music.start();
   },
 
   loop(){

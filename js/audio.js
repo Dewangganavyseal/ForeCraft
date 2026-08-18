@@ -183,3 +183,102 @@ const Sfx={
   /* serangan tertahan armor */
   armorHit(){this.noiseBurst(0.08,0.2,1800);this.tone(260,0.1,'square',0.1,-90);},
 };
+
+/* =====================================================================
+   MUSIK LATAR (BACKSOUND)
+   ---------------------------------------------------------------------
+   Memutar MP3 dari folder Audio/Music secara loop dengan volume PELAN agar
+   tidak mengganggu permainan. Volume & keadaan on/off disimpan di
+   localStorage dan bisa diubah lewat panel pengaturan (tombol 🎵 di HUD).
+   Mulai diputar saat game dimulai (sesudah gestur pengguna, sehingga
+   autoplay diizinkan browser).
+   ===================================================================== */
+const Music={
+  el:null,vol:0.18,on:true,started:false,
+  KEY:'forecraft_music',
+  TRACK:"Audio/Music/Traveler's Respite.mp3",
+  load(){
+    try{
+      const d=JSON.parse(localStorage.getItem(this.KEY)||'null');
+      if(d){
+        if(typeof d.vol==='number')this.vol=clamp(d.vol,0,1);
+        this.on=d.on!==false;
+      }
+    }catch(e){}
+  },
+  save(){try{localStorage.setItem(this.KEY,JSON.stringify({vol:this.vol,on:this.on}));}catch(e){}},
+  ensure(){
+    if(this.el)return;
+    this.el=new Audio(this.TRACK);
+    this.el.loop=true;
+    this.el.volume=this.on?this.vol:0;
+  },
+  /* dipanggil saat game mulai (gestur pengguna -> boleh autoplay) */
+  start(){
+    this.load();this.ensure();this.started=true;
+    if(this.on){this.el.volume=this.vol;this.el.play().catch(()=>{});}
+    this.refreshUI();
+  },
+  setVol(v){
+    this.vol=clamp(v,0,1);
+    if(this.el)this.el.volume=this.on?this.vol:0;
+    this.save();
+  },
+  setOn(b){
+    this.on=!!b;
+    if(!this.el)this.ensure();
+    if(this.on){
+      this.el.volume=this.vol;
+      if(this.started)this.el.play().catch(()=>{});
+    }else if(this.el){this.el.pause();}
+    this.save();this.refreshUI();
+  },
+  toggle(){this.setOn(!this.on);return this.on;},
+
+  /* ---------- UI pengaturan (tombol 🎵 + panel volume/on-off) ---------- */
+  initUI(){
+    if(document.getElementById('btn-music'))return;
+    /* tombol kecil di area kanan-atas HUD */
+    const host=document.getElementById('topright')||document.body;
+    const b=document.createElement('button');
+    b.id='btn-music';b.title='Pengaturan musik';b.textContent='🎵';
+    b.addEventListener('click',e=>{e.preventDefault();this.togglePanel();});
+    host.appendChild(b);
+    this.btn=b;
+
+    /* panel pengaturan */
+    const p=document.createElement('div');
+    p.id='music-panel';p.className='panel hidden';
+    p.innerHTML=
+      '<h2>🎵 Musik <button class="x" id="music-x">✕</button></h2>'+
+      '<div class="mus-row"><span>Putar musik</span>'+
+        '<button id="mus-toggle" class="mus-tg"></button></div>'+
+      '<div class="mus-row"><span>Volume</span>'+
+        '<input id="mus-vol" type="range" min="0" max="100" step="1"></div>'+
+      '<p class="tip">Musik diputar pelan sebagai latar. Perubahan disimpan otomatis.</p>';
+    document.body.appendChild(p);
+    this.panel=p;
+    this.tgEl=p.querySelector('#mus-toggle');
+    this.volEl=p.querySelector('#mus-vol');
+
+    p.querySelector('#music-x').addEventListener('click',()=>this.togglePanel());
+    this.tgEl.addEventListener('click',()=>this.toggle());
+    this.volEl.addEventListener('input',()=>this.setVol((+this.volEl.value)/100));
+    this.volEl.addEventListener('change',()=>this.setVol((+this.volEl.value)/100));
+    this.refreshUI();
+  },
+  togglePanel(){
+    if(!this.panel)return;
+    const open=this.panel.classList.contains('hidden');
+    this.panel.classList.toggle('hidden',!open);
+    if(open)this.refreshUI();
+  },
+  refreshUI(){
+    if(this.tgEl){
+      this.tgEl.textContent=this.on?'ON':'OFF';
+      this.tgEl.classList.toggle('on',this.on);
+    }
+    if(this.volEl)this.volEl.value=Math.round(this.vol*100);
+    if(this.btn)this.btn.classList.toggle('off',!this.on);
+  },
+};

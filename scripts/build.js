@@ -12,5 +12,9 @@ fs.mkdirSync(wwwDir, { recursive: true });
 fs.copyFileSync(path.join(rootDir, 'index.html'), path.join(wwwDir, 'index.html'));
 fs.cpSync(path.join(rootDir, 'css'), path.join(wwwDir, 'css'), { recursive: true });
 fs.cpSync(path.join(rootDir, 'js'), path.join(wwwDir, 'js'), { recursive: true });
+/* folder Audio (musik latar & SFX) ikut disalin bila ada */
+if (fs.existsSync(path.join(rootDir, 'Audio'))) {
+  fs.cpSync(path.join(rootDir, 'Audio'), path.join(wwwDir, 'Audio'), { recursive: true });
+}
 
 console.log('Build completed: Assets successfully copied to www/');

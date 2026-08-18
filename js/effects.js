@@ -91,6 +91,42 @@ const FX={
     }
   },
 
+  /* material blok gelombang: berbagi tekstur ATLAS asli blok sehingga blok
+     yang terangkat benar-benar tampak seperti blok aslinya (rumput, batu, dll).
+     Dibuat sekali dan dipakai semua blok gelombang. */
+  waveMat(){
+    if(this._waveMat)return this._waveMat;
+    const atlas=(typeof Mesher!=='undefined'&&Mesher.atlas)?Mesher.atlas():null;
+    this._waveMat=atlas
+      ? new THREE.MeshLambertMaterial({map:atlas,vertexColors:true})
+      : new THREE.MeshLambertMaterial({color:0x8a8f98});
+    return this._waveMat;
+  },
+  /* geometri blok gelombang: UV atlas per sisi mengikuti tile blok ASLI
+     (atas/bawah/samping) + shading warna-vertex sama dengan mesher, sehingga
+     blok yang terangkat identik dengan blok tanahnya. */
+  waveBlockGeo(blk){
+    const geo=new THREE.BoxGeometry(0.98,1.0,0.98);
+    if(typeof Mesher==='undefined'||!Mesher.tilesFor||!Mesher.tileUV)return geo;
+    const tiles=Mesher.tilesFor(blk);             // [atas,bawah,samping]
+    const uv=geo.attributes.uv;
+    /* urutan sisi BoxGeometry: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z */
+    const faceTile=[tiles[2],tiles[2],tiles[0],tiles[1],tiles[2],tiles[2]];
+    for(let f=0;f<6;f++){
+      const t=Mesher.tileUV(faceTile[f]);
+      const o=f*4;
+      uv.setXY(o,t[0],t[3]);uv.setXY(o+1,t[1],t[3]);
+      uv.setXY(o+2,t[0],t[2]);uv.setXY(o+3,t[1],t[2]);
+    }
+    uv.needsUpdate=true;
+    /* shading per sisi sama dengan mesher: atas 1.0, bawah 0.5, ±x 0.72, ±z 0.85 */
+    const shade=[0.72,0.72,1.0,0.5,0.85,0.85];
+    const col=[];
+    for(let f=0;f<6;f++){const s=shade[f];for(let v=0;v<4;v++)col.push(s,s,s);}
+    geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+    return geo;
+  },
+
   /* ---------- GELOMBANG TANAH (ground wave) — BLOK NYATA TERANGKAT ----------
      Bukan sekadar efek: blok-blok tanah di area gelombang benar-benar
      terangkat halus lalu turun lagi, mengikuti sebuah "height-field" yang
@@ -134,20 +170,17 @@ const FX={
       }
     }
 
-    /* spawn blok tiruan berwarna tanah asli di tiap titik. Blok dibuat LEBIH
-       TINGGI (1.5) dan dipendam, sehingga saat terangkat yang terlihat adalah
-       permukaan tanah yang benar-benar NAIK setinggi `lift` (bukan balok
-       melayang). Puncak blok = gy+lift = persis tinggi physics waveHeightAt. */
+    /* spawn blok bergelombang bertekstur asli di tiap titik. Blok dibuat setinggi
+       1 blok dan dipendam, sehingga saat terangkat yang terlihat adalah permukaan
+       tanah yang benar-benar NAIK setinggi `lift` (puncak blok = gy+lift = persis
+       tinggi physics waveHeightAt). Warna & tekstur mengikuti blok aslinya. */
+    const mat=this.waveMat();
     for(const p of pts){
       const gy=World.groundAt(p.x,p.z,y+2);
       const blk=World.getBlock(Math.floor(p.x),Math.floor(gy)-1,Math.floor(p.z));
-      const info=(typeof BLOCK_INFO!=='undefined'&&BLOCK_INFO[blk])?BLOCK_INFO[blk]:null;
-      const baseC=info?info.color:0x8a8f98;
-      const c=new THREE.Color(baseC).lerp(new THREE.Color(color),0.32);
-      const geo=new THREE.BoxGeometry(0.98,1.5,0.98);
-      const mat=new THREE.MeshLambertMaterial({color:c,transparent:true,opacity:0.98});
+      const geo=this.waveBlockGeo(blk);
       const mesh=new THREE.Mesh(geo,mat);
-      mesh.position.set(p.x,gy-0.75,p.z);
+      mesh.position.set(p.x,gy-0.5,p.z);
       mesh.visible=false;
       mesh.renderOrder=2;
       this.group.add(mesh);
@@ -506,10 +539,8 @@ const FX={
         const dd=dist-front;
         const lift=f.amp*Math.exp(-(dd*dd)/(f.width*f.width));
         /* puncak blok tepat di gy+lift (sama dengan physics waveHeightAt) */
-        mb.mesh.position.y=mb.base+lift-0.75;
-        mb.mesh.visible=lift>0.03;
-        /* sedikit memudar di ujung umur supaya transisi hilangnya lembut */
-        mb.mesh.material.opacity=f.t>f.dur-0.3?Math.max(0,(f.dur-f.t)/0.3):0.98;
+        mb.mesh.position.y=mb.base+lift-0.5;
+        mb.mesh.visible=lift>0.05;
       }
       if(f.t>f.dur){
         for(const mb of f.meshes){

@@ -503,6 +503,9 @@ const Mesher=(()=>{
             roof:mk(RP,RN,RU,RC,RI)};
 
   }
-  return {build,getMats,fadeLeaf:FADE_LEAF,fadeRoof:FADE_ROOF,occ:OCC};
+  return {build,getMats,fadeLeaf:FADE_LEAF,fadeRoof:FADE_ROOF,occ:OCC,
+    /* dipakai FX.groundWave agar blok gelombang memakai material/tekstur asli */
+    atlas(){if(!atlasTex)makeAtlas();return atlasTex;},
+    tilesFor,tileUV};
 
 })();

@@ -743,6 +743,23 @@ body.touch .hslot:active{
 #btn-save:active{transform:scale(.88)}
 #btn-save.ok{background:rgba(96,178,88,.92);border-color:#d8f5bd}
 
+/* ---------- tombol & panel pengaturan musik ---------- */
+#btn-music{pointer-events:auto;z-index:26;width:30px;height:30px;border-radius:9px;
+  cursor:pointer;background:rgba(10,14,10,.55);
+  border:1px solid rgba(255,255,255,.12);color:#eaffd8;font-size:14px;
+  line-height:1;padding:0;backdrop-filter:blur(4px);margin-left:8px;
+  transition:transform .12s,background .2s,border-color .2s,opacity .2s}
+#btn-music:active{transform:scale(.88)}
+#btn-music.off{opacity:.45}
+#music-panel{width:min(340px,92vw)}
+.mus-row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:8px 2px;font-size:13px;color:#e8f0d8}
+.mus-tg{pointer-events:auto;min-width:64px;padding:6px 10px;border-radius:20px;
+  cursor:pointer;font-weight:700;font-size:12px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#cfd8c8}
+.mus-tg.on{background:rgba(107,196,90,.25);border-color:#6da55f;color:#c8f0b0}
+#mus-vol{flex:1;pointer-events:auto;accent-color:#9fd77f;cursor:pointer}
+
 /* =========================================================================
    TATA LETAK MOBILE — ZONA ANTI-TUMPANG-TINDIH
    -------------------------------------------------------------------------
