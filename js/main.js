@@ -215,7 +215,9 @@ const Game={
     Input.jumpQ=false;Input.attackQ=false;Input.dodgeQ=false;
 
     try{
-      RPG.updateActive(dt);Player.update(dt);
+      RPG.updateActive(dt);
+      if(typeof SlamAim!=='undefined')SlamAim.update(dt);
+      Player.update(dt);
       Monsters.update(dt);
       NPCS.update(dt);
       if(typeof RareNPC!=='undefined')RareNPC.update(dt);

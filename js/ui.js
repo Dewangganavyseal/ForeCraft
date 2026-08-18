@@ -707,6 +707,8 @@ const UI={
   /* skill aktif yang sudah dipelajari, urut sesuai daftar SKILLS.
      Urutan ini dipakai bersama oleh tombol HUD dan tombol keyboard Q/E/R/T. */
   activeList(){return SKILLS.filter(s=>s.active&&RPG.skillVal(s.id));},
+  /* id skill di slot aktif ke-i (atau null) — dipakai Input untuk SlamAim */
+  activeSlotSkill(i){const s=this.activeList()[i];return s?s.id:null;},
   /* dipanggil Input saat menekan Q/E/R/T (slot 0–3) */
   useActiveSlot(i){
     const s=this.activeList()[i];
@@ -729,9 +731,29 @@ const UI={
           const b=document.createElement('button');
           b.className='m-active-btn';b.dataset.id=s.id;
           b.innerHTML=`${s.icon}<span></span>`;
-          const fn=e=>{e.preventDefault();e.stopPropagation();RPG.useActive(s.id);};
-          b.addEventListener('touchstart',fn,{passive:false});
-          b.addEventListener('click',fn);
+          if(s.id==='slam'&&typeof SlamAim!=='undefined'){
+            /* MOBA: tahan tombol lalu seret untuk membidik, lepas = eksekusi.
+               Tekan cepat tetap menghantam di tempat. */
+            b.addEventListener('touchstart',e=>{
+              e.preventDefault();e.stopPropagation();
+              const t=e.changedTouches[0];
+              SlamAim.dragStart={x:t.clientX,y:t.clientY};
+              SlamAim.dragCur={x:t.clientX,y:t.clientY};
+              SlamAim.press();
+            },{passive:false});
+            b.addEventListener('touchmove',e=>{
+              e.preventDefault();
+              const t=e.changedTouches[0];
+              SlamAim.dragCur={x:t.clientX,y:t.clientY};
+            },{passive:false});
+            const end=e=>{e.preventDefault();SlamAim.release();};
+            b.addEventListener('touchend',end,{passive:false});
+            b.addEventListener('touchcancel',end,{passive:false});
+          }else{
+            const fn=e=>{e.preventDefault();e.stopPropagation();RPG.useActive(s.id);};
+            b.addEventListener('touchstart',fn,{passive:false});
+            b.addEventListener('click',fn);
+          }
           mob.appendChild(b);
         }
       }

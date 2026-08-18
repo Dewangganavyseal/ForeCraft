@@ -506,6 +506,37 @@ const Player={
       FX.ring(this.pos.x,this.pos.y+0.2,this.pos.z,0x8fe0ff,0.5,2.2);
     }
   },
+
+  /* ---------- LOMPATAN HANTAM BUMI TERARAH (SlamAim) ----------
+     Terbang mengikuti busur dari posisi sekarang ke (tx,tz); saat mendarat
+     langsung menghantam tanah (RPG.doSlamAt). Selama lompatan, fisika & gerak
+     normal dilewati (di-handle update()). */
+  startSlamLeap(tx,tz){
+    const dx=tx-this.pos.x,dz=tz-this.pos.z;
+    const dist=Math.hypot(dx,dz);
+    this.slamLeap={sx:this.pos.x,sy:this.pos.y,sz:this.pos.z,tx,tz,t:0,
+      dur:clamp(dist/13,0.32,0.62),arc:clamp(1.8+dist*0.22,2,3.4)};
+    if(dist>0.01)this.facing=Math.atan2(dx,dz);
+    this.vel.set(0,0,0);
+    if(this.playSkillAnim)this.playSkillAnim('slam');
+    Sfx.jump();
+  },
+  updateSlamLeap(dt){
+    const L=this.slamLeap;
+    L.t+=dt;
+    const p=clamp(L.t/L.dur,0,1);
+    this.pos.x=lerp(L.sx,L.tx,p);
+    this.pos.z=lerp(L.sz,L.tz,p);
+    const gy=World.groundAt(this.pos.x,this.pos.z,L.sy+3);
+    this.pos.y=lerp(L.sy,gy,p)+Math.sin(p*Math.PI)*L.arc;
+    this.vel.set(0,0,0);
+    this.animate(dt,false,0,false);
+    if(p>=1){
+      this.pos.y=gy;this.onGround=true;this.airJumped=false;
+      this.slamLeap=null;
+      if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
+    }
+  },
   tryDodge(){
     if(this.dead||this.dodge.active||this.dodge.cd>0)return;
     const cost=20*RPG.stamCostMult();
@@ -707,9 +738,6 @@ const Player={
       this.hitStop=Math.min(0.09,0.03+ci*0.012);
       if(ci===4)FX.shockwave(this.pos.x+Math.sin(this.facing)*1.3,this.pos.y+0.1,this.pos.z+Math.cos(this.facing)*1.3,0xff6b57,4.5);
     }
-    /* COMBO TERAKHIR (pukulan ke-5): gelombang blok menjalar ke arah depan */
-    if(ci===4&&typeof FX.groundWave==='function')
-      FX.groundWave(this.pos.x,this.pos.y,this.pos.z,{mode:'line',dir:this.facing,color:0xff6b57});
     /* ikan yang berenang di perairan bisa ditangkap dengan serangan biasa
        (sistem FishSys — porting fish.html) */
     if(typeof FishSys!=='undefined'&&FishSys.checkHit(reach,this.facing))
@@ -851,6 +879,8 @@ const Player={
     if(this.dead)return;
     /* ganti model tangan saat item hotbar terpilih berubah */
     this.updateHeld();
+    /* lompatan Hantam Bumi terarah: terbang ke target, hantam saat mendarat */
+    if(this.slamLeap){this.updateSlamLeap(dt);return;}
     const A=this.attack,D=this.dodge;
     D.cd=Math.max(0,D.cd-dt);
     this.buffSpeed=Math.max(0,this.buffSpeed-dt);
@@ -1155,3 +1185,119 @@ const Player={
     this.skillAnim={id,t:dur,max:dur};
   },
 };
+
+/* =====================================================================
+   SLAM AIM — Hantam Bumi terarah ala MOBA
+   ---------------------------------------------------------------------
+   Tekan cepat (Q / tombol skill)      -> loncat & hantam di tempat.
+   Tahan (PC: kursor; mobile: seret)   -> masuk mode bidik, lalu lepas untuk
+                                           melompat ke titik bidik & menghantam.
+   PC     : tahan Q, arahkan kursor (dibatasi radius), lepas.
+   Mobile : tahan tombol skill lalu seret ke arah mana pun (seperti Mobile
+            Legends), lepas untuk mengeksekusi.
+   ===================================================================== */
+const SlamAim={
+  HOLD:0.28,      // detik tahan sebelum masuk mode bidik
+  MAX_R:7,        // radius bidik maksimum dari pemain
+  state:'idle',   // idle | pending | aiming
+  t:0,
+  aim:{x:0,z:0},
+  dragStart:null,dragCur:null,
+  indicator:null,
+
+  active(){return this.state!=='idle';},
+
+  press(){
+    if(this.state!=='idle')return;
+    if(typeof RPG==='undefined'||RPG.skillVal('slam')<=0||Player.dead)return;
+    if(RPG.activeCD.slam>0){UI.toast(`⏳ ${Math.ceil(RPG.activeCD.slam)}s lagi`);return;}
+    this.state='pending';this.t=0;
+    this.dragStart=null;this.dragCur=null;
+  },
+
+  /* dipanggil loop game tiap frame */
+  update(dt){
+    if(this.state==='idle')return;
+    this.t+=dt;
+    if(this.state==='pending'&&this.t>=this.HOLD){
+      this.state='aiming';
+      this.updateAim();
+      this.showIndicator();
+    }
+    if(this.state==='aiming'){
+      this.updateAim();
+      this.moveIndicator();
+    }
+  },
+
+  release(){
+    if(this.state==='idle')return;
+    const wasAiming=this.state==='aiming';
+    this.hideIndicator();
+    this.state='idle';
+    if(Player.dead)return;
+    if(!wasAiming){
+      /* tekan cepat: hantam di tempat (loncat kecil) */
+      RPG.useActive('slam');
+      return;
+    }
+    /* terarah: loncat ke titik bidik lalu hantam saat mendarat */
+    const dx=this.aim.x-Player.pos.x,dz=this.aim.z-Player.pos.z;
+    if(Math.hypot(dx,dz)<1.2){RPG.useActive('slam');return;}
+    Player.startSlamLeap(this.aim.x,this.aim.z);
+  },
+
+  /* hitung titik bidik dari kursor (PC) atau seretan jempol (mobile) */
+  updateAim(){
+    if(IS_MOBILE&&this.dragCur&&this.dragStart){
+      /* ala MOBA: arah & jarak mengikuti seretan dari tombol skill */
+      const dx=this.dragCur.x-this.dragStart.x;
+      const dy=this.dragCur.y-this.dragStart.y;
+      const d=Math.hypot(dx,dy);
+      if(d<8){this.aim.x=Player.pos.x;this.aim.z=Player.pos.z;return;}
+      const ix=dx/d, iz=-dy/d;              // layar -> input (y layar ke bawah)
+      const yaw=Cam.yaw;
+      const wx=-Math.sin(yaw)*iz+Math.cos(yaw)*ix;
+      const wz=-Math.cos(yaw)*iz-Math.sin(yaw)*ix;
+      const dist=clamp(d/16,0,1)*this.MAX_R; // skala seretan -> jarak dunia
+      this.aim.x=Player.pos.x+wx*dist;
+      this.aim.z=Player.pos.z+wz*dist;
+    }else if(typeof Input!=='undefined'&&Input.mouseX!==undefined){
+      /* PC: proyeksikan kursor ke bidang tanah setinggi pemain */
+      const nx=(Input.mouseX/window.innerWidth)*2-1;
+      const ny=-(Input.mouseY/window.innerHeight)*2+1;
+      const ray=new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(nx,ny),Cam.cam);
+      const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-Player.pos.y);
+      const hit=new THREE.Vector3();
+      if(ray.ray.intersectPlane(plane,hit)){this.aim.x=hit.x;this.aim.z=hit.z;}
+    }
+    /* batasi radius bidik agar tidak terlalu jauh dari pemain */
+    const ax=this.aim.x-Player.pos.x,az=this.aim.z-Player.pos.z;
+    const ad=Math.hypot(ax,az);
+    if(ad>this.MAX_R){
+      this.aim.x=Player.pos.x+ax/ad*this.MAX_R;
+      this.aim.z=Player.pos.z+az/ad*this.MAX_R;
+    }
+  },
+
+  /* indikator lingkaran di titik bidik */
+  showIndicator(){
+    if(!this.indicator){
+      const g=new THREE.RingGeometry(1.6,1.85,40);
+      const m=new THREE.MeshBasicMaterial({color:0xffb33c,transparent:true,opacity:0.9,side:THREE.DoubleSide,depthWrite:false});
+      this.indicator=new THREE.Mesh(g,m);
+      this.indicator.rotation.x=-Math.PI/2;
+      this.indicator.renderOrder=4;
+    }
+    if(!this.indicator.parent)Game.scene.add(this.indicator);
+    this.indicator.visible=true;
+  },
+  hideIndicator(){ if(this.indicator)this.indicator.visible=false; },
+  moveIndicator(){
+    if(!this.indicator)return;
+    const gy=World.groundAt(this.aim.x,this.aim.z,Player.pos.y+3);
+    this.indicator.position.set(this.aim.x,gy+0.08,this.aim.z);
+  },
+};
+window.SlamAim=SlamAim;

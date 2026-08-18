@@ -185,6 +185,34 @@ const RPG={
     const sk=SKILLS.find(s=>s.id===id);
     return (sk&&sk.cd)||10;
   },
+  /* ---------- HANTAM BUMI (slam) ----------
+     _slamAoE = efek ledakan melingkar di satu titik (damage + FX). Dipakai
+     oleh tekan-cepat (hantam di tempat) maupun slam terarah (hantam di titik
+     pendaratan sesudah loncat). doSlamDipakai oleh SlamAim saat mendarat. */
+  _slamAoE(x,y,z){
+    const C=new THREE.Vector3(x,y,z);
+    for(const m of Monsters.list){
+      if(m.dead||m.pos.distanceTo(C)>=4.5)continue;
+      const d=new THREE.Vector3().subVectors(m.pos,C).setY(.3).normalize();
+      Monsters.hurt(m,24*this.slamMult()*this.dmgMult(),d,7);
+      if(typeof NPCS!=='undefined'&&NPCS.onPlayerAttack)NPCS.onPlayerAttack(m);
+    }
+    FX.ring(x,y+.05,z,0xffb33c,.7,4.5);
+    FX.shockwave(x,y,z,0xffd24d,5);
+    if(typeof FX.groundWave==='function')FX.groundWave(x,y,z,{mode:'radial',color:0xffb33c,radius:4.5});
+    FX.addShake(.7);Sfx.hit();
+  },
+  /* eksekusi slam di titik (x,y,z): cek cooldown & stamina, lalu ledakkan.
+     Dipanggil SlamAim saat pemain mendarat dari loncatan terarah. */
+  doSlamAt(x,y,z){
+    if(this.activeCD.slam>0)return false;
+    if(Player.stamina<25){UI.toast('⚡ Stamina kurang!');Sfx.noStamina();return false;}
+    Player.stamina-=25;
+    this._slamAoE(x,y,z);
+    this.activeCD.slam=this.activeCDMax('slam');
+    UI.renderActiveSkills();
+    return true;
+  },
   /* Pemakaian skill aktif. Dipanggil tombol HUD (mobile), bar skill (PC),
      dan tombol keyboard Q/E/R/T lewat UI.useActiveSlot(). */
   useActive(id){
@@ -200,18 +228,11 @@ const RPG={
     let msg='';
 
     if(id==='slam'){
-      /* Hantam Bumi: ledakan melingkar di sekitar pemain */
+      /* Tekan cepat (Q sekali): loncat kecil di tempat lalu hantam tanah.
+         Versi tahan-untuk-membidik ditangani SlamAim (player.js). */
       if(!cost(25))return false;
-      for(const m of Monsters.list){
-        if(m.dead||m.pos.distanceTo(P)>=4.5)continue;
-        const d=new THREE.Vector3().subVectors(m.pos,P).setY(.3).normalize();
-        Monsters.hurt(m,24*this.slamMult()*this.dmgMult(),d,7);
-        if(typeof NPCS!=='undefined'&&NPCS.onPlayerAttack)NPCS.onPlayerAttack(m);
-      }
-      FX.ring(P.x,P.y+.05,P.z,0xffb33c,.7,4.5);
-      FX.shockwave(P.x,P.y,P.z,0xffd24d,5);
-      if(typeof FX.groundWave==='function')FX.groundWave(P.x,P.y,P.z,{mode:'radial',color:0xffb33c,radius:4.5});
-      FX.addShake(.7);Sfx.hit();
+      Player.vel.y=Math.max(Player.vel.y,6);
+      this._slamAoE(P.x,P.y,P.z);
       msg='💥 Hantam Bumi!';
     }
     else if(id==='whirl'){

@@ -72,23 +72,23 @@ const Sfx={
     s.connect(f);f.connect(this.rainGain);this.rainGain.connect(this.master);s.start();
   },
   setRain(v){if(this.ok&&this.rainGain)this.rainGain.gain.value=v*0.22;},
-  swing(i){this.noiseBurst(0.1,0.09,1300+i*280);this.tone(320-i*25,0.09,'triangle',0.05,-180);},
+  swing(i){this.noiseBurst(0.1,0.38,1300+i*280);this.tone(320-i*25,0.09,'triangle',0.2,-180);},
   /* pukulan tangan kosong: desing angin frekuensi rendah + 'thud' tumpul,
      berbeda jelas dari swing() pedang yang tinggi & tajam */
   punch(i){
-    this.noiseBurst(0.07,0.06,420+i*90);
-    this.tone(150-i*10,0.1,'sine',0.09,-70);
+    this.noiseBurst(0.07,0.36,420+i*90);
+    this.tone(150-i*10,0.1,'sine',0.22,-70);
   },
-  hit(){this.noiseBurst(0.07,0.24,950);this.tone(150,0.11,'square',0.13,-50);},
-  hurt(){this.tone(120,0.24,'sawtooth',0.22,-50);this.noiseBurst(0.15,0.12,500);},
-  splash(big){this.noiseBurst(big?0.5:0.16,big?0.32:0.12,650);},
+  hit(){this.noiseBurst(0.07,0.4,950);this.tone(150,0.11,'square',0.25,-50);},
+  hurt(){this.tone(120,0.24,'sawtooth',0.4,-50);this.noiseBurst(0.15,0.25,500);},
+  splash(big){this.noiseBurst(big?0.5:0.16,big?0.42:0.3,650);},
   /* semburan asam lizard: desis basah + cipratan */
-  cast(){this.noiseBurst(0.2,0.2,720);this.tone(280,0.16,'sawtooth',0.1,-130);},
-  chop(){this.noiseBurst(0.09,0.2,420);this.tone(180,0.08,'square',0.08,-60);},
-  rock(){this.noiseBurst(0.12,0.22,300);},
-  eat(){this.tone(400,0.07,'sine',0.14);setTimeout(()=>this.tone(300,0.08,'sine',0.12),90);},
-  craft(){this.tone(330,0.09,'triangle',0.15);setTimeout(()=>this.tone(440,0.09,'triangle',0.15),90);setTimeout(()=>this.tone(550,0.12,'triangle',0.15),180);},
-  levelup(){[392,494,587,784].forEach((f,i)=>setTimeout(()=>this.tone(f,0.22,'triangle',0.2),i*110));},
+  cast(){this.noiseBurst(0.2,0.38,720);this.tone(280,0.16,'sawtooth',0.22,-130);},
+  chop(){this.noiseBurst(0.09,0.4,420);this.tone(180,0.08,'square',0.22,-60);},
+  rock(){this.noiseBurst(0.12,0.4,300);},
+  eat(){this.tone(400,0.07,'sine',0.35);setTimeout(()=>this.tone(300,0.08,'sine',0.32),90);},
+  craft(){this.tone(330,0.09,'triangle',0.36);setTimeout(()=>this.tone(440,0.09,'triangle',0.36),90);setTimeout(()=>this.tone(550,0.12,'triangle',0.36),180);},
+  levelup(){[392,494,587,784].forEach((f,i)=>setTimeout(()=>this.tone(f,0.22,'triangle',0.4),i*110));},
   smash(){this.noiseBurst(0.6,0.5,280);this.tone(55,0.5,'sine',0.4,-20);},
   /* raungan singa: dengung rendah berlapis + desau napas kuat */
   roar(){this.noiseBurst(0.55,0.45,240);this.tone(90,0.65,'sawtooth',0.30,-45);
@@ -98,31 +98,32 @@ const Sfx={
   wave(power=1){
     if(!this.ok)return;
     const p=0.8+Math.random()*0.4;                 // variasi pitch acak
-    const k=0.5+0.5*clamp(power,0,1);              // besar gelombang -> volume
-    this.noiseBurst(0.5,0.20*k,160*p);
-    this.tone(66*p,0.45,'sine',0.16*k,40*p);
-    this.tone(42*p,0.55,'triangle',0.12*k,24*p);
+    const k=0.55+0.45*clamp(power,0,1);            // besar gelombang -> volume
+    this.noiseBurst(0.5,0.38*k,160*p);
+    this.tone(66*p,0.45,'sine',0.30*k,40*p);
+    this.tone(42*p,0.55,'triangle',0.22*k,24*p);
   },
   thunder(){this.noiseBurst(1.6,0.45,180);},
-  pickup(){this.tone(660,0.07,'sine',0.12,200);},
+  pickup(){this.tone(660,0.07,'sine',0.35,200);},
 
   /* ===================== SFX tambahan per-aksi ===================== */
 
   /* lompat: whoosh naik nada */
   jump(){
-    this.tone(300,0.13,'sine',0.10,240);
-    this.noiseBurst(0.07,0.05,1500);
+    this.tone(300,0.13,'sine',0.3,240);
+    this.noiseBurst(0.07,0.2,1500);
   },
   /* mendarat: intensitas mengikuti kecepatan jatuh */
   land(power=1){
     const p=clamp(power,0,1);
-    this.noiseBurst(0.09+p*0.09,0.10+p*0.22,260+p*180);
-    this.tone(90-p*25,0.13,'sine',0.09+p*0.13,-35);
+    this.noiseBurst(0.09+p*0.09,0.22+p*0.2,260+p*180);
+    this.tone(90-p*25,0.13,'sine',0.2+p*0.15,-35);
   },
-  /* langkah kaki: frekuensi diacak agar tidak monoton */
+  /* langkah kaki: frekuensi diacak agar tidak monoton (volume sedang biar
+     tidak bising karena sangat sering dipanggil) */
   step(inWater){
-    if(inWater){this.noiseBurst(0.1,0.10,520);return;}
-    this.noiseBurst(0.05,0.055,340+Math.random()*220);
+    if(inWater){this.noiseBurst(0.1,0.22,520);return;}
+    this.noiseBurst(0.05,0.18,340+Math.random()*220);
   },
   /* dash / roll: sapuan udara cepat (bandpass sweep) */
   dash(){
@@ -137,61 +138,61 @@ const Sfx={
     const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=1.1;
     f.frequency.setValueAtTime(420,t);
     f.frequency.linearRampToValueAtTime(1900,t+0.26);
-    const g=c.createGain();g.gain.setValueAtTime(0.20,t);
+    const g=c.createGain();g.gain.setValueAtTime(0.35,t);
     g.gain.exponentialRampToValueAtTime(0.001,t+0.26);
     s.connect(f);f.connect(g);g.connect(this.master);s.start(t);
   },
   /* serangan kritikal: lebih tajam + berdentang */
   crit(){
-    this.noiseBurst(0.09,0.30,2600);
-    this.tone(880,0.14,'square',0.14,-360);
-    setTimeout(()=>this.tone(1320,0.1,'triangle',0.10,-200),35);
+    this.noiseBurst(0.09,0.42,2600);
+    this.tone(880,0.14,'square',0.28,-360);
+    setTimeout(()=>this.tone(1320,0.1,'triangle',0.22,-200),35);
   },
   /* pedang mengenai benda keras */
   parry(){
-    this.tone(1500,0.09,'square',0.12,-700);
-    this.noiseBurst(0.06,0.14,3000);
+    this.tone(1500,0.09,'square',0.3,-700);
+    this.noiseBurst(0.06,0.32,3000);
   },
   /* monster mati */
   monsterDie(){
-    this.tone(190,0.3,'sawtooth',0.18,-140);
-    this.noiseBurst(0.26,0.18,420);
-    setTimeout(()=>this.tone(90,0.24,'sine',0.12,-40),110);
+    this.tone(190,0.3,'sawtooth',0.38,-140);
+    this.noiseBurst(0.26,0.35,420);
+    setTimeout(()=>this.tone(90,0.24,'sine',0.25,-40),110);
   },
   /* geraman monster saat mendeteksi pemain */
   growl(pitch=1){
-    this.tone(88*pitch,0.42,'sawtooth',0.14,26*pitch);
-    this.noiseBurst(0.3,0.07,240);
+    this.tone(88*pitch,0.42,'sawtooth',0.35,26*pitch);
+    this.noiseBurst(0.3,0.2,240);
   },
   /* pemain mati */
   die(){
     [330,262,196,131].forEach((f,i)=>
-      setTimeout(()=>this.tone(f,0.4,'triangle',0.2,-30),i*170));
-    this.noiseBurst(0.7,0.2,300);
+      setTimeout(()=>this.tone(f,0.4,'triangle',0.38,-30),i*170));
+    this.noiseBurst(0.7,0.35,300);
   },
   /* HP kritis */
   lowHp(){
-    this.tone(720,0.1,'sine',0.10);
-    setTimeout(()=>this.tone(720,0.1,'sine',0.10),160);
+    this.tone(720,0.1,'sine',0.3);
+    setTimeout(()=>this.tone(720,0.1,'sine',0.3),160);
   },
   /* stamina tidak cukup */
-  noStamina(){this.tone(180,0.14,'square',0.07,-70);},
+  noStamina(){this.tone(180,0.14,'square',0.28,-70);},
   /* UI */
-  click(){this.tone(700,0.04,'square',0.055);},
-  open(){this.tone(420,0.08,'sine',0.09,180);},
-  close(){this.tone(600,0.08,'sine',0.09,-180);},
+  click(){this.tone(700,0.04,'square',0.28);},
+  open(){this.tone(420,0.08,'sine',0.3,180);},
+  close(){this.tone(600,0.08,'sine',0.3,-180);},
   /* ambil skill */
   skill(){
     [523,659,784].forEach((f,i)=>
-      setTimeout(()=>this.tone(f,0.16,'triangle',0.16),i*70));
+      setTimeout(()=>this.tone(f,0.16,'triangle',0.38),i*70));
   },
   /* minum */
   drink(){
-    this.tone(240,0.1,'sine',0.11,90);
-    setTimeout(()=>this.tone(320,0.12,'sine',0.10,120),110);
+    this.tone(240,0.1,'sine',0.32,90);
+    setTimeout(()=>this.tone(320,0.12,'sine',0.3,120),110);
   },
   /* serangan tertahan armor */
-  armorHit(){this.noiseBurst(0.08,0.2,1800);this.tone(260,0.1,'square',0.1,-90);},
+  armorHit(){this.noiseBurst(0.08,0.38,1800);this.tone(260,0.1,'square',0.25,-90);},
 };
 
 /* =====================================================================

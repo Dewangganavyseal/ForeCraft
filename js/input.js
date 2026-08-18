@@ -3,6 +3,7 @@
 const Input={
   keys:{},jumpQ:false,attackQ:false,dodgeQ:false,
   joyX:0,joyY:0,lastShift:0,camDrag:false,lastMX:0,rmb:false,
+  mouseX:undefined,mouseY:undefined,   // posisi kursor ( utk SlamAim PC )
 
   init(){
     /* ---------- keyboard ---------- */
@@ -67,9 +68,16 @@ const Input={
 
       /* makan kini lewat klik/tombol serang saat memegang makanan */
       /* Q/E/R/T = empat slot skill aktif (urutannya sama dengan tombol di
-         HUD). Dipakai di PC; di mobile slot yang sama ditekan lewat tombol. */
+         HUD). Dipakai di PC; di mobile slot yang sama ditekan lewat tombol.
+         Khusus 'slam' (Hantam Bumi): pakai SlamAim supaya bisa DITAHAN untuk
+         membidik (ala MOBA) — tekan cepat tetap menghantam di tempat. */
       const si=this.SKILL_KEYS.indexOf(k);
-      if(si>=0){UI.useActiveSlot(si);e.preventDefault();}
+      if(si>=0){
+        const sid=(typeof UI!=='undefined'&&UI.activeSlotSkill)?UI.activeSlotSkill(si):null;
+        if(sid==='slam'&&typeof SlamAim!=='undefined')SlamAim.press();
+        else UI.useActiveSlot(si);
+        e.preventDefault();
+      }
       if(k.startsWith('Digit')){
         const n=+k.slice(5);
         if(n>=1&&n<=7){
@@ -79,7 +87,13 @@ const Input={
         }
       }
     });
-    window.addEventListener('keyup',e=>{this.keys[e.code]=false;});
+    window.addEventListener('keyup',e=>{
+      this.keys[e.code]=false;
+      /* lepas tombol skill 'slam' -> eksekusi bidikan / hantam di tempat */
+      const si=this.SKILL_KEYS.indexOf(e.code);
+      if(si>=0&&typeof UI!=='undefined'&&UI.activeSlotSkill&&
+         UI.activeSlotSkill(si)==='slam'&&typeof SlamAim!=='undefined')SlamAim.release();
+    });
     /* ---------- mouse ---------- */
     const cv=()=>Game.renderer.domElement;
     window.addEventListener('mousedown',e=>{
@@ -100,6 +114,7 @@ const Input={
     });
     window.addEventListener('mouseup',e=>{if(e.button===2)this.rmb=false;});
     window.addEventListener('mousemove',e=>{
+      this.mouseX=e.clientX;this.mouseY=e.clientY;   // utk bidikan slam (PC)
       if(this.rmb){Cam.yaw-=(e.clientX-this.lastMX)*0.005;this.lastMX=e.clientX;}
     });
     window.addEventListener('wheel',e=>{
