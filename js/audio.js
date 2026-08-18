@@ -93,6 +93,16 @@ const Sfx={
   /* raungan singa: dengung rendah berlapis + desau napas kuat */
   roar(){this.noiseBurst(0.55,0.45,240);this.tone(90,0.65,'sawtooth',0.30,-45);
     this.tone(58,0.75,'square',0.20,-18);this.tone(140,0.3,'sawtooth',0.12,-60);},
+  /* gelombang tanah: gemuruh rendah + desakan tanah saat blok terangkat.
+     Pitch & intensitas diacak/diskalakan agar terasa dinamis & satisfying. */
+  wave(power=1){
+    if(!this.ok)return;
+    const p=0.8+Math.random()*0.4;                 // variasi pitch acak
+    const k=0.5+0.5*clamp(power,0,1);              // besar gelombang -> volume
+    this.noiseBurst(0.5,0.20*k,160*p);
+    this.tone(66*p,0.45,'sine',0.16*k,40*p);
+    this.tone(42*p,0.55,'triangle',0.12*k,24*p);
+  },
   thunder(){this.noiseBurst(1.6,0.45,180);},
   pickup(){this.tone(660,0.07,'sine',0.12,200);},
 

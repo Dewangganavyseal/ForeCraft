@@ -187,6 +187,8 @@ const FX={
       field.meshes.push({mesh,base:gy,x:p.x,z:p.z});
     }
     this.waveFields.push(field);
+    /* SFX gemuruh gelombang tanah (dinamis; volume meredam sesuai jarak) */
+    if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(new THREE.Vector3(x,y,z),'wave',clamp(amp,0,1));
   },
 
   /* tinggi gelombang di titik dunia (x,z) saat ini; 0 bila tidak ada.
@@ -490,6 +492,7 @@ const FX={
     if(typeof HeldModels!=='undefined'&&HeldModels.MODELS&&HeldModels.MODELS[id]){
       mesh=HeldModels.build(id);
       mesh.rotation.set(0,0,0);
+      mesh.scale.setScalar(1.5);            // perbesar 50% agar jelas terlihat
       isModel=true;
     }else{
       const g=new THREE.BoxGeometry(0.26,0.26,0.26);

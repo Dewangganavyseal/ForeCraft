@@ -947,6 +947,8 @@ const Monsters={
        merah menyapu tanah + serpihan batu */
     FX.ring(c.x,c.y+0.05,c.z,0xff5a35,0.55,5.5);
     FX.ring(c.x,c.y+0.05,c.z,0xdddddd,0.4,3.5);
+    /* gelombang tanah menjalar dari titik hantaman, lalu tanah hancur */
+    if(typeof FX.groundWave==='function')FX.groundWave(c.x,c.y,c.z,{mode:'radial',radius:3.4,color:0xff5a35});
     if(typeof PortFX!=='undefined')
       PortFX.crescent(c.x,c.y+1.1,c.z,m.mesh.rotation.y,-1.35,0,2.4,1.9,0.3,0xff5a2a);
     FX.debris(new THREE.Vector3(c.x,c.y+0.4,c.z),0x8a8a8a,22,4);

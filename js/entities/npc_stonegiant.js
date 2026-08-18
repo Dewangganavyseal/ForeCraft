@@ -234,6 +234,8 @@ const NPC_Stonegiant={
     PortFX.slash(p.x,y+2.2*0.46,p.z,n.mesh.rotation.y,[.3,0,0],1.5,0xffb066);
     FX.ring(p.x,y+.05,p.z,0xff8a3d,.6,9);
     FX.ring(p.x,y+.05,p.z,0xffffff,.32,4.5);
+    /* gelombang tanah menjalar dari titik hantaman (1x per slam = 3x smooth) */
+    if(typeof FX.groundWave==='function')FX.groundWave(p.x,y,p.z,{mode:'radial',radius:4.4,color:0xff8a3d});
     FX.debris(new THREE.Vector3(p.x,y+.3,p.z),0x7a7f87,13,4);
     PortFX.spark(p.x,y+.5,p.z,10,0xffd9a0,9);
     FX.addShake(.5);

@@ -333,18 +333,19 @@ const Farming={
       return false;
     }
 
-    /* benih: tanam di ladang kosong */
+    /* benih: pegang benih lalu klik/sentuh area lahan untuk menanam.
+       Bila target bukan lahan ladang -> muncul notif (tidak menyerang). */
     if(id&&this.SEED_TO_CROP[id]){
+      if(p&&p.stage<3){UI.toast('🌿 Tanaman masih tumbuh');return true;}
       if(block===B.FARM&&!p){
         if(this.plant(bx,by,bz,this.SEED_TO_CROP[id])){
           slot.n--;if(slot.n<=0)RPG.hotbar[RPG.sel]=null;
           UI.renderHotbar();
-          return true;
         }
-      }else if(p&&p.stage<3){
-        UI.toast('🌿 Tanaman masih tumbuh');return true;
+        return true;
       }
-      return false;
+      UI.toast('🌾 Tidak ada lahan di sini — cangkul tanah dulu');
+      return true;
     }
 
     return false;

@@ -226,6 +226,8 @@ const NPC_Lionknight={
     if(wave===1){
       FX.ring(n.pos.x,n.pos.y+0.2,n.pos.z,0xffd24d,1.4,8);
       FX.ring(n.pos.x,n.pos.y+0.1,n.pos.z,0xfff3c4,0.7,4.5);
+      /* gelombang tanah sekali, menjalar dari posisi singa */
+      if(typeof FX.groundWave==='function')FX.groundWave(n.pos.x,n.pos.y,n.pos.z,{mode:'radial',radius:5.2,color:0xffd24d});
       PortFX.spark(n.pos.x,n.pos.y+1.4,n.pos.z,16,0xffd24d,11);
       FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.5,0)),0xE3B45A,14,4.5);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2.6,0)),'AUM!!','#ffd24d');
