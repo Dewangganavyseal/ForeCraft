@@ -1,0 +1,32 @@
+{
+  "name": "forest-survival-3d",
+  "version": "1.0.0",
+  "description": "Forest Survival 3D - Voxel survival game",
+  "main": "index.js",
+  "scripts": {
+    "studio": "node scripts/studio.js",
+    "build": "node scripts/build.js",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:copy": "npm run build && npx cap copy",
+    "android:open": "npx cap open android",
+    "android:build": "cd android && gradlew assembleDebug",
+    "android:apk": "npm run cap:sync && cd android && gradlew assembleDebug && cd .. && node scripts/copy-apk.js"
+  },
+  "keywords": [
+    "game",
+    "voxel",
+    "survival",
+    "3d",
+    "three.js",
+    "mobile",
+    "android"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^7.6.8",
+    "@capacitor/cli": "^7.6.8",
+    "@capacitor/core": "^7.6.8"
+  }
+}

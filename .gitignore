@@ -1,0 +1,26 @@
+# ============ Dependencies ============
+node_modules/
+
+# ============ Build artifacts (bisa digenerate ulang) ============
+# www/ dibuat oleh scripts/build.js, android/ oleh npx cap sync
+www/
+android/
+*.apk
+
+# ============ File personal / ekspor besar ============
+chat-export-*.json
+
+# ============ Backup & checkpoint manual ============
+# Sudah tergantikan oleh git; file tetap ada di disk, hanya tidak dilacak.
+js/backup/
+CHECKPOINT_*/
+# salinan "(backup)" dari file yang sudah dilacak, mis. player_animations(backup).js
+*(backup)*
+
+# ============ Proyek referensi pihak ketiga (besar) ============
+Modeling/LinearAbiltyCastingThreeJS-main/
+
+# ============ OS / editor ============
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORECRAFT — Environment 3D Showcase</title>
+<style>
+  body { margin:0; overflow:hidden; background:#0a0e17; font-family:sans-serif; color:#e0aa4f; }
+  #ui { position:fixed; top:18px; left:18px; z-index:10; background:rgba(10,14,23,0.88); padding:16px 22px; border:1px solid #e0aa4f; border-radius:10px; max-width:380px; box-shadow:0 8px 32px rgba(0,0,0,0.6); }
+  h1 { margin:0 0 6px 0; font-size:22px; color:#ffd24d; text-shadow:0 2px 8px rgba(255,210,77,0.3); }
+  p { margin:0 0 12px 0; font-size:13px; color:#9aa3b2; line-height:1.4; }
+  .btn-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+  button { background:#1e2738; color:#e0aa4f; border:1px solid #3c4b66; padding:8px 12px; font-weight:bold; font-size:12px; border-radius:6px; cursor:pointer; transition:0.2s; text-align:left; }
+  button:hover { background:#e0aa4f; color:#0a0e17; border-color:#ffe0a3; transform:translateY(-1px); }
+  button.active { background:gradient(135deg, #e0aa4f, #c48b2e); color:#0a0e17; border-color:#fff; }
+  .scene-btn { width:100%; padding:10px; text-align:center; background:#1b3d2b; color:#7ef5a0; border:1px solid #38bf64; font-size:13px; border-radius:6px; cursor:pointer; font-weight:bold; }
+  .scene-btn:hover { background:#38bf64; color:#0a0e17; }
+  #stats-panel { margin-top:12px; padding:10px; background:rgba(255,255,255,0.05); border-radius:6px; font-size:12px; color:#d4dcfa; }
+  #stats-panel strong { color:#ffd24d; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>FORECRAFT: Environment 3D</h1>
+  <p>Pilih Aset Lingkungan untuk ditinjau secara interaktif 3D:</p>
+  <div class="btn-grid">
+    <button onclick="selectItem('tree_oak', this)">🌳 Pohon Oak</button>
+    <button onclick="selectItem('tree_pine', this)">🌲 Pohon Pinus</button>
+    <button onclick="selectItem('tree_birch', this)">🍂 Pohon Birch</button>
+    <button onclick="selectItem('tree_palm', this)">🌴 Pohon Palem</button>
+    <button onclick="selectItem('campfire', this)">🔥 Api Unggun Realistis</button>
+    <button onclick="selectItem('house_cottage', this)">🏡 Rumah Desa</button>
+    <button onclick="selectItem('house_tower', this)">🏰 Menara Pengawas</button>
+  </div>
+  <button class="scene-btn" onclick="selectItem('campsite_scene', this)">🎪 Pemandangan Perkemahan Utuh</button>
+  <div id="stats-panel">
+    <div id="stat-name"><strong>Api Unggun & Panggangan Tripod</strong></div>
+    <div id="stat-desc">Fitur: Dual Flame Engine (Inti Kristal 3D + Sprite Organik), panggangan tripod kayu, periuk sup besi, kayu retakan magma membara, 42 bara api spiral heliks & asap tipis membumbung.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="../../Script Model 3D/model_environment.js"></script>
+
+<script>
+  let currentKey = 'campfire';
+  let activeObject = null;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0e17);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(3.4, 2.8, 4.0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  const controls = (typeof THREE.OrbitControls === 'function')
+    ? new THREE.OrbitControls(camera, renderer.domElement)
+    : { update: () => {} };
+  if (controls.target) controls.target.set(0, 0.8, 0);
+  if (controls.enableDamping) controls.enableDamping = true;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.0));
+  const dirLight = new THREE.DirectionalLight(0xffe0a3, 1.8);
+  dirLight.position.set(8, 12, 8);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  const grid = new THREE.GridHelper(16, 16, 0xe0aa4f, 0x223344);
+  scene.add(grid);
+
+  function updateDisplay() {
+    if (activeObject) scene.remove(activeObject);
+
+    if (currentKey === 'campsite_scene') {
+      activeObject = Environment3DModels.buildCampsiteScene();
+      camera.position.set(12.0, 9.0, 14.0);
+      if (controls.target) controls.target.set(0, 1.5, 0);
+      document.getElementById('stat-name').innerHTML = `🎪 <strong>Pemandangan Perkemahan Utuh</strong>`;
+      document.getElementById('stat-desc').innerHTML = `Menggabungkan Rumah Desa, Api Unggun Realistis & Panggangan Tripod, dan 3 varian Pohon ke dalam satu lokasi interaktif.`;
+    } else if (currentKey === 'campfire') {
+      activeObject = Environment3DModels.buildCampfire(true);
+      camera.position.set(3.4, 2.8, 4.0);
+      if (controls.target) controls.target.set(0, 0.8, 0);
+      const info = ENVIRONMENT_REGISTRY[currentKey] || {};
+      document.getElementById('stat-name').innerHTML = `${info.icon} <strong>${info.name}</strong>`;
+      document.getElementById('stat-desc').innerHTML = `Tipe: <strong>${info.type}</strong><br>Fitur: Dual Flame Engine (Inti Kristal 3D + Sprite Organik), panggangan tripod kayu, periuk sup besi, kayu retakan magma membara, 42 bara api spiral heliks & asap tipis membumbung.`;
+    } else if (currentKey.startsWith('tree_')) {
+      activeObject = Environment3DModels.buildTree(currentKey);
+      camera.position.set(5.0, 4.0, 6.0);
+      if (controls.target) controls.target.set(0, 2.0, 0);
+      const info = ENVIRONMENT_REGISTRY[currentKey] || {};
+      document.getElementById('stat-name').innerHTML = `${info.icon} <strong>${info.name}</strong>`;
+      document.getElementById('stat-desc').innerHTML = `Tipe: <strong>${info.type}</strong><br>Desain: Voxel berlapis dengan batang bercabang dan tajuk daun biomeik.`;
+    } else {
+      activeObject = Environment3DModels.buildHouse(currentKey);
+      camera.position.set(7.5, 5.5, 8.5);
+      if (controls.target) controls.target.set(0, 1.8, 0);
+      const info = ENVIRONMENT_REGISTRY[currentKey] || {};
+      document.getElementById('stat-name').innerHTML = `${info.icon} <strong>${info.name}</strong>`;
+      document.getElementById('stat-desc').innerHTML = `Tipe: <strong>${info.type}</strong><br>Komponen: Pondasi batu, tiang sudut kayu, dinding papan, jendela kaca, pintu & cerobong.`;
+    }
+
+    scene.add(activeObject);
+  }
+
+  function selectItem(key, btn) {
+    currentKey = key;
+    document.querySelectorAll('.btn-grid button, .scene-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    updateDisplay();
+  }
+
+  // Set default Api Unggun
+  selectItem('campfire', document.querySelectorAll('.btn-grid button')[4]);
+
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    const dt = clock.getDelta();
+    const t = clock.getElapsedTime();
+
+    if (activeObject) {
+      if (currentKey !== 'campsite_scene') activeObject.rotation.y += 0.003;
+      activeObject.traverse(child => {
+        if (child.userData && typeof child.userData.update === 'function') {
+          child.userData.update(t, dt);
+        }
+      });
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>

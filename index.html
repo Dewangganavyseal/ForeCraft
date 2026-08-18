@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>🌲 Forest Survival 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game"></div>
+<div id="vignette"></div>
+<div id="flash"></div>
+
+<!-- ================= HUD ================= -->
+<div id="hud">
+  <div id="stats">
+    <div class="bar hp"><span class="ico">❤️</span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
+    <div class="bar st"><span class="ico">⚡</span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
+    <div class="bar hu"><span class="ico">🍖</span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
+    <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">⭐ Lv 1</span></div>
+  </div>
+  <!-- ============ CHAT: buka dengan ENTER, persis di bawah bar Lv ============ -->
+  <div id="chat">
+    <div id="chat-log"></div>
+    <div id="chat-row"><span class="cico">💬</span>
+      <input id="chat-input" type="text" maxlength="80" autocomplete="off"
+        placeholder="Ketik pesan...">
+      <button id="chat-send" title="Kirim">➤</button>
+    </div>
+  </div>
+  <div id="topright">
+    <div id="compass"><div id="compass-strip"></div><div id="compass-mark">▼</div></div>
+    <div id="clock">☀️ 12:00</div>
+    <div id="daynum">Hari 1</div>
+    <div id="coinbox" title="Koin — tukarkan di pedagang desa">🪙 <b id="coin-num">0</b></div>
+  </div>
+  <div id="combo"></div>
+  <div id="hotbar"></div>
+  <!-- ikon rekan tim: kanan atas, di bawah panel stat -->
+  <div id="team"></div>
+  <div id="toast"></div>
+<div id="skillbar"></div>
+<div id="hint">WASD gerak · SHIFT lari · SHIFT×2 dodge · KLIK serang/makan · SPACE lompat · Q/E/R/T skill · B tas · K skill · C crafting · G rekan · ←→ kamera · H bantu</div>
+</div>
+
+<!-- ================= PANEL TAS ================= -->
+<div class="panel" id="panel-bag">
+  <h2>🎒 Tas <button class="x" data-close="bag">✕</button></h2>
+  <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span></div>
+
+  <div class="grid equip" id="equip-grid"></div>
+  <div class="sub">Hotbar (1–7)</div>
+
+  <div class="grid" id="bag-hotbar"></div>
+  <div class="sub">Kantong</div>
+  <div class="grid" id="bag-grid"></div>
+  <p class="tip">Klik item lalu klik slot lain untuk memindahkan. Tekan <b>F</b> untuk makan item hotbar terpilih.</p>
+</div>
+
+<!-- ================= PANEL SKILL ================= -->
+<div class="panel" id="panel-skills">
+  <h2>🌟 Skill Tree <button class="x" data-close="skills">✕</button></h2>
+  <div id="sp-info">Skill Points: <b id="sp-num">0</b></div>
+  <div id="branches">
+    <div class="branch"><h3>⚔️ Combat</h3><div class="nodes" id="br-combat"></div></div>
+    <div class="branch"><h3>🏃 Movement</h3><div class="nodes" id="br-move"></div></div>
+    <div class="branch"><h3>🛠️ Crafting</h3><div class="nodes" id="br-craft"></div></div>
+  </div>
+</div>
+
+<!-- ================= PANEL CRAFTING ================= -->
+<div class="panel" id="panel-craft">
+  <h2>🔨 Crafting <button class="x" data-close="craft">✕</button></h2>
+  <div id="craft-tabs"></div>
+  <div id="recipes"></div>
+</div>
+
+<!-- ================= PANEL PETI PENYIMPANAN ================= -->
+<div class="panel" id="panel-chest">
+  <h2>🧰 Peti Penyimpanan <button class="x" data-close="chest">✕</button></h2>
+  <div class="sub">Isi Peti <span id="chest-num">0/0</span>
+    <button id="chest-all" class="mini">⬇️ Titip Semua Resource</button></div>
+  <div class="grid" id="chest-grid"></div>
+  <div class="sub">Tasmu — klik untuk menitipkan</div>
+  <div class="grid" id="chest-bag"></div>
+  <p class="tip">Klik item di peti untuk mengambilnya, klik item di tasmu untuk menitipkannya. Isi peti tetap tersimpan walau kamu keluar dari permainan.</p>
+</div>
+
+<!-- ================= PANEL REKAN ================= -->
+
+<div class="panel" id="panel-npc">
+  <h2>🤝 Rekan Tim <button class="x" data-close="npc">✕</button></h2>
+  <div id="npc-body"></div>
+</div>
+
+<!-- ================= PANEL PEDAGANG / TOKO =================
+     Beli item dengan koin, atau jual item dari tas untuk dapat koin. -->
+<div class="panel hidden" id="panel-shop">
+  <h2>🏪 Pedagang Desa <button class="x" data-close="shop">✕</button></h2>
+  <div class="shop-coin">🪙 Koinmu: <b id="shop-coin">0</b></div>
+  <div class="sub">Beli</div>
+  <div id="shop-buy"></div>
+  <div class="sub">Jual (klik item di tasmu)</div>
+  <div id="shop-sell-bag"></div>
+  <p class="tip">Harga beli tetap; harga jual setengah harga beli. Koin didapat dari quest, mengalahkan monster, dan menjual barang.</p>
+</div>
+
+<!-- ================= TERMINAL (RAHASIA) =================
+     Konsol dev tersembunyi: hanya bisa dibuka lewat kode khusus yang
+     diketik di chat. Dipakai untuk men-spawn apa pun yang ada di game. -->
+<div class="panel hidden" id="panel-term">
+  <h2>🖥️ TERMINAL <button class="x" data-close="term">✕</button></h2>
+  <div id="term-body"></div>
+</div>
+
+<!-- ================= PANEL HELP ================= -->
+<div class="panel" id="panel-help">
+  <h2>ℹ️ Bantuan <button class="x" data-close="help">✕</button></h2>
+  <table class="help-t">
+    <tr><td>WASD / Panah</td><td>Gerak (panah ←→ juga putar kamera)</td></tr>
+    <tr><td>SHIFT</td><td>Lari &nbsp;·&nbsp; tekan 2× = roll/dodge</td></tr>
+    <tr><td>Klik Kiri</td><td>Serang pedang (rantai sampai 5 combo)</td></tr>
+    <tr><td>SPACE</td><td>Lompat / berenang naik</td></tr>
+    <tr><td>B / K / C / H</td><td>Tas / Skill / Crafting / Bantuan</td></tr>
+    <tr><td>Klik saat memegang makanan</td><td>Makan item hotbar terpilih</td></tr>
+    <tr><td>G</td><td>Ajak bicara penduduk desa (rekrut) / buka panel rekan</td></tr>
+    <tr><td>1–7</td><td>Pilih slot hotbar</td></tr>
+    <tr><td>Q / E / R / T</td><td>Pakai skill aktif slot 1–4 (lihat bar skill)</td></tr>
+    <tr><td>← → / Scroll</td><td>Putar / zoom kamera (mobile: geser/cubit 2 jari)</td></tr>
+  </table>
+  <p class="tip">🏘️ Cari <b>desa</b> di hutan: penduduknya bisa direkrut jadi rekan (maks 3) bila kamu membawa bahan yang mereka minta. Rekan ikut bertarung, punya level dan skill pasif sendiri, bisa diberi makanan/senjata/armor, dan bisa diperintah <b>mencari resource</b> di sekitarmu. Klik ikon rekan di kanan atas untuk mengatur mereka.</p>
+  <p class="tip">⚠️ Hati-hati dengan Golem Hutan raksasa — hantamannya <b>menghancurkan tanah</b>! Lubang dekat air akan perlahan tergenang. Tebang pohon (pukul batang) untuk kayu, panen semak beri, dan masak daging agar hunger pulih.</p>
+</div>
+
+<!-- ================= MOBILE ================= -->
+<div id="mobile">
+  <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+  <div id="m-buttons">
+    <button id="m-bag" class="m-s">🎒</button>
+    <button id="m-craft" class="m-s">🔨</button>
+    <button id="m-skill" class="m-s">🌟</button>
+    <button id="m-chat" class="m-s" title="Chat">💬</button>
+    <button id="m-talk" class="m-s" title="Ajak bicara / rekrut">🤝</button>
+  </div>
+  <div id="m-main">
+    <button id="m-roll" class="m-m" title="Dash">💨</button>
+    <button id="m-jump" class="m-m">⤴️</button>
+    <button id="m-attack" class="m-l">⚔️</button>
+  </div>
+  <div id="m-active"></div>
+</div>
+
+<!-- ================= OVERLAYS ================= -->
+<div id="loading" style="display:none"><div class="loader"></div><p>Memuat dunia...</p></div>
+
+<div id="start"></div>
+
+<div id="death" class="hidden">
+  <h1>💀 KAMU MATI</h1>
+  <p id="death-stats"></p>
+  <button id="btn-respawn" class="big">🔄 Respawn</button>
+</div>
+
+<div id="levelup">LEVEL UP!</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/worldgen.js"></script>
+<script src="js/mesher.js"></script>
+<script src="js/world.js"></script>
+<script src="js/farming.js"></script>
+<script src="js/effects.js"></script>
+<!-- ================= MODULAR 3D ENTITY BUILDERS ================= -->
+<!-- Player 3D Models & Equipments -->
+<script src="js/player/player_model.js"></script>
+<script src="js/player/player_animations.js"></script>
+<script src="js/player/armors/armor_leather.js"></script>
+<script src="js/player/armors/armor_iron.js"></script>
+<script src="js/player/armors/armor_gold.js"></script>
+<script src="js/player/armors/armor_crystal.js"></script>
+<script src="js/player/armors/armor_manager.js"></script>
+<script src="js/player/weapons/weapon_sword_wood.js"></script>
+<script src="js/player/weapons/weapon_sword_iron.js"></script>
+<script src="js/player/weapons/weapon_sword_storm.js"></script>
+<script src="js/player/weapons/weapon_sword_venom.js"></script>
+<script src="js/player/weapons/weapon_sword_frost.js"></script>
+<script src="js/player/weapons/weapon_sword_titan.js"></script>
+<script src="js/player/weapons/weapon_manager.js"></script>
+<script src="js/player/held_items.js"></script>
+
+<!-- ============ ENTITAS: model 3D + animasi per NPC & mob ============
+     Tiap file di js/entities/ memuat model dan animasi lengkap satu entitas.
+     Dipakai Monsters.make/animate (mob) dan NPCS.buildModel/animate (NPC). -->
+<!-- Mob -->
+<script src="js/entities/mob_slime.js"></script>
+<script src="js/entities/mob_boar.js"></script>
+<script src="js/entities/mob_wolf.js"></script>
+<script src="js/entities/mob_scorpion.js"></script>
+<script src="js/entities/mob_rabbit.js"></script>
+<script src="js/entities/mob_golem.js"></script>
+<script src="js/entities/mob_dragon.js"></script>
+<script src="js/entities/mob_lizard.js"></script>
+<script src="js/entities/mob_cow.js"></script>
+<script src="js/entities/mob_horse.js"></script>
+<!-- NPC desa -->
+<script src="js/entities/npc_guard.js"></script>
+<script src="js/entities/npc_hunter.js"></script>
+<script src="js/entities/npc_miner.js"></script>
+<script src="js/entities/npc_farmer.js"></script>
+<script src="js/entities/npc_herbal.js"></script>
+<script src="js/entities/npc_warrior.js"></script>
+<script src="js/entities/npc_guardian.js"></script>
+<script src="js/entities/npc_merchant.js"></script>
+<!-- NPC langka -->
+<script src="js/entities/npc_lionknight.js"></script>
+<script src="js/entities/npc_elfmage.js"></script>
+<script src="js/entities/npc_stonegiant.js"></script>
+<script src="js/entities/npc_rabbitwarrior.js"></script>
+<script src="js/entities/npc_goblin.js"></script>
+
+<!-- Environment 3D Models -->
+<script src="js/environment/env_trees.js"></script>
+<script src="js/environment/env_campfire.js"></script>
+<script src="js/environment/env_structures.js"></script>
+<script src="js/environment/env_chest.js"></script>
+<script src="js/environment/env_fish.js"></script>
+
+<script src="js/player.js"></script>
+<script src="js/monsters.js"></script>
+<!-- Porting NEW MODEL: peti voxel, ikan, efek skill, dan dispatcher SkillsPort
+     (meneruskan combat/animasi NPC langka ke js/entities/). Wajib sebelum npc.js. -->
+<script src="js/ports.js"></script>
+<script src="js/npc.js"></script>
+<!-- Pengembara langka antar desa; bergantung pada NPCS & WGEN. -->
+<script src="js/npc_rare.js"></script>
+<script src="js/weather.js"></script>
+
+<script src="js/camera.js"></script>
+<script src="js/rpg.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/furni.js"></script>
+<!-- Quest wajib setelah furni/ui/rpg/monsters: modul ini membungkus fungsi
+     mereka (Monsters.kill, RPG.craft, UI.toggle) saat dimuat. -->
+<script src="js/quest.js"></script>
+
+  <script src="js/dungeon.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/ui_layout.js"></script>
+  <script src="js/ui_studio.js"></script>
+  <!-- Chat & terminal rahasia: butuh ITEMS/NPCS/Monsters/RPG, dan harus dimuat
+       sebelum input.js memakai flag Chat.active -->
+  <script src="js/chat.js"></script>
+  <script src="js/input.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
