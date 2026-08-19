@@ -237,13 +237,22 @@ const FX={
     /* spinG menyapu di dalam bidang tebasan sehingga busur terasa bergerak
        mengikuti ayunan, bukan muncul utuh lalu memudar. */
     const spinG=new THREE.Group();
-    mainArc.add(spinG);
     if(!vertical){
-      mainArc.rotation.x=-Math.PI/2;
-      mainArc.rotation.z=-yaw+Math.PI/2;
+      /* HORISONTAL: gelungkan cincin mendatar lewat tiltG (rotasi -90° di sumbu X),
+         lalu putar grup luar pada sumbu Y dunia mengikuti arah hadap pemain.
+         Cara lama (rotation.x + rotation.z sekaligus) menghasilkan arah tebasan
+         yang tidak sejajar depan pemain; struktur bersusun ini menjamin busur
+         selalu menghadap ke arah player menghadap. */
+      mainArc.rotation.y=yaw-Math.PI/2;
+      const tiltG=new THREE.Group();
+      tiltG.rotation.x=-Math.PI/2;
+      mainArc.add(tiltG);
+      tiltG.add(spinG);
     }else{
+      /* VERTIKAL: cincin tegak menghadap arah hadap */
       mainArc.rotation.y=yaw;
       mainArc.rotation.x=0.3;
+      mainArc.add(spinG);
     }
 
     // Primary swipe arc (glowing blade swipe - warna sesuai combo)
@@ -288,6 +297,18 @@ const FX={
     const glowArc=new THREE.Mesh(glowGeo,glowMat);
     glowArc.renderOrder=7;
     spinG.add(glowArc);
+
+    /* TEBASAN ANGIN PUTIH di ujung pedang: crescent putih tipis terang di tepi
+       luar sapuan (radius terbesar = ujung bilah), ikut tersapu bersama busur
+       sehingga terlihat seperti angin yang terbelah mengikuti arah pedang. */
+    const windGeo=new THREE.RingGeometry(1.45*boost,1.9*boost,24,1,-Math.PI*0.14,Math.PI*0.28);
+    const windMat=new THREE.MeshBasicMaterial({
+      color:0xffffff,transparent:true,opacity:0.95,
+      side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false
+    });
+    const windArc=new THREE.Mesh(windGeo,windMat);
+    windArc.renderOrder=11;
+    spinG.add(windArc);
 
     /* --- Afterimage (motion blur): salinan busur yang tertinggal di belakang
        sapuan, tiap lapis makin transparan. Inilah yang membuat tebasan

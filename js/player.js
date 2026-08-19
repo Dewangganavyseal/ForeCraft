@@ -981,10 +981,13 @@ const Player={
     if(this.inWater){
       if(this.pos.y<CFG.WATER_Y-0.55)this.vel.y+=19*dt;
       this.vel.y=clamp(this.vel.y,-3,3.5);
-      if(!wasInWater&&this.vel.y<-3){
-        FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,3);
-        FX.debris(this.pos.clone().setY(CFG.WATER_Y),0xbfe6f5,10,2.5);
-        Sfx.splash(true);
+      if(!wasInWater){
+        /* baru masuk air: suara kecebur — besar bila jatuh cepat, kecil bila
+           melangkah/nyemplung pelan */
+        const big=this.vel.y<-3;
+        FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,big?3:1.6);
+        FX.debris(this.pos.clone().setY(CFG.WATER_Y),0xbfe6f5,big?10:5,big?2.5:1.4);
+        Sfx.splash(big);
       }
     }
     /* horizontal + step-up
@@ -1071,12 +1074,13 @@ const Player={
     }
     if(this.pos.y<-6)this.respawn();
 
-    /* efek air saat bergerak */
+    /* efek air saat bergerak (berenang): desir air lembut berulang */
     const hspd=Math.hypot(this.vel.x,this.vel.z);
     if(this.inWater&&hspd>1.2){
       this.splashT-=dt;this.rippleT-=dt;
-      if(this.splashT<=0){this.splashT=0.16;
-        FX.debris(this.pos.clone().setY(CFG.WATER_Y),0xdff2fa,3,1.8);Sfx.splash(false);}
+      if(this.splashT<=0){this.splashT=0.22;
+        FX.debris(this.pos.clone().setY(CFG.WATER_Y),0xdff2fa,3,1.8);
+        if(typeof Sfx.swim==='function')Sfx.swim();else Sfx.splash(false);}
       if(this.rippleT<=0){this.rippleT=0.42;
         FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xbfe6f5,1.6);}
     }

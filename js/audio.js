@@ -82,6 +82,11 @@ const Sfx={
   hit(){this.noiseBurst(0.07,0.4,950);this.tone(150,0.11,'square',0.25,-50);},
   hurt(){this.tone(120,0.24,'sawtooth',0.4,-50);this.noiseBurst(0.15,0.25,500);},
   splash(big){this.noiseBurst(big?0.5:0.16,big?0.42:0.3,650);},
+  /* kayuhan renang: desir air lembut yang berulang saat berenang */
+  swim(){
+    this.noiseBurst(0.16,0.18,460+Math.random()*180);
+    this.tone(200+Math.random()*70,0.11,'sine',0.06,50);
+  },
   /* semburan asam lizard: desis basah + cipratan */
   cast(){this.noiseBurst(0.2,0.38,720);this.tone(280,0.16,'sawtooth',0.22,-130);},
   chop(){this.noiseBurst(0.09,0.4,420);this.tone(180,0.08,'square',0.22,-60);},
