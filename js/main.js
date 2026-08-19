@@ -464,7 +464,13 @@ const MainMenu={
   startNew(i){
     RPG.slot=i;
     RPG.clearSlot(i);
-    Game.begin(null,i);
+    /* Cutscene intro "Mimpi yang Terbakar": diputar SEKALI (disimpan di
+       localStorage) saat New Game pertama; New Game berikutnya langsung mulai. */
+    if(typeof CutsceneIntro!=='undefined'&&!CutsceneIntro.done()){
+      CutsceneIntro.play(()=>Game.begin(null,i));
+    }else{
+      Game.begin(null,i);
+    }
   },
 
   confirm(msg,onOk){
@@ -521,6 +527,67 @@ const Tutorial={
       this.markDone();
       ov.remove();
     });
+  },
+};
+
+/* =============================================================================
+   INTRO CUTSCENE — kisah "Mimpi yang Terbakar"
+   -----------------------------------------------------------------------------
+   Diputar SEKALI saja saat pertama kali New Game (flag di localStorage).
+   Cutscene dimuat dari Cutscene/Page 1 - Lost Memory.html dalam iframe
+   fullscreen dengan mode "?embed=1" (autoplay tanpa layar mulai). Saat selesai
+   atau dilewati, cutscene mengirim postMessage {type:'forecraft-cutscene'}
+   dan game langsung dimulai. Tombol "Lewati" bawaan cutscene mengakhiri
+   seketika (fade out -> mulai game).
+   ============================================================================= */
+const CutsceneIntro={
+  KEY:'forecraft_cutscene_v1',
+  SRC:'Cutscene/Page 1 - Lost Memory.html?embed=1',
+  active:false,
+
+  done(){
+    try{return localStorage.getItem(this.KEY)==='1';}catch(e){return true;}
+  },
+  markDone(){
+    try{localStorage.setItem(this.KEY,'1');}catch(e){}
+  },
+
+  play(onDone){
+    if(this.active)return;
+    this.active=true;
+    this.markDone();                    // dihitung sudah dilihat walau dilewati
+
+    /* pause musik main menu supaya tidak bertumpuk dengan audio cutscene;
+       musik dalam game akan dimulai oleh Game.begin() -> Music.start() */
+    if(typeof Music!=='undefined'&&Music.el){try{Music.el.pause();}catch(e){}}
+
+    const ov=document.createElement('div');
+    ov.id='cutscene-ov';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#000;';
+    const fr=document.createElement('iframe');
+    fr.src=this.SRC;
+    fr.setAttribute('allow','autoplay; fullscreen');
+    fr.style.cssText='display:block;width:100%;height:100%;border:0;';
+    ov.appendChild(fr);
+    document.body.appendChild(ov);
+
+    let finished=false,guard=null;
+    const finish=()=>{
+      if(finished)return;
+      finished=true;
+      window.removeEventListener('message',onMsg);
+      if(guard)clearTimeout(guard);
+      ov.remove();                      // buang iframe -> WebGL loop cutscene berhenti
+      this.active=false;
+      if(onDone)onDone();
+    };
+    const onMsg=(e)=>{
+      if(e&&e.data&&e.data.type==='forecraft-cutscene')finish();
+    };
+    window.addEventListener('message',onMsg);
+    /* jaring pengaman: bila file cutscene hilang / gagal mengirim sinyal,
+       game tetap bisa dimulai (maksimal menunggu 2 menit) */
+    guard=setTimeout(finish,120000);
   },
 };
 

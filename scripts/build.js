@@ -16,5 +16,9 @@ fs.cpSync(path.join(rootDir, 'js'), path.join(wwwDir, 'js'), { recursive: true }
 if (fs.existsSync(path.join(rootDir, 'Audio'))) {
   fs.cpSync(path.join(rootDir, 'Audio'), path.join(wwwDir, 'Audio'), { recursive: true });
 }
+/* folder Cutscene (intro story saat New Game) ikut disalin bila ada */
+if (fs.existsSync(path.join(rootDir, 'Cutscene'))) {
+  fs.cpSync(path.join(rootDir, 'Cutscene'), path.join(wwwDir, 'Cutscene'), { recursive: true });
+}
 
 console.log('Build completed: Assets successfully copied to www/');
