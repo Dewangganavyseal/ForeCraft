@@ -23,7 +23,7 @@ const UI={
     const hb=document.getElementById('hotbar');
     for(let i=0;i<7;i++){
       const d=document.createElement('div');d.className='hslot';
-      d.innerHTML=`<span class="key">${i+1}</span><span class="emo"></span><span class="cnt"></span>`;
+      d.innerHTML=`<span class="key">${i+1}</span><span class="emo"></span><span class="cnt"></span><span class="lvl"></span>`;
       const selectSlot=e=>{
         if(UI.open)return;
         e.preventDefault();
@@ -56,8 +56,9 @@ const UI={
       e.preventDefault();
       const arr=(+sl.dataset.g)===0?RPG.hotbar:RPG.bag;
       const s=arr[+sl.dataset.i];
-      /* pedang maupun armor bisa dipakai lewat klik kanan */
-      if(s&&(ITEMS[s.id].armor||ITEMS[s.id].weapon))RPG.equipItem(s.id);
+      /* pedang maupun armor bisa dipakai lewat klik kanan
+         (g & i diteruskan agar level tempa stack ikut terbawa) */
+      if(s&&(ITEMS[s.id].armor||ITEMS[s.id].weapon))RPG.equipItem(s.id,+sl.dataset.g,+sl.dataset.i);
 
     });
 
@@ -797,6 +798,8 @@ const UI={
       el.classList.toggle('sel',i===RPG.sel);
       el.querySelector('.emo').textContent=s?ITEMS[s.id].e:'';
       el.querySelector('.cnt').textContent=s&&s.n>1?s.n:'';
+      /* badge level tempa (Landasan Tempa) */
+      el.querySelector('.lvl').textContent=s&&s.lvl?'+'+s.lvl:'';
     }
     this.updateAttackIcon();
   },
@@ -819,16 +822,16 @@ const UI={
     }
   },
   /* ---------- panel ---------- */
-  PANELS:['bag','skills','craft','help','npc','chest','shop','term'],
+  PANELS:['bag','skills','craft','help','npc','chest','shop','term','anvil'],
   toggle(name){
     if(this.open===name)this.open=null;
     else{
       this.open=name;this.picked=null;
       /* Render dibungkus try/catch: bila satu panel gagal digambar, state
-         this.open tetap konsisten dan syncPanels() di bawah tetap jalan.
-         Tanpa ini, error di renderCraft membuat panel tidak pernah tampil
-         sekaligus mengunci input (open='craft' padahal panel tersembunyi),
-         sehingga tombol serang ikut mati. */
+          this.open tetap konsisten dan syncPanels() di bawah tetap jalan.
+          Tanpa ini, error di renderCraft membuat panel tidak pernah tampil
+          sekaligus mengunci input (open='craft' padahal panel tersembunyi),
+          sehingga tombol serang ikut mati. */
       try{
         if(name==='bag')this.renderBag();
         if(name==='skills')this.renderSkills();
@@ -836,6 +839,7 @@ const UI={
         if(name==='npc')this.renderNpcPanel();
         if(name==='chest')this.renderChest();
         if(name==='shop')this.renderShop();
+        if(name==='anvil'&&typeof Anvil!=='undefined')Anvil.render();
         /* terminal rahasia: isinya dibangun dinamis oleh modul chat */
         if(name==='term'&&typeof Chat!=='undefined')Chat.renderTerm();
       }catch(err){
@@ -875,8 +879,9 @@ const UI={
         if(this.picked&&this.picked.i===i&&this.picked.g===g)d.classList.add('picked');
         if(s){
           const it=ITEMS[s.id];
-          d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span>`;
-          d.title=this.itemTip(s.id);
+          d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span>`+
+            (s.lvl?`<span class="lvl">+${s.lvl}</span>`:'');
+          d.title=this.itemTip(s.id)+(s.lvl?`\n⚒️ Level tempa ${s.lvl}`:'');
           /* bingkai slot memakai warna rarity agar item langka mudah dikenali */
           if(it.rarity&&RARITY[it.rarity]){
             d.classList.add('r-'+it.rarity);
@@ -1111,20 +1116,23 @@ const UI={
     }
     return c.length?`<div class="stats">${c.join('')}</div>`:'';
   },
-  /* ---------- slot perlengkapan (senjata + armor) ---------- */
+  /* ---------- slot perlengkapan (armor + tameng; khusus karakter utama) ---------- */
   renderEquip(){
     const el=document.getElementById('equip-grid');
     if(!el)return;
     el.innerHTML='';
-    for(const s of ARMOR_SLOTS){
-      const id=RPG.equip[s.id];
+    const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
+    for(const s of slots){
+      const id=RPG.equipId?RPG.equipId(s.id):RPG.equip[s.id];
+      const lvl=RPG.equipLv?RPG.equipLv(s.id):0;
       const d=document.createElement('div');
       d.className='slot eq'+(id?' filled':'');
       d.dataset.slot=s.id;
       if(id){
         const it=ITEMS[id];
-        d.innerHTML=`<span class="lbl">${s.name}</span>${it.e}`;
-        d.title=this.itemTip(id)+'\nKlik untuk melepas';
+        d.innerHTML=`<span class="lbl">${s.name}</span>${it.e}`+
+          (lvl?`<span class="lvl">+${lvl}</span>`:'');
+        d.title=this.itemTip(id)+(lvl?`\n⚒️ Level tempa ${lvl}`:'')+'\nKlik untuk melepas';
         if(it.rarity&&RARITY[it.rarity]){
           d.classList.add('r-'+it.rarity);
           d.style.borderColor=RARITY[it.rarity].css;

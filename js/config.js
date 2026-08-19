@@ -304,6 +304,25 @@ const ITEMS={
     armor:{slot:'chest',def:0.28,tier:'crystal',fx:'regen'}},
   helm_thorns:{n:'Mahkota Duri Titan',e:'😈',rarity:'legendary',
     armor:{slot:'helm',def:0.24,tier:'crystal',fx:'thorns'}},
+
+  /* ================= TAMENG (slot shield — khusus karakter utama) =================
+     Tujuh tameng dari NEW MODEL/Tameng.html. `tier` menentukan bahan
+     enchant di Landasan Tempa (anvil), bukan warna model — tiap tameng
+     punya model voxel unik sendiri di js/player/shields.js. */
+  shield_wood:  {n:'Tameng Kayu',      e:'🛡️',rarity:'common',
+    armor:{slot:'shield',def:0.05,tier:'leather'}},
+  shield_iron:  {n:'Tameng Ksatria Besi',e:'🛡️',rarity:'uncommon',
+    armor:{slot:'shield',def:0.10,tier:'iron'}},
+  shield_flame: {n:'Tameng Bara',      e:'🛡️',rarity:'rare',
+    armor:{slot:'shield',def:0.13,tier:'gold'}},
+  shield_venom: {n:'Tameng Bisa',      e:'🛡️',rarity:'rare',
+    armor:{slot:'shield',def:0.12,tier:'iron'}},
+  shield_storm: {n:'Tameng Badai',     e:'🛡️',rarity:'epic',
+    armor:{slot:'shield',def:0.15,tier:'gold'}},
+  shield_frost: {n:'Tameng Fajar Beku',e:'🛡️',rarity:'epic',
+    armor:{slot:'shield',def:0.17,tier:'crystal'}},
+  shield_dark:  {n:'Tameng Bayangan',  e:'🛡️',rarity:'legendary',
+    armor:{slot:'shield',def:0.20,tier:'crystal'}},
 };
 /* rarity default untuk item lama agar UI tetap konsisten */
 (function(){
@@ -329,6 +348,9 @@ const ARMOR_SLOTS=[
   {id:'chest',name:'Badan', e:'👕'},
   {id:'boots',name:'Kaki',  e:'👣'},
 ];
+/* slot perlengkapan KHUSUS karakter utama: armor dasar + tameng.
+   NPC/rekan tetap memakai NPC_GEAR_SLOTS (tanpa tameng). */
+const PLAYER_GEAR_SLOTS=ARMOR_SLOTS.concat([{id:'shield',name:'Tameng',e:'🛡️'}]);
 /* slot perlengkapan NPC/rekan: rekan masih bisa memegang senjata sendiri */
 const NPC_GEAR_SLOTS=[{id:'weapon',name:'Senjata',e:'🗡️'}].concat(ARMOR_SLOTS);
 
@@ -352,7 +374,11 @@ const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mus
   sword_wood:0xc2a06a,sword_iron:0xdce2ea,sword_storm:0xbfe6ff,
   sword_venom:0xa8e86a,sword_frost:0xd6f4ff,sword_titan:0xffb066,
   cloak_swift:0x8fe0ff,helm_guard:0xc9d2dc,boots_greed:0xffd24d,
-  plate_regen:0x7dffb0,helm_thorns:0xff6bd6};
+  plate_regen:0x7dffb0,helm_thorns:0xff6bd6,
+  /* tameng */
+  shield_wood:0x9c6b35,shield_iron:0xa8b2bd,shield_flame:0xff7a1f,
+  shield_venom:0x2bcc4f,shield_storm:0xffd75e,shield_frost:0x9fd6ff,
+  shield_dark:0xa633ff};
 
 
 
@@ -409,6 +435,17 @@ const RECIPES=[
   {out:'boots_greed',need:{gold_ingot:3,pelt:2},skill:'smith',prof:{mining:12},name:'Sepatu Pemburu Harta'},
   {out:'plate_regen',need:{crystal:4,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Zirah Nadi Kristal'},
   {out:'helm_thorns',need:{crystal:3,venom:5,boss_core:2},skill:'smith',prof:{mining:18},name:'Mahkota Duri Titan'},
+
+  /* ================= TEMPA TAMENG =================
+     Rantai upgrade: kayu → besi → (bara/bisa) → badai → beku → bayangan.
+     Tier bahan mengikuti rarity logamnya. */
+  {out:'shield_wood',need:{wood:6,fiber:2},name:'Tameng Kayu'},
+  {out:'shield_iron',need:{shield_wood:1,iron_ingot:4,leather:1},skill:'smith',prof:{mining:5},name:'Tameng Ksatria Besi'},
+  {out:'shield_flame',need:{shield_iron:1,gold_ingot:3,coal:4},skill:'smith',prof:{mining:10},name:'Tameng Bara'},
+  {out:'shield_venom',need:{shield_iron:1,venom:5,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Tameng Bisa'},
+  {out:'shield_storm',need:{shield_flame:1,gold_ingot:4,crystal:2},skill:'smith',prof:{mining:15},name:'Tameng Badai'},
+  {out:'shield_frost',need:{shield_storm:1,crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Tameng Fajar Beku'},
+  {out:'shield_dark',need:{shield_frost:1,boss_core:2,crystal:4},skill:'smith',prof:{mining:22},name:'Tameng Bayangan'},
 ];
 
 
@@ -698,8 +735,9 @@ function itemStats(id){
   }
   if(it.armor){
     out.push({k:'DEF',v:'+'+Math.round(it.armor.def*mul*100)+'%',e:'🛡️',css:'#8fe0ff'});
-    if(ARMOR_SLOTS.some(s=>s.id===it.armor.slot)){
-      const sl=ARMOR_SLOTS.find(s=>s.id===it.armor.slot);
+    const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
+    if(slots.some(s=>s.id===it.armor.slot)){
+      const sl=slots.find(s=>s.id===it.armor.slot);
       out.push({k:'Slot',v:sl.name,e:sl.e,css:'#c9d2dc'});
     }
   }
@@ -738,10 +776,17 @@ Object.assign(ITEMS,{
   /* Papan Quest: salinan papan pengumuman desa yang bisa dipasang di basis
      sendiri, sehingga pemain tidak perlu balik ke desa hanya untuk lapor. */
   f_board:{n:'Papan Quest', e:'📜', place:'board', rarity:'uncommon'},
+  /* ---------- STASIUN KERJA (model voxel dari NEW MODEL/Workstation.html) ----------
+     Meja Kayu biasa kini hanya dekorasi; crafting dilakukan di Meja Kerja. */
+  f_workbench:{n:'Meja Kerja', e:'🔨', place:'workbench', rarity:'common'},
+  f_anvil:    {n:'Landasan Tempa', e:'⚒️', place:'anvil', rarity:'rare'},
+  f_stove:    {n:'Tungku Masak', e:'🍲', place:'stove', rarity:'uncommon'},
+  f_campfire: {n:'Api Unggun', e:'🔥', place:'campfire', rarity:'common'},
 });
 
 Object.assign(DROP_COLOR,{f_table:0x8a5a2b,f_chair:0x8a5a2b,f_bed:0xc23b3b,
-  f_chest:0x9a6b3c,f_boat:0xb07c46,f_board:0x8a5a2b});
+  f_chest:0x9a6b3c,f_boat:0xb07c46,f_board:0x8a5a2b,
+  f_workbench:0xb8894f,f_anvil:0x474c52,f_stove:0x8f4a38,f_campfire:0x5a4128});
 
 
 RECIPES.push(
@@ -754,7 +799,13 @@ RECIPES.push(
      crafting berhenti dengan error dan panel Craft tidak pernah tampil. */
   {out:'f_boat', need:{wood:9,fiber:3,resin:1},name:'Perahu Kayu'},
 
-  {out:'f_board',need:{wood:8,fiber:4,resin:2},name:'Papan Quest'}
+  {out:'f_board',need:{wood:8,fiber:4,resin:2},name:'Papan Quest'},
+
+  /* ---------- stasiun kerja ---------- */
+  {out:'f_workbench',need:{wood:8,stone:4,fiber:2},name:'Meja Kerja'},
+  {out:'f_stove',need:{stone:10,wood:4,coal:2},name:'Tungku Masak'},
+  {out:'f_campfire',need:{wood:5,fiber:2,coal:1},name:'Api Unggun'},
+  {out:'f_anvil',need:{iron_ingot:6,stone:6,wood:2},skill:'smith',prof:{mining:8},name:'Landasan Tempa'}
 );
 
 

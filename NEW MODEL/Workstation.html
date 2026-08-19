@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Craftset — Anvil, Stove, Crafting Bench, Campfire</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#fff;font-family:system-ui,Arial,sans-serif}
+  canvas{display:block}
+  #info{position:fixed;top:14px;left:16px;color:#a0a6ac;font-size:13px;letter-spacing:.4px;user-select:none;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="info">VOXEL CRAFTSET &nbsp;•&nbsp; drag = putar &nbsp;•&nbsp; scroll = zoom</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   SETUP DASAR — scene putih polos, tanpa post-processing
+============================================================ */
+const VOX = 0.3;
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0xffffff);
+document.body.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 120);
+camera.position.set(10.5, 8, 13);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.6, 0);
+controls.enableDamping = true;  controls.dampingFactor = 0.06;
+controls.autoRotate = true;     controls.autoRotateSpeed = 0.7;
+controls.minDistance = 7;       controls.maxDistance = 34;
+controls.maxPolarAngle = Math.PI/2 - 0.06;
+controls.enablePan = false;
+controls.addEventListener('start', ()=> controls.autoRotate = false);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xe3e7ec, 0.95));
+const sun  = new THREE.DirectionalLight(0xffffff, 1.15); sun.position.set(8,14,10); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.32); fill.position.set(-9,6,-8); scene.add(fill);
+
+/* ============================================================
+   HELPER VOXEL
+============================================================ */
+class Vox {
+  constructor(){ this.m = new Map(); }
+  k(x,y,z){ return x+','+y+','+z; }
+  set(x,y,z,c){ this.m.set(this.k(x,y,z), c); }
+  del(x,y,z){ this.m.delete(this.k(x,y,z)); }
+  box(x1,y1,z1,x2,y2,z2,c){
+    for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++)for(let z=z1;z<=z2;z++) this.set(x,y,z,c);
+  }
+  delBox(x1,y1,z1,x2,y2,z2){
+    for(let x=x1;x<=x2;x++)for(let y=y1;y<=y2;y++)for(let z=z1;z<=z2;z++) this.del(x,y,z);
+  }
+}
+
+function hash3(x,y,z){ const s = Math.sin(x*127.1 + y*311.7 + z*74.7)*43758.5453; return s-Math.floor(s); }
+
+const voxGeo   = new THREE.BoxGeometry(VOX, VOX, VOX);
+const solidMat = new THREE.MeshLambertMaterial();
+const glowMat  = new THREE.MeshBasicMaterial();
+
+function toMesh(vox, mat){
+  const arr  = [...vox.m];
+  const mesh = new THREE.InstancedMesh(voxGeo, mat, arr.length);
+  const d = new THREE.Object3D(), c = new THREE.Color();
+  arr.forEach(([key, col], i)=>{
+    const [x,y,z] = key.split(',').map(Number);
+    d.position.set((x-7.5)*VOX, y*VOX + VOX*0.5, (z-7.5)*VOX);
+    d.updateMatrix();
+    mesh.setMatrixAt(i, d.matrix);
+    c.setHex(col).multiplyScalar(0.9 + hash3(x,y,z)*0.16);
+    mesh.setColorAt(i, c);
+  });
+  mesh.instanceColor.needsUpdate = true;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+/* ============================================================
+   MODEL 1 — ANVIL
+============================================================ */
+function buildAnvil(){
+  const v = new Vox();
+  const EDGE=0x25282c, DARK=0x34383d, MID=0x474c52, LIGHT=0x5c6268, FACE=0x6a7077, HI=0x7d848c;
+
+  v.box(2,0,2, 13,2,13, MID);
+  v.box(2,0,2, 13,0,13, DARK);
+  v.box(5,3,5, 10,8,10, DARK);
+  v.box(5,3,5, 10,3,10, EDGE);
+
+  v.box(0,9,2, 15,14,13, MID);
+  v.box(0,13,2, 15,14,13, LIGHT);
+  v.box(1,14,3, 14,14,12, FACE);
+  v.box(0,15,2, 15,15,2, EDGE);  v.box(0,15,13, 15,15,13, EDGE);
+  v.box(0,15,3, 0,15,12, EDGE);  v.box(15,15,3, 15,15,12, EDGE);
+  [[0,2],[15,2],[0,13],[15,13]].forEach(([x,z])=> v.del(x,9,z));
+  [[3,5],[6,9],[10,4],[12,10],[8,12],[4,11]].forEach(([x,z])=> v.set(x,14,z,EDGE));
+  [[5,7],[11,6],[13,11]].forEach(([x,z])=> v.set(x,14,z,HI));
+  return { solid:v };
+}
+
+/* ============================================================
+   MODEL 2 — CRAFTING BENCH  (BARU: meja kerja kayu biasa,
+   bukan kubus grid ala Minecraft)
+============================================================ */
+function buildBench(){
+  const v = new Vox();
+  const LEG=0x4d2f16, RAIL=0x7a4a24, SHELF=0x8a5c34, TOP=0xb8894f,
+        SEAM=0x66401f, TOP2=0xc79a63, IRON=0x9aa1a8, IRON_D=0x70767d,
+        WOOD_D=0x452a12, CRATE=0x5a3a1e;
+
+  // 4 kaki meja (2x2 voxel, kokoh)
+  for(const [x0,z0] of [[0,0],[14,0],[0,14],[14,14]])
+    v.box(x0,0,z0, x0+1,12,z0+1, LEG);
+
+  // rel / apron pengikat antar kaki
+  v.box(2,10,0, 13,11,0, RAIL);   v.box(2,10,15, 13,11,15, RAIL);
+  v.box(0,10,2, 0,11,13, RAIL);   v.box(15,10,2, 15,11,13, RAIL);
+
+  // rak bawah + garis papan
+  v.box(1,3,1, 14,4,14, SHELF);
+  v.box(1,4,5, 14,4,5, SEAM);  v.box(1,4,9, 14,4,9, SEAM);
+
+  // peti kayu di atas rak
+  v.box(3,5,9, 6,8,12, CRATE);
+  v.box(3,8,9, 6,8,12, SHELF);           // tutup peti
+  v.box(3,5,9, 3,8,9, WOOD_D);           // trim sudut peti
+  v.box(6,5,12, 6,8,12, WOOD_D);
+
+  // daun meja tebal 3 lapis, penuh 16x16
+  v.box(0,13,0, 15,15,15, TOP);
+  for(const sx of [4,8,12])              // sambungan papan sejajar
+    v.box(sx,15,0, sx,15,15, SEAM);
+  // bingkai tepi meja
+  v.box(0,15,0, 15,15,0, SEAM);   v.box(0,15,15, 15,15,15, SEAM);
+  v.box(0,15,1, 0,15,14, SEAM);   v.box(15,15,1, 15,15,14, SEAM);
+  // goresan bekas pemakaian
+  [[2,7],[6,13],[10,2],[13,9]].forEach(([x,z])=> v.set(x,15,z,SEAM));
+
+  // ---- perkakas tergeletak di atas meja ----
+  // palu: gagang memanjang + kepala besi 2 voxel tinggi
+  v.box(3,16,11, 8,16,11, WOOD_D);
+  v.box(9,16,10, 10,17,12, IRON);
+  // gergaji: bilah tipis + gagang
+  v.box(10,16,4, 14,16,4, IRON_D);
+  v.box(8,16,4, 9,17,4, WOOD_D);
+  // tumpukan papan
+  v.box(2,16,3, 6,16,6, SHELF);
+  v.box(3,17,4, 6,17,5, TOP2);
+
+  return { solid:v };
+}
+
+/* ============================================================
+   MODEL 3 — STOVE
+============================================================ */
+function buildStove(){
+  const v = new Vox(), g = new Vox();
+  const BRICK=0x8f4a38, BRICK2=0x9d5844, MORTAR=0xd8cfc0,
+        IRON=0x43484e, IRON_D=0x2c3035, IRON_L=0x5c636b, POT=0x24272b;
+  const EMB=[0xff7a1e, 0xffa02e, 0xe85d04, 0xffc83d];
+
+  v.box(0,0,0, 15,11,15, BRICK);
+  for(let i=0;i<120;i++){
+    if(Math.random()<0.5) continue;
+    const f=(Math.random()*4)|0, a=(Math.random()*16)|0, b=(Math.random()*12)|0;
+    if(f===0)v.set(a,b,0,BRICK2); else if(f===1)v.set(a,b,15,BRICK2);
+    else if(f===2)v.set(0,b,a,BRICK2); else v.set(15,b,a,BRICK2);
+  }
+  for(const ym of [2,5,8,11]) v.box(0,ym,0, 15,ym,15, MORTAR);
+  const seamX=[[5,11],[2,8,13],[5,11],[2,8,13]];
+  const seamZ=[[3,9],[6,12],[3,9],[6,12]];
+  for(let c=0;c<4;c++){
+    const y0=c*3, y1=c*3+1;
+    for(const sx of seamX[c]) v.box(sx,y0,0, sx,y1,15, MORTAR);
+    for(const sz of seamZ[c]) v.box(0,y0,sz, 15,y1,sz, MORTAR);
+  }
+
+  v.delBox(5,1,12, 10,5,15);  v.delBox(6,6,12, 9,6,15);
+  for(let x=6;x<=9;x++)for(let y=1;y<=2;y++) g.set(x,y,12, EMB[(x+y)%4]);
+  g.set(7,3,12,0xffc83d); g.set(8,3,12,0xff7a1e);
+  g.set(7,1,13,0xffd75e); g.set(8,1,13,0xffb13d);
+  g.set(7,2,13,0xffa02e); g.set(8,2,14,0xff7a1e); g.set(7,3,13,0xff5a00);
+
+  for(let y=1;y<=6;y++){ v.set(4,y,15,IRON_D); v.set(11,y,15,IRON_D); }
+  for(let x=5;x<=10;x++) v.set(x,7,15,IRON_D);
+  v.set(5,6,15,IRON_D); v.set(10,6,15,IRON_D);
+  [[6,8],[8,8],[7,9],[9,10]].forEach(([x,y])=> v.set(x,y,15,0x5a4a42));
+
+  v.box(0,12,0, 15,12,15, IRON);
+  v.delBox(6,12,6, 9,12,9);
+  for(let x=6;x<=9;x++)for(let z=6;z<=9;z++){
+    g.set(x,11,z, EMB[(x*z+x)%4]);
+    if((x+z)%2===0) v.set(x,12,z, IRON_D);
+  }
+  v.box(0,13,0, 15,13,0, IRON_L);  v.box(0,13,15, 15,13,15, IRON_L);
+  v.box(0,13,1, 0,13,14, IRON_L);  v.box(15,13,1, 15,13,14, IRON_L);
+
+  v.box(12,13,1, 14,19,3, IRON_D);
+  v.box(12,15,1, 14,15,3, IRON);  v.box(12,17,1, 14,17,3, IRON);
+  v.box(11,20,0, 15,20,4, IRON);  v.del(13,20,2);  v.set(13,19,2, 0x17181a);
+
+  v.box(2,13,10, 5,16,13, POT);
+  v.delBox(3,14,11, 4,16,12);
+  return { solid:v, glow:g, chimney:[13,21,2] };
+}
+
+/* ============================================================
+   MODEL 4 — CAMPFIRE
+============================================================ */
+function buildCampfire(){
+  const v = new Vox(), g = new Vox();
+  const BARK=0x5a4128, BARK_D=0x4a3520, BARK_L=0x6b4e31,
+        END=0xc19a6b, RING=0x8a6a3e, CHAR=0x282420;
+
+  function logX(z0){
+    for(let x=0;x<16;x++)for(let y=0;y<3;y++)for(let z=z0;z<z0+2;z++){
+      let c=BARK;
+      if(y===2) c=BARK_L; else if(x%4 === ((z0===2)?1:3)) c=BARK_D;
+      v.set(x,y,z,c);
+    }
+    for(const xe of [0,15])for(let y=0;y<3;y++)for(let z=z0;z<z0+2;z++) v.set(xe,y,z,END);
+    v.set(0,1,z0,RING); v.set(0,1,z0+1,RING); v.set(15,1,z0,RING); v.set(15,1,z0+1,RING);
+  }
+  function logZ(x0){
+    for(let z=0;z<16;z++)for(let y=0;y<3;y++)for(let x=x0;x<x0+2;x++){
+      let c=BARK;
+      if(y===2) c=BARK_L; else if(z%4 === ((x0===2)?2:0)) c=BARK_D;
+      v.set(x,y,z,c);
+    }
+    for(const ze of [0,15])for(let y=0;y<3;y++)for(let x=x0;x<x0+2;x++) v.set(x,y,ze,END);
+    v.set(x0,1,0,RING); v.set(x0+1,1,0,RING); v.set(x0,1,15,RING); v.set(x0+1,1,15,RING);
+  }
+  logX(2); logX(12); logZ(2); logZ(12);
+
+  for(let x=5;x<=10;x++)for(let z=5;z<=10;z++){
+    v.set(x,0,z,CHAR);
+    const h = hash3(x,1,z);
+    if(h>0.72)      g.set(x,1,z,0xff7a1e);
+    else if(h>0.58) g.set(x,1,z,0xffa02e);
+    else if(h<0.2)  v.set(x,1,z,CHAR);
+  }
+  g.set(7,1,7,0xffd75e); g.set(8,1,8,0xffd75e); g.set(7,1,8,0xffb13d); g.set(8,1,7,0xffb13d);
+  g.set(7,2,7,0xffa02e); g.set(8,2,8,0xff8c1a); g.set(8,2,7,0xffc83d);
+  g.set(7,3,8,0xff7a1e); g.set(8,3,7,0xff5a00); g.set(7,4,7,0xff5a00);
+  return { solid:v, glow:g };
+}
+
+/* ============================================================
+   PARTIKEL RINGAN (shader point sederhana)
+============================================================ */
+const softTex = (()=>{
+  const c=document.createElement('canvas'); c.width=c.height=64;
+  const x=c.getContext('2d');
+  const gr=x.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');
+  gr.addColorStop(0.35,'rgba(255,255,255,0.7)');
+  gr.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=gr; x.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+})();
+
+const VS = `
+attribute float aAlpha; attribute float aSize; attribute vec3 color;
+varying float vA; varying vec3 vC; uniform float uScale;
+void main(){
+  vA=aAlpha; vC=color;
+  vec4 mv = modelViewMatrix * vec4(position,1.0);
+  gl_PointSize = aSize * uScale / -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+const FS = `
+uniform sampler2D uTex; varying float vA; varying vec3 vC;
+void main(){
+  float a = texture2D(uTex, gl_PointCoord).a * vA;
+  if(a < 0.02) discard;
+  gl_FragColor = vec4(vC, a);
+}`;
+
+const mixc = (a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const fireRamp  = t => t<0.2 ? mixc([1,0.95,0.60],[1,0.65,0.22],t/0.2)
+                   : t<0.6 ? mixc([1,0.65,0.22],[0.94,0.30,0.06],(t-0.2)/0.4)
+                   :         mixc([0.94,0.30,0.06],[0.50,0.10,0.03],(t-0.6)/0.4);
+const smokeRamp = t => { const g=0.5+t*0.42; return [g,g,g]; };
+
+class Particles{
+  constructor(o){
+    this.o=o; const n=o.count; this.n=n;
+    this.pos=new Float32Array(n*3); this.col=new Float32Array(n*3);
+    this.al=new Float32Array(n);    this.sz=new Float32Array(n);
+    this.life=new Float32Array(n);  this.max=new Float32Array(n);
+    this.vel=new Float32Array(n*3); this.ph=new Float32Array(n);
+    for(let i=0;i<n;i++) this.spawn(i,true);
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos,3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(this.col,3));
+    geo.setAttribute('aAlpha',   new THREE.BufferAttribute(this.al,1));
+    geo.setAttribute('aSize',    new THREE.BufferAttribute(this.sz,1));
+    this.mat=new THREE.ShaderMaterial({
+      uniforms:{ uTex:{value:softTex}, uScale:{value:innerHeight*0.9} },
+      vertexShader:VS, fragmentShader:FS, transparent:true, depthWrite:false });
+    this.pts=new THREE.Points(geo,this.mat);
+    this.pts.frustumCulled=false;
+  }
+  spawn(i,init){
+    const o=this.o, i3=i*3;
+    const a=Math.random()*6.283, r=Math.sqrt(Math.random())*o.radius;
+    this.max[i]=o.life[0]+Math.random()*(o.life[1]-o.life[0]);
+    this.life[i]=this.max[i];
+    this.vel[i3]  =(Math.random()-0.5)*o.spread;
+    this.vel[i3+1]= o.rise*(0.75+Math.random()*0.5);
+    this.vel[i3+2]=(Math.random()-0.5)*o.spread;
+    this.ph[i]=Math.random()*6.283;
+    this.pos[i3]=o.origin[0]+Math.cos(a)*r; this.pos[i3+1]=o.origin[1]; this.pos[i3+2]=o.origin[2]+Math.sin(a)*r;
+    if(init){
+      const adv=this.max[i]*Math.random();
+      this.life[i]-=adv;
+      this.pos[i3]+=this.vel[i3]*adv; this.pos[i3+1]+=this.vel[i3+1]*adv; this.pos[i3+2]+=this.vel[i3+2]*adv;
+    }
+  }
+  update(dt,t){
+    const o=this.o;
+    for(let i=0;i<this.n;i++){
+      const i3=i*3;
+      this.life[i]-=dt;
+      if(this.life[i]<=0){ this.spawn(i); continue; }
+      const lt=1-this.life[i]/this.max[i];
+      this.pos[i3]  +=(this.vel[i3]+Math.sin(t*2.1+this.ph[i])*o.sway)*dt;
+      this.pos[i3+1]+= this.vel[i3+1]*dt;
+      this.pos[i3+2]+=(this.vel[i3+2]+Math.cos(t*1.7+this.ph[i])*o.sway*0.8+(o.wind||0))*dt;
+      const c=o.ramp(lt);
+      this.col[i3]=c[0]; this.col[i3+1]=c[1]; this.col[i3+2]=c[2];
+      this.al[i]=o.alpha(lt);
+      this.sz[i]=o.size*o.grow(lt);
+    }
+    const a=this.pts.geometry.attributes;
+    a.position.needsUpdate=a.color.needsUpdate=a.aAlpha.needsUpdate=a.aSize.needsUpdate=true;
+  }
+}
+
+/* ============================================================
+   RAKIT SCENE
+============================================================ */
+const SP = 5.2;
+const defs = [
+  { build:buildAnvil,    name:'Anvil',          pos:[-SP,0, SP] },
+  { build:buildBench,    name:'Crafting Bench', pos:[ SP,0, SP] },
+  { build:buildStove,    name:'Stove',          pos:[-SP,0,-SP] },
+  { build:buildCampfire, name:'Campfire',       pos:[ SP,0,-SP] },
+];
+
+const shadowTex = (()=>{
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const x=c.getContext('2d');
+  const g=x.createRadialGradient(128,128,10,128,128,128);
+  g.addColorStop(0,'rgba(0,0,0,0.26)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g; x.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(c);
+})();
+const shadowGeo=new THREE.PlaneGeometry(7.2,7.2);
+const shadowMat=new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false});
+
+function makeLabel(text){
+  const c=document.createElement('canvas'); c.width=512; c.height=128;
+  const x=c.getContext('2d');
+  x.font='600 56px system-ui, Arial'; x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#a3a9af'; x.fillText(text,256,64);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,opacity:0}));
+  s.scale.set(3.6,0.9,1);
+  return s;
+}
+
+const models=[];
+for(const d of defs){
+  const g=new THREE.Group(); g.position.set(...d.pos); g.scale.setScalar(1e-4);
+  const b=d.build();
+  g.add(toMesh(b.solid, solidMat));
+  if(b.glow) g.add(toMesh(b.glow, glowMat));
+  scene.add(g);
+
+  const sh=new THREE.Mesh(shadowGeo,shadowMat);
+  sh.rotation.x=-Math.PI/2; sh.position.set(d.pos[0],0.02,d.pos[2]);
+  if(d.name==='Campfire') sh.scale.setScalar(0.85);
+  scene.add(sh);
+
+  const lb=makeLabel(d.name); lb.position.set(d.pos[0],0.5,d.pos[2]+3.7); scene.add(lb);
+  models.push({ group:g, label:lb, built:b, delay:models.length*0.13 });
+}
+
+const stoveGroup = models[2].group, campGroup = models[3].group;
+
+const fireLight = new THREE.PointLight(0xff8a3c, 1.2, 8, 2);
+fireLight.position.set(SP, 1.2, -SP); scene.add(fireLight);
+const stoveLight = new THREE.PointLight(0xff7a2e, 0.7, 5, 2);
+stoveLight.position.set(-SP, 1.3, -SP+3.3); scene.add(stoveLight);
+
+const fireSys = new Particles({ count:64, size:0.55, life:[0.55,1.1], radius:0.38,
+  origin:[0,0.85,0], rise:1.8, spread:0.35, sway:0.16, ramp:fireRamp,
+  alpha:t=>{ const fi=t<0.12?t/0.12:1, fo=t>0.55?(1-t)/0.45:1; return 0.95*fi*fo; },
+  grow:t=>1-0.62*t });
+campGroup.add(fireSys.pts);
+
+const smokeSys = new Particles({ count:26, size:0.8, life:[1.6,2.8], radius:0.3,
+  origin:[0,1.7,0], rise:0.9, spread:0.22, sway:0.2, wind:0.12, ramp:smokeRamp,
+  alpha:t=>{ const fi=t<0.2?t/0.2:1, fo=t>0.45?(1-t)/0.55:1; return 0.22*fi*fo; },
+  grow:t=>0.55+1.5*t });
+campGroup.add(smokeSys.pts);
+
+const ch = models[2].built.chimney;
+const chimSys = new Particles({ count:14, size:0.5, life:[1.4,2.4], radius:0.16,
+  origin:[(ch[0]-7.5)*VOX, ch[1]*VOX, (ch[2]-7.5)*VOX], rise:1.0, spread:0.15, sway:0.12, wind:0.1,
+  ramp:smokeRamp,
+  alpha:t=>{ const fi=t<0.2?t/0.2:1, fo=t>0.45?(1-t)/0.55:1; return 0.18*fi*fo; },
+  grow:t=>0.5+1.4*t });
+stoveGroup.add(chimSys.pts);
+
+const allParticles=[fireSys,smokeSys,chimSys];
+
+/* ============================================================
+   LOOP ANIMASI
+============================================================ */
+const easeOutBack = x => { const c1=1.70158,c3=c1+1; return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2); };
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime;
+  controls.update();
+
+  models.forEach((m,i)=>{
+    const k=THREE.MathUtils.clamp((t-0.12*i-0.1)/0.7,0,1);
+    m.group.scale.setScalar(Math.max(1e-4, easeOutBack(k)));
+    m.label.material.opacity=THREE.MathUtils.clamp((t-0.12*i-0.55)/0.6,0,1)*0.95;
+  });
+
+  fireSys.update(dt,t); smokeSys.update(dt,t); chimSys.update(dt,t);
+
+  const fl=Math.max(0.45, 0.8+0.2*Math.sin(t*11)+0.15*Math.sin(t*23+1.3)+0.1*Math.sin(t*5.7));
+  fireLight.intensity  = 1.25*fl;
+  stoveLight.intensity = 0.75*(0.85+0.15*Math.sin(t*7+2));
+  glowMat.color.setScalar(0.8+0.2*fl);
+
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  for(const p of allParticles) p.mat.uniforms.uScale.value=innerHeight*0.9;
+});
+</script>
+</body>
+</html>

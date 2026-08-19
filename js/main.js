@@ -228,7 +228,9 @@ const Game={
       while(RPG.bag.length<RPG.bagMax())RPG.bag.push(null);
 
       const savedEq=save.equip||{};
-      RPG.equip={helm:savedEq.helm||null,chest:savedEq.chest||null,boots:savedEq.boots||null};
+      /* nilai slot bisa string (save lama) atau objek {id,lvl} hasil tempa */
+      RPG.equip={helm:savedEq.helm||null,chest:savedEq.chest||null,
+        boots:savedEq.boots||null,shield:savedEq.shield||null};
       if(savedEq.weapon)RPG.addItem(savedEq.weapon,1);
 
       Weather.time=save.time||0.32;Weather.day=save.day||1;

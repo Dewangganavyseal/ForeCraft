@@ -1604,6 +1604,39 @@ body.touch #place-bar{
   body.touch #questtrack{max-height:16vh}
 }
 
+/* =========================================================================
+   BADGE LEVEL TEMPA (Landasan Tempa) — angka kecil "+n" di sudut slot
+   ========================================================================= */
+.hslot .lvl,.slot .lvl{position:absolute;top:1px;right:4px;font-size:10px;font-weight:700;
+  color:#ffd24d;text-shadow:0 1px 2px rgba(0,0,0,.8);pointer-events:none}
+.slot.eq .lvl{top:auto;bottom:1px;right:4px}
+
+/* =========================================================================
+   PANEL LANDASAN TEMPA (ANVIL)
+   ========================================================================= */
+#anvil-body{display:flex;flex-direction:column;gap:12px}
+.anvil-list{display:flex;flex-wrap:wrap;gap:8px}
+.anvil-item{display:flex;align-items:center;gap:8px;padding:7px 10px;min-width:170px;
+  background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.14);border-radius:8px;
+  cursor:pointer;transition:border-color .12s,background .12s}
+.anvil-item:hover{border-color:#9fd77f}
+.anvil-item.sel{border-color:#ffd24d;background:rgba(255,210,77,.10);
+  box-shadow:0 0 10px rgba(255,210,77,.25)}
+.anvil-item .ai-ico{font-size:22px}
+.anvil-item .ai-nm{font-size:12px;line-height:1.25}
+.anvil-item .ai-nm i{font-size:10px;opacity:.6;font-style:normal}
+.ai-lv{display:inline-block;font-size:10px;font-weight:700;color:#ffd24d;
+  background:rgba(255,210,77,.14);border:1px solid rgba(255,210,77,.4);
+  border-radius:6px;padding:0 5px;margin-left:3px}
+.anvil-detail{background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:12px}
+.anvil-detail .ad-head{font-size:15px;margin-bottom:6px}
+.anvil-detail .ad-stat{font-size:13px;color:#8fe0ff;margin-bottom:8px}
+.anvil-detail .ad-cost{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;margin-bottom:10px}
+.anvil-detail .ad-cost .ok{color:#8fe07a}
+.anvil-detail .ad-cost .no{color:#ff7b6b}
+.anvil-go{font-size:14px;padding:8px 18px}
+
 
 
 

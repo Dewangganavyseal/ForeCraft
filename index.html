@@ -113,6 +113,15 @@
   <p class="tip">Harga beli tetap; harga jual setengah harga beli. Koin didapat dari quest, mengalahkan monster, dan menjual barang.</p>
 </div>
 
+<!-- ================= PANEL LANDASAN TEMPA (ANVIL) =================
+     Enchant equipment: menaikkan level pedang/armor/tameng dengan koin
+     dan bahan yang relevan. Dibuka lewat interaksi furnitur Landasan Tempa. -->
+<div class="panel hidden" id="panel-anvil">
+  <h2>⚒️ Landasan Tempa <button class="x" data-close="anvil">✕</button></h2>
+  <div class="sub">Tempa equipment untuk menaikkan Levelnya — bayar dengan 🪙 koin dan bahan yang relevan dengan equipment-nya.</div>
+  <div id="anvil-body"></div>
+</div>
+
 <!-- ================= TERMINAL (RAHASIA) =================
      Konsol dev tersembunyi: hanya bisa dibuka lewat kode khusus yang
      diketik di chat. Dipakai untuk men-spawn apa pun yang ada di game. -->
@@ -200,6 +209,9 @@
 <script src="js/player/weapons/weapon_sword_titan.js"></script>
 <script src="js/player/weapons/weapon_manager.js"></script>
 <script src="js/player/held_items.js"></script>
+<!-- Tujuh model tameng voxel (port NEW MODEL/Tameng.html); dipakai
+     Player.refreshShield() saat slot shield terisi. -->
+<script src="js/player/shields.js"></script>
 
 <!-- ============ ENTITAS: model 3D + animasi per NPC & mob ============
      Tiap file di js/entities/ memuat model dan animasi lengkap satu entitas.
@@ -251,7 +263,12 @@
 <script src="js/camera.js"></script>
 <script src="js/rpg.js"></script>
 <script src="js/ui.js"></script>
+<!-- Model voxel stasiun kerja (port NEW MODEL/Workstation.html): anvil,
+     meja kerja, tungku, api unggun. Dimuat sebelum furni.js yang memakainya. -->
+<script src="js/furni_workstation.js"></script>
 <script src="js/furni.js"></script>
+<!-- Landasan Tempa: panel enchant equipment (butuh UI/RPG/ITEMS di atas). -->
+<script src="js/anvil.js"></script>
 <!-- Quest wajib setelah furni/ui/rpg/monsters: modul ini membungkus fungsi
      mereka (Monsters.kill, RPG.craft, UI.toggle) saat dimuat. -->
 <script src="js/quest.js"></script>

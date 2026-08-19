@@ -7,8 +7,19 @@ const RPG={
   activeCD:{slam:0,whirl:0,roar:0,herb:0},
   roarT:0,                       // sisa durasi buff damage Teriakan Perang
   hotbar:new Array(7).fill(null),bag:new Array(14).fill(null),
-  /* hanya armor; senjata mengikuti item hotbar yang sedang dipilih */
-  equip:{helm:null,chest:null,boots:null},
+  /* armor + tameng (tameng khusus karakter utama). Nilai slot bisa berupa
+     string id (save lama) atau objek {id,lvl} hasil tempa Landasan Tempa —
+     baca selalu lewat equipId()/equipLv(). */
+  equip:{helm:null,chest:null,boots:null,shield:null},
+  equipId(slot){
+    const v=this.equip[slot];
+    if(!v)return null;
+    return typeof v==='string'?v:v.id;
+  },
+  equipLv(slot){
+    const v=this.equip[slot];
+    return (v&&typeof v==='object')?(v.lvl||0):0;
+  },
   /* Mata uang koin: didapat dari quest, drop monster, dan menjual item ke
      pedagang. Dipakai untuk membeli barang dari pedagang desa. */
   coin:0,
@@ -320,9 +331,16 @@ const RPG={
     const r=id&&ITEMS[id]&&ITEMS[id].rarity;
     return (r&&RARITY[r])?RARITY[r].mul:1;
   },
-  /* damage dasar pukulan: stat pedang × rarity × skill */
+  /* level tempa (Landasan Tempa) dari senjata yang sedang digenggam */
+  heldLv(){
+    if(this.sel<0)return 0;
+    const s=this.hotbar[this.sel];
+    return (s&&s.lvl)||0;
+  },
+  /* damage dasar pukulan: stat pedang × rarity × skill × level tempa */
   weaponDmg(){
-    return this.weapon().dmg*this.rarityMul(this.weaponId())*this.dmgMult();
+    const lvMul=1+(typeof Anvil!=='undefined'?Anvil.DMG_PER_LV:0.08)*this.heldLv();
+    return this.weapon().dmg*this.rarityMul(this.weaponId())*this.dmgMult()*lvMul;
   },
   weaponReach(){return this.weapon().reach;},
   weaponSpeed(){return this.weapon().spd;},
@@ -334,8 +352,9 @@ const RPG={
   /* daftar id efek aktif dari seluruh slot armor + senjata yang dipegang */
   gearEffects(){
     const out=[];
-    for(const s of ARMOR_SLOTS){
-      const id=this.equip[s.id];if(!id||!ITEMS[id])continue;
+    const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
+    for(const s of slots){
+      const id=this.equipId(s.id);if(!id||!ITEMS[id])continue;
       const it=ITEMS[id];
       const fx=(it.armor&&it.armor.fx)||(it.weapon&&it.weapon.fx);
       if(fx&&EFFECTS[fx])out.push(fx);
@@ -349,18 +368,25 @@ const RPG={
   hasEffect(fx){return this.gearEffects().indexOf(fx)>=0;},
 
   /* ---------- armor ---------- */
-  /* total reduksi damage 0..0.7 dari armor yang dipakai */
+  /* total reduksi damage 0..0.7 dari armor + tameng yang dipakai;
+     level tempa menambah pertahanan tiap item. */
   defense(){
     let d=0;
-    for(const s of ARMOR_SLOTS){
-      const id=this.equip[s.id];
-      if(id&&ITEMS[id]&&ITEMS[id].armor)d+=ITEMS[id].armor.def*this.rarityMul(id);
+    const lvMul=(typeof Anvil!=='undefined')?Anvil.DEF_PER_LV:0.06;
+    const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
+    for(const s of slots){
+      const id=this.equipId(s.id);
+      if(id&&ITEMS[id]&&ITEMS[id].armor){
+        const lv=this.equipLv(s.id);
+        d+=ITEMS[id].armor.def*this.rarityMul(id)*(1+lvMul*lv);
+      }
     }
     return Math.min(0.7,d);
   },
   /* pakai item armor dari hotbar-tas; item lama kembali ke inventory.
-     Senjata TIDAK dipasang lewat slot equipment — cukup pilih di hotbar. */
-  equipItem(id){
+     Senjata TIDAK dipasang lewat slot equipment — cukup pilih di hotbar.
+     g/i opsional = stack asal (agar level tempa item ikut terbawa). */
+  equipItem(id,g,i){
     const it=ITEMS[id];
     if(!it||!it.armor){
       if(it&&it.weapon)UI.toast('⚔️ Senjata dipakai dari hotbar');
@@ -369,22 +395,37 @@ const RPG={
     }
     if(this.countItem(id)<=0)return;
     const slot=it.armor.slot;
-    const old=this.equip[slot];
-    this.removeItems({[id]:1});
-    this.equip[slot]=id;
-    if(old)this.addItem(old,1);
+    /* cari stack sumber (prioritas slot yang ditunjuk UI) */
+    let arr=null,idx=-1;
+    if(g!=null&&i!=null){
+      const a=g===0?this.hotbar:this.bag;
+      if(a[i]&&a[i].id===id){arr=a;idx=i;}
+    }
+    if(!arr){
+      outer:
+      for(const a of[this.hotbar,this.bag])
+        for(let k=0;k<a.length;k++)
+          if(a[k]&&a[k].id===id){arr=a;idx=k;break outer;}
+    }
+    if(!arr)return;
+    const lvl=arr[idx].lvl||0;
+    const oldId=this.equipId(slot),oldLv=this.equipLv(slot);
+    arr[idx].n--;if(arr[idx].n<=0)arr[idx]=null;
+    this.equip[slot]=lvl?{id,lvl}:id;
+    if(oldId)this.addItem(oldId,1,oldLv);
     Sfx.craft();
     const fx=it.armor.fx?` · ${EFFECTS[it.armor.fx].e} ${EFFECTS[it.armor.fx].n}`:'';
-    UI.toast(`${it.e} ${it.n} dipakai · Pertahanan ${Math.round(this.defense()*100)}%${fx}`);
+    UI.toast(`${it.e} ${it.n}${lvl?' Lv '+lvl:''} dipakai · Pertahanan ${Math.round(this.defense()*100)}%${fx}`);
     Player.refreshArmor();
     UI.renderAll();
   },
 
   unequip(slot){
-    const id=this.equip[slot];
+    const id=this.equipId(slot);
     if(!id)return;
+    const lvl=this.equipLv(slot);
     this.equip[slot]=null;
-    if(this.addItem(id,1)>0){
+    if(this.addItem(id,1,lvl)>0){
       /* inventory penuh → jatuhkan ke tanah (jeda ambil agar tak langsung balik) */
       World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,id,1,{owner:true});
       UI.toast('🎒 Tas penuh, item dijatuhkan');
@@ -396,15 +437,22 @@ const RPG={
 
 
 
-  addItem(id,n){
+  addItem(id,n,lvl){
+    n=n||1;
+    /* item hasil tempa (lvl>0) tidak pernah digabung ke stack lain */
+    if(!lvl){
+      for(const arr of[this.hotbar,this.bag])
+        for(let i=0;i<arr.length;i++)
+          if(arr[i]&&arr[i].id===id&&!arr[i].lvl&&arr[i].n<64){
+            const add=Math.min(n,64-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)return 0;
+          }
+    }
     for(const arr of[this.hotbar,this.bag])
       for(let i=0;i<arr.length;i++)
-        if(arr[i]&&arr[i].id===id&&arr[i].n<64){
-          const add=Math.min(n,64-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)return 0;
+        if(!arr[i]){
+          arr[i]=lvl?{id,n:Math.min(n,64),lvl}:{id,n:Math.min(n,64)};
+          n-=Math.min(n,64);if(n<=0)return 0;
         }
-    for(const arr of[this.hotbar,this.bag])
-      for(let i=0;i<arr.length;i++)
-        if(!arr[i]){arr[i]={id,n:Math.min(n,64)};n-=Math.min(n,64);if(n<=0)return 0;}
     return n;
   },
   countItem(id){

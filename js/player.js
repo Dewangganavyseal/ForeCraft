@@ -223,12 +223,15 @@ const Player={
     /* --- wadah armor --- */
     this.armorG={helm:new THREE.Group(),chest:new THREE.Group(),
       bootL:new THREE.Group(),bootR:new THREE.Group(),
-      pauldL:new THREE.Group(),pauldR:new THREE.Group()};
+      pauldL:new THREE.Group(),pauldR:new THREE.Group(),
+      /* tameng (khusus karakter utama) menempel di lengan kiri */
+      shield:new THREE.Group()};
     head.add(this.armorG.helm);
     torso.add(this.armorG.chest);
     legL.userData.shin.add(this.armorG.bootL);
     legR.userData.shin.add(this.armorG.bootR);
     armL.add(this.armorG.pauldL);armR.add(this.armorG.pauldR);
+    armL.add(this.armorG.shield);
 
     /* parts.sword diisi refreshWeapon() (model pedang per senjata) */
     this.parts={...this.parts,legL,legR,armL,armR,head,torso,sword:null};
@@ -243,6 +246,7 @@ const Player={
   refreshArmor(){
     if(!this.armorG.helm)return;
     for(const k in this.armorG){
+      if(k==='shield')continue;  // dibersihkan & dibangun ulang oleh refreshShield()
       const g=this.armorG[k];
       while(g.children.length){
         const c=g.children.pop();
@@ -262,8 +266,9 @@ const Player={
        kubah 0.54×0.26×0.52 (menutupi rambut + margin), rim lebih lebar,
        pelat pipi digeser keluar, dan mata (y≈0.22) tetap terlihat di bawah
        rim (y≥0.30). */
-    if(eq.helm&&ITEMS[eq.helm]){
-      const t=ITEMS[eq.helm].armor.tier,C=ARMOR_TIER[t],G=this.armorG.helm;
+    const eHelm=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('helm'):(eq.helm||null);
+    if(eHelm&&ITEMS[eHelm]){
+      const t=ITEMS[eHelm].armor.tier,C=ARMOR_TIER[t],G=this.armorG.helm;
       if(t==='leather'){
         /* topi kulit: kubah besar + tepi lebar */
         G.add(this.pl(0.54,0.26,0.52,C.main,0.46));
@@ -301,8 +306,9 @@ const Player={
     }
 
     /* ===== CHEST + PAULDRON ===== */
-    if(eq.chest&&ITEMS[eq.chest]){
-      const t=ITEMS[eq.chest].armor.tier,C=ARMOR_TIER[t],G=this.armorG.chest;
+    const eChest=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('chest'):(eq.chest||null);
+    if(eChest&&ITEMS[eChest]){
+      const t=ITEMS[eChest].armor.tier,C=ARMOR_TIER[t],G=this.armorG.chest;
       if(t==='leather'){
         /* rompi kulit: panel depan + tali silang */
         G.add(this.pl(0.58,0.28,0.34,C.main,0.49));
@@ -356,8 +362,9 @@ const Player={
     }
 
     /* ===== BOOTS ===== */
-    if(eq.boots&&ITEMS[eq.boots]){
-      const t=ITEMS[eq.boots].armor.tier,C=ARMOR_TIER[t];
+    const eBoots=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('boots'):(eq.boots||null);
+    if(eBoots&&ITEMS[eBoots]){
+      const t=ITEMS[eBoots].armor.tier,C=ARMOR_TIER[t];
       for(const g of[this.armorG.bootL,this.armorG.bootR]){
         if(t==='leather'){
           g.add(this.pl(0.2,0.16,0.2,C.main,-0.2));
@@ -379,7 +386,28 @@ const Player={
         }
       }
     }
+    this.refreshShield();
     this.refreshWeapon();
+  },
+
+  /* ---------- pasang model tameng sesuai slot shield ----------
+     Model voxel unik per tameng dibangun ShieldModels (js/player/shields.js)
+     dan ditempel di lengan kiri (armorG.shield). Hanya karakter utama yang
+     punya slot tameng — NPC/rekan tidak. */
+  refreshShield(){
+    if(!this.armorG||!this.armorG.shield)return;
+    const G=this.armorG.shield;
+    while(G.children.length){
+      const c=G.children.pop();
+      c.traverse(o=>{if(o.isMesh){if(o.geometry)o.geometry.dispose();}});
+    }
+    const id=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('shield'):null;
+    if(!id||typeof ShieldModels==='undefined')return;
+    const m=ShieldModels.buildFor(id);
+    if(!m)return;
+    /* posisi di lengan kiri: menutup sisi depan-kiri tubuh, papan menghadap +Z */
+    m.position.set(0.02,-0.42,0.16);
+    G.add(m);
   },
 
   /* ---------- pasang model pedang sesuai senjata yang digenggam ----------

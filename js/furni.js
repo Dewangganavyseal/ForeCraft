@@ -54,10 +54,10 @@ const Furni={
      build(): mengembalikan THREE.Group (pusat di titik 0, berdiri di y=0)
      ========================================================================= */
   DEFS:{
-    table:{n:'Meja Kayu',e:'🍽️',item:'f_table',r:1.9,label:'🔨 Meja Kerja',
-      build(){return Furni.buildTable();},
-      use(){UI.toast('🔨 Meja kerja — panel crafting terbuka');Sfx.open();
-        if(UI.open!=='craft')UI.toggle('craft');}},
+    /* Meja kayu biasa kini DEKORASI saja — crafting pindah ke Meja Kerja
+       (workbench, model voxel dari NEW MODEL/Workstation.html). */
+    table:{n:'Meja Kayu',e:'🍽️',item:'f_table',r:1.9,decor:true,
+      build(){return Furni.buildTable();}},
     chair:{n:'Kursi Kayu',e:'💺',item:'f_chair',r:1.5,label:'💺 Duduk',
       build(){return Furni.buildChair();},
       use(f){Furni.sit(f);}},
@@ -65,15 +65,51 @@ const Furni={
       build(){return Furni.buildBed();},
       use(f){Furni.sleep(f);}},
     /* Peti: gudang pribadi. Isinya menempel pada objek peti (f.inv), bukan
-       inventory pemain, sehingga resource bisa dititipkan di basis. */
+        inventory pemain, sehingga resource bisa dititipkan di basis. */
     chest:{n:'Peti Penyimpanan',e:'🧰',item:'f_chest',r:1.7,label:'🧰 Buka Peti',
       build(){return Furni.buildChest();},
       use(f){Furni.openChest(f);}},
     /* Perahu: satu-satunya perabot yang hidup di atas air. Saat dinaiki,
-       pemain bergerak cepat di permukaan tanpa terkena penalti berenang. */
+        pemain bergerak cepat di permukaan tanpa terkena penalti berenang. */
     boat:{n:'Perahu Kayu',e:'🛶',item:'f_boat',r:2.2,label:'🛶 Naiki Perahu',
       build(){return Furni.buildBoat();},
       use(f){Furni.board(f);}},
+
+    /* ---------- STASIUN KERJA (model voxel Workstation.html) ---------- */
+    /* Meja Kerja: stasiun crafting pengganti meja biasa */
+    workbench:{n:'Meja Kerja',e:'🔨',item:'f_workbench',r:2.0,label:'🔨 Meja Kerja',
+      build(){return WSModels.make('bench',0.32);},
+      use(){UI.toast('🔨 Meja kerja — panel crafting terbuka');Sfx.open();
+        if(UI.open!=='craft')UI.toggle('craft');}},
+    /* Landasan Tempa: enchant/naikkan level equipment (panel anvil) */
+    anvil:{n:'Landasan Tempa',e:'⚒️',item:'f_anvil',r:1.9,label:'⚒️ Tempa Equipment',
+      build(){return WSModels.make('anvil',0.24);},
+      use(){UI.toast('⚒️ Landasan tempa — pilih equipment yang akan ditempa');Sfx.open();
+        if(UI.open!=='anvil')UI.toggle('anvil');}},
+    /* Tungku: stasiun memasak (panel crafting langsung ke tab Makanan) */
+    stove:{n:'Tungku Masak',e:'🍲',item:'f_stove',r:2.1,label:'🍲 Masak di Tungku',
+      build(){return WSModels.make('stove',0.27);},
+      use(){UI.toast('🍲 Tungku menyala — waktunya memasak');Sfx.open();
+        UI.craftTab='food';
+        if(UI.open!=='craft')UI.toggle('craft');}},
+    /* Api Unggun: tempat beristirahat — pulihkan HP & stamina (cooldown) */
+    campfire:{n:'Api Unggun',e:'🔥',item:'f_campfire',r:2.1,label:'🔥 Hangatkan Diri',
+      build(){return WSModels.make('campfire',0.30);},
+      use(f){Furni.warm(f);}},
+  },
+
+  /* beristirahat di api unggun: +HP & stamina, jeda 30 dtk per api */
+  warm(f){
+    const now=Date.now()/1000;
+    if(f.warmAt&&now-f.warmAt<30){
+      UI.toast('🔥 Apinya masih hangat — istirahat lagi nanti');return;
+    }
+    f.warmAt=now;
+    Player.hp=Math.min(Player.maxHp(),Player.hp+10);
+    Player.stamina=Math.min(Player.maxStamina(),Player.stamina+30);
+    if(typeof FX!=='undefined'&&FX.ring)FX.ring(f.x,f.y+0.6,f.z,0xffa04a);
+    Sfx.craft&&Sfx.craft();
+    UI.toast('🔥 Kamu menghangatkan diri · +10 ❤️ +30 ⚡');
   },
 
 
@@ -345,11 +381,14 @@ const Furni={
     }else if(!f.auto)this.save();
 
   },
-  /* perabot terdekat yang masih dalam radius interaksinya */
+  /* perabot terdekat yang masih dalam radius interaksinya
+     (perabot dekorasi tanpa aksi dilewati) */
   nearest(pos){
     let best=null,bd=1e9;
     for(const f of this.list){
-      const r=this.DEFS[f.def].r;
+      const def=this.DEFS[f.def];
+      if(!def||def.decor)continue;
+      const r=def.r;
       const d=Math.hypot(f.x-pos.x,f.z-pos.z);
       if(d<r&&d<bd&&Math.abs(f.y-pos.y)<2.6){best=f;bd=d;}
     }
@@ -357,7 +396,9 @@ const Furni={
   },
   interact(f){
     if(!f)return;
-    this.DEFS[f.def].use(f);
+    const def=this.DEFS[f.def];
+    if(!def||def.decor||!def.use)return;
+    def.use(f);
   },
 
   /* ---------- MODE PENEMPATAN dari item di hotbar ----------
@@ -937,7 +978,8 @@ const Furni={
      Semua perabot — termasuk milik desa — bisa dipukul sampai hancur dan
      menjatuhkan kembali itemnya, sehingga isi rumah desa bisa dipanen.
      ========================================================================= */
-  HP:{table:14,chair:10,bed:18,chest:24,boat:20,board:14},
+  HP:{table:14,chair:10,bed:18,chest:24,boat:20,board:14,
+    workbench:16,anvil:30,stove:24,campfire:10},
   hitNearest(pos,facing){
     let best=null,bd=1e9;
     for(const f of this.list){
