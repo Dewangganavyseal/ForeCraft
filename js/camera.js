@@ -27,7 +27,9 @@ const Cam={
     this.cam.updateProjectionMatrix();
   },
   update(dt,target){
-    this.yaw+=Input.camTurn()*dt*2.4;
+    /* di main menu kamera hanya mengorbit otomatis (updateMenu); rotasi lewat
+       panah dinonaktifkan supaya panorama tidak bisa diputar pengguna */
+    if(!(typeof Game!=='undefined'&&Game.menuMode))this.yaw+=Input.camTurn()*dt*2.4;
     this.zoom=lerp(this.zoom,this.targetZoom,clamp(8*dt,0,1));
     this.applyZoom();
     const e=this.elev,dist=this.DIST;

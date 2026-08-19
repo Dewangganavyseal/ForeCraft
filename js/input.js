@@ -115,12 +115,14 @@ const Input={
     window.addEventListener('mouseup',e=>{if(e.button===2)this.rmb=false;});
     window.addEventListener('mousemove',e=>{
       this.mouseX=e.clientX;this.mouseY=e.clientY;   // utk bidikan slam (PC)
-      if(this.rmb){Cam.yaw-=(e.clientX-this.lastMX)*0.005;this.lastMX=e.clientX;}
+      if(this.rmb&&!this.inMenu()){Cam.yaw-=(e.clientX-this.lastMX)*0.005;this.lastMX=e.clientX;}
     });
     window.addEventListener('wheel',e=>{
       /* Saat panel terbuka, roda mouse dipakai untuk menggulir isi panel —
          jangan ikut mengubah zoom kamera di belakangnya. */
       if(UI.open)return;
+      /* main menu: zoom kamera dinonaktifkan (panorama terkunci) */
+      if(this.inMenu())return;
       if(e.target&&e.target.closest&&e.target.closest('.panel,#team,#toast,#chat'))return;
       Cam.targetZoom=clamp(Cam.targetZoom*(1+e.deltaY*0.0012),5,16);
     },{passive:true});
@@ -207,8 +209,9 @@ const Input={
         if(t.identifier===jid)applyJoy(t.clientX,t.clientY);
         if(pos[t.identifier])pos[t.identifier]={x:t.clientX,y:t.clientY};
       }
-      /* DUA JARI: geser mendatar = putar kamera, cubit = zoom in/out */
-      if(cam.b!==null){
+      /* DUA JARI: geser mendatar = putar kamera, cubit = zoom in/out.
+         Dinonaktifkan di main menu (panorama terkunci). */
+      if(cam.b!==null&&!this.inMenu()){
         const d=twoDist(),mx=twoMidX();
         if(d>10&&cam.dist>10)
           Cam.targetZoom=clamp(cam.zoom*cam.dist/d,5,16);
@@ -234,8 +237,10 @@ const Input={
       }
     };
     window.addEventListener('touchend',end);window.addEventListener('touchcancel',end);
-    /* daftarkan jari di area dunia; kamera aktif saat jari kedua menyentuh */
+    /* daftarkan jari di area dunia; kamera aktif saat jari kedua menyentuh.
+       Di main menu pendaftaran kamera dilewati (panorama tidak boleh diputar). */
     window.addEventListener('touchstart',e=>{
+      if(this.inMenu())return;
       for(const t of e.changedTouches){
         if(t.identifier===jid||!isWorldTouch(t))continue;
         pos[t.identifier]={x:t.clientX,y:t.clientY};
@@ -296,6 +301,8 @@ const Input={
   /* Q/E/R/T dipakai untuk skill aktif, jadi rotasi kamera memakai panah
      kiri/kanan (atau klik-kanan seret / dua jari di mobile). */
   SKILL_KEYS:['KeyQ','KeyE','KeyR','KeyT'],
+  /* true saat main menu aktif — kamera panorama tidak boleh digerakkan pengguna */
+  inMenu(){return typeof Game!=='undefined'&&Game.menuMode;},
   camTurn(){
     let t=0;
     if(this.keys.ArrowLeft)t-=1;

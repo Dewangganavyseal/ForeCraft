@@ -68,7 +68,11 @@ const Game={
     return{x:sx,z:sz,y:WGEN.height(sx,sz)};
   },
 
-  /* ---------- main menu background ---------- */
+  /* ---------- main menu background ----------
+     Panorama yang BERJALAN antar desa: kamera mengorbit pelan (otomatis, tanpa
+     input pengguna) di atas sebuah desa, lalu setelah beberapa detik memudar
+     gelap dan berpindah ke desa lain. Desa diratakan ke tinggi CFG.SEA, jadi
+     target kamera selalu CFG.SEA+1.4 di atas tanah. */
   startMenuBackground(){
     this.menuMode=true;
     this.started=false;
@@ -79,23 +83,71 @@ const Game={
     WGEN.init(this.seed);
     this.clearWorldMeshes();
 
-    const sp=this.findSpawn();
-    this.menuCenter.set(sp.x+0.5,sp.y+1.4,sp.z+0.5);
-    Player.pos.set(sp.x+0.5,sp.y,sp.z+0.5);
+    /* daftar desa yang akan dikunjungi panorama */
+    this.menuTour=this.buildVillageTour();
+    this.menuTourState={phase:'hold',t:0,idx:0};
+    this.menuHoldMax=11;                       // detik bertahan di tiap desa
+
+    const first=this.menuTour[0];
+    this.menuCenter.set(first.x,first.y,first.z);
+    Player.pos.set(first.x,first.y-1.4,first.z);
     if(Player.mesh)Player.mesh.visible=false;
 
     Weather.time=0.35;Weather.day=1;
     Cam.targetZoom=8.2;Cam.zoom=8.2;Cam.applyZoom();
+    this.setMenuFade(0);
+    this.menuLoadChunks();
+  },
 
+  /* kumpulkan beberapa posisi desa untuk tur panorama (cari yang ada desanya) */
+  buildVillageTour(){
+    const tour=[],seen={};
+    for(let i=0;i<60&&tour.length<6;i++){
+      const gx=Math.floor(Math.random()*7)-3;
+      const gz=Math.floor(Math.random()*7)-3;
+      const key=gx+','+gz;
+      if(seen[key])continue;
+      const v=(typeof WGEN.villageInCell==='function')?WGEN.villageInCell(gx,gz):null;
+      if(!v)continue;
+      seen[key]=true;
+      tour.push({x:v.x+0.5,y:CFG.SEA+1.4,z:v.z+0.5});
+    }
+    if(!tour.length){                       // fallback bila tak ada desa
+      const sp=this.findSpawn();
+      tour.push({x:sp.x+0.5,y:sp.y+1.4,z:sp.z+0.5});
+    }
+    return tour;
+  },
+
+  /* pre-load chunk di sekitar menuCenter agar panorama tidak bolong */
+  menuLoadChunks(){
     const pcx=Math.floor(this.menuCenter.x/16),pcz=Math.floor(this.menuCenter.z/16);
     for(let dz=-CFG.VIEW_R-1;dz<=CFG.VIEW_R+1;dz++)
       for(let dx=-CFG.VIEW_R-1;dx<=CFG.VIEW_R+1;dx++)
         World.getChunk(pcx+dx,pcz+dz);
   },
 
+  /* true bila semua chunk dalam radius render sudah berupa mesh (siap fade-in) */
+  menuAreaReady(){
+    if(typeof World==='undefined'||!World.loadList||!World.loadList.length)return false;
+    const R=CFG.VIEW_R;
+    for(const e of World.loadList){
+      if(e.d>R*R)break;
+      const c=World.chunks.get(World.key(e.cx,e.cz));
+      if(!c||!c.group)return false;
+    }
+    return true;
+  },
+
+  setMenuFade(o){
+    const el=document.getElementById('menu-fade');
+    if(el)el.style.opacity=o;
+  },
+
   updateMenu(dt){
-    /* panorama perlahan: kamera mengorbit tanpa pemain */
+    /* kamera mengorbit pelan secara OTOMATIS (input pengguna tidak dipakai) */
     Cam.yaw+=dt*0.045;
+    this.menuTourUpdate(dt);
     try{
       World.update(dt,this.menuCenter);
       Weather.update(dt);
@@ -104,10 +156,43 @@ const Game={
     }catch(e){}
   },
 
+  /* mesin-state tur panorama: hold di desa -> fade out -> pindah -> tunggu chunk
+     termuat -> fade in -> hold di desa baru, dst. */
+  menuTourUpdate(dt){
+    const T=this.menuTour;
+    if(!T||!T.length)return;
+    const st=this.menuTourState;
+    st.t+=dt;
+    if(st.phase==='hold'){
+      if(st.t>=this.menuHoldMax&&T.length>1){
+        st.phase='fadeOut';st.t=0;
+        this.setMenuFade(1);                  // pudarkan layar jadi gelap
+      }
+    }else if(st.phase==='fadeOut'){
+      if(st.t>=0.7){                          // layar sudah gelap -> pindah desa
+        st.idx=(st.idx+1)%T.length;
+        const v=T[st.idx];
+        this.menuCenter.set(v.x,v.y,v.z);
+        Player.pos.set(v.x,v.y-1.4,v.z);
+        this.menuLoadChunks();
+        st.phase='load';st.t=0;
+      }
+    }else if(st.phase==='load'){
+      /* tunggu chunk desa baru selesai di-mesh (maks 3 dtk) baru fade in */
+      if(this.menuAreaReady()||st.t>=3){
+        st.phase='fadeIn';st.t=0;
+        this.setMenuFade(0);
+      }
+    }else if(st.phase==='fadeIn'){
+      if(st.t>=0.7){st.phase='hold';st.t=0;}
+    }
+  },
+
   /* ---------- mulai game ---------- */
   begin(save,slot){
     this.menuMode=false;
     document.body.classList.remove('in-menu');
+    this.setMenuFade(0);                       // jangan sampai layar hitam terbawa ke game
     if(Player.mesh)Player.mesh.visible=true;
 
     if(slot)RPG.slot=slot;
