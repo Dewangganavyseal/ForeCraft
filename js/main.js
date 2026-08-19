@@ -97,6 +97,8 @@ const Game={
     Cam.targetZoom=8.2;Cam.zoom=8.2;Cam.applyZoom();
     this.setMenuFade(0);
     this.menuLoadChunks();
+    /* musik main menu (mulai pada gestur pengguna pertama bila autoplay ditolak) */
+    if(typeof Music!=='undefined'&&Music.playMenu)Music.playMenu();
   },
 
   /* kumpulkan beberapa posisi desa untuk tur panorama (cari yang ada desanya) */
@@ -382,10 +384,37 @@ const MainMenu={
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>
+          <button id="mm-music" class="big mm-music">🎵 Musik</button>
         </div>
       </div>`;
     this.el.querySelector('#mm-load').addEventListener('click',()=>this.showLoad());
     this.el.querySelector('#mm-new').addEventListener('click',()=>this.showNew());
+    this.el.querySelector('#mm-music').addEventListener('click',()=>this.showMusic());
+  },
+
+  /* ---------- pengaturan musik (di main menu) ---------- */
+  showMusic(){
+    this.el.innerHTML=`
+      <div class="menu-wrap">
+        <h2 class="menu-head">🎵 Musik</h2>
+        <div class="mus-box">
+          <div class="mus-row"><span>Putar musik</span><button id="mm-mus-tg" class="mus-tg"></button></div>
+          <div class="mus-row"><span>Volume</span><input id="mm-mus-vol" type="range" min="0" max="100" step="1"></div>
+          <p class="tip">Perubahan disimpan otomatis.</p>
+        </div>
+        <button class="big mm-back">← Kembali</button>
+      </div>`;
+    this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
+    const tg=this.el.querySelector('#mm-mus-tg');
+    const vol=this.el.querySelector('#mm-mus-vol');
+    const sync=()=>{
+      tg.textContent=Music.on?'ON':'OFF';
+      tg.classList.toggle('on',Music.on);
+      vol.value=Math.round(Music.vol*100);
+    };
+    tg.addEventListener('click',()=>{Music.toggle();sync();});
+    vol.addEventListener('input',()=>Music.setVol((+vol.value)/100));
+    sync();
   },
 
   showLoad(){

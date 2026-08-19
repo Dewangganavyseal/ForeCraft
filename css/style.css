@@ -1341,9 +1341,11 @@ body.in-menu #mobile,
 body.in-menu #btn-save,
 body.in-menu #btn-uistudio{display:none !important}
 
-#start{background:rgba(20,22,25,.58);backdrop-filter:blur(3px)}
+#start{background:rgba(20,22,25,.58);backdrop-filter:blur(3px);
+  /* layar pendek/kecil: menu bisa digulir agar tombol tidak tertutup/terpotong */
+  overflow-y:auto;justify-content:flex-start;padding:22px 0;overscroll-behavior:contain}
 .menu-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;
-  width:min(460px,92vw)}
+  width:min(460px,92vw);margin:auto}
 .menu-title{font-family:'Press Start 2P',monospace;
   font-size:clamp(28px,6vw,54px);color:#e6ebee;
   text-shadow:0 0 24px rgba(140,200,255,.25),0 3px 0 #000;
@@ -1365,6 +1367,31 @@ body.in-menu #btn-uistudio{display:none !important}
 .slot-btn .s-info{font-size:12px;opacity:.8}
 .slot-btn.empty .s-info{opacity:.5}
 .mm-back{margin-top:12px}
+/* kotak pengaturan musik di main menu */
+.mus-box{width:min(320px,86vw);background:rgba(10,14,16,.62);border:1px solid rgba(255,255,255,.16);
+  border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;text-align:left}
+.mus-box .tip{font-size:11px;opacity:.7;margin-top:4px}
+.mus-row input[type="range"]{flex:1;pointer-events:auto;accent-color:#9fd77f;cursor:pointer}
+/* tombol Musik di menu utama (agak berbeda dari Load/New) */
+.mm-music{background:#3a5a6d;border-color:#6fa8bf}
+.mm-music:hover{background:#46708a}
+/* ---------- optimasi layar pendek / kecil ----------
+   Menu dibuat lebih ringkas supaya semua tombol (termasuk slot & kembali)
+   muat dan tidak tertutup di perangkat kecil. */
+@media (max-height:700px),(max-width:480px){
+  #start{padding:14px 0}
+  .menu-title{font-size:clamp(20px,5.5vw,36px)}
+  .menu-sub{margin-bottom:8px;letter-spacing:3px}
+  .menu-wrap{gap:10px}
+  .menu-btns{gap:8px}
+  .big{padding:11px 20px;font-size:12px;margin:4px}
+  .slot-list{gap:6px}
+  .slot-btn{padding:8px 10px;gap:2px}
+  .slot-btn .s-title{font-size:13px}
+  .slot-btn .s-info{font-size:11px}
+  .mm-back{margin-top:8px}
+  .mus-box{padding:10px 12px}
+}
 .mm-confirm{position:absolute;inset:0;z-index:5;display:flex;
   align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
 .mm-confirm-box{background:#1a1e23;border:1px solid rgba(255,255,255,.2);

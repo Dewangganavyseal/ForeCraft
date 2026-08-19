@@ -205,9 +205,11 @@ const Sfx={
    autoplay diizinkan browser).
    ===================================================================== */
 const Music={
-  el:null,vol:0.18,on:true,started:false,
+  el:null,vol:0.18,on:true,started:false,cur:null,
   KEY:'forecraft_music',
-  TRACK:"Audio/Music/Traveler's Respite.mp3",
+  /* trek berbeda utk main menu & dalam game */
+  MENU_TRACK:"Audio/Music/Hearth and Stone with Flute Melody.mp3",
+  GAME_TRACK:"Audio/Music/Traveler's Respite.mp3",
   load(){
     try{
       const d=JSON.parse(localStorage.getItem(this.KEY)||'null');
@@ -220,14 +222,43 @@ const Music={
   save(){try{localStorage.setItem(this.KEY,JSON.stringify({vol:this.vol,on:this.on}));}catch(e){}},
   ensure(){
     if(this.el)return;
-    this.el=new Audio(this.TRACK);
+    this.el=new Audio();
     this.el.loop=true;
     this.el.volume=this.on?this.vol:0;
   },
+  /* ganti trek bila berbeda (menu vs dalam game) */
+  setTrack(url){
+    if(this.cur===url)return;
+    this.cur=url;
+    this.ensure();
+    this.el.src=url;
+    try{this.el.load();}catch(e){}
+  },
+  /* coba putar; bila autoplay ditolak browser, mulai pada gestur pengguna pertama */
+  tryPlay(){
+    if(!this.on||!this.el)return;
+    this.el.volume=this.vol;
+    const p=this.el.play();
+    if(p&&p.catch)p.catch(()=>{
+      const resume=()=>{
+        window.removeEventListener('pointerdown',resume);
+        window.removeEventListener('keydown',resume);
+        if(this.on&&this.el){this.el.volume=this.vol;this.el.play().catch(()=>{});}
+      };
+      window.addEventListener('pointerdown',resume);
+      window.addEventListener('keydown',resume);
+    });
+  },
+  /* dipanggil saat main menu tampil: putar trek menu */
+  playMenu(){
+    this.load();this.setTrack(this.MENU_TRACK);this.started=true;
+    this.tryPlay();
+    this.refreshUI();
+  },
   /* dipanggil saat game mulai (gestur pengguna -> boleh autoplay) */
   start(){
-    this.load();this.ensure();this.started=true;
-    if(this.on){this.el.volume=this.vol;this.el.play().catch(()=>{});}
+    this.load();this.setTrack(this.GAME_TRACK);this.started=true;
+    this.tryPlay();
     this.refreshUI();
   },
   setVol(v){
@@ -237,10 +268,9 @@ const Music={
   },
   setOn(b){
     this.on=!!b;
-    if(!this.el)this.ensure();
+    this.ensure();
     if(this.on){
-      this.el.volume=this.vol;
-      if(this.started)this.el.play().catch(()=>{});
+      if(this.started)this.tryPlay();
     }else if(this.el){this.el.pause();}
     this.save();this.refreshUI();
   },
