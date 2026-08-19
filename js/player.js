@@ -518,7 +518,10 @@ const Player={
       dur:clamp(dist/13,0.32,0.62),arc:clamp(1.8+dist*0.22,2,3.4)};
     if(dist>0.01)this.facing=Math.atan2(dx,dz);
     this.vel.set(0,0,0);
-    if(this.playSkillAnim)this.playSkillAnim('slam');
+    this.onGround=false;
+    /* efek lepas landas: debu + suara lompat. Pose hantam baru diputar saat
+       mendarat (bukan di sini) supaya selama terbang terlihat melompat. */
+    FX.debris(new THREE.Vector3(this.pos.x,this.pos.y+0.2,this.pos.z),0xc9b48a,9,2.6);
     Sfx.jump();
   },
   updateSlamLeap(dt){
@@ -530,10 +533,18 @@ const Player={
     const gy=World.groundAt(this.pos.x,this.pos.z,L.sy+3);
     this.pos.y=lerp(L.sy,gy,p)+Math.sin(p*Math.PI)*L.arc;
     this.vel.set(0,0,0);
+    /* anggap melayang supaya animate() memakai pose 'jump' (terlihat melompat,
+       bukan diam meluncur) */
+    this.onGround=false;this.inWater=false;
     this.animate(dt,false,0,false);
+    /* SINKRONISASI MESH: biasanya dilakukan di akhir update() yang dilewati
+       selama lompatan. Tanpa ini model tidak mengikuti busur dan hanya
+       "pindah tempat" di akhir. */
+    if(this.mesh){this.mesh.position.copy(this.pos);this.mesh.rotation.y=this.facing;}
     if(p>=1){
       this.pos.y=gy;this.onGround=true;this.airJumped=false;
       this.slamLeap=null;
+      if(this.playSkillAnim)this.playSkillAnim('slam');   // pose hantaman saat mendarat
       if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
     }
   },
