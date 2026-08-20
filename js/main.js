@@ -29,6 +29,7 @@ const Game={
     Dungeon.init();
     SaveGame.init();
     Music.initUI();
+    if(typeof Settings!=='undefined')Settings.init();
     Player.buildModel();
     Cam.init();
     Input.init();

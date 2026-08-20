@@ -205,6 +205,92 @@ const EFFECTS={
 
 /* ================= item ================= */
 
+
+/* ================================ LOCALIZATION ================================
+   Multi-language system: ID/EN/ZH/JA keys available via UI.toggle('settings').
+   Use L(key) or L.i(key,{args}) template strings like:
+     L.i('mm_slot',{n:1}) → Slot 1 (in default language)
+   All toast/chat/text uses these keys so they localize automatically.
+   ================================================================================ */
+const LANG_KEYS=['mm_new','mm_load','mm_music','mm_slot','mm_empty','mm_info',
+  't_noskills','t_notool','t_full','t_crafting','t_invalid','npc_intro','npc_chat',
+  'xp_gained','kill_bonus','hp_bar','stam_bar','btn_play','btn_skip','btn_settings'];
+
+const locales={
+  id:{
+    // Menu utama
+    mm_new:'🌱 New Game',mm_load:'📂 Load Game',mm_music:'🎵 Musik',
+    mm_slot:'Slot $n',mm_empty:'Slot kosong',mm_info:'Lv $lvl · Hari $day · $time',
+    // Toast Messages
+    t_noskills:'Pelajari skill dulu!',t_notool:'Butuh alat!',t_full:'Tas penuh!',
+    t_crafting:'Membuat $item ×$qty',t_invalid:'Item tidak valid',
+    // Chat/NPC Dialogs
+    npc_intro:'Halo! Aku $name.',npc_chat:'Deskripsi chat NPC.',
+    // Generic
+    xp_gained:'+${xp} XP',kill_bonus:'${bonus}% bonus',
+    hp_bar:'❤️ HP',stam_bar:'⚡ Stamina',hu_bar:'🍖 Lapar',
+    btn_play:'▶ Putar',btn_skip:'⏭ Lewati',btn_settings:'⚙️ Pengaturan',
+    settings_title:'⚙️ Pengaturan',settings_music:'Musik',settings_sfx:'SFX',settings_custom:'Custom UI',
+    settings_save:'Simpan Manual',settings_lang:'Bahasa'
+  },
+  en:{
+    mm_new:'🌱 New Game',mm_load:'📂 Load Game',mm_music:'🎵 Music',
+    mm_slot:'Slot $n',mm_empty:'Empty slot',mm_info:'Lv $lvl · Day $day · $time',
+    t_noskills:'Learn skills first!',t_notool:'Need tool!',t_full:'Bag full!',
+    t_crafting:'Crafting $item ×$qty',t_invalid:'Invalid item',
+    npc_intro:'Hello! I\'m $name.',npc_chat:'NPC chat description.',
+    xp_gained:'+${xp} XP',kill_bonus:'${bonus}% bonus',
+    hp_bar:'❤️ HP',stam_bar:'⚡ Stamina',hu_bar:'🍖 Hunger',
+    btn_play:'▶ Play',btn_skip:'⏭ Skip',btn_settings:'⚙️ Settings',
+    settings_title:'⚙️ Settings',settings_music:'Music',settings_sfx:'SFX',settings_custom:'Custom UI',
+    settings_save:'Manual Save',settings_lang:'Language'
+  },
+  zh:{
+    mm_new:'🌱 新游戏',mm_load:'📂 读取游戏',mm_music:'🎵 音乐',
+    mm_slot:'存档$ n',mm_empty:'空槽位',mm_info:'等级$lvl · 第$day天 ·$time',
+    t_noskills:'请先学习技能!',t_notool:'需要工具!',t_full:'背包已满!',
+    t_crafting:'制作$ item ×$ qty',t_invalid:'无效物品',
+    npc_intro:'你好!我是$ name。',npc_chat:'NPC 对话描述。',
+    xp_gained:'+${xp}经验值',kill_bonus:'${bonus}% 奖励',
+    hp_bar:'❤️ 生命值',stam_bar:'⚡体力值',hu_bar:'🍖饥饿值',
+    btn_play:'▶ 开始',btn_skip:'⏭ 跳过',btn_settings:'⚙️ 设置',
+    settings_title:'⚙️ 设置',settings_music:'音乐',settings_sfx:'音效',settings_custom:'自定义界面',
+    settings_save:'手动保存',settings_lang:'语言'
+  },
+  ja:{
+    mm_new:'🌱 新しいゲーム',mm_load:'📂 セーブをロード',mm_music:'🎵 音楽',
+    mm_slot:'スロット$ n',mm_empty:'空きスロット',mm_info:'Lv$lvl ·$day日目 ·$time',
+    t_noskills:'スキルを学ぶ必要があります!',t_notool:'道具が必要です!',t_full:'バッグがいっぱい!',
+    t_crafting:'製作中:$item ×$qty',t_invalid:'無効なアイテム',
+    npc_intro:'こんにちは!私は$nameです。',npc_chat:'NPC の会話説明。',
+    xp_gained:'+${xp}経験値',kill_bonus:'${bonus}% ボーナス',
+    hp_bar:'❤️ HP',stam_bar:'⚡スタミナ',hu_bar:'🍖空腹度',
+    btn_play:'▶ プレイ',btn_skip:'⏭ スキップ',btn_settings:'⚙️ 設定',
+    settings_title:'⚙️ 設定',settings_music:'音楽',settings_sfx:'効果音',settings_custom:'カスタム UI',
+    settings_save:'手動セーブ',settings_lang:'言語'
+  }
+};
+
+// Global language state (save/load from localStorage):
+let CURRENT_LANG='id'; /* 'id'|'en'|'zh'|'ja' */
+if(typeof localStorage!=='undefined'){
+  try{CURRENT_LANG=localStorage.getItem('forecraft_lang')||'id';}catch(e){}
+}
+
+/* lookup text by key; returns key itself if not found */
+function L(key,args){
+  if(!locales[CURRENT_LANG])return key;
+  const txt=(locales[CURRENT_LANG][key]||locales.id[key]||'[??'+key+']');
+  if(!args)return txt;
+  return txt.replace(/\$\w+/g,(m)=>{
+    const k=m.substr(1);
+    return (args[k]?String(args[k]):'(missing '+k+')');
+  });
+}
+
+L.i=function(key){return L(key);} /* shorthand */
+
+
 const ITEMS={
   /* CATATAN EMOJI: seluruh ikon item memakai Unicode ≤6.0. Emoji baru seperti
      🪵 🪨 🫐 🟫 🟡 🦺 🦿 🪖 🩹 belum tersedia di font sistem Android lama,

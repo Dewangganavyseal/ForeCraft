@@ -344,6 +344,14 @@ const Monsters={
   },
   kill(m){
     m.dead=true;m.deathT=0;
+    /* PET KILL CREDIT: bila pet yang menjatuhkan monster, beri XP ke pet & pemain.
+       Pet = milik pemain, jadi kill-nya tetap dihitung untuk progres permainan. */
+    if(m.lastSrc&&m.lastSrc.pet&&typeof Capture!=='undefined'){
+      Capture.petGainXp(m.lastSrc,(m.xp||10)*0.6);
+      const xpPet=Math.max(1,Math.round(m.xp*0.6));
+      Player.addXP(xpPet);Player.kills++;
+      FX.text(m.pos.clone().add(new THREE.Vector3(0,2.2,0)),`+${xpPet} XP (pet)`,'#8fd4ff');
+    }
     /* XP & kill credit sebanding dengan kontribusi damage pemain.
        contrib = porsi HP monster yang dihancurkan pemain (0..1).
        Monster yang mati murni oleh rekan NPC / monster lain tanpa bantuan
@@ -983,6 +991,91 @@ const Monsters={
     }
     if(m.parts.armL)m.parts.armL.rotation.x=0.7;
     if(m.parts.armR)m.parts.armR.rotation.x=0.7;
+  },
+
+
+  /* ATTACK PET MONSTER: reproduksi ai() tapi target monster, bukan Player
+      Pet menggunakan SEMUA skill monster liar (naga api, golem smash, lizard acid/tail,
+      scorpion poison, wolf jump, boar headbutt, dll.). Target adalah "target"
+      (monster non-pet), atau nearest hostile monster bila null.
+      
+      Bila m.pet=true, efek area damage / terrain destruction langsung ditargetkan
+      ke monster lain dan tidak mengancurkan world map / Player.
+   ----------- */
+  petAttack(m,target,dp,dt){
+    const T=this.TYPES[m.type];
+    let d=target?target.pos.distanceTo(m.pos):dp;
+    
+    if(!target&&this.list.length){
+      // cari musuh pet: monster non-pet yang non-animal, kecuali dirinya sendiri
+      let best=null,bd=20;
+      for(const o of this.list){
+        if(o===m||o.dead||o.pet||typeof this.isAnimal==='function'&&this.isAnimal(o))continue;
+        const dist=o.pos.distanceTo(m.pos);
+        if(dist<bd){best=o;bd=dist;}
+      }
+      if(best){target=best;d=bd;}else return false;
+    }
+    if(!target||target.dead)return false;
+    
+    if(m.atkCd<=0){
+      if(m.type==='slime'&&d<1.1){
+        if(target!==Player)Monsters.hurt(target,m.dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+        m.atkCd=1.0;
+      }
+      else if(m.type==='boar'&&d<1.5){
+        if(target!==Player)Monsters.hurt(target,m.dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+        m.parts.head.rotation.x=-0.6;
+        m.atkCd=1.2;
+      }
+      else if(m.type==='wolf'&&d<1.7){
+        // gigitan cepat + lompatan kecil ke arah target
+        if(target!==Player)Monsters.hurt(target,m.dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+        m.biteT=0.22;
+        if(m.onGround){m.vel.y=3.2;
+          const ang=Math.atan2(target.pos.x-m.pos.x,target.pos.z-m.pos.z);
+          m.vel.x+=Math.sin(ang)*3;m.vel.z+=Math.cos(ang)*3;}
+        m.atkCd=0.85;
+      }
+      else if(m.type==='scorpion'&&d<1.9){
+        // sengat beracun: damage awal extra (poison hanya efek Player)
+        const dmg=Math.round(m.dmg*1.3);
+        Monsters.hurt(target,dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+        m.stingT=0.3;m.poisonHit=2;m.poisonT=1.0;
+        FX.debris(target.pos.clone().add(new THREE.Vector3(0,1,0)),0x9ad84f,6,2);
+        m.atkCd=1.6;
+      }
+      else if(m.type==='golem'&&d<3.4){
+        // smash: buat pet version yang tidak hancurkan world/Player
+        m.windup=0.8;m.atkCd=4;
+        m.smashTarget=target.pos.clone();
+        FX.ring(m.smashTarget.x,m.smashTarget.y+0.05,m.smashTarget.z,0xff5544,0.8,3.4);
+      }
+      else if(m.type==='dragon'&&d<4.0){
+        if(!m.flyT&&Math.random()<0.35){
+          m.flyT=3.9;m.atkCd=5.0;m.fireCd=0;
+        }else{
+          if(target!==Player)Monsters.hurt(target,m.dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+          m.clawT=0.95;
+          FX.debris(target.pos.clone().add(new THREE.Vector3(0,1,0)),0xC8352A,6,2.4);
+          Sfx.at(m.pos,'hurt');
+        }
+      }
+      else if(m.type==='lizard'){
+        if(d<1.8){
+          Monsters.hurt(target,m.dmg,new THREE.Vector3(0,0.2,0),1.5,m);
+          m.biteT=0.62;
+          FX.debris(target.pos.clone().add(new THREE.Vector3(0,1,0)),0x4e8f3a,5,2.0);
+          Sfx.at(m.pos,'hurt');
+          m.atkCd=1.15;
+        }else if(d<3.4&&Math.random()<0.45){
+          m.tailT=1.2;m.atkCd=2.3;m._tailHit=false;
+        }else if(d<9.5){
+          m.acidT=1.05;m.atkCd=2.6;m._acidFired=false;
+        }
+      }
+    }
+    return true;
   },
 
   /* ---------- LOMPATAN SLIME ----------

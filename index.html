@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>🌲 Forest Survival 3D</title>
+<title>ðŸŒ² Forest Survival 3D</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
@@ -18,25 +18,26 @@
 <!-- ================= HUD ================= -->
 <div id="hud">
   <div id="stats">
-    <div class="bar hp"><span class="ico">❤️</span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
-    <div class="bar st"><span class="ico">⚡</span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
-    <div class="bar hu"><span class="ico">🍖</span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
-    <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">⭐ Lv 1</span></div>
+    <div class="bar hp"><span class="ico">â¤ï¸</span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
+    <div class="bar st"><span class="ico">âš¡</span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
+    <div class="bar hu"><span class="ico">ðŸ–</span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
+    <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">â­ Lv 1</span></div>
   </div>
   <!-- ============ CHAT: buka dengan ENTER, persis di bawah bar Lv ============ -->
   <div id="chat">
     <div id="chat-log"></div>
-    <div id="chat-row"><span class="cico">💬</span>
+    <div id="chat-row"><span class="cico">ðŸ’¬</span>
       <input id="chat-input" type="text" maxlength="80" autocomplete="off"
         placeholder="Ketik pesan...">
-      <button id="chat-send" title="Kirim">➤</button>
+      <button id="chat-send" title="Kirim">âž¤</button>
     </div>
   </div>
   <div id="topright">
-    <div id="compass"><div id="compass-strip"></div><div id="compass-mark">▼</div></div>
-    <div id="clock">☀️ 12:00</div>
+    <button id="btn-gear" class="mini-btn" title="Settings">⚙️</button>
+    <div id="compass"><div id="compass-strip"></div><div id="compass-mark">â–¼</div></div>
+    <div id="clock">â˜€ï¸ 12:00</div>
     <div id="daynum">Hari 1</div>
-    <div id="coinbox" title="Koin — tukarkan di pedagang desa">🪙 <b id="coin-num">0</b></div>
+    <div id="coinbox" title="Koin â€” tukarkan di pedagang desa">ðŸª™ <b id="coin-num">0</b></div>
   </div>
   <div id="combo"></div>
   <div id="hotbar"></div>
@@ -44,19 +45,19 @@
   <div id="team"></div>
   <div id="toast"></div>
 <div id="skillbar"></div>
-<div id="hint">WASD gerak · SHIFT lari · SHIFT×2 dodge · KLIK serang/makan · SPACE lompat · Q/E/R/T skill · B tas · K skill · C crafting · G rekan · ←→ kamera · H bantu</div>
+<div id="hint">WASD gerak Â· SHIFT lari Â· SHIFTÃ—2 dodge Â· KLIK serang/makan Â· SPACE lompat Â· Q/E/R/T skill Â· B tas Â· K skill Â· C crafting Â· G rekan Â· â†â†’ kamera Â· H bantu</div>
 </div>
 
 <!-- ================= PANEL TAS ================= -->
 <div class="panel" id="panel-bag">
-  <h2>🎒 Tas <button class="x" data-close="bag">✕</button></h2>
+  <h2>ðŸŽ’ Tas <button class="x" data-close="bag">âœ•</button></h2>
 
   <div id="bag-layout">
     <div id="bag-pages">
       <div id="bag-page-bag" class="bag-page">
-        <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span></div>
+        <div class="sub">Perlengkapan Â· Pertahanan <span id="def-num">0%</span> Â· Damage <span id="dmg-num">0</span></div>
         <div class="grid equip" id="equip-grid"></div>
-        <div class="sub">Hotbar (1–7)</div>
+        <div class="sub">Hotbar (1â€“7)</div>
         <div class="grid" id="bag-hotbar"></div>
         <div class="sub">Kantong</div>
         <div class="grid" id="bag-grid"></div>
@@ -64,7 +65,7 @@
       </div>
 
       <div id="bag-page-pet" class="bag-page" style="display:none">
-        <div class="sub">Slot Mob · hanya 1 pet yang bisa deploy</div>
+        <div class="sub">Slot Mob Â· hanya 1 pet yang bisa deploy</div>
         <div id="bag-mobs"></div>
         <p class="tip">Pet tidak bisa di-drop. Pet bisa diberi makan, dipasang Sadel, dijual, atau dilepaskan.</p>
       </div>
@@ -74,20 +75,20 @@
 
 <!-- tombol melayang Bag / Pet di sisi kiri panel tas -->
 <div id="bag-float-menu">
-  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span>🎒</span>Bag</button>
-  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span>🐾</span>Pet</button>
+  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span>ðŸŽ’</span>Bag</button>
+  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span>ðŸ¾</span>Pet</button>
 </div>
 
 <!-- ================= PANEL SKILL ================= -->
 <div class="panel" id="panel-skills">
-  <h2>🌟 Skill Tree <button class="x" data-close="skills">✕</button></h2>
+  <h2>ðŸŒŸ Skill Tree <button class="x" data-close="skills">âœ•</button></h2>
   <div id="sp-info">Skill Points: <b id="sp-num">0</b></div>
   <!-- Pohon skill digambar dinamis oleh UI.renderSkills(): node per skill
        yang saling terhubung garis akar sesuai prasyarat (req). -->
   <div id="branches"></div>
   <!-- PROFICIENCY: naik otomatis dengan melakukan aksi (ala Durango) -->
   <div id="prof-wrap">
-    <h3 class="prof-title">📈 Proficiency</h3>
+    <h3 class="prof-title">ðŸ“ˆ Proficiency</h3>
     <div class="sub">Naik otomatis saat kamu melakukan aksinya. Makin tinggi, makin besar peluang hasil tambahan.</div>
     <div id="prof-list"></div>
   </div>
@@ -95,18 +96,18 @@
 
 <!-- ================= PANEL CRAFTING ================= -->
 <div class="panel" id="panel-craft">
-  <h2>🔨 Crafting <button class="x" data-close="craft">✕</button></h2>
+  <h2>ðŸ”¨ Crafting <button class="x" data-close="craft">âœ•</button></h2>
   <div id="craft-tabs"></div>
   <div id="recipes"></div>
 </div>
 
 <!-- ================= PANEL PETI PENYIMPANAN ================= -->
 <div class="panel" id="panel-chest">
-  <h2>🧰 Peti Penyimpanan <button class="x" data-close="chest">✕</button></h2>
+  <h2>ðŸ§° Peti Penyimpanan <button class="x" data-close="chest">âœ•</button></h2>
   <div class="sub">Isi Peti <span id="chest-num">0/0</span>
-    <button id="chest-all" class="mini">⬇️ Titip Semua Resource</button></div>
+    <button id="chest-all" class="mini">â¬‡ï¸ Titip Semua Resource</button></div>
   <div class="grid" id="chest-grid"></div>
-  <div class="sub">Tasmu — klik untuk menitipkan</div>
+  <div class="sub">Tasmu â€” klik untuk menitipkan</div>
   <div class="grid" id="chest-bag"></div>
   <p class="tip">Klik item di peti untuk mengambilnya, klik item di tasmu untuk menitipkannya. Isi peti tetap tersimpan walau kamu keluar dari permainan.</p>
 </div>
@@ -114,15 +115,15 @@
 <!-- ================= PANEL REKAN ================= -->
 
 <div class="panel" id="panel-npc">
-  <h2>🤝 Rekan Tim <button class="x" data-close="npc">✕</button></h2>
+  <h2>ðŸ¤ Rekan Tim <button class="x" data-close="npc">âœ•</button></h2>
   <div id="npc-body"></div>
 </div>
 
 <!-- ================= PANEL PEDAGANG / TOKO =================
      Beli item dengan koin, atau jual item dari tas untuk dapat koin. -->
 <div class="panel hidden" id="panel-shop">
-  <h2>🏪 Pedagang Desa <button class="x" data-close="shop">✕</button></h2>
-  <div class="shop-coin">🪙 Koinmu: <b id="shop-coin">0</b></div>
+  <h2>ðŸª Pedagang Desa <button class="x" data-close="shop">âœ•</button></h2>
+  <div class="shop-coin">ðŸª™ Koinmu: <b id="shop-coin">0</b></div>
   <div class="sub">Beli</div>
   <div id="shop-buy"></div>
   <div class="sub">Jual (klik item di tasmu)</div>
@@ -134,8 +135,8 @@
      Enchant equipment: menaikkan level pedang/armor/tameng dengan koin
      dan bahan yang relevan. Dibuka lewat interaksi furnitur Landasan Tempa. -->
 <div class="panel hidden" id="panel-anvil">
-  <h2>⚒️ Landasan Tempa <button class="x" data-close="anvil">✕</button></h2>
-  <div class="sub">Tempa equipment untuk menaikkan Levelnya — bayar dengan 🪙 koin dan bahan yang relevan dengan equipment-nya.</div>
+  <h2>âš’ï¸ Landasan Tempa <button class="x" data-close="anvil">âœ•</button></h2>
+  <div class="sub">Tempa equipment untuk menaikkan Levelnya â€” bayar dengan ðŸª™ koin dan bahan yang relevan dengan equipment-nya.</div>
   <div id="anvil-body"></div>
 </div>
 
@@ -143,43 +144,52 @@
      Konsol dev tersembunyi: hanya bisa dibuka lewat kode khusus yang
      diketik di chat. Dipakai untuk men-spawn apa pun yang ada di game. -->
 <div class="panel hidden" id="panel-term">
-  <h2>🖥️ TERMINAL <button class="x" data-close="term">✕</button></h2>
+  <h2>ðŸ–¥ï¸ TERMINAL <button class="x" data-close="term">âœ•</button></h2>
   <div id="term-body"></div>
 </div>
 
 <!-- ================= PANEL HELP ================= -->
 <div class="panel" id="panel-help">
-  <h2>ℹ️ Bantuan <button class="x" data-close="help">✕</button></h2>
+  <h2>â„¹ï¸ Bantuan <button class="x" data-close="help">âœ•</button></h2>
   <table class="help-t">
-    <tr><td>WASD / Panah</td><td>Gerak (panah ←→ juga putar kamera)</td></tr>
-    <tr><td>SHIFT</td><td>Lari &nbsp;·&nbsp; tekan 2× = roll/dodge</td></tr>
+    <tr><td>WASD / Panah</td><td>Gerak (panah â†â†’ juga putar kamera)</td></tr>
+    <tr><td>SHIFT</td><td>Lari &nbsp;Â·&nbsp; tekan 2Ã— = roll/dodge</td></tr>
     <tr><td>Klik Kiri</td><td>Serang pedang (rantai sampai 5 combo)</td></tr>
     <tr><td>SPACE</td><td>Lompat / berenang naik</td></tr>
     <tr><td>B / K / C / H</td><td>Tas / Skill / Crafting / Bantuan</td></tr>
     <tr><td>Klik saat memegang makanan</td><td>Makan item hotbar terpilih</td></tr>
     <tr><td>G</td><td>Ajak bicara penduduk desa (rekrut) / buka panel rekan</td></tr>
-    <tr><td>1–7</td><td>Pilih slot hotbar</td></tr>
-    <tr><td>Q / E / R / T</td><td>Pakai skill aktif slot 1–4 (lihat bar skill)</td></tr>
-    <tr><td>← → / Scroll</td><td>Putar / zoom kamera (mobile: geser/cubit 2 jari)</td></tr>
+    <tr><td>1â€“7</td><td>Pilih slot hotbar</td></tr>
+    <tr><td>Q / E / R / T</td><td>Pakai skill aktif slot 1â€“4 (lihat bar skill)</td></tr>
+    <tr><td>â† â†’ / Scroll</td><td>Putar / zoom kamera (mobile: geser/cubit 2 jari)</td></tr>
   </table>
-  <p class="tip">🏘️ Cari <b>desa</b> di hutan: penduduknya bisa direkrut jadi rekan (maks 3) bila kamu membawa bahan yang mereka minta. Rekan ikut bertarung, punya level dan skill pasif sendiri, bisa diberi makanan/senjata/armor, dan bisa diperintah <b>mencari resource</b> di sekitarmu. Klik ikon rekan di kanan atas untuk mengatur mereka.</p>
-  <p class="tip">⚠️ Hati-hati dengan Golem Hutan raksasa — hantamannya <b>menghancurkan tanah</b>! Lubang dekat air akan perlahan tergenang. Tebang pohon (pukul batang) untuk kayu, panen semak beri, dan masak daging agar hunger pulih.</p>
+  <p class="tip">ðŸ˜ï¸ Cari <b>desa</b> di hutan: penduduknya bisa direkrut jadi rekan (maks 3) bila kamu membawa bahan yang mereka minta. Rekan ikut bertarung, punya level dan skill pasif sendiri, bisa diberi makanan/senjata/armor, dan bisa diperintah <b>mencari resource</b> di sekitarmu. Klik ikon rekan di kanan atas untuk mengatur mereka.</p>
+  <p class="tip">âš ï¸ Hati-hati dengan Golem Hutan raksasa â€” hantamannya <b>menghancurkan tanah</b>! Lubang dekat air akan perlahan tergenang. Tebang pohon (pukul batang) untuk kayu, panen semak beri, dan masak daging agar hunger pulih.</p>
+</div>
+
+<!-- ================= PANEL SETTINGS (GEAR BUTTON) =================
+     Berisi pengaturan musik, custom UI, save manual, & pilihan bahasa.
+     Dibuka dari tombol gear di sisi HP bar. -->
+<div class="panel hidden" id="panel-settings">
+  <h2 id="settings-title">âš™ï¸ Pengaturan <button class="x" data-close="settings">âœ•</button></h2>
+  <div id="settings-content"></div>
+  <p class="tip" id="settings-tip">Setelan tersimpan otomatis.</p>
 </div>
 
 <!-- ================= MOBILE ================= -->
 <div id="mobile">
   <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
   <div id="m-buttons">
-    <button id="m-bag" class="m-s">🎒</button>
-    <button id="m-craft" class="m-s">🔨</button>
-    <button id="m-skill" class="m-s">🌟</button>
-    <button id="m-chat" class="m-s" title="Chat">💬</button>
-    <button id="m-talk" class="m-s" title="Ajak bicara / rekrut">🤝</button>
+    <button id="m-bag" class="m-s">ðŸŽ’</button>
+    <button id="m-craft" class="m-s">ðŸ”¨</button>
+    <button id="m-skill" class="m-s">ðŸŒŸ</button>
+    <button id="m-chat" class="m-s" title="Chat">ðŸ’¬</button>
+    <button id="m-talk" class="m-s" title="Ajak bicara / rekrut">ðŸ¤</button>
   </div>
   <div id="m-main">
-    <button id="m-roll" class="m-m" title="Dash">💨</button>
-    <button id="m-jump" class="m-m">⤴️</button>
-    <button id="m-attack" class="m-l">⚔️</button>
+    <button id="m-roll" class="m-m" title="Dash">ðŸ’¨</button>
+    <button id="m-jump" class="m-m">â¤´ï¸</button>
+    <button id="m-attack" class="m-l">âš”ï¸</button>
   </div>
   <div id="m-active"></div>
 </div>
@@ -190,9 +200,9 @@
 <div id="start"></div>
 
 <div id="death" class="hidden">
-  <h1>💀 KAMU MATI</h1>
+  <h1>ðŸ’€ KAMU MATI</h1>
   <p id="death-stats"></p>
-  <button id="btn-respawn" class="big">🔄 Respawn</button>
+  <button id="btn-respawn" class="big">ðŸ”„ Respawn</button>
 </div>
 
 <div id="levelup">LEVEL UP!</div>
@@ -204,6 +214,8 @@
 <script src="js/skills.js"></script>
 <script src="js/noise.js"></script>
 <script src="js/audio.js"></script>
+<!-- Settings UI (gear button, languages, SFX/music controls) -->
+<script src="js/settings.js"></script>
 <script src="js/worldgen.js"></script>
 <script src="js/mesher.js"></script>
 <script src="js/world.js"></script>

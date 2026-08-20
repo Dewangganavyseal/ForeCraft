@@ -1,7 +1,7 @@
 ﻿'use strict';
 /* SFX prosedural WebAudio */
 const Sfx={
-  ctx:null,master:null,rainGain:null,ok:false,
+  ctx:null,master:null,rainGain:null,ok:false,sfxEnabled:true,sfxVol:1.0,
   init(){
     if(this.ctx)return;
     try{
@@ -39,8 +39,8 @@ const Sfx={
     try{this[name](...args);}finally{this.vs=prev;}
   },
   tone(f,dur,type='sine',vol=0.2,slide=0){
-    if(!this.ok)return;const c=this.ctx,t=c.currentTime;
-    vol*=this.vs;
+    if(!this.ok||!this.sfxEnabled)return;const c=this.ctx,t=c.currentTime;
+    vol*=this.vs*this.sfxVol;
     if(vol<=0.0005)return;
     const o=c.createOscillator(),g=c.createGain();
     o.type=type;o.frequency.setValueAtTime(f,t);
@@ -50,8 +50,8 @@ const Sfx={
     o.connect(g);g.connect(this.master);o.start(t);o.stop(t+dur+0.02);
   },
   noiseBurst(dur,vol,freq=900){
-    if(!this.ok)return;const c=this.ctx,t=c.currentTime;
-    vol*=this.vs;
+    if(!this.ok||!this.sfxEnabled)return;const c=this.ctx,t=c.currentTime;
+    vol*=this.vs*this.sfxVol;
     if(vol<=0.0005)return;
     const len=Math.max(1,(dur*c.sampleRate)|0);
 
@@ -281,38 +281,12 @@ const Music={
   },
   toggle(){this.setOn(!this.on);return this.on;},
 
-  /* ---------- UI pengaturan (tombol 🎵 + panel volume/on-off) ---------- */
-  initUI(){
-    if(document.getElementById('btn-music'))return;
-    /* tombol kecil di area kanan-atas HUD */
-    const host=document.getElementById('topright')||document.body;
-    const b=document.createElement('button');
-    b.id='btn-music';b.title='Pengaturan musik';b.textContent='🎵';
-    b.addEventListener('click',e=>{e.preventDefault();this.togglePanel();});
-    host.appendChild(b);
-    this.btn=b;
-
-    /* panel pengaturan */
-    const p=document.createElement('div');
-    p.id='music-panel';p.className='panel hidden';
-    p.innerHTML=
-      '<h2>🎵 Musik <button class="x" id="music-x">✕</button></h2>'+
-      '<div class="mus-row"><span>Putar musik</span>'+
-        '<button id="mus-toggle" class="mus-tg"></button></div>'+
-      '<div class="mus-row"><span>Volume</span>'+
-        '<input id="mus-vol" type="range" min="0" max="100" step="1"></div>'+
-      '<p class="tip">Musik diputar pelan sebagai latar. Perubahan disimpan otomatis.</p>';
-    document.body.appendChild(p);
-    this.panel=p;
-    this.tgEl=p.querySelector('#mus-toggle');
-    this.volEl=p.querySelector('#mus-vol');
-
-    p.querySelector('#music-x').addEventListener('click',()=>this.togglePanel());
-    this.tgEl.addEventListener('click',()=>this.toggle());
-    this.volEl.addEventListener('input',()=>this.setVol((+this.volEl.value)/100));
-    this.volEl.addEventListener('change',()=>this.setVol((+this.volEl.value)/100));
-    this.refreshUI();
-  },
+  /* ---------- UI pengaturan musik ----------
+     CATATAN: tombol 🎵 standalone & panel musik lama sudah DIPINDAHKAN ke
+     panel Settings (tombol ⚙️ gear di HUD, modul js/settings.js). Fungsi ini
+     kini no-op; state musik tetap dikelola Music.load/setVol/toggle yang
+     dipanggil dari Settings.render(). */
+  initUI(){},
   togglePanel(){
     if(!this.panel)return;
     const open=this.panel.classList.contains('hidden');

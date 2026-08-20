@@ -589,7 +589,11 @@ const Capture={
     }
   },
 
-  /* ---------- pertarungan pet ---------- */
+  /* ---------- pertarungan pet ----------
+     PET ATTACKS = MONSTER ATTACKS: pet menggunakan seluruh skill monster liar
+     (naga api, golem smash, lizard acid/tail, scorpion poison, dll.) via
+     Monsters.petAttack(). Serangan ditargetkan ke monster musuh terdekat,
+     tidak pernah ke pemain. */
   petAI(m,dt,dp){
     if(this.riding&&this.pet===m)return;
     if(m.flash>0)m.flash=Math.max(0,m.flash); // flash diurus Monsters.update
@@ -613,16 +617,9 @@ const Capture={
         m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(7*dt,0,1));
       }else{
         m.vel.x*=0.75;m.vel.z*=0.75;
-        if(m.atkCd<=0){
-          m.atkCd=1.05;
-          const dir=to.normalize();
-          const wasDead=target.dead;
-          Monsters.hurt(target,Math.max(3,Math.round(m.dmg*0.85)),dir,2.2,m);
-          if(!wasDead&&target.dead)this.petGainXp(m,(target.xp||10)*0.6);
-          if(m.type==='wolf')m.biteT=0.22;
-          if(m.type==='scorpion')m.stingT=0.3;
-        }
       }
+      // gunakan sistem serangan monster asli bila cooldown siap
+      if(Monsters.petAttack)Monsters.petAttack(m,target,bd,dt);
       return;
     }
 
