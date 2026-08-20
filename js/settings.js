@@ -40,15 +40,15 @@ const Settings={
     ];
   },
   setLang(lid){
+    if(!locales[lid])return;
     CURRENT_LANG=lid;
     try{localStorage.setItem('forecraft_lang',lid);}catch(e){}
+    /* re-render UI utama agar teks langsung berubah; panel TIDAK ditutup,
+       cukup digambar ulang supaya user melihat hasil bahasa baru seketika. */
+    if(typeof UI!=='undefined'&&UI.renderAll)UI.renderAll();
     this.render();
-    /* re-render UI utama agar teks langsung berubah */
-    if(typeof UI!=='undefined'){
-      UI.renderAll();
-      if(UI.open==='settings')UI.toggle('settings'); // tutup & buka ulang panel
-    }
-    UI.toast('🌐 '+this.langs().find(x=>x.id===lid).name);
+    const ln=this.langs().find(x=>x.id===lid);
+    if(typeof UI!=='undefined'&&UI.toast)UI.toast('🌐 '+L('settings_lang_set',{name:ln?ln.name:lid}));
   },
 
   /* ---------- init: pasang listener tombol gear ---------- */
@@ -63,38 +63,41 @@ const Settings={
     }
   },
 
-  /* ---------- render isi panel ---------- */
+  /* ---------- render isi panel ----------
+     SEMUA teks di sini WAJIB lewat L(). Jangan pakai ternary CURRENT_LANG===...
+     karena pola itulah yang dulu membuat teks tercampur antar bahasa. */
   render(){
     const el=document.getElementById('settings-content');
     if(!el)return;
-    const l=key=>L(key);
 
     /* judul & tip mengikuti bahasa */
     const tt=document.getElementById('settings-title');
-    if(tt)tt.childNodes[0].textContent=l('settings_title')+' ';
+    if(tt){
+      /* tulis ulang node teks pertama saja agar tombol × tidak terhapus */
+      let tn=null;
+      for(const n of tt.childNodes){if(n.nodeType===3){tn=n;break;}}
+      if(tn)tn.nodeValue=L('settings_title')+' ';
+    }
     const tp=document.getElementById('settings-tip');
-    if(tp)tp.textContent=(CURRENT_LANG==='id'?'Setelan tersimpan otomatis.':
-      CURRENT_LANG==='en'?'Settings saved automatically.':
-      CURRENT_LANG==='zh'?'设置自动保存。':'設定は自動的に保存されます。');
+    if(tp)tp.textContent=L('settings_tip');
 
+    const ON=L('settings_on'),OFF=L('settings_off'),VOL=L('settings_volume');
     el.innerHTML='';
 
     /* ===== MUSIK ===== */
     const mus=document.createElement('div');
     mus.className='set-sec';
-    const mtextId=CURRENT_LANG==='en'?'Play music':(CURRENT_LANG==='zh'?'播放音乐':'音楽を再生');
-    const mvolume=CURRENT_LANG==='en'?'Volume':(CURRENT_LANG==='zh'?'音量':'音量');
     mus.innerHTML=`
-      <div class="set-h">🎵 ${l('settings_music')}</div>
-      <div class="mus-row"><span>${mtextId}</span>
+      <div class="set-h">🎵 ${L('settings_music')}</div>
+      <div class="mus-row"><span>${L('settings_music_play')}</span>
         <button id="set-mus-tg" class="mus-tg"></button></div>
-      <div class="mus-row"><span>${mvolume}</span>
+      <div class="mus-row"><span>${VOL}</span>
         <input id="set-mus-vol" type="range" min="0" max="100" step="1"></div>`;
     el.appendChild(mus);
     const mtg=mus.querySelector('#set-mus-tg');
     const mvol=mus.querySelector('#set-mus-vol');
     const syncMus=()=>{
-      mtg.textContent=Music.on?'ON':'OFF';
+      mtg.textContent=Music.on?ON:OFF;
       mtg.classList.toggle('on',Music.on);
       mvol.value=Math.round(Music.vol*100);
     };
@@ -105,18 +108,17 @@ const Settings={
     /* ===== SFX ===== */
     const sfx=document.createElement('div');
     sfx.className='set-sec';
-    const stext=CURRENT_LANG==='en'?'Play SFX':(CURRENT_LANG==='zh'?'播放音效':'効果音を再生');
     sfx.innerHTML=`
-      <div class="set-h">🔊 ${l('settings_sfx')}</div>
-      <div class="mus-row"><span>${stext}</span>
+      <div class="set-h">🔊 ${L('settings_sfx')}</div>
+      <div class="mus-row"><span>${L('settings_sfx_play')}</span>
         <button id="set-sfx-tg" class="mus-tg"></button></div>
-      <div class="mus-row"><span>${mvolume}</span>
+      <div class="mus-row"><span>${VOL}</span>
         <input id="set-sfx-vol" type="range" min="0" max="100" step="1"></div>`;
     el.appendChild(sfx);
     const stg=sfx.querySelector('#set-sfx-tg');
     const svol=sfx.querySelector('#set-sfx-vol');
     const syncSfx=()=>{
-      stg.textContent=this.sfx?'ON':'OFF';
+      stg.textContent=this.sfx?ON:OFF;
       stg.classList.toggle('on',this.sfx);
       svol.value=Math.round(this.sfxVol*100);
     };
@@ -134,11 +136,9 @@ const Settings={
     const cui=document.createElement('div');
     cui.className='set-sec';
     cui.innerHTML=`
-      <div class="set-h">🎨 ${l('settings_custom')}</div>
-      <p class="tip" style="margin-top:0">${CURRENT_LANG==='id'?'Geser & atur ukuran tombol HUD sesukamu.':
-        CURRENT_LANG==='en'?'Drag & resize HUD buttons to your liking.':
-        CURRENT_LANG==='zh'?'随意拖动和调整HUD按钮的大小。':'HUDボタンを自由にドラッグ＆リサイズ。'}</p>
-      <button class="big" id="set-open-uistudio">🎨 ${CURRENT_LANG==='id'?'Buka UI Studio':CURRENT_LANG==='en'?'Open UI Studio':CURRENT_LANG==='zh'?'打开 UI 工作室':'UI スタジオを開く'}</button>`;
+      <div class="set-h">🎨 ${L('settings_custom')}</div>
+      <p class="tip" style="margin-top:0">${L('settings_custom_tip')}</p>
+      <button class="big" id="set-open-uistudio">🎨 ${L('settings_custom_open')}</button>`;
     el.appendChild(cui);
     cui.querySelector('#set-open-uistudio').addEventListener('click',()=>{
       if(typeof UI!=='undefined'&&UI.open==='settings')UI.toggle('settings'); // tutup panel dulu
@@ -149,24 +149,22 @@ const Settings={
     const sv=document.createElement('div');
     sv.className='set-sec';
     sv.innerHTML=`
-      <div class="set-h">💾 ${l('settings_save')}</div>
-      <button class="big" id="set-save">💾 ${CURRENT_LANG==='id'?'Simpan Sekarang':CURRENT_LANG==='en'?'Save Now':CURRENT_LANG==='zh'?'立即保存':'今すぐ保存'}</button>`;
+      <div class="set-h">💾 ${L('settings_save')}</div>
+      <button class="big" id="set-save">💾 ${L('settings_save_now')}</button>`;
     el.appendChild(sv);
     sv.querySelector('#set-save').addEventListener('click',()=>{
       /* pakai SaveGame.now(): ikut menyimpan furnitur & memberi info rekan */
       if(typeof SaveGame!=='undefined'&&SaveGame.now){SaveGame.now();return;}
       if(typeof RPG!=='undefined'){
         RPG.save();
-        UI.toast('💾 '+(CURRENT_LANG==='id'?'Permainan disimpan!':
-          CURRENT_LANG==='en'?'Game saved!':
-          CURRENT_LANG==='zh'?'游戏已保存！':'ゲームを保存しました！'));
+        if(typeof UI!=='undefined'&&UI.toast)UI.toast('💾 '+L('settings_saved'));
       }
     });
 
     /* ===== BAHASA ===== */
     const lng=document.createElement('div');
     lng.className='set-sec';
-    lng.innerHTML=`<div class="set-h">🌐 ${l('settings_lang')}</div>`;
+    lng.innerHTML=`<div class="set-h">🌐 ${L('settings_lang')}</div>`;
     const row=document.createElement('div');
     row.className='set-lang-row';
     for(const ln of this.langs()){

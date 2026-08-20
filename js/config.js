@@ -214,24 +214,40 @@ const EFFECTS={
    ================================================================================ */
 const LANG_KEYS=['mm_new','mm_load','mm_music','mm_slot','mm_empty','mm_info',
   't_noskills','t_notool','t_full','t_crafting','t_invalid','npc_intro','npc_chat',
-  'xp_gained','kill_bonus','hp_bar','stam_bar','btn_play','btn_skip','btn_settings'];
+  'xp_gained','kill_bonus','hp_bar','stam_bar','hu_bar','btn_play','btn_skip','btn_settings',
+  'settings_title','settings_tip','settings_on','settings_off','settings_volume',
+  'settings_music','settings_music_play','settings_sfx','settings_sfx_play',
+  'settings_custom','settings_custom_tip','settings_custom_open',
+  'settings_save','settings_save_now','settings_saved','settings_lang','settings_lang_set'];
 
+/* CATATAN PLACEHOLDER: pakai HANYA bentuk $nama (huruf/angka/underscore, tanpa
+   spasi dan tanpa kurung kurawal). Bentuk "$ n" atau "${n}" TIDAK akan
+   tersubstitusi oleh L() dan akan tampil mentah di layar. */
 const locales={
   id:{
     // Menu utama
-    mm_new:'🌱 New Game',mm_load:'📂 Load Game',mm_music:'🎵 Musik',
+    mm_new:'🌱 Permainan Baru',mm_load:'📂 Muat Permainan',mm_music:'🎵 Musik',
     mm_slot:'Slot $n',mm_empty:'Slot kosong',mm_info:'Lv $lvl · Hari $day · $time',
-    // Toast Messages
+    // Toast
     t_noskills:'Pelajari skill dulu!',t_notool:'Butuh alat!',t_full:'Tas penuh!',
     t_crafting:'Membuat $item ×$qty',t_invalid:'Item tidak valid',
-    // Chat/NPC Dialogs
+    // Chat/NPC
     npc_intro:'Halo! Aku $name.',npc_chat:'Deskripsi chat NPC.',
-    // Generic
-    xp_gained:'+${xp} XP',kill_bonus:'${bonus}% bonus',
+    // Umum
+    xp_gained:'+$xp XP',kill_bonus:'$bonus% bonus',
     hp_bar:'❤️ HP',stam_bar:'⚡ Stamina',hu_bar:'🍖 Lapar',
     btn_play:'▶ Putar',btn_skip:'⏭ Lewati',btn_settings:'⚙️ Pengaturan',
-    settings_title:'⚙️ Pengaturan',settings_music:'Musik',settings_sfx:'SFX',settings_custom:'Custom UI',
-    settings_save:'Simpan Manual',settings_lang:'Bahasa'
+    // Panel pengaturan
+    settings_title:'⚙️ Pengaturan',settings_tip:'Setelan tersimpan otomatis.',
+    settings_on:'AKTIF',settings_off:'MATI',settings_volume:'Volume',
+    settings_music:'Musik',settings_music_play:'Putar musik',
+    settings_sfx:'Efek Suara',settings_sfx_play:'Putar efek suara',
+    settings_custom:'Custom UI',
+    settings_custom_tip:'Geser & atur ukuran tombol HUD sesukamu.',
+    settings_custom_open:'Buka UI Studio',
+    settings_save:'Simpan Manual',settings_save_now:'Simpan Sekarang',
+    settings_saved:'Permainan disimpan!',
+    settings_lang:'Bahasa',settings_lang_set:'Bahasa: $name'
   },
   en:{
     mm_new:'🌱 New Game',mm_load:'📂 Load Game',mm_music:'🎵 Music',
@@ -239,56 +255,92 @@ const locales={
     t_noskills:'Learn skills first!',t_notool:'Need tool!',t_full:'Bag full!',
     t_crafting:'Crafting $item ×$qty',t_invalid:'Invalid item',
     npc_intro:'Hello! I\'m $name.',npc_chat:'NPC chat description.',
-    xp_gained:'+${xp} XP',kill_bonus:'${bonus}% bonus',
+    xp_gained:'+$xp XP',kill_bonus:'$bonus% bonus',
     hp_bar:'❤️ HP',stam_bar:'⚡ Stamina',hu_bar:'🍖 Hunger',
     btn_play:'▶ Play',btn_skip:'⏭ Skip',btn_settings:'⚙️ Settings',
-    settings_title:'⚙️ Settings',settings_music:'Music',settings_sfx:'SFX',settings_custom:'Custom UI',
-    settings_save:'Manual Save',settings_lang:'Language'
+    settings_title:'⚙️ Settings',settings_tip:'Settings are saved automatically.',
+    settings_on:'ON',settings_off:'OFF',settings_volume:'Volume',
+    settings_music:'Music',settings_music_play:'Play music',
+    settings_sfx:'Sound Effects',settings_sfx_play:'Play sound effects',
+    settings_custom:'Custom UI',
+    settings_custom_tip:'Drag & resize HUD buttons to your liking.',
+    settings_custom_open:'Open UI Studio',
+    settings_save:'Manual Save',settings_save_now:'Save Now',
+    settings_saved:'Game saved!',
+    settings_lang:'Language',settings_lang_set:'Language: $name'
   },
   zh:{
     mm_new:'🌱 新游戏',mm_load:'📂 读取游戏',mm_music:'🎵 音乐',
-    mm_slot:'存档$ n',mm_empty:'空槽位',mm_info:'等级$lvl · 第$day天 ·$time',
-    t_noskills:'请先学习技能!',t_notool:'需要工具!',t_full:'背包已满!',
-    t_crafting:'制作$ item ×$ qty',t_invalid:'无效物品',
-    npc_intro:'你好!我是$ name。',npc_chat:'NPC 对话描述。',
-    xp_gained:'+${xp}经验值',kill_bonus:'${bonus}% 奖励',
-    hp_bar:'❤️ 生命值',stam_bar:'⚡体力值',hu_bar:'🍖饥饿值',
-    btn_play:'▶ 开始',btn_skip:'⏭ 跳过',btn_settings:'⚙️ 设置',
-    settings_title:'⚙️ 设置',settings_music:'音乐',settings_sfx:'音效',settings_custom:'自定义界面',
-    settings_save:'手动保存',settings_lang:'语言'
+    mm_slot:'存档 $n',mm_empty:'空存档位',mm_info:'等级 $lvl · 第 $day 天 · $time',
+    t_noskills:'请先学习技能！',t_notool:'需要工具！',t_full:'背包已满！',
+    t_crafting:'正在制作 $item ×$qty',t_invalid:'无效物品',
+    npc_intro:'你好！我是 $name。',npc_chat:'NPC 对话描述。',
+    xp_gained:'+$xp 经验',kill_bonus:'$bonus% 奖励',
+    hp_bar:'❤️ 生命',stam_bar:'⚡ 体力',hu_bar:'🍖 饥饿',
+    btn_play:'▶ 播放',btn_skip:'⏭ 跳过',btn_settings:'⚙️ 设置',
+    settings_title:'⚙️ 设置',settings_tip:'设置会自动保存。',
+    settings_on:'开',settings_off:'关',settings_volume:'音量',
+    settings_music:'音乐',settings_music_play:'播放音乐',
+    settings_sfx:'音效',settings_sfx_play:'播放音效',
+    settings_custom:'自定义界面',
+    settings_custom_tip:'可随意拖动和缩放 HUD 按钮。',
+    settings_custom_open:'打开 UI 工作室',
+    settings_save:'手动保存',settings_save_now:'立即保存',
+    settings_saved:'游戏已保存！',
+    settings_lang:'语言',settings_lang_set:'语言：$name'
   },
   ja:{
     mm_new:'🌱 新しいゲーム',mm_load:'📂 セーブをロード',mm_music:'🎵 音楽',
-    mm_slot:'スロット$ n',mm_empty:'空きスロット',mm_info:'Lv$lvl ·$day日目 ·$time',
-    t_noskills:'スキルを学ぶ必要があります!',t_notool:'道具が必要です!',t_full:'バッグがいっぱい!',
-    t_crafting:'製作中:$item ×$qty',t_invalid:'無効なアイテム',
-    npc_intro:'こんにちは!私は$nameです。',npc_chat:'NPC の会話説明。',
-    xp_gained:'+${xp}経験値',kill_bonus:'${bonus}% ボーナス',
-    hp_bar:'❤️ HP',stam_bar:'⚡スタミナ',hu_bar:'🍖空腹度',
-    btn_play:'▶ プレイ',btn_skip:'⏭ スキップ',btn_settings:'⚙️ 設定',
-    settings_title:'⚙️ 設定',settings_music:'音楽',settings_sfx:'効果音',settings_custom:'カスタム UI',
-    settings_save:'手動セーブ',settings_lang:'言語'
+    mm_slot:'スロット $n',mm_empty:'空きスロット',mm_info:'Lv $lvl · $day 日目 · $time',
+    t_noskills:'先にスキルを習得してください！',t_notool:'道具が必要です！',t_full:'バッグがいっぱいです！',
+    t_crafting:'$item ×$qty を製作中',t_invalid:'無効なアイテム',
+    npc_intro:'こんにちは！私は $name です。',npc_chat:'NPC の会話説明。',
+    xp_gained:'+$xp 経験値',kill_bonus:'$bonus% ボーナス',
+    hp_bar:'❤️ HP',stam_bar:'⚡ スタミナ',hu_bar:'🍖 空腹度',
+    btn_play:'▶ 再生',btn_skip:'⏭ スキップ',btn_settings:'⚙️ 設定',
+    settings_title:'⚙️ 設定',settings_tip:'設定は自動的に保存されます。',
+    settings_on:'オン',settings_off:'オフ',settings_volume:'音量',
+    settings_music:'音楽',settings_music_play:'音楽を再生',
+    settings_sfx:'効果音',settings_sfx_play:'効果音を再生',
+    settings_custom:'カスタム UI',
+    settings_custom_tip:'HUD ボタンを自由にドラッグ＆リサイズできます。',
+    settings_custom_open:'UI スタジオを開く',
+    settings_save:'手動セーブ',settings_save_now:'今すぐセーブ',
+    settings_saved:'ゲームを保存しました！',
+    settings_lang:'言語',settings_lang_set:'言語：$name'
   }
 };
 
 // Global language state (save/load from localStorage):
 let CURRENT_LANG='id'; /* 'id'|'en'|'zh'|'ja' */
 if(typeof localStorage!=='undefined'){
-  try{CURRENT_LANG=localStorage.getItem('forecraft_lang')||'id';}catch(e){}
+  try{
+    const saved=localStorage.getItem('forecraft_lang');
+    /* hanya terima kode bahasa yang benar-benar ada di `locales`, supaya nilai
+       lama/rusak di localStorage tidak membuat L() jatuh ke cabang salah. */
+    if(saved&&locales[saved])CURRENT_LANG=saved;
+  }catch(e){}
 }
 
-/* lookup text by key; returns key itself if not found */
+/* Ambil teks sesuai CURRENT_LANG.
+   - Bila kunci tidak ada di bahasa aktif → fallback ke bahasa Indonesia.
+   - Bila tetap tidak ada → '[??kunci]' agar kunci hilang mudah terlihat.
+   - Placeholder didukung dua bentuk: $nama dan ${nama}.
+   - Nilai 0 / '' / false tetap disubstitusi (dulu dianggap "missing"). */
 function L(key,args){
-  if(!locales[CURRENT_LANG])return key;
-  const txt=(locales[CURRENT_LANG][key]||locales.id[key]||'[??'+key+']');
+  const dict=locales[CURRENT_LANG]||locales.id;
+  let txt=dict[key];
+  if(txt===undefined)txt=locales.id[key];
+  if(txt===undefined)return '[??'+key+']';
   if(!args)return txt;
-  return txt.replace(/\$\w+/g,(m)=>{
-    const k=m.substr(1);
-    return (args[k]?String(args[k]):'(missing '+k+')');
+  return txt.replace(/\$\{(\w+)\}|\$(\w+)/g,(m,a,b)=>{
+    const k=a||b;
+    return Object.prototype.hasOwnProperty.call(args,k)?String(args[k]):m;
   });
 }
 
-L.i=function(key){return L(key);} /* shorthand */
+/* shorthand — tetap meneruskan args */
+L.i=function(key,args){return L(key,args);};
 
 
 const ITEMS={
