@@ -37,6 +37,10 @@ const UI={
     }
     document.querySelectorAll('[data-close]').forEach(b=>
       b.addEventListener('click',()=>this.toggle(b.dataset.close)));
+    /* menu kiri panel tas: Bag / Pet */
+    document.querySelectorAll('.bag-menu-btn').forEach(b=>
+      b.addEventListener('click',e=>{e.preventDefault();this.setBagPage(b.dataset.bagpage);}));
+    window.addEventListener('resize',()=>this.positionBagMenu());
     /* slot klik (panel tas) */
     document.body.addEventListener('click',e=>{
       if(this.open!=='bag')return;
@@ -444,7 +448,12 @@ const UI={
   renderTeam(){
     const root=document.getElementById('team');if(!root)return;
     const team=(typeof NPCS!=='undefined')?NPCS.team.filter(n=>!n.dead):[];
-    const sig=team.map(n=>`${n.id}:${n.level}:${Math.ceil(n.hp)}:${n.order}:${n.aggr===false?0:1}`).join('|');
+    const pet=(typeof Capture!=='undefined'&&Capture.pet&&!Capture.pet.dead)?Capture.pet:null;
+    let sig=team.map(n=>`${n.id}:${n.level}:${Math.ceil(n.hp)}:${n.order}:${n.aggr===false?0:1}`).join('|');
+    if(pet){
+      const pd=(Capture.deployedSlot>=0&&RPG.mobSlots[Capture.deployedSlot])||{};
+      sig+='|pet:'+pet.type+':'+Math.ceil(pet.hp)+':'+(pd.lvl||1)+':'+(pd.stars||1);
+    }
     if(sig===this.teamSig)return;
     this.teamSig=sig;
     root.innerHTML='';
@@ -457,6 +466,29 @@ const UI={
         `<span class="tmode" title="${n.aggr===false?'Pasif':'Agresif'}">${n.aggr===false?'🕊️':'⚔️'}</span>`+
         `<span class="tord">${n.order==='gather'?'⛏️':n.order==='wait'?'⏸️':'👣'}</span>`;
       const fn=e=>{e.preventDefault();e.stopPropagation();this.openNpc(n);};
+      d.addEventListener('touchstart',fn,{passive:false});
+      d.addEventListener('click',fn);
+      root.appendChild(d);
+    }
+
+    /* ikon pet aktif di grup yang sama dengan ikon team */
+    if(pet){
+      const pd=(Capture.deployedSlot>=0&&RPG.mobSlots[Capture.deployedSlot])||{};
+      const d=document.createElement('div');
+      d.className='tmate pet'+(Capture.riding?' busy':'');
+      const emoji=(typeof PET_EMOJI!=='undefined'&&PET_EMOJI[pet.type])?PET_EMOJI[pet.type]:'🐾';
+      const stars='⭐'.repeat(pd.stars||1);
+      d.innerHTML=`<span class="tface">${emoji}</span>`+
+        `<span class="tlv">Lv${pd.lvl||1}</span>`+
+        `<div class="thp"><i style="width:${Math.max(0,pet.hp/pet.maxhp*100)}%"></i></div>`+
+        `<span class="tmode" title="${stars}">${Capture.riding?'🐾':'⭐'}</span>`+
+        `<span class="tord">${pd.saddle?'🐴':'➰'}</span>`;
+      const fn=e=>{
+        e.preventDefault();e.stopPropagation();
+        if(this.open!=='bag'){this.open='bag';this.picked=null;this.renderBag();}
+        this.setBagPage('pet');
+        this.syncPanels();
+      };
       d.addEventListener('touchstart',fn,{passive:false});
       d.addEventListener('click',fn);
       root.appendChild(d);
@@ -833,7 +865,7 @@ const UI={
           sekaligus mengunci input (open='craft' padahal panel tersembunyi),
           sehingga tombol serang ikut mati. */
       try{
-        if(name==='bag')this.renderBag();
+        if(name==='bag'){this.renderBag();this.setBagPage(this.bagPage||'bag');}
         if(name==='skills')this.renderSkills();
         if(name==='craft')this.renderCraft();
         if(name==='npc')this.renderNpcPanel();
@@ -858,6 +890,29 @@ const UI={
       const el=document.getElementById('panel-'+n);
       if(el)el.classList.toggle('hidden',this.open!==n);
     }
+    const bm=document.getElementById('bag-float-menu');
+    if(bm)bm.classList.toggle('show',this.open==='bag');
+    if(this.open==='bag')this.positionBagMenu();
+  },
+
+  /* letakkan tombol Bag/Pet tepat di samping kiri panel Tas, bukan di tepi layar */
+  positionBagMenu(){
+    const menu=document.getElementById('bag-float-menu');
+    const panel=document.getElementById('panel-bag');
+    if(!menu||!panel||this.open!=='bag')return;
+    requestAnimationFrame(()=>{
+      if(this.open!=='bag')return;
+      const r=panel.getBoundingClientRect();
+      const mw=menu.offsetWidth||58;
+      const mh=menu.offsetHeight||130;
+      let left=r.left-mw-10;
+      /* layar sempit: tetap tempel sedekat mungkin ke panel */
+      if(left<4)left=Math.max(4,r.left-mw*0.55);
+      let top=r.top+r.height/2-mh/2;
+      top=clamp(top,64,Math.max(64,window.innerHeight-mh-64));
+      menu.style.left=left+'px';
+      menu.style.top=top+'px';
+    });
   },
   closeAll(){this.open=null;this.syncPanels();},
 
@@ -895,6 +950,39 @@ const UI={
     mk(RPG.hotbar,0,document.getElementById('bag-hotbar'));
     mk(RPG.bag,1,document.getElementById('bag-grid'));
     this.renderEquip();
+    if(typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
+    if(this.open==='bag')this.positionBagMenu();
+  },
+
+  /* ---------- live update tas ----------
+     Dipanggil setiap item masuk/keluar (pickup, craft, panen, dll).
+     Render ditunda satu frame supaya banyak perubahan sekaligus tidak
+     memicu render berulang. */
+  _invDirty:false,
+  markInvDirty(){
+    if(this._invDirty)return;
+    this._invDirty=true;
+    requestAnimationFrame(()=>{
+      this._invDirty=false;
+      this.renderHotbar();
+      if(this.open==='bag')this.renderBag();
+      if(this.open==='chest')this.renderChest();
+      if(this.open==='shop')this.renderShop&&this.renderShop();
+    });
+  },
+
+  /* ---------- halaman kiri panel tas: Bag / Pet ---------- */
+  bagPage:'bag',
+  setBagPage(page){
+    this.bagPage=(page==='pet')?'pet':'bag';
+    const bag=document.getElementById('bag-page-bag');
+    const pet=document.getElementById('bag-page-pet');
+    if(bag)bag.style.display=(this.bagPage==='bag')?'':'none';
+    if(pet)pet.style.display=(this.bagPage==='pet')?'':'none';
+    document.querySelectorAll('.bag-menu-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.bagpage===this.bagPage);
+    });
+    if(this.bagPage==='pet'&&typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
   },
   /* ================= PANEL PETI =================
      Dua grid: isi peti & isi tas pemain. Item bisa DIKLIK (pindah seluruh
@@ -1162,6 +1250,7 @@ const UI={
     move:{icon:'🏃',name:'Movement'},
     craft:{icon:'🛠️',name:'Crafting'},
     gather:{icon:'🧺',name:'Gather'},
+    catch:{icon:'🪢',name:'Catch'},
   },
   /* SKILL TREE berbentuk pohon-akar: tiap branch digambar sebagai node yang
      saling terhubung garis sesuai prasyarat (req). Node disusun per "kedalaman"
@@ -1173,7 +1262,7 @@ const UI={
     const wrap=document.getElementById('branches');
     if(!wrap)return;
     wrap.innerHTML='';
-    for(const br of['combat','move','craft','gather']){
+    for(const br of['combat','move','craft','gather','catch']){
       const sks=SKILLS.filter(s=>s.br===br);
       if(!sks.length)continue;
       const meta=this.BRANCH_META[br]||{icon:'🌿',name:br};

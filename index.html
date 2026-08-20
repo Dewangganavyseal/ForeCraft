@@ -50,15 +50,32 @@
 <!-- ================= PANEL TAS ================= -->
 <div class="panel" id="panel-bag">
   <h2>🎒 Tas <button class="x" data-close="bag">✕</button></h2>
-  <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span></div>
 
-  <div class="grid equip" id="equip-grid"></div>
-  <div class="sub">Hotbar (1–7)</div>
+  <div id="bag-layout">
+    <div id="bag-pages">
+      <div id="bag-page-bag" class="bag-page">
+        <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span></div>
+        <div class="grid equip" id="equip-grid"></div>
+        <div class="sub">Hotbar (1–7)</div>
+        <div class="grid" id="bag-hotbar"></div>
+        <div class="sub">Kantong</div>
+        <div class="grid" id="bag-grid"></div>
+        <p class="tip">Klik item lalu klik slot lain untuk memindahkan. Tekan <b>F</b> untuk makan item hotbar terpilih.</p>
+      </div>
 
-  <div class="grid" id="bag-hotbar"></div>
-  <div class="sub">Kantong</div>
-  <div class="grid" id="bag-grid"></div>
-  <p class="tip">Klik item lalu klik slot lain untuk memindahkan. Tekan <b>F</b> untuk makan item hotbar terpilih.</p>
+      <div id="bag-page-pet" class="bag-page" style="display:none">
+        <div class="sub">Slot Mob · hanya 1 pet yang bisa deploy</div>
+        <div id="bag-mobs"></div>
+        <p class="tip">Pet tidak bisa di-drop. Pet bisa diberi makan, dipasang Sadel, dijual, atau dilepaskan.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- tombol melayang Bag / Pet di sisi kiri panel tas -->
+<div id="bag-float-menu">
+  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span>🎒</span>Bag</button>
+  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span>🐾</span>Pet</button>
 </div>
 
 <!-- ================= PANEL SKILL ================= -->
@@ -281,6 +298,8 @@
        sebelum input.js memakai flag Chat.active -->
   <script src="js/chat.js"></script>
   <script src="js/input.js"></script>
+  <script src="js/hpbar.js"></script>
+  <script src="js/capture.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

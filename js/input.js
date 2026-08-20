@@ -100,6 +100,9 @@ const Input={
       if(!Game.started||UI.open)return;
       /* klik saat chat terbuka = tutup chat, bukan menyerang */
       if(typeof Chat!=='undefined'&&Chat.active)return;
+      /* klik tombol HUD khusus tidak boleh memicu serangan */
+      const el=e.target;
+      if(el&&el.closest&&el.closest('#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu'))return;
       if(e.button===0){
         /* saat mode penempatan, klik kiri memindahkan ghost ke titik klik —
            tapi klik pada elemen UI (bar pasang, hotbar, panel) diabaikan */

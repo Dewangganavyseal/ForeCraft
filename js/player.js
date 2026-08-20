@@ -518,6 +518,8 @@ const Player={
   /* ---------- aksi ---------- */
   tryJump(){
     if(this.dead)return;
+    /* lompat saat menunggangi diteruskan ke mount */
+    if(typeof Capture!=='undefined'&&Capture.riding){Capture.jumpQ=true;return;}
     if(this.onGround){this.vel.y=CFG.PLAYER.jump;this.onGround=false;this.airJumped=false;
       Sfx.jump();
       if(typeof Prof!=='undefined')Prof.gain('agility',2,1);
@@ -593,6 +595,10 @@ const Player={
   },
    tryAttack(){
      if(this.dead||this.dodge.active)return;
+     if(typeof Capture!=='undefined'){
+       if(Capture.active)return;                     // sedang minigame tangkap
+       if(Capture.riding){UI.toast('🐴 Turun dulu untuk menyerang');return;}
+     }
      /* pertanian: cangkul / tanam / panen memakai tombol serang */
      if(typeof Farming!=='undefined'&&Farming.tryUse(this))return;
      /* makanan: klik/tombol serang dipakai untuk makan saat sedang memegang
@@ -603,10 +609,10 @@ const Player={
      this.stamina-=5*RPG.stamCostMult();this.stamRegenT=0.5;
      let next=(this.attack.sinceEnd<0.95*RPG.comboWindowMult()&&this.attack.combo<4)?this.attack.combo+1:0;
      this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0};
-     /* auto-aim ke monster terdekat */
-     let best=null,bd=4.2;
-     for(const m of Monsters.list){
-       if(m.dead)continue;
+      /* auto-aim ke monster terdekat; pet tidak ikut dibidik */
+      let best=null,bd=4.2;
+      for(const m of Monsters.list){
+        if(m.dead||m.pet)continue;
        const d=m.pos.distanceTo(this.pos);
        if(d<bd){bd=d;best=m;}
      }
@@ -688,7 +694,7 @@ const Player={
       case 'shock':{
         let jumps=0;
         for(const o of Monsters.list){
-          if(o===m||o.dead||jumps>=2)continue;
+          if(o===m||o.dead||o.pet||jumps>=2)continue;
           if(o.pos.distanceTo(m.pos)>4.5)continue;
           jumps++;
           Monsters.hurt(o,dmg*0.5,new THREE.Vector3(0,0.2,0),1.5);
@@ -721,8 +727,8 @@ const Player={
       case 'quake':
         if(ci===4){
           FX.shockwave(m.pos.x,m.pos.y+0.05,m.pos.z,0xff7a3c,5.2);
-          for(const o of Monsters.list){
-            if(o===m||o.dead)continue;
+           for(const o of Monsters.list){
+             if(o===m||o.dead||o.pet)continue;
             if(o.pos.distanceTo(m.pos)>4.2)continue;
             const d=new THREE.Vector3().subVectors(o.pos,m.pos).setY(0.35).normalize();
             Monsters.hurt(o,dmg*0.45,d,6);
@@ -745,7 +751,7 @@ const Player={
     const reach=RPG.weaponReach();
     let hitAny=false;
     for(const m of Monsters.list){
-      if(m.dead)continue;
+      if(m.dead||m.pet)continue;
       const dx=m.pos.x-this.pos.x,dz=m.pos.z-this.pos.z;
       const d=Math.hypot(dx,dz);
       if(d>reach)continue;
@@ -864,7 +870,7 @@ const Player={
     if(th>0&&src){
       let atk=null,bd=3.2;
       for(const m of Monsters.list){
-        if(m.dead)continue;
+        if(m.dead||m.pet)continue;
         const d=m.pos.distanceTo(src);
         if(d<bd){bd=d;atk=m;}
       }
@@ -918,6 +924,9 @@ const Player={
     if(this.dead)return;
     /* ganti model tangan saat item hotbar terpilih berubah */
     this.updateHeld();
+    /* MENUNGGANGI MOB: gerak pemain sepenuhnya mengikuti mount.
+       Serangan & dash dinonaktifkan saat menunggangi. */
+    if(typeof Capture!=='undefined'&&Capture.riding){Capture.ridePlayer(this,dt);return;}
     /* lompatan Hantam Bumi terarah: terbang ke target, hantam saat mendarat */
     if(this.slamLeap){this.updateSlamLeap(dt);return;}
     const A=this.attack,D=this.dodge;

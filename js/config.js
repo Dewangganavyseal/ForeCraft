@@ -224,6 +224,10 @@ const ITEMS={
   leather:{n:'Kulit',e:'📜'},
   /* ---------- pertanian ---------- */
   hoe:{n:'Cangkul',e:'⛏️',tool:'hoe'},
+  /* ---------- pawang / menangkap mob ---------- */
+  rope:{n:'Tali',e:'➰'},
+  saddle:{n:'Sadel',e:'🐴'},
+  pet_charm:{n:'Jimat Pawang',e:'🧿'},
   seed_wheat:{n:'Benih Gandum',e:'🌾'},
   seed_carrot:{n:'Benih Wortel',e:'🥕'},
   seed_cabbage:{n:'Benih Kubis',e:'🥬'},
@@ -355,6 +359,7 @@ const PLAYER_GEAR_SLOTS=ARMOR_SLOTS.concat([{id:'shield',name:'Tameng',e:'🛡�
 const NPC_GEAR_SLOTS=[{id:'weapon',name:'Senjata',e:'🗡️'}].concat(ARMOR_SLOTS);
 
 const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
+  rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,
   meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,
   fish:0x93adc0,cfish:0xd98a4d,
   resin:0xd9a13c,leather:0x8a5f35,
@@ -390,6 +395,10 @@ const RECIPES=[
   {out:'bandage',need:{fiber:2,mush:1},skill:'alchem',name:'Perban'},
   {out:'pie',need:{berry:3,fiber:2},skill:'gourmet',prof:{cooking:6},name:'Pai Beri'},
   {out:'leather',need:{gel:2,fiber:2},name:'Kulit'},
+  /* ---------- pawang ---------- */
+  {out:'rope',need:{fiber:4,leather:1},name:'Tali'},
+  {out:'saddle',need:{leather:4,wood:2},skill:'catcher',name:'Sadel'},
+  {out:'pet_charm',need:{boss_core:1,gold_ingot:2,crystal:2},skill:'catch_master',name:'Jimat Pawang'},
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
   {out:'hoe',need:{wood:3,stone:2},name:'Cangkul'},
   {out:'seed_wheat',need:{wheat:1},name:'Benih Gandum'},
@@ -512,6 +521,24 @@ const SKILLS=[
   {id:'mgather',br:'gather',icon:'🌳',name:'Penguasa Alam',
     desc:'+25% hasil semua gathering',max:1,cost:3,req:'groot',
     prof:{logging:15,mining:15,harvesting:15}},
+  /* ---------- CATCH / PAWANG ----------
+     Cabang menangkap monster: membuka Tali & Sadel, memperkuat tarikan,
+     mengurangi risiko tali putus, dan memperlambat kaburnya monster. */
+  {id:'catcher',br:'catch',icon:'🪢',name:'Pawang Pemula',
+    desc:'+10% drain stamina & -10% ketegangan · membuka resep Sadel',
+    max:1,cost:1},
+  {id:'catch_pow',br:'catch',icon:'💪',name:'Tarikan Kuat',
+    desc:'+20% drain stamina monster saat tarik-tarikan / rank',
+    max:3,cost:1,req:'catcher'},
+  {id:'catch_rope',br:'catch',icon:'🧵',name:'Tali Lentur',
+    desc:'-15% kenaikan ketegangan tali / rank',
+    max:3,cost:1,req:'catcher'},
+  {id:'catch_calm',br:'catch',icon:'🕊️',name:'Suara Tenang',
+    desc:'Monster 15% lebih lambat kabur saat proses menangkap / rank',
+    max:2,cost:1,req:'catch_pow'},
+  {id:'catch_master',br:'catch',icon:'🐉',name:'Pawang Agung',
+    desc:'+25% drain stamina & -10% ketegangan · memudahkan menangkap boss/naga',
+    max:1,cost:3,req:'catch_rope'},
 ];
 /* label kategori skill untuk ditampilkan di sudut kiri atas kartu skill */
 const SKILL_KIND={

@@ -226,6 +226,8 @@ const Game={
       RPG.hotbar=save.hotbar||new Array(7).fill(null);
       RPG.bag=save.bag||new Array(RPG.BAG_BASE).fill(null);
       while(RPG.bag.length<RPG.bagMax())RPG.bag.push(null);
+      RPG.mobSlots=save.mobSlots||new Array(4).fill(null);
+      RPG.deployedPet=(typeof save.deployedPet==='number')?save.deployedPet:-1;
 
       const savedEq=save.equip||{};
       /* nilai slot bisa string (save lama) atau objek {id,lvl} hasil tempa */
@@ -239,6 +241,8 @@ const Game={
     }else{
       RPG.addItem('bread',2);
       RPG.addItem(RPG.START_WEAPON,1);
+      RPG.mobSlots=new Array(4).fill(null);
+      RPG.deployedPet=-1;
     }
 
     /* proficiency: muat dari save, atau reset untuk permainan baru */
@@ -258,6 +262,7 @@ const Game={
     if(typeof Farming!=='undefined'){
       if(save)Farming.load();else Farming.clear();
     }
+    if(typeof Capture!=='undefined')Capture.load(save?save.mobSlots:null,save?save.deployedPet:-1);
 
     this.started=true;
 
@@ -318,6 +323,8 @@ const Game={
       World.update(dt,Player.pos);
       FX.update(dt);
       Weather.update(dt);
+      if(typeof HPBars!=='undefined')HPBars.update(dt);
+      if(typeof Capture!=='undefined')Capture.update(dt);
       this.camTarget.set(Player.pos.x,Player.pos.y+1.3,Player.pos.z);
       Cam.update(dt,this.camTarget);
       UI.updateHUD();

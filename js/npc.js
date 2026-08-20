@@ -334,6 +334,7 @@ const NPCS={
      itu sampai mati, baru kembali pasif. */
   onPlayerAttack(m){
     if(!m||m.dead)return;
+    if(m.pet)return;
     if(typeof Monsters!=='undefined'&&Monsters.isAnimal&&Monsters.isAnimal(m))return;
     for(const n of this.team){
       if(n.dead||n.aggr!==false||n.retreat)continue;
@@ -392,7 +393,10 @@ const NPCS={
     let best=null,bd=CFG.NPC.SIGHT;
     for(const m of Monsters.list){
       if(m.dead)continue;
-      /* hewan ternak (animal) tidak pernah menjadi target NPC */
+      /* hewan ternak (animal), MOB PELIHARAAN, dan mob yang sedang ditangkap
+         tidak pernah menjadi target NPC */
+      if(m.pet)continue;
+      if(m.catchActive)continue;
       if(Monsters.isAnimal&&Monsters.isAnimal(m))continue;
       const d=m.pos.distanceTo(n.pos);
       if(d>=bd)continue;
@@ -416,6 +420,7 @@ const NPCS={
   hurt(n,dmg){
     if(n.dead)return;
     n.hp-=dmg*(1-this.npcDef(n));n.flash=0.18;
+    n.hpT=6; /* durasi tampil HP bar setelah terkena serangan */
     FX.text(n.pos.clone().add(new THREE.Vector3(0,1.9,0)),
       String(Math.round(dmg)),'#ff9d8a');
     FX.debris(n.pos.clone().add(new THREE.Vector3(0,1,0)),0xff5544,3,1.6);
@@ -659,7 +664,10 @@ const NPCS={
       let hit=null;
       for(const m of Monsters.list){
         if(m.dead)continue;
-        /* panah NPC tidak mengenai hewan ternak */
+        /* panah NPC tidak mengenai hewan ternak, mob peliharaan,
+           atau mob yang sedang dalam proses tangkap */
+        if(m.pet)continue;
+        if(m.catchActive)continue;
         if(Monsters.isAnimal&&Monsters.isAnimal(m))continue;
         if(m.pos.distanceTo(a.pos)<1.0){hit=m;break;}
       }
@@ -713,7 +721,7 @@ const NPCS={
     /* bersihkan target yang mati/hilang. Target fokus (dari serangan pemain)
        tidak dibatasi jarak pendek — passive mengejar sampai target mati. */
     if(n.target){
-      const gone=n.target.dead||Monsters.list.indexOf(n.target)<0;
+      const gone=n.target.dead||n.target.pet||n.target.catchActive||Monsters.list.indexOf(n.target)<0;
       if(gone){n.target=null;n.focus=false;}
       else if(!n.focus&&n.target.pos.distanceTo(n.pos)>CFG.NPC.SIGHT+4)
         n.target=null;

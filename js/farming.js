@@ -294,23 +294,78 @@ const Farming={
     if(p)this.remove(p,dropSeed);
   },
 
-  /* ---------- aksi pemain: cangkul / tanam / panen ---------- */
-  tryUse(player){
+  /* ---------- target blok di depan pemain (dipakai aksi + highlight) ---------- */
+  targetTile(player){
     const fx=Math.sin(player.facing),fz=Math.cos(player.facing);
     const bx=Math.floor(player.pos.x+fx*1.15);
     const bz=Math.floor(player.pos.z+fz*1.15);
     let by=World.topY(bx,bz)-1;
-    if(by<0||by>=CFG.WORLD_H)return false;
-    if(Math.abs(by-Math.floor(player.pos.y))>1)return false;
+    if(by<0||by>=CFG.WORLD_H)return null;
+    if(Math.abs(by-Math.floor(player.pos.y))>1)return null;
     const k=this.key(bx,by,bz);
-    const p=this.map.get(k);
+    return {x:bx,y:by,z:bz,k,p:this.map.get(k),block:World.getBlock(bx,by,bz)};
+  },
+
+  /* ---------- highlight blok target ---------- */
+  ensureHighlight(){
+    if(!this.hl){
+      const geo=new THREE.PlaneGeometry(1,1);
+      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.25,
+        depthTest:false,depthWrite:false,side:THREE.DoubleSide});
+      this.hl=new THREE.Mesh(geo,mat);
+      this.hl.rotation.x=-Math.PI/2;
+      this.hl.renderOrder=980;
+      this.hl.visible=false;
+    }
+    if(typeof Game!=='undefined'&&Game.scene&&this.hl.parent!==Game.scene)Game.scene.add(this.hl);
+    return this.hl;
+  },
+
+  updateHighlight(){
+    const hl=this.ensureHighlight();
+    const active=(typeof Game!=='undefined'&&Game.started&&!Game.menuMode&&
+      typeof UI!=='undefined'&&!UI.open&&
+      typeof Player!=='undefined'&&Player&&!Player.dead);
+    if(!active){hl.visible=false;return;}
+    const slot=(typeof RPG!=='undefined')?RPG.hotbar[RPG.sel]:null;
+    const id=slot&&slot.id;
+    const isHoe=id==='hoe';
+    const isSeed=id&&this.SEED_TO_CROP[id];
+    if(!isHoe&&!isSeed){hl.visible=false;return;}
+    const t=this.targetTile(Player);
+    if(!t){hl.visible=false;return;}
+
+    hl.visible=true;
+    hl.position.set(t.x+0.5,t.y+1.03,t.z+0.5);
+    const now=performance.now()*0.001;
+    let color=0xffffff,op=0.24+0.09*Math.sin(now*6);
+
+    if(isHoe){
+      if(t.block===B.GRASS||t.block===B.DIRT)color=0xd8a15a;      // bisa dicangkul
+      else if(t.block===B.FARM)color=0x8fd3ff;                    // sudah jadi ladang
+      else color=0xff6a4d;                                          // tidak bisa
+    }else if(isSeed){
+      if(t.block===B.FARM&&!t.p)color=0x6dff7c;                   // ladang kosong
+      else if(t.block===B.FARM&&t.p&&t.p.stage===3)color=0xffd447; // siap panen
+      else if(t.block===B.FARM&&t.p)color=0xffa94d;                // sudah terisi
+      else color=0xff6a4d;                                          // bukan ladang
+    }
+    hl.material.color.setHex(color);
+    hl.material.opacity=op;
+  },
+
+  /* ---------- aksi pemain: cangkul / tanam / panen ---------- */
+  tryUse(player){
+    const t=this.targetTile(player);
+    if(!t)return false;
+    const {x:bx,y:by,z:bz,k,p}=t;
+    const block=t.block;
 
     /* panen dulu bila sudah matang */
     if(p&&p.stage===3){this.harvest(p);return true;}
 
     const slot=RPG.hotbar[RPG.sel];
     const id=slot&&slot.id;
-    const block=World.getBlock(bx,by,bz);
 
     /* cangkul: rumput/tanah -> ladang */
     if(id==='hoe'){
@@ -353,6 +408,7 @@ const Farming={
 
   /* ---------- update pertumbuhan ---------- */
   update(dt,pp){
+    this.updateHighlight();
     this.saveT-=dt;
     if(this.saveT<=0){this.saveT=12;this.save();}
     this.restoreT-=dt;

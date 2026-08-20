@@ -1089,6 +1089,18 @@ const Action={
       pos:new THREE.Vector3(Furni.riding.x,CFG.WATER_Y+1.5,Furni.riding.z)};
     if(Furni.sitting)return {kind:'stand',label:'🧍 Berdiri',
       pos:new THREE.Vector3(Furni.sitting.x,Furni.sitting.y+1.2,Furni.sitting.z)};
+    /* ---------- MOB PELIHARAAN ---------- */
+    if(typeof Capture!=='undefined'){
+      if(Capture.riding){
+        return {kind:'pet-dismount',label:'🐾 Turun',
+          pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
+      }
+      const pet=Capture.pet;
+      if(pet&&!pet.dead&&pet.saddle&&pet.pos.distanceTo(Player.pos)<5){
+        return {kind:'pet-ride',label:'🐾 Naiki',
+          pos:pet.pos.clone().add(new THREE.Vector3(0,meshHeight(pet.type)+0.8,0))};
+      }
+    }
     const n=NPCS.nearby();
     if(n)return {kind:'talk',npc:n,
       label:`💬 Bicara · ${n.role.e} ${n.name}`,
@@ -1106,6 +1118,8 @@ const Action={
     if(!a){UI.toast('Tidak ada yang bisa diinteraksi di sini');return;}
     if(a.kind==='disembark')Furni.disembark();
     else if(a.kind==='stand')Furni.stand();
+    else if(a.kind==='pet-ride'&&typeof Capture!=='undefined')Capture.startRide();
+    else if(a.kind==='pet-dismount'&&typeof Capture!=='undefined')Capture.stopRide();
     else if(a.kind==='talk')NPCS.talk(a.npc);
     else if(a.kind==='furni')Furni.interact(a.furni);
     else if(a.kind==='place')Furni.placeFromHand();

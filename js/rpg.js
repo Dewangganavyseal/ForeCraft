@@ -7,6 +7,9 @@ const RPG={
   activeCD:{slam:0,whirl:0,roar:0,herb:0},
   roarT:0,                       // sisa durasi buff damage Teriakan Perang
   hotbar:new Array(7).fill(null),bag:new Array(14).fill(null),
+  /* slot khusus mob hasil tangkapan (bukan item biasa; tidak bisa di-drop) */
+  mobSlots:new Array(4).fill(null),
+  deployedPet:-1,
   /* armor + tameng (tameng khusus karakter utama). Nilai slot bisa berupa
      string id (save lama) atau objek {id,lvl} hasil tempa Landasan Tempa —
      baca selalu lewat equipId()/equipLv(). */
@@ -228,6 +231,10 @@ const RPG={
      dan tombol keyboard Q/E/R/T lewat UI.useActiveSlot(). */
   useActive(id){
     if(!this.skillVal(id)||Player.dead)return false;
+    if(typeof Capture!=='undefined'&&Capture.riding){
+      UI.toast('🐴 Tidak bisa memakai skill saat menunggangi');
+      return false;
+    }
     if(this.activeCD[id]>0){
       UI.toast(`⏳ ${Math.ceil(this.activeCD[id])}s lagi`);return false;
     }
@@ -439,20 +446,24 @@ const RPG={
 
   addItem(id,n,lvl){
     n=n||1;
+    const before=n;
     /* item hasil tempa (lvl>0) tidak pernah digabung ke stack lain */
     if(!lvl){
       for(const arr of[this.hotbar,this.bag])
         for(let i=0;i<arr.length;i++)
           if(arr[i]&&arr[i].id===id&&!arr[i].lvl&&arr[i].n<64){
-            const add=Math.min(n,64-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)return 0;
+            const add=Math.min(n,64-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)break;
           }
     }
-    for(const arr of[this.hotbar,this.bag])
-      for(let i=0;i<arr.length;i++)
-        if(!arr[i]){
-          arr[i]=lvl?{id,n:Math.min(n,64),lvl}:{id,n:Math.min(n,64)};
-          n-=Math.min(n,64);if(n<=0)return 0;
-        }
+    if(n>0){
+      for(const arr of[this.hotbar,this.bag])
+        for(let i=0;i<arr.length;i++)
+          if(!arr[i]){
+            arr[i]=lvl?{id,n:Math.min(n,64),lvl}:{id,n:Math.min(n,64)};
+            n-=Math.min(n,64);if(n<=0)break;
+          }
+    }
+    if(before>0&&n<before&&typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
     return n;
   },
   countItem(id){
@@ -473,6 +484,7 @@ const RPG={
           }
         }
     }
+    if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
   },
   /* craft `count` item sekaligus (default 1). Hasil MASUK TAS; bila tas penuh
      sisanya dijatuhkan ke tanah (tidak hilang). Berhenti bila bahan habis. */
@@ -581,6 +593,8 @@ const RPG={
         pos:[Player.pos.x,Player.pos.y,Player.pos.z],
         sp:this.sp,skills:this.skills,hotbar:this.hotbar,bag:this.bag,
         equip:this.equip,coin:this.coin,bagTier:this.bagTier,
+        mobSlots:(typeof Capture!=='undefined'&&Capture.serialize)?Capture.serialize():this.mobSlots,
+        deployedPet:(typeof Capture!=='undefined'&&typeof Capture.deployedSlot==='number')?Capture.deployedSlot:this.deployedPet,
         /* proficiency "belajar dengan melakukan" (ala Durango) */
         prof:Prof.serialize(),
         /* rekan yang sedang ikut; penduduk desa biasa tidak perlu disimpan
