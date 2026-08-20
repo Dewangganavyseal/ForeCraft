@@ -728,6 +728,11 @@ const NPCS={
     }
     if(!n.target&&!passive)n.target=this.findTarget(n);
 
+    /* BUGFIX animasi macet: skill porting (giant quake, elf, kelinci) harus
+       terus di-update walau target hilang/mati di tengah skill — bila tidak,
+       timer skill berhenti dan NPC beku di pose skill selamanya. */
+    if(!n.target&&n.quake&&typeof SkillsPort!=='undefined')SkillsPort.combat(n,dt);
+
     if(n.target){this.aiFight(n,dt);return;}
     /* lapar & tidak punya bekal → cari makanan sendiri di sekitar pemain */
     if(this.isTeam(n)&&n.starving){
