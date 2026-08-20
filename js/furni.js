@@ -1089,17 +1089,11 @@ const Action={
       pos:new THREE.Vector3(Furni.riding.x,CFG.WATER_Y+1.5,Furni.riding.z)};
     if(Furni.sitting)return {kind:'stand',label:'🧍 Berdiri',
       pos:new THREE.Vector3(Furni.sitting.x,Furni.sitting.y+1.2,Furni.sitting.z)};
-    /* ---------- MOB PELIHARAAN ---------- */
-    if(typeof Capture!=='undefined'){
-      if(Capture.riding){
-        return {kind:'pet-dismount',label:'🐾 Turun',
-          pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
-      }
-      const pet=Capture.pet;
-      if(pet&&!pet.dead&&pet.saddle&&pet.pos.distanceTo(Player.pos)<5){
-        return {kind:'pet-ride',label:'🐾 Naiki',
-          pos:pet.pos.clone().add(new THREE.Vector3(0,meshHeight(pet.type)+0.8,0))};
-      }
+    /* ---------- MOB PELIHARAAN: TURUN ----------
+       Saat menunggangi, satu-satunya aksi adalah turun. */
+    if(typeof Capture!=='undefined'&&Capture.riding){
+      return {kind:'pet-dismount',label:'🐾 Turun',
+        pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
     }
     const n=NPCS.nearby();
     if(n)return {kind:'talk',npc:n,
@@ -1111,6 +1105,19 @@ const Action={
     const s=RPG.hotbar[RPG.sel];
     if(s&&ITEMS[s.id].place)
       return {kind:'place',label:`📦 Pasang ${ITEMS[s.id].n}`};
+    /* ---------- MOB PELIHARAAN: NAIKI (prioritas TERAKHIR) ----------
+       Pet mengikuti pemain ke mana-mana; bila aksi Naiki diprioritaskan,
+       tombol "Naiki" selalu menutupi interaksi NPC/furnitur. Kini aksi Naiki
+       hanya muncul bila TIDAK ADA hal lain untuk diinteraksi, dan hanya saat
+       sangat dekat (<2.2 blok). Alternatif eksplisit: tombol "Naiki" di panel
+       mob (🐾 ikon team di kanan atas) yang sekaligus memanggil pet mendekat. */
+    if(typeof Capture!=='undefined'){
+      const pet=Capture.pet;
+      if(pet&&!pet.dead&&pet.saddle&&pet.pos.distanceTo(Player.pos)<2.2){
+        return {kind:'pet-ride',label:'🐾 Naiki',
+          pos:pet.pos.clone().add(new THREE.Vector3(0,meshHeight(pet.type)+0.8,0))};
+      }
+    }
     return null;
   },
   trigger(){

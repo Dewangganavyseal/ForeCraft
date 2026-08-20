@@ -671,11 +671,21 @@ const Capture={
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
   },
 
-  startRide(){
+  /* call=true (dari tombol panel): pet dipanggil ke sisi pemain dulu bila jauh */
+  startRide(call){
     const m=this.pet;
     if(!m||m.dead)return;
     if(!m.saddle){UI.toast('🐴 Pasang Sadel dulu dari tas mob.');return;}
     if(this.active)return;
+    /* bila dipanggil dari panel dan pet jauh, tarik pet ke samping pemain */
+    if(call&&m.pos.distanceTo(Player.pos)>2.5){
+      const ang=Cam.yaw+Math.PI*0.5;
+      const nx=Player.pos.x+Math.sin(ang)*1.2,nz=Player.pos.z+Math.cos(ang)*1.2;
+      const g=World.groundAt(nx,nz,Player.pos.y+3);
+      m.pos.set(nx,Math.max(g,Player.pos.y-1),nz);
+      m.vel.set(0,0,0);
+      UI.toast('🐾 Kemari!');
+    }
     this.riding=true;
     m.vel.x=0;m.vel.z=0;   // buang momentum lama supaya tidak langsung meluncur
     UI.toast(`🐾 Menunggangi ${this.mobName(m.type)}!`);
@@ -946,25 +956,31 @@ const Capture={
         </div>
         <div class="pc-actions"></div>
       `;
-      const btns=d.querySelector('.pc-actions');
-      const mkBtn=(txt,fn,cls,title)=>{
-        const b=document.createElement('button');
-        b.textContent=txt;
-        if(cls)b.className=cls;
-        if(title)b.title=title;
-        b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();fn();});
-        btns.appendChild(b);
-      };
+       const btns=d.querySelector('.pc-actions');
+       const mkBtn=(txt,fn,cls,title)=>{
+         const b=document.createElement('button');
+         b.textContent=txt;
+         if(cls)b.className=cls;
+         if(title)b.title=title;
+         b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();fn();});
+         btns.appendChild(b);
+       };
 
-      if(active)mkBtn('📦 Simpan',()=>this.storeActive(false),'primary');
-      else mkBtn('🐾 Deploy',()=>this.deploy(i),'primary');
+       if(active)mkBtn('📦 Simpan',()=>this.storeActive(false),'primary');
+       else mkBtn('🐾 Deploy',()=>this.deploy(i),'primary');
 
-      mkBtn('⬆ Naik',()=>this.tryLevelUp(i),null,
-        `Butuh ${cost.n} ${ITEMS[cost.food].n}, XP penuh, peluang ${rate}%\nJimat Pawang menambah +30% peluang (dipakai otomatis bila ada).`);
-      mkBtn('🍖 Makan',()=>this.feed(i));
-      if(!pet.saddle)mkBtn('🐴 Sadel',()=>this.addSaddle(i));
-      mkBtn('💰 Jual',()=>this.sell(i));
-      mkBtn('🕊️ Lepas',()=>this.release(i));
+       /* Tombol ride hanya muncul jika saddle terpasang — via panel, pet
+          dipanggil ke sisi pemain sehingga tidak perlu tombol melayang
+          di atas pet yang mengganggu interaksi lain. */
+       if(pet.saddle&&active)mkBtn('🐎 Naiki',()=>this.startRide(true),null,
+         'Pet dipanggil ke sisimu lalu langsung dinaiki.');
+
+       mkBtn('⬆ Naik',()=>this.tryLevelUp(i),null,
+         `Butuh ${cost.n} ${ITEMS[cost.food].n}, XP penuh, peluang ${rate}%\nJimat Pawang menambah +30% peluang (dipakai otomatis bila ada).`);
+       mkBtn('🍖 Makan',()=>this.feed(i));
+       if(!pet.saddle)mkBtn('🐴 Sadel',()=>this.addSaddle(i));
+       mkBtn('💰 Jual',()=>this.sell(i));
+       mkBtn('🕊️ Lepas',()=>this.release(i));
       wrap.appendChild(d);
     });
   },
