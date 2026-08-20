@@ -37,7 +37,7 @@ const Monsters={
      Boss bukan tipe terpisah: monster biasa dipromosikan jadi boss dengan
      skala tubuh, HP/damage berlipat, dan drop inti boss. Ini menjaga semua
      AI/animasi tetap berlaku sekaligus membuat pertemuan boss terasa acak. */
-  bossCount(){return this.list.filter(m=>m.boss&&!m.dead).length;},
+  bossCount(){return this.list.filter(m=>m.boss&&!m.dead&&!m.pet).length;},
 
   /* ---------- apakah titik ini di dalam bangunan desa? ----------
      Monster tidak boleh muncul di dalam rumah (dulu bisa terjebak di ruang
@@ -307,9 +307,17 @@ const Monsters={
 
   hurt(m,dmg,dir,knock,src){
     if(m.dead)return;
+    /* Mob yang sedang dalam minigame tangkap tidak boleh menerima damage,
+       supaya proses tangkap tidak dirusak oleh NPC, pet, DoT, atau serangan lain. */
+    if(m.catchActive)return;
     /* NPC (rekan/penjaga) tidak boleh melukai hewan ternak (animal).
        Pemain tetap bisa, predator juga bisa. */
     if(this.isAnimal(m)&&src&&src!==Player&&src.role)return;
+    /* NPC (rekan/penjaga/penduduk) tidak boleh melukai mob peliharaan pemain */
+    if(m.pet&&src&&src!==Player&&src.role)return;
+    /* PLAYER tidak bisa melukai pet; hanya monster liar yang bisa.
+       src kosong = skill pemain (slam/whirl), bleed/venom, thorns, dsb. */
+    if(m.pet&&(!src||src===Player))return;
     /* siapa sumber serangan terakhir (untuk XP/drop & ternak kabur) */
     m.lastSrc=src;
     /* akumulasi damage pemain untuk kontribusi XP saat monster mati.
@@ -320,6 +328,7 @@ const Monsters={
     /* dipukul = otomatis waspada walau pemain di luar kerucut pandang */
     m.hp-=dmg;m.flash=0.18;m.state='chase';
     m.alert=Math.max(m.alert||0,6);m.seeT=CFG.MOB.MEM;
+    m.hpT=6; /* durasi tampil HP bar setelah terkena serangan */
     /* catat siapa yang memukul — dasar pemilihan sasaran */
     this.addThreat(m,src,dmg,
       src&&src!==Player&&src.role&&(src.role.skill.id==='taunt'||src.role.skill.id==='lionclaw')?2.2:1);
@@ -328,7 +337,10 @@ const Monsters={
       String(Math.round(dmg)),'#ffd24d');
     FX.debris(m.pos.clone().add(new THREE.Vector3(0,1,0)),0xff5544,4,2);
     Sfx.hit();
-    if(m.hp<=0)this.kill(m);
+    if(m.hp<=0){
+      if(m.pet&&typeof Capture!=='undefined')Capture.petDown(m);
+      else this.kill(m);
+    }
   },
   kill(m){
     m.dead=true;m.deathT=0;
@@ -462,8 +474,9 @@ const Monsters={
       }
       if(m.dead)continue;
 
-      /* efek racun kalajengking: damage susulan tiap 1 detik */
-      if(m.poisonHit>0){
+      /* efek racun kalajengking: damage susulan tiap 1 detik.
+         Mob yang sedang dalam proses tangkap tidak boleh menyerang pemain. */
+      if(!m.catchActive&&m.poisonHit>0){
         m.poisonT-=dt;
         if(m.poisonT<=0){
           m.poisonT=1.0;m.poisonHit--;
@@ -481,11 +494,16 @@ const Monsters={
       }
 
       const dp=m.pos.distanceTo(Player.pos);
-      if(dp>55){Game.scene.remove(m.mesh);this.list.splice(i,1);continue;}
-      this.ai(m,dt,dp);
+      if(!m.pet&&dp>55){Game.scene.remove(m.mesh);this.list.splice(i,1);continue;}
+      if(m.pet&&typeof Capture!=='undefined'){Capture.petAI(m,dt,dp);}
+      else if(m.catchActive&&typeof Capture!=='undefined'){Capture.catchAI(m,dt,dp);}
+      else this.ai(m,dt,dp);
       this.physics(m,dt);
-      /* hewan ternak punya tabrakan badan dengan pemain/NPC/mob lain */
-      if(m.type==='cow'||m.type==='horse')this.separateAnimal(m);
+      /* hewan ternak punya tabrakan badan dengan pemain/NPC/mob lain
+         Saat ditunggangi, jangan pisahkan: penunggang duduk di punggungnya;
+         bila dipisah, kuda terdorong maju tiap frame → bug kuda ngebut */
+      const beingRidden=(typeof Capture!=='undefined')&&Capture.riding&&(Capture.pet===m);
+      if((m.type==='cow'||m.type==='horse')&&!beingRidden)this.separateAnimal(m);
       m.mesh.position.copy(m.pos);
       this.animate(m,dt);
 
@@ -493,7 +511,7 @@ const Monsters={
          Selama jendela sembur api (flyFireActive>0), pemain di dalam kerucut
          ~60° di depan naga (jarak <6) menerima damage berkala, dan BLOCK di
          titik jatuh api ikut TERBAKAR/hancur berkala seperti Hantaman golem. */
-      if(m.type==='dragon'&&m.flyT>0&&!Player.dead){
+      if(m.type==='dragon'&&m.flyT>0&&!Player.dead&&!m.catchActive){
         const stT=m.drag&&m.drag.stateT||0;
         const fb=(typeof Mob_Dragon!=='undefined')?Mob_Dragon.flyFireActive(stT):0;
         if(fb>0){
@@ -524,7 +542,7 @@ const Monsters={
       }
       /* SAPUAN EKOR LIZARD: damage AoE di frame hit (tengah spin ~0.55-0.7).
          Radius diperkecil 3.2→2.5 mengikuti model yang kini seukuran babi. */
-      if(m.type==='lizard'&&(m.tailT||0)>0&&!m._tailHit&&m.tailT<0.7){
+      if(m.type==='lizard'&&!m.catchActive&&(m.tailT||0)>0&&!m._tailHit&&m.tailT<0.7){
         m._tailHit=true;
         FX.ring(m.pos.x,m.pos.y+0.1,m.pos.z,0x2fae24,0.8,2.5);
         if(m.pos.distanceTo(Player.pos)<2.5&&!Player.dead){
@@ -778,7 +796,8 @@ const Monsters={
     const reach=m.type==='golem'?3.2:m.type==='scorpion'?1.9:1.7;
     if(m.atkCd<=0&&d<reach){
       m.atkCd=m.type==='wolf'?0.85:m.type==='golem'?2.6:1.2;
-      NPCS.hurt(f,m.dmg);
+      if(f.pet&&typeof Capture!=='undefined')Capture.hurtPet(f,m.dmg);
+      else NPCS.hurt(f,m.dmg);
       if(m.type==='wolf')m.biteT=0.22;
       if(m.type==='scorpion')m.stingT=0.3;
       FX.debris(f.pos.clone().add(new THREE.Vector3(0,1,0)),0xff5544,4,2);
