@@ -153,6 +153,8 @@ const Settings={
       <button class="big" id="set-save">💾 ${CURRENT_LANG==='id'?'Simpan Sekarang':CURRENT_LANG==='en'?'Save Now':CURRENT_LANG==='zh'?'立即保存':'今すぐ保存'}</button>`;
     el.appendChild(sv);
     sv.querySelector('#set-save').addEventListener('click',()=>{
+      /* pakai SaveGame.now(): ikut menyimpan furnitur & memberi info rekan */
+      if(typeof SaveGame!=='undefined'&&SaveGame.now){SaveGame.now();return;}
       if(typeof RPG!=='undefined'){
         RPG.save();
         UI.toast('💾 '+(CURRENT_LANG==='id'?'Permainan disimpan!':

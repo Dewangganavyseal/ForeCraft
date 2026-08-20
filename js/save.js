@@ -12,16 +12,11 @@
    ========================================================================= */
 const SaveGame={
 
-  /* ---------- tombol simpan ---------- */
-  init(){
-    if(document.getElementById('btn-save'))return;
-    const b=document.createElement('button');
-    b.id='btn-save';b.title='Simpan permainan';b.textContent='💾';
-    /* ditempel di blok bar HP/stamina supaya kecil & tidak menutupi layar */
-    (document.getElementById('stats')||document.body).appendChild(b);
-    b.addEventListener('click',e=>{e.preventDefault();this.now();});
-    this.btn=b;
-  },
+  /* ---------- tombol simpan ----------
+     Tombol 💾 melayang DIHAPUS: aksi simpan kini ada di panel Pengaturan
+     (tombol ⚙️ di samping bar HP). init() dibiarkan sebagai no-op agar
+     pemanggilan lama di Game.init() tetap aman. */
+  init(){},
 
   /* Simpan sekarang juga lalu beri umpan balik singkat. */
   now(){

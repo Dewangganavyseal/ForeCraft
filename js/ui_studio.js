@@ -78,17 +78,11 @@ const UIStudio={
 
   defaultMode(){return (typeof IS_MOBILE!=='undefined'&&IS_MOBILE)?'mobile':'pc';},
 
-  /* ---------------- tombol pembuka ---------------- */
-  buildButton(){
-    if(document.getElementById('btn-uistudio'))return;
-    const b=document.createElement('button');
-    b.id='btn-uistudio';
-    b.title='UI Studio (U)';
-    b.textContent='🎛️';
-    const host=document.getElementById('stats')||document.body;
-    host.appendChild(b);
-    b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();this.toggle();});
-  },
+  /* ---------------- tombol pembuka ----------------
+     Tombol 🎛️ melayang DIHAPUS: UI Studio kini dibuka dari panel
+     Pengaturan (⚙️ di samping bar HP) atau tombol U. buildButton()
+     dibiarkan no-op agar init() lama tetap aman. */
+  buildButton(){},
 
   /* ---------------- overlay ---------------- */
   buildOverlay(){

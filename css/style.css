@@ -793,14 +793,17 @@ body.touch .hslot:active{
 #btn-music:active{transform:scale(.88)}
 #btn-music.off{opacity:.45}
 #music-panel{width:min(340px,92vw)}
-/* tombol gear (settings) di #topright — style mengikuti btn-music */
-#btn-gear{pointer-events:auto;z-index:26;width:30px;height:30px;border-radius:9px;
+/* tombol gear (settings) di #stats — menempel di kanan bar HP.
+   #hud memakai pointer-events:none, jadi tombolnya mengaktifkan kembali sendiri. */
+#btn-gear{position:absolute;left:100%;top:0;margin-left:8px;
+  pointer-events:auto;z-index:26;width:30px;height:30px;border-radius:9px;
   cursor:pointer;background:rgba(10,14,10,.55);
   border:1px solid rgba(255,255,255,.12);color:#eaffd8;font-size:14px;
-  line-height:1;padding:0;backdrop-filter:blur(4px);margin-left:8px;
+  line-height:1;padding:0;backdrop-filter:blur(4px);
   transition:transform .12s,background .2s,border-color .2s,opacity .2s}
 #btn-gear:active{transform:scale(.88)}
 #btn-gear:hover{background:rgba(20,28,20,.8);border-color:rgba(159,215,127,.5)}
+body.touch #btn-gear{width:34px;height:34px;font-size:16px}
 /* panel settings */
 #panel-settings{width:min(420px,94vw)}
 .set-sec{border-bottom:1px solid rgba(255,255,255,.1);padding:10px 2px}
@@ -1377,6 +1380,7 @@ body.us-real-mobile .us-lab input[type=range]{width:76px}
 body.in-menu #hud,
 body.in-menu #mobile,
 body.in-menu #btn-save,
+body.in-menu #btn-gear,
 body.in-menu #btn-uistudio{display:none !important}
 
 #start{background:rgba(20,22,25,.58);backdrop-filter:blur(3px);
