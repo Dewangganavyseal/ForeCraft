@@ -255,7 +255,12 @@ const NPC_Stonegiant={
       FX.debris(new THREE.Vector3(p.x,n.pos.y+.3,p.z),0x7a7f87,8,3);
       FX.addShake(.3);
     }
-    n.swing=0.3;   // mace ikut terayun di animasi
+    /* mace ikut terayun di animasi. CEGAH ANIMASI STACK: bila ayunan
+       sebelumnya masih berjalan (combo rapat), lanjutkan sisa ayunannya
+       alih-alih me-restart dari awal — restart tiap hit bikin mace
+       bergetar bolak-balik & animasi tampak macet. */
+    if((n._swingPrev||0)>0.12)n.swing=n._swingPrev;
+    else n.swing=0.3;
   },
   /* giant pose: idle/jalan/keyframe quake (dari pose system prototipe) */
   countNear(n,r){
@@ -280,6 +285,10 @@ const NPC_Stonegiant={
   /* ---------- ANIMASI ---------- */
   giantAnim(n,dt){
     const R=n.parts,rr=R.rare,t=performance.now()*0.001;
+    /* catat sisa swing SEBELUM aiFight frame berikutnya mengeset ulang —
+       dipakai onMeleeHit untuk mencegah restart animasi yang masih berjalan
+       (penyebab animasi "stack"/patah-patah saat pukulan combo cepat) */
+    n._swingPrev=n.swing;
     const P=n._pose||(n._pose={rootY:0,crouch:0,lean:0,twist:0,headX:0,headY:0,
       aLx:.06,aLy:0,aLz:.12,aRx:-.32,aRy:0,aRz:-.12,mX:-1.6,
       legLx:0,legLz:.04,legRx:0,legRz:-.04});
@@ -305,31 +314,43 @@ const NPC_Stonegiant={
           T.mX=-1.6+u*2.05;T.aLx=0.2-u*2.1;T.legLx=-u*0.65;T.legRx=-u*0.65;
         }
       }
-    }else if(sp>0.3){
-      /* locomotion prototipe */
-      n._ph=(n._ph||0)+dt*(sp>2.2?10.2:6.8);
-      const ph=n._ph,amp=sp>2.2?1.0:.6,arm=sp>2.2?.9:.5;
-      T.legLx=Math.sin(ph)*amp;T.legRx=-Math.sin(ph)*amp;
-      T.aLx=-Math.sin(ph)*arm;
-      T.aRx=-.35-Math.sin(ph)*arm*.2;
-      T.mX=-1.6+Math.sin(ph*2)*.06;
-      T.rootY=Math.abs(Math.cos(ph))*(sp>2.2?.16:.08);
-      T.lean=sp>2.2?.2:.07;T.twist=Math.sin(ph)*.06;
-      T.headY=Math.sin(ph*.5)*.1;
-    }else if(n.swing>0){
-      /* ayunan mace: angkat lalu hantam (disederhanakan dari HITS) */
-      blend=22;
-      const sw=1-n.swing/0.3;
-      T.aRx=sw<0.4?-3.0*sw/0.4:lerp(-3.0,-0.7,(sw-0.4)/0.6);
-      T.mX=sw<0.4?lerp(-1.6,-2.6,sw/0.4):lerp(-2.6,0.1,(sw-0.4)/0.6);
-      T.lean=sw<0.4?-0.3*(sw/0.4):lerp(-0.3,0.45,(sw-0.4)/0.6);
-      T.crouch=sw>0.6?0.4:0.1;
     }else{
-      const b=Math.sin(t*1.7);
-      T.aLx=.06+b*.04;T.aRx=-.32-b*.04;
-      T.mX=-1.6+b*.05;T.lean=.02+b*.015;
-      T.headY=Math.sin(t*.6)*.25;T.headX=Math.sin(t*.9)*.06;
-      T.rootY=b*.03;
+      /* ---------- GERAK DASAR: jalan / idle ----------
+         Kaki & lengan kiri selalu mengikuti locomotion/idle; ayunan mace
+         (swing) dioverlay di atasnya supaya serangan tetap terlihat walau
+         raksasa sedang bergerak — dulu swing & jalan saling meniadakan
+         sehingga animasi terasa macet/terlambat saat bertarung. */
+      if(sp>0.3){
+        /* kecepatan fase di-smooth (bukan switch tajam di sp=2.2) supaya
+           kaki tidak bergetar saat kecepatan naik-turun di sekitar ambang */
+        const phaseSpeed=sp>=2.7?10.2:sp<=1.7?6.8:lerp(6.8,10.2,(sp-1.7)/1.0);
+        n._ph=(n._ph||0)+dt*phaseSpeed;
+        const ph=n._ph,amp=sp>2.2?1.0:.6,arm=sp>2.2?.9:.5;
+        T.legLx=Math.sin(ph)*amp;T.legRx=-Math.sin(ph)*amp;
+        T.aLx=-Math.sin(ph)*arm;
+        T.aRx=-.35-Math.sin(ph)*arm*.2;
+        T.mX=-1.6+Math.sin(ph*2)*.06;
+        T.rootY=Math.abs(Math.cos(ph))*(sp>2.2?.16:.08);
+        T.lean=sp>2.2?.2:.07;T.twist=Math.sin(ph)*.06;
+        T.headY=Math.sin(ph*.5)*.1;
+      }else{
+        const b=Math.sin(t*1.7);
+        T.aLx=.06+b*.04;T.aRx=-.32-b*.04;
+        T.mX=-1.6+b*.05;T.lean=.02+b*.015;
+        T.headY=Math.sin(t*.6)*.25;T.headX=Math.sin(t*.9)*.06;
+        T.rootY=b*.03;
+      }
+      /* ---------- OVERLAY AYUNAN MACE ----------
+         Lengan kanan + mace + condong badan diambil alih animasi swing,
+         sementara kaki tetap berjalan. Blend dinaikkan agar pukulan tajam. */
+      if(n.swing>0){
+        blend=22;
+        const sw=1-n.swing/0.3;
+        T.aRx=sw<0.4?-3.0*sw/0.4:lerp(-3.0,-0.7,(sw-0.4)/0.6);
+        T.mX=sw<0.4?lerp(-1.6,-2.6,sw/0.4):lerp(-2.6,0.1,(sw-0.4)/0.6);
+        T.lean+=(sw<0.4?-0.3*(sw/0.4):lerp(-0.3,0.45,(sw-0.4)/0.6));
+        T.crouch=sw>0.6?0.4:0.1;
+      }
     }
     const f=1-Math.exp(-blend*dt);
     for(const k in T)P[k]+=(T[k]-P[k])*f;
