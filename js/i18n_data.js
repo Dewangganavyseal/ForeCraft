@@ -534,5 +534,36 @@ const I18N_PHRASE={
   'rekan':['companions','同伴','仲間'],
   'kamera':['camera','镜头','カメラ'],
   'bantu':['help','帮助','ヘルプ'],
+
+  /* ------ Tambahan cakupan toast/UI (audit i18n) ------ */
+  /* frasa penuh — diprioritaskan karena lebih panjang */
+  'Pelajari skill Pawang Pemula dulu!':['Learn the Novice Tamer skill first!','请先学习驯兽初学者技能！','まず初級テイマーのスキルを習得しよう！'],
+  'Memasang':['Placing','正在放置','設置中'],
+  'klik tanah utk geser':['click ground to move','点击地面以移动','地面をクリックで移動'],
+  'Putar/Pasang/Batal di bawah':['Rotate/Place/Cancel below','下方 旋转/放置/取消','下で 回転/設置/キャンセル'],
+  'Pohon tumbang!':['A tree falls!','树倒了！','木が倒れた！'],
+  'Hujan turun...':['Rain begins...','开始下雨……','雨が降ってきた…'],
+  'Hujan reda':['Rain stops','雨停了','雨が止んだ'],
+  'Layout UI tersimpan':['UI layout saved','界面布局已保存','UIレイアウトを保存した'],
+  'Perubahan dibatalkan':['Changes discarded','更改已撤销','変更を取り消した'],
+  'js/ui_layout.js berhasil diupdate':['js/ui_layout.js updated successfully','js/ui_layout.js 更新成功','js/ui_layout.js を更新しました'],
+  'ui_layout.js tersimpan':['ui_layout.js saved','ui_layout.js 已保存','ui_layout.js を保存した'],
+  'ui_layout.js diunduh':['ui_layout.js downloaded','ui_layout.js 已下载','ui_layout.js をダウンロードした'],
+  'ditangkap!':['captured!','已捕获！','捕獲した！'],
+  '(+12% stat)':['(+12% stats)','（+12% 属性）','（+12% ステータス）'],
+  'Error:':['Error:','错误：','エラー：'],
+  /* kata tunggal — hanya ditukar bila berdiri sebagai kata utuh */
+  'muncul':['appeared','出现了','現れた'],
+  'Raksasa':['Giant','巨型','巨大個体'],
+  'memakan':['eats','吃掉了','食べた'],
+  'koin':['coins','金币','コイン'],
+  'blok':['blocks','格','ブロック'],
+  'maks':['max','最多','最大'],
+  'lagi':['left','剩余','残り'],
+  'Rank':['Rank','等级','ランク'],
+  'dari':['from','从','から'],
+  'Panel':['Panel','面板','パネル'],
+  'bermasalah':['has a problem','出现问题','に問題が発生'],
+  'Jumlah:':['Amount:','数量：','数量：'],
 };
 
