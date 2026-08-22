@@ -968,11 +968,15 @@ Object.assign(ITEMS,{
   f_anvil:    {n:'Landasan Tempa', e:'⚒️', place:'anvil', rarity:'rare'},
   f_stove:    {n:'Tungku Masak', e:'🍲', place:'stove', rarity:'uncommon'},
   f_campfire: {n:'Api Unggun', e:'🔥', place:'campfire', rarity:'common'},
+  /* Rumah modular 5×5: diletakkan seperti perabot, bisa disusun & digabung
+     satu sama lain menjadi bangunan besar berbentuk bebas. */
+  f_house:    {n:'Rumah Kayu', e:'🏠', place:'house', rarity:'uncommon'},
 });
 
 Object.assign(DROP_COLOR,{f_table:0x8a5a2b,f_chair:0x8a5a2b,f_bed:0xc23b3b,
   f_chest:0x9a6b3c,f_boat:0xb07c46,f_board:0x8a5a2b,
-  f_workbench:0xb8894f,f_anvil:0x474c52,f_stove:0x8f4a38,f_campfire:0x5a4128});
+  f_workbench:0xb8894f,f_anvil:0x474c52,f_stove:0x8f4a38,f_campfire:0x5a4128,
+  f_house:0x9d6a35});
 
 
 RECIPES.push(
@@ -991,7 +995,9 @@ RECIPES.push(
   {out:'f_workbench',need:{wood:8,stone:4,fiber:2},name:'Meja Kerja'},
   {out:'f_stove',need:{stone:10,wood:4,coal:2},name:'Tungku Masak'},
   {out:'f_campfire',need:{wood:5,fiber:2,coal:1},name:'Api Unggun'},
-  {out:'f_anvil',need:{iron_ingot:6,stone:6,wood:2},skill:'smith',prof:{mining:8},name:'Landasan Tempa'}
+  {out:'f_anvil',need:{iron_ingot:6,stone:6,wood:2},skill:'smith',prof:{mining:8},name:'Landasan Tempa'},
+  /* Rumah modular 5×5: satu modul per craft; disusun bebas & digabung di dunia */
+  {out:'f_house',need:{wood:20,fiber:8,stone:6},name:'Rumah Kayu'}
 );
 
 

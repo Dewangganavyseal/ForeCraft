@@ -604,5 +604,13 @@ const I18N_PHRASE={
   'untuk bicara atau rekrut.':['to talk or recruit.','以交谈或招募。','話す・勧誘する。'],
   'Malam berbahaya — siapkan makanan dan senjata.':
     ['Night is dangerous — prepare food and weapons.','夜晚危险 — 准备好食物和武器。','夜は危険 — 食料と武器を用意しよう。'],
+
+  /* Rumah modular */
+  'Sudah ada rumah di petak ini':['A house already occupies this plot','此格已有房屋','この区画にはすでに家がある'],
+  'Rumah digabung — total':['House merged — total','房屋已合并 — 共','家を合体 — 合計'],
+  'petak':['plots','格','区画'],
+  'Petak ini sudah jadi rumah':['This plot is already a house','此格已是房屋','この区画はすでに家だ'],
+  'Tidak bisa membangun di air':['Cannot build on water','无法在水上建造','水上には建てられない'],
+  'Satu petak rumah dibongkar':['One house plot dismantled','拆除了一格房屋','家を一区画取り壊した'],
 };
 

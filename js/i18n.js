@@ -88,6 +88,7 @@ const I18N_ITEMS={
   shield_frost:{en:'Frost Dawn Shield',zh:'霜晓之盾',ja:'氷暁の盾'},
   shield_dark:{en:'Shadow Shield',zh:'暗影之盾',ja:'影の盾'},
   bag:{en:'Large Leather Bag',zh:'大皮背包',ja:'大きな革のバッグ'},
+  f_house:{en:'Wooden House',zh:'木屋',ja:'木の家'},
 };
 
 /* ----------------------------------------------------------------- MOB NAMES */
