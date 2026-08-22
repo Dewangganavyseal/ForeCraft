@@ -276,6 +276,22 @@ const NPC_Goblin={
     /* mundur paksa (HP kritis) membatalkan skill yang sedang berjalan */
     if(gb.action&&n.retreat){gb.action=null;n.gobRide=null;}
 
+    /* BUGFIX animasi macet: gb.action.t HANYA bertambah di combat(), dan
+       combat() hanya dipanggil aiFight selama n.target ada. Bila target
+       mati/hilang DI TENGAH skill (sering: goblin sendiri yang membunuhnya
+       saat tusukan beruntun), ai() meng-null-kan target sebelum aiFight →
+       combat() tak dipanggil → timer beku → goblin macet di pose skill sambil
+       tetap berjalan. Safeguard: teruskan timeline di sini sampai selesai lalu
+       clear, sehingga pose kembali ke locomotion normal (mirip elf & lion). */
+    if(gb.action&&(!n.target||n.target.dead)){
+      n.gobRide=null;                        // mob tunggangan sudah tak ada
+      gb.action.t+=dt;
+      if(gb.action.t>=this.GB_DUR){
+        gb.action=null;
+        n.atkCd=CFG.NPC.ATK_CD*0.7;
+      }
+    }
+
     /* --- reset pose dasar --- */
     R.body.position.set(0,HIP,0);R.body.rotation.set(0,0,0);
     R.head.rotation.set(0,0,0);
