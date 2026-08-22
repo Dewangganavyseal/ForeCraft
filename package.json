@@ -6,6 +6,7 @@
   "scripts": {
     "studio": "node scripts/studio.js",
     "build": "node scripts/build.js",
+    "audit:i18n": "node tools/audit-i18n.js",
     "cap:sync": "npm run build && npx cap sync",
     "cap:copy": "npm run build && npx cap copy",
     "android:open": "npx cap open android",
