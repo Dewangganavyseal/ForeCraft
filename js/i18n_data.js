@@ -565,5 +565,44 @@ const I18N_PHRASE={
   'Panel':['Panel','面板','パネル'],
   'bermasalah':['has a problem','出现问题','に問題が発生'],
   'Jumlah:':['Amount:','数量：','数量：'],
+
+  /* ------ Tambahan cakupan panel/tutorial/statis (audit i18n penuh) ------ */
+  /* Anvil */
+  'Tidak ada equipment. Buat pedang/armor/tameng dulu, atau pakai dari tas.':
+    ['No equipment. Craft a sword/armor/shield first, or use one from your bag.',
+     '没有装备。请先制作剑/护甲/盾牌，或从背包中使用。',
+     '装備がありません。まず剣/防具/盾を作るか、バッグから使いましょう。'],
+  'Klik salah satu equipment di atas untuk menempa.':
+    ['Click one of the equipment above to forge.','点击上方任一装备进行锻造。','上の装備をクリックして鍛造します。'],
+  /* Capture */
+  'Slot Mob (tidak bisa di-drop)':['Mob Slots (cannot be dropped)','宠物栏（无法丢弃）','モブスロット（捨てられない）'],
+  /* Chat / terminal */
+  'Kamu:':['You:','你：','あなた：'],
+  'Jumlah':['Amount','数量','数量'],
+  'Varian Boss (monster)':['Boss Variant (monster)','首领变种（怪物）','ボス種（モンスター）'],
+  'item masuk tas otomatis (lebihan dijatuhkan ke tanah)':
+    ['items go to your bag automatically (extras dropped on the ground)',
+     '物品自动进入背包（多余的掉落到地面）',
+     'アイテムは自動でバッグへ（あふれは地面に落ちる）'],
+  /* Furni */
+  'Putar':['Rotate','旋转','回転'],
+  /* UI rekan */
+  'Tidak ada rekan yang dipilih.':['No companion selected.','未选择同伴。','仲間が選択されていません。'],
+  /* UI Studio */
+  'Klik elemen untuk memilih':['Click an element to select','点击元素进行选择','要素をクリックして選択'],
+  /* Tutorial (PANDUAN DASAR) */
+  'Bergerak: WASD / joystick (mobile).':['Move: WASD / joystick (mobile).','移动：WASD / 摇杆（移动端）。','移動：WASD / ジョイスティック（モバイル）。'],
+  'Klik / tombol serang: menyerang, makan saat memegang makanan, mencangkul, menanam, memanen.':
+    ['Click / attack button: attack, eat while holding food, till, plant, harvest.',
+     '点击/攻击键：攻击、手持食物时进食、耕地、种植、收获。',
+     'クリック/攻撃ボタン：攻撃、食料所持中は食事、耕す、植える、収穫。'],
+  'tas · ':['bag · ','背包 · ','バッグ · '],
+  'skill · ':['skill · ','技能 · ','スキル · '],
+  'Cangkul rumput menjadi ladang, lalu tanam benih.':
+    ['Till grass into farmland, then plant seeds.','把草地耕成农田，然后种下种子。','草を耕して農地にし、種を植えよう。'],
+  'Dekati penduduk lalu tekan G / tombol':['Approach a villager then press G / button','靠近村民然后按 G / 按钮','村人に近づいてG / ボタンを押す'],
+  'untuk bicara atau rekrut.':['to talk or recruit.','以交谈或招募。','話す・勧誘する。'],
+  'Malam berbahaya — siapkan makanan dan senjata.':
+    ['Night is dangerous — prepare food and weapons.','夜晚危险 — 准备好食物和武器。','夜は危険 — 食料と武器を用意しよう。'],
 };
 
