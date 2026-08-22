@@ -266,7 +266,11 @@ const Input={
     const bind=(id,fn)=>{
       const el=document.getElementById(id);
       if(!el)return;
-      el.addEventListener('touchstart',e=>{e.preventDefault();fn();},{passive:false});
+      el.addEventListener('touchstart',e=>{e.preventDefault();el.classList.add('pressed');fn();},{passive:false});
+      /* efek tekan (mengecil) dilepas saat jari angkat / batal */
+      const unpress=()=>el.classList.remove('pressed');
+      el.addEventListener('touchend',unpress);
+      el.addEventListener('touchcancel',unpress);
     };
     bind('m-attack',()=>this.attackQ=true);
     bind('m-jump',()=>this.jumpQ=true);

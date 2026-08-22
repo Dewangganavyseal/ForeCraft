@@ -1301,7 +1301,12 @@ const SlamAim={
 
   /* hitung titik bidik dari kursor (PC) atau seretan jempol (mobile) */
   updateAim(){
-    if(IS_MOBILE&&this.dragCur&&this.dragStart){
+    /* Sepanjang drag sentuh aktif (dragStart/dragCur terisi) ia selalu
+       dimenangkan — tidak digate oleh IS_MOBILE, karena IS_MOBILE dihitung
+       sekali saat load dan bisa tetap false bila halaman dimuat di mode PC
+       lalu diprakira ke mode mobile (UI Studio). Di PC tanpa sentuh
+       dragStart/dragCur null sehingga jatuh ke cabang kursor mouse. */
+    if(this.dragCur&&this.dragStart){
       /* ala MOBA: arah & jarak mengikuti seretan dari tombol skill */
       const dx=this.dragCur.x-this.dragStart.x;
       const dy=this.dragCur.y-this.dragStart.y;

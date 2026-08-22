@@ -72,6 +72,7 @@ const UI={
     this.initChestDrag();
     this.renderHotbar();
     this.renderActiveSkills(true);
+    this.initButtonImages();
     /* pastikan semua panel tertutup saat game pertama kali dibuka */
     this.closeAll();
   },
@@ -175,7 +176,7 @@ const UI={
           this.picked=null;
           this.renderBag();this.renderHotbar();
         }else if(!t){
-          /* dilepas di luar slot: bila di luar panel tas â†’ konfirmasi buang */
+          /* dilepas di luar slot: bila di luar panel tas → konfirmasi buang */
           const under=document.elementFromPoint(e.clientX,e.clientY);
           if(!under||!panel.contains(under)){
             const arr=d.g===0?RPG.hotbar:RPG.bag;
@@ -197,7 +198,7 @@ const UI={
       icon:it.e,
       text:`Buang <b>${it.n}</b> ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
-      okLabel:'âœ” Buang',cancelLabel:'âœ– Batal',
+      okLabel:'✔ Buang',cancelLabel:'✖ Batal',
       onOk:(n)=>{
         if(n<=0)return;
         const arr=g===0?RPG.hotbar:RPG.bag;
@@ -211,7 +212,7 @@ const UI={
         const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
         const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
         World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,{owner:true});
-        this.toast(`ðŸ—‘ï¸ Membuang ${it.e} ${it.n} Ã—${take}`);
+        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take}`);
         Sfx.click();
         this.renderBag();this.renderHotbar();
       }
@@ -225,7 +226,7 @@ const UI={
       icon:it.e,
       text:`Buang <b>${it.n}</b> milik ${n.name} ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
-      okLabel:'âœ” Buang',cancelLabel:'âœ– Batal',
+      okLabel:'✔ Buang',cancelLabel:'✖ Batal',
       onOk:(cnt)=>{
         if(cnt<=0)return;
         const cur=n.bag[i];
@@ -234,7 +235,7 @@ const UI={
         cur.n-=take;
         if(cur.n<=0)n.bag[i]=null;
         World.dropItem(n.pos.x,n.pos.y+0.6,n.pos.z,s.id,take,{owner:true});
-        this.toast(`ðŸ—‘ï¸ Membuang ${it.e} ${it.n} Ã—${take} dari ${n.name}`);
+        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari ${n.name}`);
         Sfx.click();
         this.renderNpcPanel();
       }
@@ -296,8 +297,10 @@ const UI={
     const to=toG===0?RPG.hotbar:RPG.bag;
     const a=from[fromI],b=to[toI];
     if(!a)return false;
-    if(b&&b.id===a.id&&b.n<64){
-      const mv=Math.min(a.n,64-b.n);b.n+=mv;a.n-=mv;
+    /* equipment (pedang/armor/tameng) maks 1 per slot -> tidak pernah digabung */
+    const cap=(typeof stackCap==='function')?stackCap(a.id):64;
+    if(b&&b.id===a.id&&b.n<cap){
+      const mv=Math.min(a.n,cap-b.n);b.n+=mv;a.n-=mv;
       if(a.n<=0)from[fromI]=null;
     }else{to[toI]=a;from[fromI]=b;}
     return true;
@@ -309,7 +312,11 @@ const UI={
   TOAST_MAX:IS_MOBILE?4:7,
   toast(msg){
     const t=document.getElementById('toast');
-    const d=document.createElement('div');d.className='toast-item';d.textContent=msg;
+    const d=document.createElement('div');d.className='toast-item';
+    /* notifikasi ikut bahasa aktif (data item/mob sudah ter-patch, sisanya
+       ditukar lewat pemetaan frasa I18N) */
+    d.textContent=(typeof I18N!=='undefined'&&I18N.lang!=='id')
+      ? I18N.translateText(msg,I18N.lang) : msg;
     t.appendChild(d);
     /* buang notifikasi terlama bila melebihi batas */
     while(t.childElementCount>this.TOAST_MAX)t.firstElementChild.remove();
@@ -319,7 +326,7 @@ const UI={
      opt: {icon, text, count, input:{value,min,max}, okLabel, cancelLabel,
            allLabel, onOk(n), onCancel}. `input` bila hadir menampilkan kotak
            angka yang nilainya dikirim ke onOk. `allLabel` (hanya bila `input`
-           ada) menambah tombol yang langsung mengirim nilai maksimum â€” dipakai
+           ada) menambah tombol yang langsung mengirim nilai maksimum — dipakai
            utk "Jual Semua". Dipakai utk konfirmasi buang item & input jumlah. */
   modal(opt){
     this.closeModal();                    // hanya satu modal pada satu waktu
@@ -330,11 +337,11 @@ const UI={
     if(opt.text)h+=`<div class="m-txt">${opt.text}</div>`;
     if(opt.input)h+=`<input type="number" id="modal-num" min="${opt.input.min||1}" `+
       `max="${opt.input.max||999}" value="${opt.input.value||1}">`;
-    else if(opt.count!==undefined)h+=`<div class="m-count">Jumlah: Ã—${opt.count}</div>`;
+    else if(opt.count!==undefined)h+=`<div class="m-count">Jumlah: ×${opt.count}</div>`;
     h+=`<div id="modal-btns">`+
        ((opt.allLabel&&opt.input)?`<button id="modal-all">${opt.allLabel}</button>`:'')+
-       `<button id="modal-ok">${opt.okLabel||'âœ” OK'}</button>`+
-       `<button id="modal-cancel">${opt.cancelLabel||'âœ– Batal'}</button></div>`;
+       `<button id="modal-ok">${opt.okLabel||'✔ OK'}</button>`+
+       `<button id="modal-cancel">${opt.cancelLabel||'✖ Batal'}</button></div>`;
     box.innerHTML=h;ov.appendChild(box);document.body.appendChild(ov);
     const numEl=document.getElementById('modal-num');
     const maxV=(opt.input&&opt.input.max)||99999;
@@ -392,11 +399,11 @@ const UI={
     document.getElementById('hu-num').textContent=Math.ceil(Player.hunger);
     const need=Math.round(70*Math.pow(Player.level,1.4));
     document.getElementById('xp-fill').style.width=(Player.xp/need*100)+'%';
-    document.getElementById('lvl').textContent=`â­ Lv ${Player.level}`;
+    document.getElementById('lvl').textContent=`⭐ Lv ${Player.level}`;
     const mins=Math.floor(Weather.time*1440);
     const hh=String(Math.floor(mins/60)).padStart(2,'0'),mm=String(mins%60).padStart(2,'0');
-    const icon=Weather.nightF>0.5?'ðŸŒ™':'â˜€ï¸';
-    document.getElementById('clock').textContent=`${Weather.rain>0.4?'ðŸŒ§ï¸ ':''}${icon} ${hh}:${mm}`;
+    const icon=Weather.nightF>0.5?'🌙':'☀️';
+    document.getElementById('clock').textContent=`${Weather.rain>0.4?'🌧️ ':''}${icon} ${hh}:${mm}`;
     document.getElementById('daynum').textContent='Hari '+Weather.day;
     this.renderCompass();
     this.renderHotbar();
@@ -405,18 +412,18 @@ const UI={
   },
 
   /* ================= KOMPAS ARAH MATA ANGIN =================
-     Strip 360Â° dibangun sekali (label N/NE/E/... + garis derajat), lalu tiap
-     frame hanya digeser (translateX) sesuai yaw kamera. Penanda â–¼ di tengah
+     Strip 360° dibangun sekali (label N/NE/E/... + garis derajat), lalu tiap
+     frame hanya digeser (translateX) sesuai yaw kamera. Penanda ▼ di tengah
      menunjukkan arah pandang saat ini. */
   compassBuilt:false,
-  COMPASS_W:168,          // lebar jendela kompas (px) â€” samakan dgn CSS
+  COMPASS_W:168,          // lebar jendela kompas (px) — samakan dgn CSS
   COMPASS_PPD:1.6,        // piksel per derajat
   renderCompass(){
     const strip=document.getElementById('compass-strip');
     if(!strip)return;
     const PPD=this.COMPASS_PPD;
     if(!this.compassBuilt){
-      /* label tiap 15Â°, huruf mata angin tiap 45Â°; strip dibuat 3Ã— (âˆ’360..+720)
+      /* label tiap 15°, huruf mata angin tiap 45°; strip dibuat 3× (−360..+720)
          supaya bisa digeser mulus tanpa terlihat ujungnya */
       const CARD={0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'};
       let html='';
@@ -425,16 +432,16 @@ const UI={
           const c=CARD[deg];
           const w=(15*PPD);
           html+=`<span class="${c?'card':'tick'}" style="width:${w}px">`+
-                `${c||'Â·'}</span>`;
+                `${c||'·'}</span>`;
         }
       }
       strip.innerHTML=html;
       this.compassBuilt=true;
     }
-    /* yaw kamera â†’ derajat kompas (0=N). Cam.yaw adalah arah pandang. */
+    /* yaw kamera → derajat kompas (0=N). Cam.yaw adalah arah pandang. */
     let yaw=(typeof Cam!=='undefined'&&Cam.yaw!==undefined)?Cam.yaw:0;
     let deg=(yaw*180/Math.PI)%360;if(deg<0)deg+=360;
-    /* offset: strip dimulai dari -360Â°, jadi titik 0Â° ada di 360*PPD */
+    /* offset: strip dimulai dari -360°, jadi titik 0° ada di 360*PPD */
     const off=360*PPD+deg*PPD-this.COMPASS_W/2;
     strip.style.transform=`translateX(${-off}px)`;
   },
@@ -463,8 +470,8 @@ const UI={
       d.innerHTML=`<span class="tface">${n.role.e}</span>`+
         `<span class="tlv">Lv${n.level}</span>`+
         `<div class="thp"><i style="width:${Math.max(0,n.hp/n.maxhp*100)}%"></i></div>`+
-        `<span class="tmode" title="${n.aggr===false?'Pasif':'Agresif'}">${n.aggr===false?'ðŸ•Šï¸':'âš”ï¸'}</span>`+
-        `<span class="tord">${n.order==='gather'?'â›ï¸':n.order==='wait'?'â¸ï¸':'ðŸ‘£'}</span>`;
+        `<span class="tmode" title="${n.aggr===false?'Pasif':'Agresif'}">${n.aggr===false?'🕊️':'⚔️'}</span>`+
+        `<span class="tord">${n.order==='gather'?'⛏️':n.order==='wait'?'⏸️':'👣'}</span>`;
       const fn=e=>{e.preventDefault();e.stopPropagation();this.openNpc(n);};
       d.addEventListener('touchstart',fn,{passive:false});
       d.addEventListener('click',fn);
@@ -476,13 +483,13 @@ const UI={
       const pd=(Capture.deployedSlot>=0&&RPG.mobSlots[Capture.deployedSlot])||{};
       const d=document.createElement('div');
       d.className='tmate pet'+(Capture.riding?' busy':'');
-      const emoji=(typeof PET_EMOJI!=='undefined'&&PET_EMOJI[pet.type])?PET_EMOJI[pet.type]:'ðŸ¾';
-      const stars='â­'.repeat(pd.stars||1);
+      const emoji=(typeof PET_EMOJI!=='undefined'&&PET_EMOJI[pet.type])?PET_EMOJI[pet.type]:'🐾';
+      const stars='⭐'.repeat(pd.stars||1);
       d.innerHTML=`<span class="tface">${emoji}</span>`+
         `<span class="tlv">Lv${pd.lvl||1}</span>`+
         `<div class="thp"><i style="width:${Math.max(0,pet.hp/pet.maxhp*100)}%"></i></div>`+
-        `<span class="tmode" title="${stars}">${Capture.riding?'ðŸ¾':'â­'}</span>`+
-        `<span class="tord">${pd.saddle?'ðŸ´':'âž°'}</span>`;
+        `<span class="tmode" title="${stars}">${Capture.riding?'🐾':'⭐'}</span>`+
+        `<span class="tord">${pd.saddle?'🐴':'➰'}</span>`;
       const fn=e=>{
         e.preventDefault();e.stopPropagation();
         if(this.open!=='bag'){this.open='bag';this.picked=null;this.renderBag();}
@@ -524,16 +531,16 @@ const UI={
       </div>
     </div>
     <div class="npc-stats">
-      <span>âš”ï¸ ATK ${Math.round(NPCS.npcDmg(n))}</span>
-      <span>ðŸ›¡ï¸ DEF ${Math.round(NPCS.npcDef(n)*100)}%</span>
-      <span>ðŸ‘£ ${n.speed.toFixed(1)}</span>
+      <span>⚔️ ATK ${Math.round(NPCS.npcDmg(n))}</span>
+      <span>🛡️ DEF ${Math.round(NPCS.npcDef(n)*100)}%</span>
+      <span>👣 ${n.speed.toFixed(1)}</span>
     </div>
-    <div class="npc-skill">${sk.e} <b>${sk.name}</b> â€” ${sk.desc}</div>`;
+    <div class="npc-skill">${sk.e} <b>${sk.name}</b> — ${sk.desc}</div>`;
 
     /* mode bertarung: aggressive / passive */
     h+='<div class="sub">Mode bertarung</div><div class="npc-cmd">'+
-      `<button data-mode="aggressive" class="${n.aggr===false?'':'on'}">âš”ï¸ Agresif</button>`+
-      `<button data-mode="passive" class="${n.aggr===false?'on':''}">ðŸ•Šï¸ Pasif</button></div>`+
+      `<button data-mode="aggressive" class="${n.aggr===false?'':'on'}">⚔️ Agresif</button>`+
+      `<button data-mode="passive" class="${n.aggr===false?'on':''}">🕊️ Pasif</button></div>`+
       `<p class="tip">Agresif: menyerang monster yang mendekatimu. `+
       `Pasif: tidak menyerang sendiri; hanya mengejar target yang kamu serang sampai target mati.</p>`;
 
@@ -542,20 +549,20 @@ const UI={
     for(const s of (typeof NPC_GEAR_SLOTS!=='undefined'?NPC_GEAR_SLOTS:ARMOR_SLOTS)){
       const id=n.gear[s.id];
       h+=`<div class="ngear" data-slot="${s.id}" title="${
-        id?ITEMS[id].n:'Kosong â€” beri item dari daftar bawah'}">`+
+        id?ITEMS[id].n:'Kosong — beri item dari daftar bawah'}">`+
         `<span class="ge">${id?ITEMS[id].e:s.e}</span>`+
         `<span class="gn">${s.name}</span></div>`;
     }
     h+='</div>';
 
     /* perintah */
-    const cmds=[['follow','ðŸ‘£ Ikuti aku'],['gather','â›ï¸ Cari resource'],
-      ['wait','â¸ï¸ Tunggu di sini']];
-    if(n.role.id==='farmer')cmds.push(['farm','ðŸŒ¾ Farming']);
+    const cmds=[['follow','👣 Ikuti aku'],['gather','⛏️ Cari resource'],
+      ['wait','⏸️ Tunggu di sini']];
+    if(n.role.id==='farmer')cmds.push(['farm','🌾 Farming']);
     h+='<div class="sub">Perintah</div><div class="npc-cmd">'+
       cmds.map(([k,t])=>
         `<button data-order="${k}" class="${n.order===k?'on':''}">${t}</button>`).join('')+
-      '<button data-dismiss="1" class="danger">ðŸšª Bubarkan</button></div>'+
+      '<button data-dismiss="1" class="danger">🚪 Bubarkan</button></div>'+
       `<p class="tip">Saat diperintah mencari resource, rekan hanya memanen `+
       `kayu, batu, dan bijih dalam radius ${CFG.NPC.GATHER_R} blok dari posisimu.`+
       (n.role.id==='farmer'?' Untuk farming, beri benih di tas rekan.': '')+`</p>`;
@@ -565,7 +572,7 @@ const UI={
     for(let i=0;i<n.bag.length;i++){
       const s=n.bag[i];
       h+=`<div class="slot nb" data-take="${i}">`+
-        (s?`<span class="emo">${ITEMS[s.id].e}</span><span class="cnt">${s.n>1?s.n:''}</span>`:'')+
+        (s?`<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span>`:'')+
         '</div>';
     }
     h+='</div>';
@@ -576,14 +583,15 @@ const UI={
       for(let i=0;i<arr.length;i++){
         const s=arr[i];if(!s)continue;
         const it=ITEMS[s.id];
-        const kind=it.food?'ðŸ–':(it.weapon?'âš”ï¸':(it.armor?'ðŸ›¡ï¸':'ðŸ“¦'));
+        const kind=it.food?'🍖':(it.weapon?'⚔️':(it.armor?'🛡️':'📦'));
         h+=`<div class="slot ng" data-give="${g}:${i}" title="${it.n} ${kind}">`+
-          `<span class="emo">${it.e}</span><span class="cnt">${s.n>1?s.n:''}</span></div>`;
+          `<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span></div>`;
       }
     };
     push(RPG.hotbar,0);push(RPG.bag,1);
     h+='</div>';
     body.innerHTML=h;
+    this.applyItemIcons(body);
 
     /* --- binding aksi panel --- */
     body.querySelectorAll('[data-order]').forEach(b=>
@@ -603,13 +611,13 @@ const UI={
         const arr=g===0?RPG.hotbar:RPG.bag;
         const s=arr[i];if(!s)return;
         const it=ITEMS[s.id];
-        /* senjata/armor selalu 1 & langsung dipakai â€” tidak perlu dialog jumlah */
+        /* senjata/armor selalu 1 & langsung dipakai — tidak perlu dialog jumlah */
         if(it.weapon||it.armor){NPCS.give(n,g,i,1);return;}
         this.modal({
           icon:it.e,
           text:`Berapa <b>${it.n}</b> untuk ${n.name}?`,
           input:{value:1,min:1,max:s.n},
-          okLabel:'âœ” Beri',cancelLabel:'âœ– Batal',
+          okLabel:'✔ Beri',cancelLabel:'✖ Batal',
           onOk:(cnt)=>{if(cnt>0)NPCS.give(n,g,i,cnt);}
         });
       }));
@@ -650,14 +658,15 @@ const UI={
           ?` <i style="color:${RARITY[it.rarity].css}">${RARITY[it.rarity].n}</i>`:'';
         const info=isBag
           ?`<b>${it.n}</b> <i>+${RPG.BAG_PER_TIER} slot tas</i> <i>(tier ${RPG.bagTier}/${RPG.BAG_MAX_TIER})</i>`
-          :`<b>${it.n}</b>${rar}${g.n>1?` <i>Ã—${g.n}</i>`:''}`;
-        d.innerHTML=`<span class="s-ico">${it.e}</span>`+
+          :`<b>${it.n}</b>${rar}${g.n>1?` <i>×${g.n}</i>`:''}`;
+        d.innerHTML=`<span class="s-ico">${isBag?it.e:this.itemIcon(g.id)}</span>`+
           `<div class="s-info">${info}</div>`+
           `<button class="s-buy" ${(afford&&!soldOut)?'':'disabled'}>`+
-          `${soldOut?'Habis':'ðŸª™ '+g.price}</button>`;
+          `${soldOut?'Habis':'🪙 '+g.price}</button>`;
         if(!soldOut)d.querySelector('.s-buy').addEventListener('click',()=>this.shopBuy(g));
         buyEl.appendChild(d);
       }
+      this.applyItemIcons(buyEl);
     }
     /* --- daftar jual: semua item di hotbar+tas --- */
     const sellEl=document.getElementById('shop-sell-bag');
@@ -668,15 +677,16 @@ const UI={
         const it=ITEMS[s.id],price=sellPrice(s.id);
         const d=document.createElement('div');
         d.className='slot sell';
-        d.title=`${it.n} â€” klik untuk menjual (punya Ã—${s.n}, ${price} ðŸª™/item)`;
-        d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span><span class="pr">${price}ðŸª™</span>`;
+        d.title=`${it.n} — klik untuk menjual (punya ×${s.n}, ${price} 🪙/item)`;
+        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span><span class="pr">${price}🪙</span>`;
         if(it.rarity&&RARITY[it.rarity]){d.classList.add('r-'+it.rarity);d.style.borderColor=RARITY[it.rarity].css;}
         d.addEventListener('click',()=>this.shopSell(arr,idx));
         sellEl.appendChild(d);
       });
       push(RPG.hotbar);push(RPG.bag);
       if(!sellEl.childElementCount)
-        sellEl.innerHTML='<p class="tip">Tasmu kosong â€” tidak ada yang bisa dijual.</p>';
+        sellEl.innerHTML='<p class="tip">Tasmu kosong — tidak ada yang bisa dijual.</p>';
+      else this.applyItemIcons(sellEl);
     }
   },
   /* beli satu entri dari stok pedagang (g = {id,price,n}); kurangi stok */
@@ -684,28 +694,28 @@ const UI={
     if(!g||g.n<=0)return;
     /* upgrade tas: tambah 7 slot, maks 5 tingkat */
     if(g.id==='bag'){
-      if(RPG.bagTier>=RPG.BAG_MAX_TIER){this.toast('ðŸŽ’ Tas sudah maksimum');return;}
-      if(!RPG.spendCoin(g.price)){this.toast('ðŸª™ Koin tidak cukup');return;}
+      if(RPG.bagTier>=RPG.BAG_MAX_TIER){this.toast('🎒 Tas sudah maksimum');return;}
+      if(!RPG.spendCoin(g.price)){this.toast('🪙 Koin tidak cukup');return;}
       RPG.expandBag();g.n=0;
-      this.toast(`ðŸŽ’ Tas diperluas! +${RPG.BAG_PER_TIER} slot (tier ${RPG.bagTier})`);
+      this.toast(`🎒 Tas diperluas! +${RPG.BAG_PER_TIER} slot (tier ${RPG.bagTier})`);
       Sfx.craft();
       this.renderShop();this.renderAll();RPG.save();
       return;
     }
-    if(!RPG.spendCoin(g.price)){this.toast('ðŸª™ Koin tidak cukup');return;}
+    if(!RPG.spendCoin(g.price)){this.toast('🪙 Koin tidak cukup');return;}
     const left=RPG.addItem(g.id,1);
-    if(left>0){ /* tas penuh â†’ koin dikembalikan, item jatuh ke tanah */
+    if(left>0){ /* tas penuh → koin dikembalikan, item jatuh ke tanah */
       RPG.coin+=g.price;
       World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,g.id,1,{owner:true});
-      this.toast('ðŸŽ’ Tas penuh â€” item dijatuhkan, koin kembali');
+      this.toast('🎒 Tas penuh — item dijatuhkan, koin kembali');
     }else{
       g.n--;
-      this.toast(`ðŸª Membeli ${ITEMS[g.id].e} ${ITEMS[g.id].n} (âˆ’${g.price} ðŸª™)`);
+      this.toast(`🏪 Membeli ${ITEMS[g.id].e} ${ITEMS[g.id].n} (−${g.price} 🪙)`);
     }
     Sfx.craft();
     this.renderShop();this.renderAll();RPG.save();
   },
-  /* klik item di daftar jual â†’ buka dialog pilihan jumlah (input manual +
+  /* klik item di daftar jual → buka dialog pilihan jumlah (input manual +
      tombol "Semua"), bukan langsung menjual seluruhnya. */
   shopSell(arr,idx){
     const s=arr[idx];if(!s)return;
@@ -713,11 +723,11 @@ const UI={
     this.modal({
       icon:it.e,
       text:`Jual <b style="color:#fff">${it.n}</b>?<br>`+
-        `<span style="font-size:12px;opacity:.85">${price} ðŸª™ / item Â· kamu punya Ã—${s.n}</span>`,
+        `<span style="font-size:12px;opacity:.85">${price} 🪙 / item · kamu punya ×${s.n}</span>`,
       input:{value:1,min:1,max:s.n},
-      allLabel:'ðŸ’° Semua',
-      okLabel:'âœ” Jual',
-      cancelLabel:'âœ– Batal',
+      allLabel:'💰 Semua',
+      okLabel:'✔ Jual',
+      cancelLabel:'✖ Batal',
       onOk:(n)=>{
         const cur=arr[idx];
         if(!cur||cur.id!==id)return;      // slot berubah sejak modal dibuka
@@ -732,20 +742,29 @@ const UI={
     const price=sellPrice(s.id),total=price*qty;
     if(qty>=s.n)arr[idx]=null;else s.n-=qty;
     RPG.addCoin(total,true);
-    this.toast(`ðŸ’° Menjual ${ITEMS[s.id].e} ${ITEMS[s.id].n} Ã—${qty} â†’ +${total} ðŸª™`);
+    this.toast(`💰 Menjual ${ITEMS[s.id].e} ${ITEMS[s.id].n} ×${qty} → +${total} 🪙`);
     Sfx.pickup();
     this.renderShop();this.renderAll();RPG.save();
+  },
+
+  /* gambar tombol untuk skill aktif tertentu (folder Button UI -> buttons/).
+     Skill lain tetap memakai ikon emoji bawaan. */
+  SKILL_IMG:{
+    slam:'buttons/slam.png',       // Hantaman Kuat / Hantam Bumi
+    whirl:'buttons/tornado.png',   // Tebasan Angin Puyuh
+    roar:'buttons/battlecry.png',  // Teriakan Perang
+    herb:'buttons/heal.png',       // Ramuan Herbal
   },
 
   /* skill aktif yang sudah dipelajari, urut sesuai daftar SKILLS.
      Urutan ini dipakai bersama oleh tombol HUD dan tombol keyboard Q/E/R/T. */
   activeList(){return SKILLS.filter(s=>s.active&&RPG.skillVal(s.id));},
-  /* id skill di slot aktif ke-i (atau null) â€” dipakai Input untuk SlamAim */
+  /* id skill di slot aktif ke-i (atau null) — dipakai Input untuk SlamAim */
   activeSlotSkill(i){const s=this.activeList()[i];return s?s.id:null;},
-  /* dipanggil Input saat menekan Q/E/R/T (slot 0â€“3) */
+  /* dipanggil Input saat menekan Q/E/R/T (slot 0–3) */
   useActiveSlot(i){
     const s=this.activeList()[i];
-    if(!s){UI.toast('Belum ada skill aktif di slot ini â€” pelajari di ðŸŒŸ Skill');return;}
+    if(!s){UI.toast('Belum ada skill aktif di slot ini — pelajari di 🌟 Skill');return;}
     RPG.useActive(s.id);
   },
   renderActiveSkills(force=false){
@@ -763,28 +782,48 @@ const UI={
         for(const s of list){
           const b=document.createElement('button');
           b.className='m-active-btn';b.dataset.id=s.id;
-          b.innerHTML=`${s.icon}<span></span>`;
+          /* skill tertentu memakai gambar tombol dari folder Button UI */
+          const img=this.SKILL_IMG[s.id];
+          if(img){b.classList.add('has-img');b.innerHTML=`<img src="${img}" alt=""><span></span>`;}
+          else b.innerHTML=`${s.icon}<span></span>`;
+          const press=()=>b.classList.add('pressed');
+          const unpress=()=>b.classList.remove('pressed');
           if(s.id==='slam'&&typeof SlamAim!=='undefined'){
             /* MOBA: tahan tombol lalu seret untuk membidik, lepas = eksekusi.
-               Tekan cepat tetap menghantam di tempat. */
+               Tekan cepat tetap menghantam di tempat. Seretan dilacak lewat
+               window memakai identifier sentuhan, sehingga membidik tetap
+               berjalan walau jari keluar dari area tombol. */
+            let tid=null;
             b.addEventListener('touchstart',e=>{
               e.preventDefault();e.stopPropagation();
+              press();
               const t=e.changedTouches[0];
+              tid=t.identifier;
               SlamAim.dragStart={x:t.clientX,y:t.clientY};
               SlamAim.dragCur={x:t.clientX,y:t.clientY};
               SlamAim.press();
             },{passive:false});
-            b.addEventListener('touchmove',e=>{
-              e.preventDefault();
-              const t=e.changedTouches[0];
-              SlamAim.dragCur={x:t.clientX,y:t.clientY};
-            },{passive:false});
-            const end=e=>{e.preventDefault();SlamAim.release();};
-            b.addEventListener('touchend',end,{passive:false});
-            b.addEventListener('touchcancel',end,{passive:false});
+            const mv=e=>{
+              if(tid===null)return;
+              for(const t of e.changedTouches)if(t.identifier===tid){
+                SlamAim.dragCur={x:t.clientX,y:t.clientY};
+                if(e.cancelable)e.preventDefault();
+              }
+            };
+            const end=e=>{
+              if(tid===null)return;
+              for(const t of e.changedTouches)if(t.identifier===tid){
+                tid=null;unpress();SlamAim.release();
+              }
+            };
+            window.addEventListener('touchmove',mv,{passive:false});
+            window.addEventListener('touchend',end,{passive:false});
+            window.addEventListener('touchcancel',end,{passive:false});
           }else{
             const fn=e=>{e.preventDefault();e.stopPropagation();RPG.useActive(s.id);};
-            b.addEventListener('touchstart',fn,{passive:false});
+            b.addEventListener('touchstart',e=>{press();fn(e);},{passive:false});
+            b.addEventListener('touchend',unpress);
+            b.addEventListener('touchcancel',unpress);
             b.addEventListener('click',fn);
           }
           mob.appendChild(b);
@@ -805,8 +844,13 @@ const UI={
           const key=(Input.SKILL_KEYS[i]||'').replace('Key','');
           const b=document.createElement('button');
           b.className='sk-btn';b.dataset.id=s.id;
-          b.title=`${s.name} â€” ${s.desc}${key?` (${key})`:''}`;
-          b.innerHTML=`<span class="key">${key||'-'}</span>${s.icon}<span class="cd"></span>`;
+          b.title=`${s.name} — ${s.desc}${key?` (${key})`:''}`;
+          /* skill tertentu memakai gambar tombol (sama dengan mobile) agar
+             tidak mengandalkan emoji */
+          const img=this.SKILL_IMG[s.id];
+          if(img)b.classList.add('has-img');
+          b.innerHTML=`<span class="key">${key||'-'}</span>`+
+            (img?`<img src="${img}" alt="">`:s.icon)+`<span class="cd"></span>`;
           b.addEventListener('click',e=>{e.preventDefault();RPG.useActive(s.id);});
           bar.appendChild(b);
         });
@@ -828,29 +872,143 @@ const UI={
     for(let i=0;i<7;i++){
       const s=RPG.hotbar[i],el=this.hotEls[i];
       el.classList.toggle('sel',i===RPG.sel);
-      el.querySelector('.emo').textContent=s?ITEMS[s.id].e:'';
+      const emo=el.querySelector('.emo');
+      const icon=s?this.itemIcon(s.id):'';
+      if(emo._icon!==icon){emo._icon=icon;emo.innerHTML=icon;this.applyItemIcons(emo);}
       el.querySelector('.cnt').textContent=s&&s.n>1?s.n:'';
       /* badge level tempa (Landasan Tempa) */
       el.querySelector('.lvl').textContent=s&&s.lvl?'+'+s.lvl:'';
     }
     this.updateAttackIcon();
   },
-  /* icon tombol serang mobile mengikuti item yang dipegang:
-     makanan = icon makan, senjata = pedang, resource/alat lain = tangan kosong */
+  /* ---------- tombol bergambar PNG ----------
+     PNG tombol sering berupa kanvas besar (mis. 1000x1000) dengan gambar inti
+     kecil di dalamnya. Fungsi ini mencari bounding-box pixel tidak transparan,
+     lalu membuat versi crop supaya gambar pas di tengah tombol. */
+  _btnImgCache:new Map(),
+  croppedButtonImage(url,cb){
+    const cached=this._btnImgCache.get(url);
+    if(cached){cb(cached);return;}
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const w=img.naturalWidth,h=img.naturalHeight;
+        if(!w||!h){this._btnImgCache.set(url,url);cb(url);return;}
+        const cv=document.createElement('canvas');
+        cv.width=w;cv.height=h;
+        const ctx=cv.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(img,0,0);
+        const data=ctx.getImageData(0,0,w,h).data;
+        let minX=w,minY=h,maxX=-1,maxY=-1;
+        for(let y=0;y<h;y++){
+          for(let x=0;x<w;x++){
+            const a=data[(y*w+x)*4+3];
+            if(a>12){
+              if(x<minX)minX=x;
+              if(x>maxX)maxX=x;
+              if(y<minY)minY=y;
+              if(y>maxY)maxY=y;
+            }
+          }
+        }
+        if(maxX<0){this._btnImgCache.set(url,url);cb(url);return;}
+        const cw=maxX-minX+1,ch=maxY-minY+1;
+        const out=document.createElement('canvas');
+        out.width=cw;out.height=ch;
+        out.getContext('2d').drawImage(cv,minX,minY,cw,ch,0,0,cw,ch);
+        const cropped=out.toDataURL('image/png');
+        this._btnImgCache.set(url,cropped);
+        cb(cropped);
+      }catch(e){
+        /* fallback bila canvas tidak diizinkan */
+        this._btnImgCache.set(url,url);
+        cb(url);
+      }
+    };
+    img.onerror=()=>{this._btnImgCache.set(url,url);cb(url);};
+    img.src=url;
+  },
+
+  setButtonImage(btn,url){
+    if(!btn)return;
+    btn.textContent='';
+    btn.classList.add('btn-img');
+    this.croppedButtonImage(url,u=>{
+      btn.style.backgroundImage=`url('${u}')`;
+      btn.style.backgroundSize='contain';
+      btn.style.backgroundPosition='center';
+      btn.style.backgroundRepeat='no-repeat';
+      btn.style.backgroundColor='transparent';
+    });
+  },
+
+  initButtonImages(){
+    /* tombol mobile utama yang memakai PNG */
+    this.setButtonImage(document.getElementById('m-jump'),'buttons/jump.png');
+    this.setButtonImage(document.getElementById('m-roll'),'buttons/dash.png');
+    this.setButtonImage(document.getElementById('m-talk'),'buttons/talk.png');
+    this.updateAttackIcon();
+  },
+
+  /* ---------- IKON ITEM BERGAMBAR (bag, hotbar, crafting, peti, toko) ----------
+     Item yang punya PNG di folder buttons/ ditampilkan sebagai <img>, sisanya
+     tetap memakai emoji. PNG dipotong otomatis ke area pixel yang terlihat
+     (croppedButtonImage) supaya gambar pas di tengah slot. */
+  ITEM_IMG:{
+    berry:'buttons/berry.png',
+    mush:'buttons/mush.png',
+    meat:'buttons/meat.png',
+    cmeat:'buttons/cmeat.png',
+    bread:'buttons/bread.png',
+    salad:'buttons/salad.png',
+    pie:'buttons/pie.png',
+    bandage:'buttons/bandage.png',
+    fish:'buttons/fish.png',
+    cfish:'buttons/cfish.png',
+    wheat:'buttons/wheat.png',
+    carrot:'buttons/carrot.png',
+    cabbage:'buttons/cabbage.png',
+    tomato:'buttons/tomato.png',
+    watermelon:'buttons/watermelon.png',
+    /* biji-bijian */
+    seed_wheat:'buttons/seed_wheat.png',
+    seed_carrot:'buttons/seed_carrot.png',
+    seed_cabbage:'buttons/seed_cabbage.png',
+    seed_tomato:'buttons/seed_tomato.png',
+    seed_watermelon:'buttons/seed_watermelon.png',
+  },
+
+  /* HTML ikon satu item: <img> bila ada PNG, emoji bila tidak */
+  itemIcon(id){
+    const it=ITEMS[id];
+    if(!it)return '';
+    const src=this.ITEM_IMG[id];
+    if(!src)return it.e;
+    return `<img class="iico" src="${src}" data-iico="${src}" alt="">`;
+  },
+
+  /* tukar src <img class="iico"> ke versi yang sudah dipotong (sekali per URL) */
+  applyItemIcons(root){
+    const scope=root||document;
+    if(!scope.querySelectorAll)return;
+    scope.querySelectorAll('img.iico[data-iico]').forEach(img=>{
+      const url=img.dataset.iico;
+      delete img.dataset.iico;
+      this.croppedButtonImage(url,u=>{if(img.src!==u)img.src=u;});
+    });
+  },
+
+  /* icon tombol serang mobile: Eat.png saat memegang makanan, Attack.png
+     untuk kondisi lainnya. Hanya dua gambar ini yang dipakai. */
   updateAttackIcon(){
     const btn=document.getElementById('m-attack');
     if(!btn)return;
     const s=RPG.hotbar[RPG.sel];
     const it=s&&ITEMS[s.id];
-    let icon='ðŸ‘Š';
-    if(it&&it.food)icon=it.e;
-    else if(it&&it.weapon)icon='âš”ï¸';
-    else if(it&&it.tool)icon=it.e;
-    else if(!it)icon='ðŸ‘Š';
-    else icon='ðŸ‘Š';
-    if(this._atkIcon!==icon){
-      this._atkIcon=icon;
-      btn.textContent=icon;
+    const img=(it&&it.food)?'buttons/eat.png':'buttons/attack.png';
+    if(this._atkImg!==img){
+      this._atkImg=img;
+      this.setButtonImage(btn,img);
     }
   },
   /* ---------- panel ---------- */
@@ -877,7 +1035,7 @@ const UI={
         if(name==='term'&&typeof Chat!=='undefined')Chat.renderTerm();
       }catch(err){
         console.error('UI.toggle('+name+') gagal:',err);
-        this.toast('âš ï¸ Panel '+name+' bermasalah');
+        this.toast('⚠️ Panel '+name+' bermasalah');
       }
     }
     /* menutup panel peti = melepas peti yang sedang dibuka */
@@ -935,9 +1093,9 @@ const UI={
         if(this.picked&&this.picked.i===i&&this.picked.g===g)d.classList.add('picked');
         if(s){
           const it=ITEMS[s.id];
-          d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span>`+
+          d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`+
             (s.lvl?`<span class="lvl">+${s.lvl}</span>`:'');
-          d.title=this.itemTip(s.id)+(s.lvl?`\nâš’ï¸ Level tempa ${s.lvl}`:'');
+          d.title=this.itemTip(s.id)+(s.lvl?`\n⚒️ Level tempa ${s.lvl}`:'');
           /* bingkai slot memakai warna rarity agar item langka mudah dikenali */
           if(it.rarity&&RARITY[it.rarity]){
             d.classList.add('r-'+it.rarity);
@@ -947,6 +1105,7 @@ const UI={
 
         el.appendChild(d);
       });
+      this.applyItemIcons(el);
     };
     mk(RPG.hotbar,0,document.getElementById('bag-hotbar'));
     mk(RPG.bag,1,document.getElementById('bag-grid'));
@@ -1013,8 +1172,8 @@ const UI={
       d.className='slot cs';d.dataset.cs=i;
       if(s){
         const it=ITEMS[s.id];
-        d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span>`;
-        d.title=this.itemTip(s.id)+'\nKlik = ambil Â· Seret ke tas = titip/ambil';
+        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`;
+        d.title=this.itemTip(s.id)+'\nKlik = ambil · Seret ke tas = titip/ambil';
         deco(d,it);
         d.addEventListener('click',()=>{
           if(this._chestSkipClick){this._chestSkipClick=false;return;}
@@ -1023,6 +1182,7 @@ const UI={
       }
       gEl.appendChild(d);
     });
+    this.applyItemIcons(gEl);
     if(nEl)nEl.textContent=`${f.inv.filter(s=>s).length}/${f.inv.length}`;
 
     /* --- isi tas pemain: data-cg (0=hotbar,1=kantong) + data-ci --- */
@@ -1032,8 +1192,8 @@ const UI={
       d.className='slot cb';d.dataset.cg=g;d.dataset.ci=i;
       if(s){
         const it=ITEMS[s.id];
-        d.innerHTML=`${it.e}<span class="cnt">${s.n>1?s.n:''}</span>`;
-        d.title=this.itemTip(s.id)+'\nKlik = titip Â· Seret ke peti = titip';
+        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`;
+        d.title=this.itemTip(s.id)+'\nKlik = titip · Seret ke peti = titip';
         deco(d,it);
         d.addEventListener('click',()=>{
           if(this._chestSkipClick){this._chestSkipClick=false;return;}
@@ -1043,6 +1203,7 @@ const UI={
       bEl.appendChild(d);
     });
     push(RPG.hotbar,0);push(RPG.bag,1);
+    this.applyItemIcons(bEl);
 
     /* tombol titip semua: dipasang sekali saja */
     const all=document.getElementById('chest-all');
@@ -1052,7 +1213,7 @@ const UI={
     }
   },
   /* drag & drop dua arah antara grid peti (cs) dan grid tas pemain (cb).
-     Seret item peti â†’ tas = ambil; seret item tas â†’ peti = titip.
+     Seret item peti → tas = ambil; seret item tas → peti = titip.
      Seret keluar panel = konfirmasi buang (dari sumbernya). */
   initChestDrag(){
     const DEAD=8;
@@ -1098,7 +1259,7 @@ const UI={
       const p=panel();if(!p)return;
       p.querySelectorAll('.drop-hint').forEach(el=>el.classList.remove('drop-hint'));
       const el=document.elementFromPoint(e.clientX,e.clientY);
-      /* target hanya dari sisi berlawanan (petiâ†”tas) */
+      /* target hanya dari sisi berlawanan (peti↔tas) */
       const t=el&&(d.isChest?el.closest('.slot.cb'):el.closest('.slot.cs'));
       if(t)t.classList.add('drop-hint');
     });
@@ -1110,15 +1271,15 @@ const UI={
         const t=el&&(d.isChest?el.closest('.slot.cb'):el.closest('.slot.cs'));
         if(t&&f){
           if(d.isChest){
-            /* peti â†’ tas pemain */
+            /* peti → tas pemain */
             Furni.chestTake(f,+d.sl.dataset.cs);
           }else{
-            /* tas â†’ peti */
+            /* tas → peti */
             const arr=(+d.sl.dataset.cg)===0?RPG.hotbar:RPG.bag;
             Furni.chestPut(f,arr,+d.sl.dataset.ci);
           }
         }else{
-          /* keluar panel â†’ konfirmasi buang dari sumber */
+          /* keluar panel → konfirmasi buang dari sumber */
           const p=panel();
           if(!p||!el||!p.contains(el)){
             if(d.isChest){
@@ -1144,7 +1305,7 @@ const UI={
       icon:it.e,
       text:`Buang <b>${it.n}</b> dari peti ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
-      okLabel:'âœ” Buang',cancelLabel:'âœ– Batal',
+      okLabel:'✔ Buang',cancelLabel:'✖ Batal',
       onOk:(cnt)=>{
         if(cnt<=0)return;
         const cur=f.inv[i];
@@ -1154,7 +1315,7 @@ const UI={
         if(cur.n<=0)f.inv[i]=null;
         World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,s.id,take,{owner:true});
         Furni.save();
-        this.toast(`ðŸ—‘ï¸ Membuang ${it.e} ${it.n} Ã—${take} dari peti`);
+        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari peti`);
         Sfx.click();
         this.renderChest();
       }
@@ -1168,16 +1329,16 @@ const UI={
     if(!it)return '';
     const lines=[it.n];
     if(it.rarity&&RARITY[it.rarity])
-      lines.push(`${RARITY[it.rarity].e} ${RARITY[it.rarity].n} (Ã—${RARITY[it.rarity].mul.toFixed(2)})`);
+      lines.push(`${RARITY[it.rarity].e} ${RARITY[it.rarity].n} (×${RARITY[it.rarity].mul.toFixed(2)})`);
     if(it.weapon){
       const w=it.weapon;
-      lines.push(`âš” ${w.dmg} damage Â· ${w.spd.toFixed(2)}Ã— kecepatan`);
-      lines.push(`ðŸŽ¯ ${Math.round(w.crit*100)}% kritikal Â· jangkauan ${w.reach}`);
+      lines.push(`⚔ ${w.dmg} damage · ${w.spd.toFixed(2)}× kecepatan`);
+      lines.push(`🎯 ${Math.round(w.crit*100)}% kritikal · jangkauan ${w.reach}`);
       if(w.fx&&EFFECTS[w.fx])
         lines.push(`${EFFECTS[w.fx].e} ${EFFECTS[w.fx].n}: ${EFFECTS[w.fx].desc}`);
       lines.push('Klik kanan untuk memakai');
     }else if(it.armor){
-      lines.push(`ðŸ›¡ +${Math.round(it.armor.def*100)}% pertahanan`);
+      lines.push(`🛡 +${Math.round(it.armor.def*100)}% pertahanan`);
       if(it.armor.fx&&EFFECTS[it.armor.fx])
         lines.push(`${EFFECTS[it.armor.fx].e} ${EFFECTS[it.armor.fx].n}: ${EFFECTS[it.armor.fx].desc}`);
 
@@ -1219,19 +1380,20 @@ const UI={
       d.dataset.slot=s.id;
       if(id){
         const it=ITEMS[id];
-        d.innerHTML=`<span class="lbl">${s.name}</span>${it.e}`+
+        d.innerHTML=`<span class="lbl">${s.name}</span>${this.itemIcon(id)}`+
           (lvl?`<span class="lvl">+${lvl}</span>`:'');
-        d.title=this.itemTip(id)+(lvl?`\nâš’ï¸ Level tempa ${lvl}`:'')+'\nKlik untuk melepas';
+        d.title=this.itemTip(id)+(lvl?`\n⚒️ Level tempa ${lvl}`:'')+'\nKlik untuk melepas';
         if(it.rarity&&RARITY[it.rarity]){
           d.classList.add('r-'+it.rarity);
           d.style.borderColor=RARITY[it.rarity].css;
         }
       }else{
         d.innerHTML=`<span class="lbl">${s.name}</span><span class="ghost">${s.e}</span>`;
-        d.title=`${s.name} kosong Â· klik kanan item di tas untuk memakainya`;
+        d.title=`${s.name} kosong · klik kanan item di tas untuk memakainya`;
       }
       el.appendChild(d);
     }
+    this.applyItemIcons(el);
     document.getElementById('def-num').textContent=Math.round(RPG.defense()*100)+'%';
     /* tampilkan damage senjata aktif bila elemennya tersedia */
     const dmgEl=document.getElementById('dmg-num');
@@ -1242,16 +1404,22 @@ const UI={
     this.renderHotbar();
     if(this.open==='bag')this.renderBag();
     if(this.open==='craft')this.renderCraft();
+    if(this.open==='skills')this.renderSkills();
+    if(this.open==='npc')this.renderNpcPanel();
+    if(this.open==='shop'&&this.renderShop)this.renderShop();
     this.renderEquip();
+    this.teamSig='';                 // paksa HUD rekan digambar ulang
+    this.renderTeam();
+    if(typeof I18N!=='undefined'&&I18N.refresh)I18N.refresh();
   },
 
   /* label & ikon tiap cabang untuk header pohon */
   BRANCH_META:{
-    combat:{icon:'âš”ï¸',name:'Combat'},
-    move:{icon:'ðŸƒ',name:'Movement'},
-    craft:{icon:'ðŸ› ï¸',name:'Crafting'},
-    gather:{icon:'ðŸ§º',name:'Gather'},
-    catch:{icon:'ðŸª¢',name:'Catch'},
+    combat:{icon:'⚔️',name:'Combat'},
+    move:{icon:'🏃',name:'Movement'},
+    craft:{icon:'🛠️',name:'Crafting'},
+    gather:{icon:'🧺',name:'Gather'},
+    catch:{icon:'🪢',name:'Catch'},
   },
   /* SKILL TREE berbentuk pohon-akar: tiap branch digambar sebagai node yang
      saling terhubung garis sesuai prasyarat (req). Node disusun per "kedalaman"
@@ -1266,7 +1434,7 @@ const UI={
     for(const br of['combat','move','craft','gather','catch']){
       const sks=SKILLS.filter(s=>s.br===br);
       if(!sks.length)continue;
-      const meta=this.BRANCH_META[br]||{icon:'ðŸŒ¿',name:br};
+      const meta=this.BRANCH_META[br]||{icon:'🌿',name:br};
       const sec=document.createElement('div');
       sec.className='branch tree';
       sec.innerHTML=`<h3>${meta.icon} ${meta.name}</h3>`;
@@ -1329,8 +1497,8 @@ const UI={
     if(sk.active)cls+=' active';
     d.className=cls;
     d.dataset.id=sk.id;
-    const badge=maxed?'âœ” Maks':locked?(needProf?'ðŸ“ˆ '+RPG.profReqText(sk):'ðŸ”’')
-      :(sk.active?'âš¡ ':'')+sk.cost+' SP';
+    const badge=maxed?'✔ Maks':locked?(needProf?'📈 '+RPG.profReqText(sk):'🔒')
+      :(sk.active?'⚡ ':'')+sk.cost+' SP';
     d.innerHTML=`<div class="t-ico">${sk.icon}</div>
       <div class="t-nm">${sk.name}</div>
       <div class="t-rk">Rank ${rank}/${sk.max}</div>
@@ -1368,24 +1536,24 @@ const UI={
     const maxed=rank>=sk.max;
     const reqMet=!sk.req||RPG.skillVal(sk.req)>0;
     const afford=RPG.sp>=sk.cost;
-    const kind=sk.active?'<span class="st-type act">âš¡ AKTIF</span>':'<span class="st-type pas">ðŸ”· Pasif</span>';
+    const kind=sk.active?'<span class="st-type act">⚡ AKTIF</span>':'<span class="st-type pas">🔷 Pasif</span>';
     let html=`<div class="st-nm">${sk.icon} ${sk.name} ${kind}</div>
       <div class="st-rk">Rank ${rank}/${sk.max}</div>
       <div class="st-desc">${sk.desc}</div>`;
     if(sk.req){
       const p=SKILLS.find(s=>s.id===sk.req);
-      html+=`<div class="st-line ${reqMet?'ok':'no'}">${reqMet?'âœ”':'ðŸ”’'} Butuh skill: ${p?p.name:sk.req}</div>`;
+      html+=`<div class="st-line ${reqMet?'ok':'no'}">${reqMet?'✔':'🔒'} Butuh skill: ${p?p.name:sk.req}</div>`;
     }
     if(sk.prof&&typeof SUBSKILLS!=='undefined'&&typeof Prof!=='undefined'){
       for(const id in sk.prof){
         const s=SUBSKILLS[id];const have=Prof.level(id);const need=sk.prof[id];
         const ok=have>=need;
-        html+=`<div class="st-line ${ok?'ok':'no'}">${ok?'âœ”':'ðŸ“ˆ'} ${s?s.icon+' '+s.name:id} Lv ${have}/${need}</div>`;
+        html+=`<div class="st-line ${ok?'ok':'no'}">${ok?'✔':'📈'} ${s?s.icon+' '+s.name:id} Lv ${have}/${need}</div>`;
       }
     }
-    html+=`<div class="st-line ${afford?'ok':'no'}">ðŸ’  Biaya: ${sk.cost} SP (punya ${RPG.sp})</div>`;
-    const status=maxed?'âœ” Sudah maksimal':(!reqMet)?'ðŸ”’ Terkunci â€” penuhi syarat dulu':
-      (afford?'âœ… Klik untuk mempelajari':'âš  Skill Point kurang');
+    html+=`<div class="st-line ${afford?'ok':'no'}">💠 Biaya: ${sk.cost} SP (punya ${RPG.sp})</div>`;
+    const status=maxed?'✔ Sudah maksimal':(!reqMet)?'🔒 Terkunci — penuhi syarat dulu':
+      (afford?'✅ Klik untuk mempelajari':'⚠ Skill Point kurang');
     html+=`<div class="st-status">${status}</div>`;
     el.innerHTML=html;
     el.classList.remove('hidden');
@@ -1449,20 +1617,20 @@ const UI={
   },
   /* kategori resep: kelompokkan berdasarkan jenis item hasil */
   craftCategory(it){
-    if(it.food)return{k:'food',t:'ðŸ– Makanan & Obat'};
-    if(it.weapon)return{k:'weapon',t:'âš”ï¸ Senjata'};
-    if(it.armor)return{k:'armor',t:'ðŸ›¡ï¸ Armor'};
-    if(it.place)return{k:'furni',t:'ðŸª‘ Furnitur'};
-    return{k:'mat',t:'ðŸ“¦ Bahan & Lainnya'};
+    if(it.food)return{k:'food',t:'🍖 Makanan & Obat'};
+    if(it.weapon)return{k:'weapon',t:'⚔️ Senjata'};
+    if(it.armor)return{k:'armor',t:'🛡️ Armor'};
+    if(it.place)return{k:'furni',t:'🪑 Furnitur'};
+    return{k:'mat',t:'📦 Bahan & Lainnya'};
   },
   /* kategori crafting yang sedang dipilih (tab) */
   craftTab:'food',
   CRAFT_TABS:[
-    {k:'food',  t:'ðŸ– Makanan'},
-    {k:'weapon',t:'ðŸ—¡ï¸ Senjata'},
-    {k:'armor', t:'ðŸ›¡ï¸ Armor'},
-    {k:'furni', t:'ðŸª‘ Furnitur'},
-    {k:'mat',   t:'ðŸ“¦ Bahan'},
+    {k:'food',  t:'🍖 Makanan'},
+    {k:'weapon',t:'🗡️ Senjata'},
+    {k:'armor', t:'🛡️ Armor'},
+    {k:'furni', t:'🪑 Furnitur'},
+    {k:'mat',   t:'📦 Bahan'},
   ],
   renderCraft(){
     /* kelompokkan resep per kategori agar mudah dicari */
@@ -1509,18 +1677,20 @@ const UI={
         const needStr=Object.keys(r.need).map(id=>{
           const have=RPG.countItem(id);
           const cls=have>=r.need[id]?'ok':'no';
-          return `<span class="${cls}">${ITEMS[id].e}${r.need[id]} (punya ${have})</span>`;
+          return `<span class="${cls}">${this.itemIcon(id)}${r.need[id]} (punya ${have})</span>`;
         }).join(' ');
         const d=document.createElement('div');d.className='recipe';
         const statStr=unlocked?this.statChips(r.out):'';
+        /* nama resep memakai nama ITEM (ikut bahasa aktif), bukan label resep */
+        const rName=(ITEMS[r.out]&&ITEMS[r.out].n)||r.name;
         /* input jumlah + tombol Buat. Jumlah maksimum = perkiraan dari bahan
            yang paling terbatas (dihitung saat klik agar selalu akurat). */
-        d.innerHTML=`<div class="out">${unlocked?ITEMS[r.out].e:'ðŸ”’'}</div>
-          <div class="info"><div class="nm">${r.name}${unlocked?'':' â€” butuh '+RPG.recipeReqText(r)}</div>
+        d.innerHTML=`<div class="out">${unlocked?this.itemIcon(r.out):'🔒'}</div>
+          <div class="info"><div class="nm">${rName}${unlocked?'':' — butuh '+RPG.recipeReqText(r)}</div>
           ${statStr}
-          <div class="need">${unlocked?needStr:'ðŸ”’ '+RPG.recipeReqText(r)}</div></div>
+          <div class="need">${unlocked?needStr:'🔒 '+RPG.recipeReqText(r)}</div></div>
           ${unlocked?'<input type="number" class="craft-qty" min="1" max="64" value="1">':''}
-          <button ${can?'':'disabled'}>${unlocked?'Buat':'ðŸ”’'}</button>`;
+          <button ${can?'':'disabled'}>${unlocked?'Buat':'🔒'}</button>`;
         if(unlocked)d.querySelector('.out').title=this.itemTip(r.out);
         if(can){
           const btn=d.querySelector('button');
@@ -1536,6 +1706,7 @@ const UI={
         }
         el.appendChild(d);
       }
+      this.applyItemIcons(el);
     }
   },
 };

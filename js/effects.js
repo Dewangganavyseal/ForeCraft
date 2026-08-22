@@ -528,12 +528,17 @@ const FX={
     if(opts.owner){drop.ownerId=this.LOCAL_ID;drop.lockOwner=this.DROP_LOCK_OWNER;drop.lockOther=this.DROP_LOCK_OTHER;}
     this.drops.push(drop);
   },
-  /* lepas drop dari scene; geometri selalu dibuang, material hanya untuk kotak
-     (material model 3D dipakai bersama oleh HeldModels jadi tidak boleh dibuang) */
+  /* lepas drop dari scene; geometri selalu dibuang. Material hanya dibuang
+     bila bukan material bersama milik HeldModels: model 3D asli (pedang,
+     tameng, armor) membuat material baru per build dan menandainya lewat
+     userData.ownMats sehingga ikut dibuang agar tidak bocor. */
   disposeDrop(mesh,isModel){
     this.group.remove(mesh);
-    if(mesh.traverse)mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();});
-    else if(mesh.geometry)mesh.geometry.dispose();
+    const ownMats=mesh.userData&&mesh.userData.ownMats;
+    mesh.traverse(o=>{
+      if(o.geometry)o.geometry.dispose();
+      if(ownMats&&o.material)o.material.dispose();
+    });
     if(!isModel&&mesh.material)mesh.material.dispose();
   },
   addShake(v){this.shake=Math.min(1.2,this.shake+v);},

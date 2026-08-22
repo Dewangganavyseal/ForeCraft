@@ -1,6 +1,6 @@
 ﻿'use strict';
 /* Generator terrain deterministik: 4 biome, pohon, tanaman, bijih, desa */
-let nH=null,nM=null,nT=null,nV=null,nMnt=null;
+let nH=null,nM=null,nT=null,nV=null,nMnt=null,nC=null,nI=null;
 const WGEN={
   seed:1,
   _villCache:{},       // cache hasil villageInCell per sel (gx,gz)
@@ -12,6 +12,8 @@ const WGEN={
     nT=new Noise.Simplex(seed+877);   // suhu → penentu biome
     nV=new Noise.Simplex(seed+1543);  // sebaran desa
     nMnt=new Noise.Simplex(seed+2024); // ketinggian pegunungan → biome MOUNTAIN
+    nC=new Noise.Simplex(seed+3311);  // benua vs laut
+    nI=new Noise.Simplex(seed+4703);  // pulau di tengah laut (ukuran acak)
   },
   hash(x,z,s){const n=Math.sin(x*127.1+z*311.7+s*74.7)*43758.5453;return n-Math.floor(n);},
 
@@ -27,8 +29,51 @@ const WGEN={
   /* noise ketinggian pegunungan; ambang 0.72 membuat pegunungan jadi wilayah
      yang cukup langka (hanya puncak noise tinggi yang jadi gunung) */
   mnt(wx,wz){return Noise.fbm(nMnt,wx*0.003,wz*0.003,3)*0.5+0.5;},
+
+  /* ---------- KONTINEN / LAUT ----------
+     nC = noise frekuensi sangat rendah yang menentukan mana laut & mana
+     daratan. Nilai tinggi = daratan, rendah = laut. Karena frekuensinya kecil
+     (0.0016), hasilnya berupa benua & pulau lebar, bukan bercak kecil.
+     nI = noise frekuensi lebih tinggi yang menaikkan sebagian area laut
+     menjadi PULAU dengan ukuran acak.
+
+     Ambang:
+       cont >= LAND_T            → daratan utama
+       cont <  LAND_T            → laut, KECUALI bila island() lolos
+       cont dalam pita SHORE_T   → pantai (pita pasir tepi laut) */
+  LAND_T:0.50,
+  SHORE_W:0.035,
+  cont(wx,wz){return Noise.fbm(nC,wx*0.0016,wz*0.0016,4)*0.5+0.5;},
+
+  /* Kekuatan "pulau" pada titik laut. Memakai dua oktaf noise berbeda skala
+     sehingga ukuran pulau bervariasi: ada yang kecil (beberapa blok) sampai
+     yang cukup lebar (puluhan blok). */
+  island(wx,wz){
+    const a=Noise.fbm(nI,wx*0.0075,wz*0.0075,3)*0.5+0.5;   // pulau sedang/besar
+    const b=Noise.fbm(nI,wx*0.021+53,wz*0.021-29,2)*0.5+0.5; // pulau kecil
+    return Math.max(a,b*0.94);
+  },
+
+  /* true bila titik ini daratan (di atas permukaan air) */
+  isLand(wx,wz){
+    const c=this.cont(wx,wz);
+    if(c>=this.LAND_T)return true;
+    /* pulau: makin jauh dari ambang daratan, makin tinggi syarat noise pulau */
+    const depth=(this.LAND_T-c)/this.LAND_T;          // 0..1
+    return this.island(wx,wz)>0.62+depth*0.30;
+  },
+
+  /* true bila titik daratan ini bertetangga dengan laut (dipakai untuk pantai) */
+  nearOcean(wx,wz){
+    return !this.isLand(wx+3,wz)||!this.isLand(wx-3,wz)||
+           !this.isLand(wx,wz+3)||!this.isLand(wx,wz-3);
+  },
+
   biomeAt(wx,wz){
     if(Math.abs(wx)<24&&Math.abs(wz)<24)return BIOME.FOREST;
+    /* laut & pantai diputuskan lebih dulu: keduanya mengabaikan suhu */
+    if(!this.isLand(wx,wz))return BIOME.OCEAN;
+    if(this.nearOcean(wx,wz))return BIOME.BEACH;
     if(this.mnt(wx,wz)>0.72)return BIOME.MOUNTAIN;
     const t=this.temp(wx,wz);
     if(t>0.63)return BIOME.DESERT;
@@ -40,9 +85,21 @@ const WGEN={
      pernah membentuk genangan tipis. Wilayah air (m<0.30) digali ke kedalaman
      TEPAT 3 atau 4 blok di bawah permukaan air (SEA=5) → dasar y=2 atau y=1. */
   height(wx,wz){
+    /* ---- LAUT: dasar landai, makin jauh dari pantai makin dalam ---- */
+    const b=this.biomeAt(wx,wz);
+    if(b===BIOME.OCEAN){
+      const c=this.cont(wx,wz);
+      /* dinormalkan ke pita 0.16 supaya laut lepas benar-benar dalam, bukan
+         genangan 1 blok (noise cont jarang turun jauh di bawah LAND_T) */
+      const depth=clamp((this.LAND_T-c)/0.16,0,1);          // 0 (tepi) .. 1 (dalam)
+      /* SEA-1 di tepi sampai SEA-4 di laut dalam; y=0 tetap bedrock */
+      return clamp(CFG.SEA-1-Math.round(depth*3),1,CFG.SEA-1);
+    }
     let t=Noise.fbm(nH,wx*0.042,wz*0.042,3)*0.5+0.5;
     t=Math.pow(clamp(t,0,1),1.15);
     const m=Noise.fbm(nM,wx*0.02,wz*0.02,2)*0.5+0.5;
+    /* ---- PANTAI: selalu rata di permukaan air supaya jadi pita pasir ---- */
+    if(b===BIOME.BEACH)return CFG.SEA;
     /* ---- sungai/danau: kedalaman TEPAT 3-4 blok dari permukaan air ---- */
     if(m<0.30){
       const deep=m<0.18;
@@ -51,7 +108,6 @@ const WGEN={
     /* ---- daratan: SEA..7 (5..7) ---- */
     let h=CFG.SEA+Math.round(t*(7-CFG.SEA));     // 5..7
     if(m>0.75)h=Math.max(h,6);                   // dataran tinggi
-    const b=this.biomeAt(wx,wz);
     if(b===BIOME.DESERT)h=clamp(h-(this.hash(wx,wz,21)<0.5?1:0),CFG.SEA,6);
     if(b===BIOME.TUNDRA&&m>0.55)h=Math.min(7,h+1);
     if(b===BIOME.MOUNTAIN)h=clamp(h+2,6,7);      // pegunungan paling tinggi
@@ -67,6 +123,10 @@ const WGEN={
   plantAt(wx,wz){
     const b=this.biomeAt(wx,wz);
     const r=this.hash(wx,wz,2);
+    /* laut: tidak ada tanaman permukaan */
+    if(b===BIOME.OCEAN)return 0;
+    /* pantai: hanya rumput pantai yang sangat jarang */
+    if(b===BIOME.BEACH)return r<0.03?1:0;
     /* gurun: hanya kaktus/semak kering yang jarang */
     if(b===BIOME.DESERT)return r<0.045?1:0;
     /* tundra: rumput jarang + jamur salju */
@@ -88,6 +148,7 @@ const WGEN={
   /* batu besar tersebar sebagai penanda arah */
   rockAt(wx,wz,h){
     if(h<CFG.SEA)return 0;
+    if(this.biomeAt(wx,wz)===BIOME.OCEAN)return 0;
     if(Math.abs(wx)<3&&Math.abs(wz)<3)return 0;
     const r=this.hash(wx,wz,6);
     if(r>0.004)return 0;
@@ -112,6 +173,27 @@ const WGEN={
      mulai: cukup jauh agar tanah spawn tidak diratakan, tapi masih di dalam
      jarak render sehingga pemain langsung melihat desa & penjaganya. */
   VILLAGE_GRID:96,
+  /* ---------- syarat lahan desa ----------
+     Desa hanya boleh berdiri di DARATAN. Titik pusat kandidat diuji bersama
+     cincin di sekelilingnya (radius desa) supaya desa tidak setengah tercelup
+     laut. Pantai juga ditolak agar rumah tidak menempel garis air. */
+  villageSpotOK(cx,cz,r){
+    if(!this.isLand(cx,cz))return false;
+    if(this.biomeAt(cx,cz)===BIOME.BEACH)return false;
+    const R=r||26;
+    /* 8 arah pada radius penuh + radius setengah: cukup untuk menolak tanjung
+       sempit maupun pulau yang lebih kecil dari desa. */
+    for(const f of [1,0.6]){
+      const d=Math.round(R*f);
+      for(let i=0;i<8;i++){
+        const a=i/8*Math.PI*2;
+        const x=Math.round(cx+Math.cos(a)*d);
+        const z=Math.round(cz+Math.sin(a)*d);
+        if(!this.isLand(x,z))return false;
+      }
+    }
+    return true;
+  },
   villageInCell(gx,gz){
     /* CACHE: desa deterministik per sel, jadi hasilnya bisa disimpan. Ini
        krusial karena villageInCell dipanggil belasan kali per frame (lewat
@@ -125,13 +207,24 @@ const WGEN={
     const home=(gx===0&&gz===0);
     let v=null;
     if(home||Noise.fbm(nV,gx*1.7,gz*1.7,1)*0.5+0.5>=0.55){
-      const ox=home?34:Math.floor(this.hash(gx,gz,71)*(G-52))+26;
-      const oz=home?30:Math.floor(this.hash(gx,gz,73)*(G-52))+26;
-      const cx=gx*G+ox,cz=gz*G+oz;
-      v={x:cx,z:cz,biome:this.biomeAt(cx,cz),r:26};
-      v.plan=housePlan(v,gx,gz);
-      v.farms=farmPlan(v);
-      v.houses=v.plan.length;
+      /* Beberapa kandidat titik di dalam sel; dipakai yang benar-benar berada
+         di daratan. Bila semua kandidat jatuh di laut/pantai, sel ini TIDAK
+         berdesa (deterministik karena memakai hash indeks sel). */
+      const R=26;
+      let cx=null,cz=null;
+      for(let k=0;k<10;k++){
+        const ox=home?34:Math.floor(this.hash(gx,gz,71+k*13)*(G-52))+26;
+        const oz=home?30:Math.floor(this.hash(gx,gz,73+k*17)*(G-52))+26;
+        const tx=gx*G+ox,tz=gz*G+oz;
+        if(this.villageSpotOK(tx,tz,R)){cx=tx;cz=tz;break;}
+        if(home)break;   // sel spawn memakai titik tetap
+      }
+      if(cx!==null){
+        v={x:cx,z:cz,biome:this.biomeAt(cx,cz),r:R};
+        v.plan=housePlan(v,gx,gz);
+        v.farms=farmPlan(v);
+        v.houses=v.plan.length;
+      }
     }
     this._villCache[key]=v;this._villN=(this._villN||0)+1;
     return v;

@@ -39,6 +39,38 @@ const HeldModels={
     this.box(g,0.10,0.02,0.10,0xffffff,0,0.12,0);
   },
 
+  /* ---------- model 3D original untuk drop pedang/tameng/armor ----------
+     Item yang sudah punya model 3D asli (pedang di js/player/weapons, tameng
+     di js/player/shields, armor di js/player/armors) dibangun ulang dari
+     builder aslinya sehingga saat jatuh sebagai drop tampil dengan model
+     original — bukan kotak warna lagi.
+     Pose "dipegang" bawaan builder (posisi/rotasi) di-reset, lalu pivot
+     dipindah ke tengah model (bounding box) supaya putaran drop rapi.
+     Mengembalikan false bila model kosong -> caller fallback ke generic. */
+  _addOriginal(g,child,scale){
+    if(!child)return false;
+    child.position.set(0,0,0);
+    child.rotation.set(0,0,0);
+    /* multiplyScalar (bukan setScalar) agar skala normalisasi bawaan builder
+       — mis. ShieldModels.buildFor yang menyesuaikan tinggi tameng — tetap
+       terjaga dan hanya dikalikan faktor drop. */
+    child.scale.multiplyScalar(scale||1);
+    g.add(child);
+    g.updateWorldMatrix(true,true);
+    const bb=new THREE.Box3().setFromObject(g);
+    if(bb.isEmpty()){g.remove(child);return false;}
+    /* Pusatkan X/Z di origin supaya putaran drop (rotasi Y) stabil tanpa
+       goyah. Dasar model (min.y) diletakkan tepat di origin agar model
+       "duduk" di atas titik drop dan tidak menembus tanah berapa pun
+       tingginya (drop ditempatkan FX.spawnDrop ~0.3 di atas lantai). */
+    const c=bb.getCenter(new THREE.Vector3());
+    child.position.set(-c.x,-bb.min.y,-c.z);
+    /* material dibuat sendiri oleh builder (bukan cache HeldModels._mats)
+       sehingga aman dibuang saat drop diambil — dicek FX.disposeDrop */
+    g.userData.ownMats=true;
+    return true;
+  },
+
   MODELS:{
     berry(g){
       this.box(g,0.12,0.12,0.12,0x4d6bd6,-0.05,0,0);
@@ -152,4 +184,61 @@ const HeldModels={
     },
   },
 };
+
+/* ---------- registrasi pedang / tameng / armor ----------
+   Semua item yang punya model 3D asli didaftarkan ke HeldModels.MODELS
+   supaya FX.spawnDrop menampilkannya sebagai drop berbentuk model original
+   (bukan kotak warna). Skala diperkecil agar cocok sebagai item di tanah
+   (FX.spawnDrop masih mengalikan 1.5x di luar). `hold` dipakai bila item
+   sedang dipegang di tangan lewat hotbar. */
+(function(){
+  const SCALE={sword:0.42,shield:0.42,helm:0.45,chest:0.40,boots:0.60};
+  const HOLD={
+    sword :{pos:[0,-0.31,0.22],rot:[-Math.PI/2,0,0],scale:1},
+    shield:{pos:[0,-0.35,0.28],rot:[0,0,0],scale:0.9},
+    helm  :{pos:[0,-0.31,0.22],rot:[0,0,0],scale:1},
+    chest :{pos:[0,-0.31,0.22],rot:[0,0,0],scale:0.9},
+    boots :{pos:[0,-0.31,0.22],rot:[0,0,0],scale:1},
+  };
+  for(const id in ITEMS){
+    const it=ITEMS[id];
+    if(it.weapon){
+      HeldModels.MODELS[id]=function(g){
+        let w=null;
+        if(typeof WeaponManager!=='undefined'){
+          w=WeaponManager.buildWeapon(id);
+          /* build() menimpa builder._sword (pemilik animasi aura). Kembalikan
+             kepemilikan itu ke pedang yang sedang digenggam pemain bila tipenya
+             sama, supaya drop ini tidak membekukan aura senjata yang dipakai. */
+          const b=WeaponManager.getWeapon(id);
+          if(b&&typeof RPG!=='undefined'&&RPG.weaponId&&RPG.weaponId()===id
+            &&typeof Player!=='undefined'&&Player.parts&&Player.parts.sword){
+            b._sword=Player.parts.sword;
+          }
+        }
+        if(HeldModels._addOriginal(g,w,SCALE.sword))g.userData.hold=HOLD.sword;
+        else HeldModels.generic(g,id);
+      };
+    }else if(it.armor&&it.armor.slot==='shield'){
+      HeldModels.MODELS[id]=function(g){
+        const s=(typeof ShieldModels!=='undefined')?ShieldModels.buildFor(id):null;
+        if(HeldModels._addOriginal(g,s,SCALE.shield))g.userData.hold=HOLD.shield;
+        else HeldModels.generic(g,id);
+      };
+    }else if(it.armor){
+      HeldModels.MODELS[id]=function(g){
+        const slot=it.armor.slot,tier=it.armor.tier||'iron';
+        let a=null;
+        if(typeof ArmorManager!=='undefined'){
+          if(slot==='helm')a=ArmorManager.buildHelmet(tier,id);
+          else if(slot==='chest')a=ArmorManager.buildChestplate(tier,id);
+          else if(slot==='boots')a=ArmorManager.buildBoots(tier,id);
+        }
+        if(HeldModels._addOriginal(g,a,SCALE[slot]||0.5))g.userData.hold=HOLD[slot]||HOLD.helm;
+        else HeldModels.generic(g,id);
+      };
+    }
+  }
+})();
+
 window.HeldModels=HeldModels;

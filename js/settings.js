@@ -1,8 +1,8 @@
 ﻿'use strict';
 /* =============================================================================
-   SETTINGS PANEL â€" Gear button UI + Multi-language system
+   SETTINGS PANEL — Gear button UI + Multi-language system
    ---------------------------------------------------------------------------
-   - Tombol âš™ di samping HP bar membuka panel settings.
+   - Tombol ⚙ di samping HP bar membuka panel settings.
    - Panel berisi: Musik (toggle+volume), SFX, Custom UI (UIStudio),
      Simpan Manual, dan pilihan Bahasa (ID/EN/ZH/JA).
    - Sistem bahasa: dictionary `locales` di config.js + helper L(key).
@@ -43,10 +43,14 @@ const Settings={
     if(!locales[lid])return;
     CURRENT_LANG=lid;
     try{localStorage.setItem('forecraft_lang',lid);}catch(e){}
+    /* terapkan bahasa ke DATA GAME (item, mob, NPC, skill, dialog) + seluruh DOM */
+    if(typeof I18N!=='undefined')I18N.apply(lid);
     /* re-render UI utama agar teks langsung berubah; panel TIDAK ditutup,
        cukup digambar ulang supaya user melihat hasil bahasa baru seketika. */
     if(typeof UI!=='undefined'&&UI.renderAll)UI.renderAll();
+    if(typeof MainMenu!=='undefined'&&MainMenu.el&&typeof Game!=='undefined'&&Game.menuMode&&MainMenu.showMain)MainMenu.showMain();
     this.render();
+    if(typeof I18N!=='undefined')I18N.refresh();
     const ln=this.langs().find(x=>x.id===lid);
     if(typeof UI!=='undefined'&&UI.toast)UI.toast('🌐 '+L('settings_lang_set',{name:ln?ln.name:lid}));
   },

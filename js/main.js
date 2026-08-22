@@ -55,12 +55,15 @@ const Game={
 
   findSpawn(){
     let sx=0,sz=0;
-    for(let r=0;r<40;r++){
+    for(let r=0;r<64;r++){
       let found=false;
       for(let a=0;a<16;a++){
         const ang=a/16*Math.PI*2;
         const x=Math.round(Math.cos(ang)*r),z=Math.round(Math.sin(ang)*r);
-        if(WGEN.height(x,z)>=CFG.SEA&&!WGEN.treeAt(x,z,WGEN.height(x,z))){
+        /* pemain harus mulai di daratan yang kering, bukan laut/pantai basah */
+        if(!WGEN.isLand(x,z))continue;
+        const h=WGEN.height(x,z);
+        if(h>=CFG.SEA&&!WGEN.treeAt(x,z,h)){
           sx=x;sz=z;found=true;break;
         }
       }

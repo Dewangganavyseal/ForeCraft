@@ -138,7 +138,7 @@ const ORE_BLOCKS=[B.ORE_IRON,B.ORE_GOLD,B.ORE_CRYSTAL];
 /* 3 biome dipilih dari noise suhu; memengaruhi warna kabut, blok
    permukaan, kepadatan pohon, jenis bijih, dan monster yang muncul. */
 const BIOME={
-  FOREST:0, DESERT:1, TUNDRA:2, MOUNTAIN:3,
+  FOREST:0, DESERT:1, TUNDRA:2, MOUNTAIN:3, OCEAN:4, BEACH:5,
 };
 const BIOME_INFO={
   /* mobW = bobot kemunculan tiap monster di biome ini.
@@ -159,6 +159,17 @@ const BIOME_INFO={
   [BIOME.MOUNTAIN]:{name:'Pegunungan',e:'⛰️',surface:B.STONE,sub:B.STONE,
     fog:0xc4d2e0,tree:0.15,ore:B.ORE_CRYSTAL,mobs:['dragon','wolf','golem'],
     mobW:{dragon:0.3,wolf:1.5,golem:7.5}},
+  /* ---------- LAUT & PANTAI ----------
+     OCEAN: dasar berpasir di bawah permukaan air; tidak ada pohon dan tidak
+     pernah dipakai untuk desa. Monster darat tidak spawn di sini karena
+     spawner menolak titik dengan tinggi < CFG.SEA.
+     BEACH: pita pasir tipis di tepi daratan yang berbatasan dengan laut. */
+  [BIOME.OCEAN]:{name:'Laut',e:'🌊',surface:B.SAND,sub:B.SAND,
+    fog:0x9ec9e8,tree:0,ore:B.ORE_IRON,mobs:['slime'],
+    mobW:{slime:1}},
+  [BIOME.BEACH]:{name:'Pantai',e:'🏖️',surface:B.SAND,sub:B.SAND,
+    fog:0xdCe8f0,tree:0.10,ore:B.ORE_IRON,mobs:['slime','boar','scorpion'],
+    mobW:{slime:3.0,boar:2.0,scorpion:1.2}},
 };
 
 
@@ -366,11 +377,11 @@ const ITEMS={
   rope:{n:'Tali',e:'➰'},
   saddle:{n:'Sadel',e:'🐴'},
   pet_charm:{n:'Jimat Pawang',e:'🧿'},
-  seed_wheat:{n:'Benih Gandum',e:'🌾'},
-  seed_carrot:{n:'Benih Wortel',e:'🥕'},
-  seed_cabbage:{n:'Benih Kubis',e:'🥬'},
-  seed_tomato:{n:'Benih Tomat',e:'🍅'},
-  seed_watermelon:{n:'Benih Semangka',e:'🍉'},
+  seed_wheat:{n:'Benih Gandum',e:'…'},
+  seed_carrot:{n:'Benih Wortel',e:'…'},
+  seed_cabbage:{n:'Benih Kubis',e:'…'},
+  seed_tomato:{n:'Benih Tomat',e:'…'},
+  seed_watermelon:{n:'Benih Semangka',e:'…'},
   wheat:{n:'Gandum',e:'🌾',food:{hunger:8,hp:0}},
   carrot:{n:'Wortel',e:'🥕',food:{hunger:10,hp:2}},
   cabbage:{n:'Kubis',e:'🥬',food:{hunger:12,hp:4}},
@@ -495,6 +506,16 @@ const ARMOR_SLOTS=[
 const PLAYER_GEAR_SLOTS=ARMOR_SLOTS.concat([{id:'shield',name:'Tameng',e:'🛡️'}]);
 /* slot perlengkapan NPC/rekan: rekan masih bisa memegang senjata sendiri */
 const NPC_GEAR_SLOTS=[{id:'weapon',name:'Senjata',e:'🗡️'}].concat(ARMOR_SLOTS);
+
+/* ---------- batas stack per item ----------
+   Equipment (pedang/weapon, armor, tameng, alat seperti cangkul) TIDAK bisa
+   di-stack: tiap pieces menempati slotnya sendiri (maks 1). Item lain
+   menumpuk sampai 64. Dipakai oleh RPG.addItem, UI.moveStack, NPCS.bagAdd,
+   dan Furni.chestAdd. */
+function stackCap(id){
+  const it=ITEMS[id];
+  return (it&&(it.weapon||it.armor||it.tool))?1:64;
+}
 
 const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
   rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,

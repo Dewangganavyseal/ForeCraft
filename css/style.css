@@ -493,8 +493,91 @@ body.touch .hslot:active{
 }
 
 #mobile button:active{
-  background:rgba(120,180,110,.55);
+  background-color:rgba(120,180,110,.55);
   transform: scale(0.94);
+}
+
+/* ---------- tombol bergambar (PNG dari folder Button UI) ----------
+   Gambar dipakai sebagai background-image. Aturan :active di atas hanya
+   mengubah background-color (bukan shorthand `background`) sehingga gambar
+   tidak ikut terhapus saat ditekan. Efek mengecil saat ditekan ditangani
+   class .pressed (dipasang JS pada touchstart) karena preventDefault() di
+   touchstart membuat pseudo-class :active tidak konsisten di layar sentuh. */
+#mobile button.btn-img{
+  background-color:transparent;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  border:none;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+#m-attack.btn-img{ background-image:url('../buttons/attack.png'); }
+#m-jump.btn-img{ background-image:url('../buttons/jump.png'); }
+#m-roll.btn-img{ background-image:url('../buttons/dash.png'); }
+
+/* ---------- IKON ITEM BERGAMBAR (bag, hotbar, crafting, peti, toko) ----------
+   Item yang punya PNG khusus dirender sebagai <img class="iico">. Ukurannya
+   mengikuti kotak slot/ikon induknya supaya sejajar dengan ikon emoji. */
+img.iico{
+  width:1.15em;height:1.15em;
+  object-fit:contain;
+  display:inline-block;
+  vertical-align:middle;
+  pointer-events:none;
+  image-rendering:auto;
+}
+.slot img.iico,.hslot .emo img.iico{width:82%;height:82%}
+/* .emo pada hotbar & slot NPC dijadikan kotak penuh agar <img> bisa mengisi */
+.hslot .emo,.slot .emo{display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;line-height:1}
+.slot .emo img.iico{width:82%;height:82%}
+.recipe .out img.iico{width:1.05em;height:1.05em}
+.shop-row .s-ico img.iico{width:1.1em;height:1.1em}
+.recipe .need img.iico{width:1.05em;height:1.05em;margin-right:1px}
+
+/* umpan balik tekan: mengecil sedikit (dipicu JS, andal di layar sentuh) */
+#mobile button.pressed,
+.m-active-btn.pressed,
+.sk-btn.pressed{
+  transform: scale(0.88);
+  filter: brightness(1.12);
+}
+#mobile button, .m-active-btn, .sk-btn{
+  transition: transform 0.06s ease, filter 0.06s ease;
+}
+
+/* gambar di tombol skill aktif (mobile) & bar skill (PC) */
+.m-active-btn img, .sk-btn img{
+  width:100%; height:100%;
+  object-fit:cover;
+  border-radius:inherit;
+  display:block;
+  pointer-events:none;
+}
+/* tombol skill yang memakai gambar: buang latar & border default biar art
+   PNG terlihat penuh; filter cooling (grayscale) tetap berlaku lewat button */
+.m-active-btn.has-img{
+  background:transparent;
+  border:none;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+/* bar skill PC bergambar: dibundarkan mengikuti art PNG (tidak lagi kotak),
+   tanpa latar/border; efek tekan mengecil via :active (klik mouse) */
+#skillbar .sk-btn.has-img{
+  background:transparent;
+  border:none;
+  border-radius:50%;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+#skillbar .sk-btn.has-img:active{
+  transform:scale(0.88);
+  filter:brightness(1.12);
 }
 
 /* Tombol Serang Utama (Kanan Bawah) */
@@ -1645,6 +1728,50 @@ body.touch #place-bar{
   body.touch #m-active{max-height:min(24vh,110px)}
   body.touch #questtrack{max-height:16vh}
 }
+
+/* =========================================================================
+   OPTIMASI MOBILE: ikon tim/hewan, panel crafting, pelacak quest
+   ========================================================================= */
+
+/* ---- ikon rekan & pet: versi ringkas agar semua muat di kolom kanan ---- */
+body.touch .tmate{width:44px;padding:3px 2px 4px;gap:1px}
+body.touch .tmate .tface{font-size:16px}
+body.touch .tmate .tlv{font-size:8px}
+body.touch .tmate .thp{width:34px;height:3px}
+body.touch .tmate .tord,body.touch .tmate .tmode{font-size:9px;padding:0 2px}
+
+/* landscape / layar pendek: ruang vertikal sempit, jadi ikon tim disusun
+   mendatar (baris) ke arah kiri alih-alih dipotong secara vertikal */
+@media (orientation:landscape){
+  body.touch #team{
+    flex-direction:row;flex-wrap:wrap;justify-content:flex-end;
+    max-width:min(240px,42vw);
+    max-height:none;overflow:visible;
+  }
+}
+
+/* ---- panel crafting: list & kategori lebih ringkas di layar sempit ---- */
+body.touch #craft-tabs{padding:6px 10px;gap:4px}
+body.touch .craft-tab{font-size:9px;padding:5px 7px}
+body.touch .craft-tab i{font-size:8px}
+body.touch .panel>.panel-body{padding:8px 10px 12px}
+body.touch #recipes{gap:5px}
+body.touch .recipe{padding:5px 8px;gap:7px;border-radius:7px}
+body.touch .recipe .out{font-size:20px}
+body.touch .recipe .nm{font-size:11px}
+body.touch .recipe .need{font-size:9px}
+body.touch .recipe .stats{margin:2px 0 3px;gap:3px}
+body.touch .recipe .chip{font-size:8px;padding:1px 4px}
+body.touch .recipe button{padding:5px 9px;font-size:11px}
+body.touch .craft-qty{width:42px;font-size:11px;padding:4px 5px}
+
+/* ---- pelacak quest: baris ringkas agar semua quest terlihat ---- */
+body.touch #questtrack{padding:5px 7px}
+body.touch .qt-h{font-size:8px;margin-bottom:3px}
+body.touch .qt-row{margin-bottom:4px}
+body.touch .qt-n{font-size:9.5px;line-height:1.2}
+body.touch .qt-c{font-size:8.5px;margin:0 0 2px}
+body.touch .qbar{height:3px}
 
 /* =========================================================================
    BADGE LEVEL TEMPA (Landasan Tempa) — angka kecil "+n" di sudut slot

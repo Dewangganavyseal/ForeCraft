@@ -723,14 +723,18 @@ const Furni={
   },
   /* masukkan item ke peti; mengembalikan sisa yang tidak tertampung */
   chestAdd(f,id,n){
-    for(let i=0;i<f.inv.length&&n>0;i++){
-      const s=f.inv[i];
-      if(s&&s.id===id&&s.n<64){
-        const add=Math.min(n,64-s.n);s.n+=add;n-=add;
+    /* equipment (pedang/armor/tameng) maks 1 per slot -> tidak ditumpuk */
+    const cap=(typeof stackCap==='function')?stackCap(id):64;
+    if(cap>1){
+      for(let i=0;i<f.inv.length&&n>0;i++){
+        const s=f.inv[i];
+        if(s&&s.id===id&&s.n<cap){
+          const add=Math.min(n,cap-s.n);s.n+=add;n-=add;
+        }
       }
     }
     for(let i=0;i<f.inv.length&&n>0;i++)
-      if(!f.inv[i]){const add=Math.min(n,64);f.inv[i]={id,n:add};n-=add;}
+      if(!f.inv[i]){const add=Math.min(n,cap);f.inv[i]={id,n:add};n-=add;}
     if(n>=0)this.save();
     return n;
   },
@@ -1176,6 +1180,8 @@ const Action={
         b.onclick=ev=>{ev.stopPropagation();Sfx.click();c.fn();};
         bb.appendChild(b);
       }
+      /* isi bubble baru ikut bahasa aktif */
+      if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(bub,I18N.lang);
       bub.style.display='';
       bub.classList.remove('pop');void bub.offsetWidth;bub.classList.add('pop');
       this.update();
@@ -1235,7 +1241,9 @@ const Action={
     /* satu NPC hanya boleh punya satu celetukan aktif */
     for(let i=says.length-1;i>=0;i--)if(says[i].npc===npc)kill(i);
     const el=document.createElement('div');
-    el.className='npcsay';el.textContent=text;
+    el.className='npcsay';
+    el.textContent=(typeof I18N!=='undefined'&&I18N.lang!=='id')
+      ? I18N.translateText(text,I18N.lang) : text;
     document.body.appendChild(el);
     says.push({npc,el,life:secs||3});
   };

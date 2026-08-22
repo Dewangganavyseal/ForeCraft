@@ -447,20 +447,22 @@ const RPG={
   addItem(id,n,lvl){
     n=n||1;
     const before=n;
+    /* equipment (pedang/armor/tameng) maks 1 per slot — tidak pernah ditumpuk */
+    const cap=(typeof stackCap==='function')?stackCap(id):64;
     /* item hasil tempa (lvl>0) tidak pernah digabung ke stack lain */
     if(!lvl){
       for(const arr of[this.hotbar,this.bag])
         for(let i=0;i<arr.length;i++)
-          if(arr[i]&&arr[i].id===id&&!arr[i].lvl&&arr[i].n<64){
-            const add=Math.min(n,64-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)break;
+          if(arr[i]&&arr[i].id===id&&!arr[i].lvl&&arr[i].n<cap){
+            const add=Math.min(n,cap-arr[i].n);arr[i].n+=add;n-=add;if(n<=0)break;
           }
     }
     if(n>0){
       for(const arr of[this.hotbar,this.bag])
         for(let i=0;i<arr.length;i++)
           if(!arr[i]){
-            arr[i]=lvl?{id,n:Math.min(n,64),lvl}:{id,n:Math.min(n,64)};
-            n-=Math.min(n,64);if(n<=0)break;
+            arr[i]=lvl?{id,n:Math.min(n,cap),lvl}:{id,n:Math.min(n,cap)};
+            n-=Math.min(n,cap);if(n<=0)break;
           }
     }
     if(before>0&&n<before&&typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();

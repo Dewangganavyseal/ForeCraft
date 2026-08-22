@@ -27,6 +27,8 @@ Object.assign(WGEN,{
     const ox=Math.floor(this.hash(gx,gz,913)*(G-64))+32;
     const oz=Math.floor(this.hash(gx,gz,917)*(G-64))+32;
     const cx=gx*G+ox,cz=gz*G+oz;
+    /* reruntuhan juga hanya di daratan (bukan laut / pantai) */
+    if(typeof this.villageSpotOK==='function'&&!this.villageSpotOK(cx,cz,16))return null;
     /* jangan menimpa desa (jarak diperbesar karena benteng kini jauh lebih luas) */
     const nv=this.nearestVillage(cx,cz);
     if(nv&&nv.dist<64)return null;

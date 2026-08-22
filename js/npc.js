@@ -345,9 +345,19 @@ const NPCS={
 
   /* ---------- tas rekan ---------- */
   bagAdd(n,id,cnt){
-    for(const s of n.bag)if(s&&s.id===id){s.n+=cnt;return true;}
-    for(let i=0;i<n.bag.length;i++)if(!n.bag[i]){n.bag[i]={id,n:cnt};return true;}
-    return false;                                    // tas penuh
+    /* equipment (pedang/armor/tameng) maks 1 per slot -> tidak ditumpuk */
+    const cap=(typeof stackCap==='function')?stackCap(id):64;
+    if(cap>1){
+      for(const s of n.bag){
+        if(s&&s.id===id&&s.n<cap){
+          const add=Math.min(cnt,cap-s.n);s.n+=add;cnt-=add;
+          if(cnt<=0)return true;
+        }
+      }
+    }
+    for(let i=0;i<n.bag.length&&cnt>0;i++)
+      if(!n.bag[i]){const add=Math.min(cnt,cap);n.bag[i]={id,n:add};cnt-=add;}
+    return cnt<=0;                              // false bila tas penuh
   },
   bagFull(n){return n.bag.every(s=>s!==null);},
   /* pemain mengambil satu tumpuk dari tas rekan */
