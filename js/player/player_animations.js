@@ -29,7 +29,10 @@ class PlayerAnimator {
       skill_heal:        1.60,
       skill_shield_bash: 0.65,
       skill_whirlwind:   1.10,
-      skill_thunder:     1.50
+      skill_thunder:     1.50,
+      // Menunggangi (one-shot naik & turun)
+      ride_mount:    0.55,
+      ride_dismount: 0.45
     };
   }
 
@@ -138,6 +141,12 @@ class PlayerAnimator {
       case 'skill_shield_bash': this.animShieldBash(p, P); break;
       case 'skill_whirlwind':   this.animWhirlwind(p, P); break;
       case 'skill_thunder':     this.animThunder(p, P); break;
+
+      // Menunggangi
+      case 'ride_mount':    this.animRideMount(p, P); break;
+      case 'ride_idle':     this.animRideIdle(t, P); break;
+      case 'ride_move':     this.animRideMove(t, P); break;
+      case 'ride_dismount': this.animRideDismount(p, P); break;
 
       case 'sequence': this.animSequence(dt, P); break;
       default: this.animIdle(t, P);
@@ -654,6 +663,200 @@ class PlayerAnimator {
 
     if (P.legL) P.legL.rotation.x = 0.2;
     if (P.legR) P.legR.rotation.x = -0.2;
+  }
+
+  /* ================= MENUNGGANGI (RIDING) =================
+     Konvensi rig (dipelajari dari player.js mkLeg/mkArm):
+       - legL/legR: pivot di pinggul. rotation.x negatif = paha terangkat ke
+         DEPAN (arah dada). rotation.z membuka kaki ke samping (mengangkang).
+         userData.shin: rotation.x positif = betis menekuk ke BELAKANG bawah.
+       - armL/armR: pivot di bahu. rotation.x negatif = lengan terangkat ke
+         DEPAN. userData.fore: rotation.x negatif = siku menekuk (tangan naik).
+       - torso: rotation.x positif = membungkuk ke depan.
+       - body.position.y: geser seluruh badan naik/turun (dipakai untuk lompatan).
+     Pose duduk = kedua paha terangkat ke depan (-1.3) & sedikit mengangkang,
+     betis menekuk turun (shin +1.3), kedua lengan menjulur ke DEPAN memegang
+     tali kendali (arm x -0.9, fore -0.35). */
+
+  // Pose dasar duduk di atas mount; dipakai idle & move sebagai basis.
+  _rideSeat(P, opt) {
+    opt = opt || {};
+    const bodyY   = opt.bodyY   != null ? opt.bodyY   : -0.18;
+    const torsoX  = opt.torsoX  != null ? opt.torsoX  : 0.10;
+    const armX    = opt.armX    != null ? opt.armX    : -0.95;  // lengan ke depan
+    const foreX   = opt.foreX   != null ? opt.foreX   : -0.35;  // siku sedikit menekuk
+    const thighX  = opt.thighX  != null ? opt.thighX  : -1.30;  // paha ke depan
+    const thighZ  = opt.thighZ  != null ? opt.thighZ  : 0.42;   // mengangkang
+    const shinX   = opt.shinX   != null ? opt.shinX   : 1.30;   // betis menekuk turun
+
+    if (P.body)  P.body.position.set(0, bodyY, 0);
+    if (P.torso) P.torso.rotation.set(torsoX, opt.torsoY || 0, 0);
+    if (P.head)  P.head.rotation.set(opt.headX || -0.05, opt.headY || 0, 0);
+
+    if (P.legL) {
+      P.legL.rotation.set(thighX, opt.thighYL || -0.12, thighZ);
+      if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(shinX, 0, 0);
+    }
+    if (P.legR) {
+      P.legR.rotation.set(thighX, opt.thighYR || 0.12, -thighZ);
+      if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(shinX, 0, 0);
+    }
+
+    if (P.armL) {
+      P.armL.rotation.set(armX, opt.armYL || 0.14, 0.10);
+      if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = foreX;
+    }
+    if (P.armR) {
+      P.armR.rotation.set(armX, opt.armYR || -0.14, -0.10);
+      if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = foreX;
+    }
+  }
+
+  // NAIK: melompat dari tanah ke punggung mount, lalu turun ke pose duduk.
+  animRideMount(p, P) {
+    if (p < 0.45) {
+      // Fase 1: menekuk lutut lalu melompat naik (badan terangkat)
+      const k = this.easeOut(p / 0.45);
+      const bodyY = this.lerp(-0.15, 0.55, k);      // meloncat ke atas
+      const torsoX = this.lerp(0.30, 0.14, k);      // condong ke depan saat naik
+      // paha berayun dari agak lurus ke terangkat penuh
+      const thighX = this.lerp(-0.20, -1.20, k);
+      const thighZ = this.lerp(0.05, 0.40, k);
+      const shinX  = this.lerp(0.30, 1.15, k);
+      // tangan menjangkau ke depan meraih punggung/tali
+      const armX  = this.lerp(-0.30, -1.05, k);
+      const foreX = this.lerp(-0.20, -0.45, k);
+
+      if (P.body)  P.body.position.set(0, bodyY, 0);
+      if (P.torso) P.torso.rotation.set(torsoX, 0, 0);
+      if (P.head)  P.head.rotation.set(-0.08, 0, 0);
+      if (P.legL) {
+        P.legL.rotation.set(thighX, -0.10, thighZ);
+        if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.legR) {
+        P.legR.rotation.set(thighX, 0.10, -thighZ);
+        if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.armL) {
+        P.armL.rotation.set(armX, 0.16, 0.10);
+        if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = foreX;
+      }
+      if (P.armR) {
+        P.armR.rotation.set(armX, -0.16, -0.10);
+        if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = foreX;
+      }
+    } else {
+      // Fase 2: turun & mengendap ke pose duduk final
+      const k = this.easeOut((p - 0.45) / 0.55);
+      this._rideSeat(P, {
+        bodyY:  this.lerp(0.55, -0.18, k),
+        torsoX: this.lerp(0.14, 0.10, k),
+        armX:   this.lerp(-1.05, -0.95, k),
+        foreX:  this.lerp(-0.45, -0.35, k),
+        thighX: this.lerp(-1.20, -1.30, k),
+        thighZ: this.lerp(0.40, 0.42, k),
+        shinX:  this.lerp(1.15, 1.30, k)
+      });
+    }
+  }
+
+  // DUDUK DIAM di atas mount: napas halus, tangan ke depan memegang kendali.
+  animRideIdle(t, P) {
+    const breathe = Math.sin(t * 2.0) * 0.03;
+    const sway    = Math.sin(t * 0.9) * 0.02;
+    this._rideSeat(P, {
+      bodyY:  -0.18 + breathe,
+      torsoX: 0.10 + breathe * 0.4,
+      torsoY: sway,
+      headX:  -0.04 + Math.sin(t * 1.1) * 0.03,
+      headY:  Math.sin(t * 0.6) * 0.08,
+      armX:   -0.95 + breathe * 0.3,
+      foreX:  -0.35,
+      thighX: -1.30,
+      thighZ: 0.42,
+      shinX:  1.30
+    });
+  }
+
+  // BERGERAK / berlari di atas mount: memantul mengikuti derap + tangan mengayun.
+  animRideMove(t, P) {
+    const f = 8.0;
+    const bounce = Math.abs(Math.sin(t * f)) * 0.09;   // pantulan derap
+    const nod    = Math.sin(t * f) * 0.05;             // anggukan badan
+    const sway   = Math.sin(t * f * 0.5) * 0.03;
+    this._rideSeat(P, {
+      bodyY:  -0.18 + bounce,
+      torsoX: 0.16 + nod,
+      torsoY: sway,
+      headX:  -0.08,
+      headY:  Math.sin(t * 1.2) * 0.05,
+      armX:   -0.92 + nod * 0.6,     // tangan mengayun halus mengikuti derap
+      foreX:  -0.40 + nod * 0.2,
+      thighX: -1.32,
+      thighZ: 0.44,
+      shinX:  1.34
+    });
+  }
+
+  // TURUN: mengayun kaki ke samping lalu meluncur turun & mendarat.
+  animRideDismount(p, P) {
+    if (p < 0.5) {
+      // Fase 1: angkat badan sedikit & ayunkan kaki keluar dari sadel
+      const k = this.easeIn(p / 0.5);
+      const bodyY  = this.lerp(-0.18, 0.30, Math.sin(k * Math.PI));
+      const thighX = this.lerp(-1.30, -0.30, k);   // paha turun mendekati lurus
+      const thighZ = this.lerp(0.42, 0.20, k);
+      const shinX  = this.lerp(1.30, 0.50, k);
+      const armX   = this.lerp(-0.95, -0.30, k);   // lepas kendali, lengan turun
+      const foreX  = this.lerp(-0.35, -0.20, k);
+      if (P.body)  P.body.position.set(0, bodyY, 0);
+      if (P.torso) P.torso.rotation.set(this.lerp(0.10, 0.18, k), 0, 0);
+      if (P.head)  P.head.rotation.set(-0.05, 0, 0);
+      if (P.legL) {
+        P.legL.rotation.set(thighX, -0.10, thighZ);
+        if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.legR) {
+        P.legR.rotation.set(thighX, 0.10, -thighZ);
+        if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.armL) {
+        P.armL.rotation.set(armX, 0.12, 0.20);
+        if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = foreX;
+      }
+      if (P.armR) {
+        P.armR.rotation.set(armX, -0.12, -0.20);
+        if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = foreX;
+      }
+    } else {
+      // Fase 2: mendarat di tanah, lutut menekuk meredam lalu tegak
+      const k = this.easeOut((p - 0.5) / 0.5);
+      const bodyY  = this.lerp(0.30, 0, k) - 0.10 * Math.sin(k * Math.PI);
+      const thighX = this.lerp(-0.30, 0.02, k);
+      const shinX  = this.lerp(0.50, 0.10, k);
+      const armX   = this.lerp(-0.30, 0.05, k);
+      const foreX  = this.lerp(-0.20, -0.15, k);
+      if (P.body)  P.body.position.set(0, bodyY, 0);
+      if (P.torso) P.torso.rotation.set(this.lerp(0.18, 0.02, k), 0, 0);
+      if (P.head)  P.head.rotation.set(0, 0, 0);
+      if (P.legL) {
+        P.legL.rotation.set(thighX, 0, 0.06 * (1 - k));
+        if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.legR) {
+        P.legR.rotation.set(thighX, 0, -0.06 * (1 - k));
+        if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(shinX, 0, 0);
+      }
+      if (P.armL) {
+        P.armL.rotation.set(armX, 0.06, this.lerp(0.20, 0.10, k));
+        if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = foreX;
+      }
+      if (P.armR) {
+        P.armR.rotation.set(armX, -0.06, this.lerp(-0.20, -0.10, k));
+        if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = foreX;
+      }
+    }
   }
 
   /* ================= SEQUENCE (demo combo) ================= */

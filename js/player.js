@@ -925,8 +925,17 @@ const Player={
     /* ganti model tangan saat item hotbar terpilih berubah */
     this.updateHeld();
     /* MENUNGGANGI MOB: gerak pemain sepenuhnya mengikuti mount.
-       Serangan & dash dinonaktifkan saat menunggangi. */
-    if(typeof Capture!=='undefined'&&Capture.riding){Capture.ridePlayer(this,dt);return;}
+       Serangan & dash dinonaktifkan saat menunggangi. ridePlayer() memindahkan
+       posisi (termasuk transisi naik/turun); animate() dipanggil di sini juga
+       agar pose duduk/naik/turun ikut diperbarui (update() di-return lebih awal
+       sehingga jalur animasi normal tidak tercapai). */
+    if(typeof Capture!=='undefined'&&(Capture.riding||Capture.dismounting)){
+      Capture.ridePlayer(this,dt);
+      const mv=(typeof Input!=='undefined')?Input.moveVec():{x:0,z:0};
+      const moving=Math.hypot(mv.x,mv.z)>0.12;
+      this.animate(dt,moving,0,false);
+      return;
+    }
     /* lompatan Hantam Bumi terarah: terbang ke target, hantam saat mendarat */
     if(this.slamLeap){this.updateSlamLeap(dt);return;}
     const A=this.attack,D=this.dodge;
@@ -1179,6 +1188,21 @@ const Player={
 
     /* timer skill game tetap berjalan (dipakai logika & penanda state) */
     if(this.skillAnim&&this.skillAnim.t>0)this.skillAnim.t-=dt;
+
+    /* MENUNGGANGI: naik (ride_mount) → duduk diam (ride_idle) / bergerak
+       (ride_move) → turun (ride_dismount). Prioritas di atas gerak biasa.
+       Saat dismounting, `riding` sudah false tapi animasi turun masih jalan. */
+    if(typeof Capture!=='undefined'&&(Capture.riding||Capture.dismounting)){
+      let name;
+      if(Capture.dismounting)      name='ride_dismount';
+      else if(Capture.mounting)    name='ride_mount';
+      else if(moving)              name='ride_move';
+      else                         name='ride_idle';
+      if(an.currentAnim!==name)an.setAnimation(name);
+      an.update(dt);
+      this.extraYaw=0;this.moveLean=0;
+      return;
+    }
 
     /* one-shot (dodge/skill/combo) prioritas tertinggi; dipicu sekali per aktivasi */
     const dodgeKey=this.dodge.active?'dodge':null;

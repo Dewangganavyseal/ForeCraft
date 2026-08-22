@@ -34,6 +34,8 @@ const CATCH_MAX_LEN=8;
 const Capture={
   pet:null,
   riding:false,
+  mounting:false,       // animasi lompat naik ke punggung sedang berjalan
+  dismounting:false,    // animasi lompat turun sedang berjalan
   jumpQ:false,
   active:null,          // minigame tangkap
   deployedSlot:-1,
@@ -674,6 +676,7 @@ const Capture={
     if(!m||m.dead)return;
     if(!m.saddle){UI.toast('🐴 Pasang Sadel dulu dari tas mob.');return;}
     if(this.active)return;
+    if(this.mounting||this.dismounting)return;
     /* bila dipanggil dari panel dan pet jauh, tarik pet ke samping pemain */
     if(call&&m.pos.distanceTo(Player.pos)>2.5){
       const ang=Cam.yaw+Math.PI*0.5;
@@ -684,21 +687,37 @@ const Capture={
       UI.toast('🐾 Kemari!');
     }
     this.riding=true;
+    /* animasi naik: badan dilerp dari posisi berdiri ke atas punggung selama
+       durasi ride_mount, lalu masuk pose duduk. */
+    this.mounting=true;
+    this.mountT=0;
+    this.mountDur=0.55;
+    this.mountStartPos=Player.pos.clone();
     m.vel.x=0;m.vel.z=0;   // buang momentum lama supaya tidak langsung meluncur
+    if(Player.animator)Player.animator.setAnimation('ride_mount');
+    if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
     UI.toast(`🐾 Menunggangi ${this.mobName(m.type)}!`);
   },
 
   stopRide(silent){
     if(!this.riding)return;
+    if(this.dismounting)return;
     this.riding=false;
     this.jumpQ=false;
+    this.mounting=false;
     const m=this.pet;
     if(m){
-      Player.pos.set(m.pos.x+1.1,m.pos.y,m.pos.z+1.1);
-      const g=World.groundAt(Player.pos.x,Player.pos.z,Player.pos.y+3);
-      Player.pos.y=Math.max(Player.pos.y,g);
-      Player.vel.set(0,0,0);
-      Player.onGround=true;
+      /* animasi turun: pemain melompat ke samping mount lalu mendarat. */
+      this.dismounting=true;
+      this.dismountT=0;
+      this.dismountDur=0.45;
+      this.dismountStartPos=Player.pos.clone();
+      const landX=m.pos.x+Math.cos(m.mesh.rotation.y+0.6)*1.3;
+      const landZ=m.pos.z-Math.sin(m.mesh.rotation.y+0.6)*1.3;
+      const gy=World.groundAt(landX,landZ,m.pos.y+3);
+      this.dismountTargetPos=new THREE.Vector3(landX,Math.max(gy,m.pos.y),landZ);
+      if(Player.animator)Player.animator.setAnimation('ride_dismount');
+      if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
     }
     if(!silent)UI.toast('🧍 Turun dari tunggangan.');
   },
@@ -707,14 +726,59 @@ const Capture={
     const m=this.pet;
     if(!m||m.dead){this.stopRide(true);return;}
 
-    /* lompat saat menunggangi: 2 blok, naga 3 blok */
-    if(this.jumpQ){
+    const seat=(typeof meshHeight==='function')?meshHeight(m.type)*0.72:1.2;
+
+    /* ---- transisi TURUN: lompat ke samping mount lalu mendarat ---- */
+    if(this.dismounting){
+      this.dismountT+=dt;
+      const k=Math.min(1,this.dismountT/this.dismountDur);
+      const from=this.dismountStartPos,to=this.dismountTargetPos;
+      p.pos.x=lerp(from.x,to.x,k);
+      p.pos.z=lerp(from.z,to.z,k);
+      /* lengkung parabola kecil saat melompat turun */
+      p.pos.y=lerp(from.y,to.y,k)+Math.sin(k*Math.PI)*0.5;
+      p.mesh.position.copy(p.pos);
+      p.mesh.rotation.y=p.facing;
+      p.vel.set(0,0,0);
+      if(k>=1){
+        this.dismounting=false;
+        this.pet=this.pet; // no-op, biarkan pet tetap terdeploy
+        p.pos.copy(to);
+        p.mesh.position.copy(p.pos);
+        p.vel.set(0,0,0);
+        p.onGround=true;
+      }
+      return;
+    }
+
+    /* lompat saat menunggangi: 2 blok, naga 3 blok (nonaktif saat naik/turun) */
+    if(this.jumpQ&&!this.mounting){
       this.jumpQ=false;
       if(m.onGround){
         m.vel.y=m.type==='dragon'?12.5:10.3;
         m.onGround=false;
         if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
       }
+    }
+
+    /* ---- transisi NAIK: lompat dari tanah ke atas punggung ---- */
+    if(this.mounting){
+      this.mountT+=dt;
+      const k=Math.min(1,this.mountT/this.mountDur);
+      const from=this.mountStartPos;
+      const tx=m.pos.x,ty=m.pos.y+seat,tz=m.pos.z;
+      p.pos.x=lerp(from.x,tx,k);
+      p.pos.z=lerp(from.z,tz,k);
+      /* lengkung parabola: melompat naik melewati puncak lalu mendarat di sadel */
+      p.pos.y=lerp(from.y,ty,k)+Math.sin(k*Math.PI)*0.55;
+      p.facing=angLerp(p.facing,m.mesh.rotation.y,clamp(10*dt,0,1));
+      p.mesh.position.copy(p.pos);
+      p.mesh.rotation.y=p.facing;
+      p.vel.set(0,0,0);
+      /* rem mount supaya diam saat pemain masih naik */
+      m.vel.x*=Math.exp(-24*dt);m.vel.z*=Math.exp(-24*dt);
+      if(k>=1)this.mounting=false;
+      return;
     }
 
     const mv=Input.moveVec();
@@ -746,7 +810,6 @@ const Capture={
     }
 
     /* posisi pemain mengikuti punggung mount */
-    const seat=(typeof meshHeight==='function')?meshHeight(m.type)*0.72:1.2;
     p.pos.set(m.pos.x,m.pos.y+seat,m.pos.z);
     p.mesh.position.copy(p.pos);
     p.mesh.rotation.y=p.facing;
