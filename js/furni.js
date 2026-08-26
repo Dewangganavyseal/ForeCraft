@@ -399,7 +399,6 @@ const Furni={
     let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
     for(const k of fp){const [x,z]=k.split(',').map(Number);
       if(x<minX)minX=x;if(x>maxX)maxX=x;if(z<minZ)minZ=z;if(z>maxZ)maxZ=z;}
-
     /* asal mesh = pusat sel asal */
     const ox=originCx*S+S/2,oz=originCz*S+S/2;
     const boxAt=(x,y,z,w,h,d,mat)=>{
@@ -647,7 +646,10 @@ const Furni={
       const openN=!inF(x,z-1),openS=!inF(x,z+1),
             openW=!inF(x-1,z),openE=!inF(x+1,z);
       if(!(openN||openS||openW||openE))continue;            // interior
-      const corner=(openW||openE)&&(openN||openS);          // tiang sudut kayu
+      /* tiang sudut ala desa: HANYA sudut BBOX gabungan (rumus desa memakai
+         lx/lz tepi bangunan). Uji tetangga-lokal membuat kolom pintu ikut
+         terhitung sudut pada bentuk L/T sehingga lubang pintu tertutup. */
+      const corner=((x===minX||x===maxX)&&(z===minZ||z===maxZ));
       for(let wy2=0;wy2<H;wy2++){
         let id=B.PLANK;
         if(corner)id=B.WOOD;                                // tiang sudut

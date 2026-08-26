@@ -246,11 +246,11 @@ const RPG={
     let msg='';
 
     if(id==='slam'){
-      /* Tekan cepat (Q sekali): loncat kecil di tempat lalu hantam tanah.
-         Versi tahan-untuk-membidik ditangani SlamAim (player.js). */
+      /* Tekan cepat (Q sekali): JONGKOK dulu → lompat fisika → BARU menghantam
+         tanah saat mendarat. Damage & efek dipicu updateSlamQuick() di fase
+         'land', bukan instan di sini. Versi bidik: SlamAim (player.js). */
       if(!cost(25))return false;
-      Player.vel.y=Math.max(Player.vel.y,6);
-      this._slamAoE(P.x,P.y,P.z);
+      Player.startSlamQuick();
       msg='💥 Hantam Bumi!';
     }
     else if(id==='whirl'){
@@ -300,8 +300,9 @@ const RPG={
     }
     else return false;                     // skill aktif tanpa implementasi
 
-    /* animasi tubuh khas per skill aktif */
-    if(typeof Player!=='undefined'&&Player.playSkillAnim)Player.playSkillAnim(id);
+    /* animasi tubuh khas per skill aktif (slam lewat mesin fase slamQuick) */
+    if(id!=='slam'&&typeof Player!=='undefined'&&Player.playSkillAnim)
+      Player.playSkillAnim(id);
     this.activeCD[id]=this.activeCDMax(id);
     UI.toast(msg);
     UI.renderActiveSkills();

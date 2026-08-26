@@ -598,6 +598,7 @@ const Player={
   },
    tryAttack(){
      if(this.dead||this.dodge.active)return;
+     if(this.slamQuick)return;                    // sedang melakukan Hantam Bumi
      if(typeof Capture!=='undefined'){
        if(Capture.active)return;                     // sedang minigame tangkap
        if(Capture.riding){UI.toast('🐴 Turun dulu untuk menyerang');return;}
@@ -607,6 +608,10 @@ const Player={
      /* makanan: klik/tombol serang dipakai untuk makan saat sedang memegang
         makanan (ala Minecraft), bukan memukul. */
      if(typeof RPG!=='undefined'&&RPG.tryEatSelected&&RPG.tryEatSelected())return;
+     /* IJEDA: jeda antar-combo & jeda antar-klik menahan spam agar ada ritme */
+     if(this.comboGap>0)return;
+     if(this.tapGap>0)return;
+     this.tapGap=0.10;
      if(this.attack.active){this.attack.queued=true;return;}
      if(this.stamina<3){UI.toast('⚡ Terlalu lelah!');Sfx.noStamina();return;}
      this.stamina-=5*RPG.stamCostMult();this.stamRegenT=0.5;
@@ -642,12 +647,48 @@ const Player={
           lalu bergeser ke warna combo saat rangkaian serangan makin tinggi. */
        this.swordGlow=[0.45,0.55,0.7,0.85,1.0][next]||0.5;
        const comboC=[0x4dd0ff,0x4dd0ff,0x7dff9d,0xffd24d,0xff6b57][next]||0x4dd0ff;
-       this.swordGlowColor=this.weaponFxColor!==undefined
-         ? new THREE.Color(this.weaponFxColor).lerp(new THREE.Color(comboC),next/6).getHex()
-         : comboC;
-     }
+        this.swordGlowColor=this.weaponFxColor!==undefined
+          ? new THREE.Color(this.weaponFxColor).lerp(new THREE.Color(comboC),next/6).getHex()
+          : comboC;
+      }
 
    },
+
+  /* =========================================================================
+     HANTAM BUMI CEPAT (Q sekali) — tiga fase mengikuti fisika nyata:
+       windup : jongkok statis sesaat (animasi slam_windup, tanpa damage)
+       air    : lompatan fisika sungguhan (vel.y) — pose 'jump'
+       land   : saat kembali menyentuh tanah → BARU AoE hantaman + pose
+                slam_land. Damage tidak lagi keluar instan di awal.
+     ========================================================================= */
+  startSlamQuick(){
+    if(this.dead||this.slamQuick||this.dodge.active)return;
+    if(typeof Capture!=='undefined'&&Capture.riding)return;
+    this.slamQuick={phase:'windup',t:0};
+  },
+  updateSlamQuick(dt){
+    const q=this.slamQuick;
+    if(!q)return;
+    q.t+=dt;
+    if(q.phase==='windup'){
+      /* jongkok dulu; baru melesat ke atas setelah windup selesai */
+      if(q.t>=0.16){
+        q.phase='air';q.t=0;
+        this.vel.y=Math.max(this.vel.y,6.6);
+        this.onGround=false;
+        if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+      }
+    }else if(q.phase==='air'){
+      /* di udara: tunggu mendarat (jaga-jaga bila terdorong ke air dsb.) */
+      if((this.onGround&&q.t>0.15)||q.t>2.5){
+        q.phase='land';q.t=0;
+        if(typeof RPG!=='undefined'&&RPG.doSlamAt)
+          RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
+      }
+    }else if(q.phase==='land'){
+      if(q.t>=0.5)this.slamQuick=null;   // tunggu animasi slam_land selesai
+    }
+  },
 
   /* --- animasi nyala pedang: emissive + opacity mata bilah meredup halus --- */
   updateSwordGlow(dt){
@@ -925,6 +966,9 @@ const Player={
   /* ---------- update ---------- */
   update(dt){
     if(this.dead)return;
+    /* HANTAM BUMI cepat: mesin fase jongkok → lompat (fisika) → hantam saat
+       mendarat. Dipanggil paling awal agar damage tepat di frame mendarat. */
+    if(this.slamQuick)this.updateSlamQuick(dt);
     /* ganti model tangan saat item hotbar terpilih berubah */
     this.updateHeld();
     /* MENUNGGANGI MOB: gerak pemain sepenuhnya mengikuti mount.
@@ -945,6 +989,9 @@ const Player={
     D.cd=Math.max(0,D.cd-dt);
     this.buffSpeed=Math.max(0,this.buffSpeed-dt);
     this.hitStop=Math.max(0,this.hitStop-dt);
+    /* ijeda antar combo: menahan spam tombol serang agar ada ritme */
+    this.comboGap=Math.max(0,(this.comboGap||0)-dt);
+    this.tapGap=Math.max(0,(this.tapGap||0)-dt);
     A.sinceEnd+=dt;
     /* hit-stop: tahan animasi & gerak sesaat biar pukulan terasa berat */
     if(this.hitStop>0)dt*=0.15;
@@ -1140,8 +1187,8 @@ const Player={
       const dur=C.dur/RPG.comboSpeedMult();
       A.t+=dt;
       if(!A.hitDone&&A.t>=C.hit){A.hitDone=true;this.doHit(A.combo);}
-      if(A.queued&&A.t>dur*0.55){A.queued=false;this.attack.active=false;this.tryAttack();}
-      else if(A.t>=dur){A.active=false;A.sinceEnd=0;}
+      if(A.queued&&A.t>dur*0.55){A.queued=false;this.attack.active=false;this.comboGap=0.12;this.tryAttack();}
+      else if(A.t>=dur){A.active=false;A.sinceEnd=0;this.comboGap=0.28;}
     }
     /* hadap */
     if(!A.active){
@@ -1165,9 +1212,8 @@ const Player={
   /* pemetaan skill aktif game → animasi terdekat di PlayerAnimator */
   skillAnimName(id){
     const map={
-      slam :'combo5',          // Heavy Cleave = tebasan berat dari atas (paling dekat)
       whirl:'skill_whirlwind', // serangan putar area
-      roar :'skill_thunder',   // kedua lengan diangkat (paling dekat dengan auman)
+      roar :'roar',            // Teriakan Perang: auman berdiri (animasi sendiri)
       herb :'skill_heal'       // minum ramuan / penyembuhan
     };
     return map[id]||'skill_heal';
@@ -1210,6 +1256,16 @@ const Player={
 
     /* timer skill game tetap berjalan (dipakai logika & penanda state) */
     if(this.skillAnim&&this.skillAnim.t>0)this.skillAnim.t-=dt;
+
+    /* HANTAM BUMI cepat: animasi mengikuti fase fisika (jongkok/jump/hantam) */
+    if(this.slamQuick){
+      const name=this.slamQuick.phase==='windup'?'slam_windup'
+        :this.slamQuick.phase==='air'?'jump':'slam_land';
+      if(an.currentAnim!==name)an.setAnimation(name);
+      comboTick();
+      this.extraYaw=0;this.moveLean=0;
+      return;
+    }
 
     /* MENUNGGANGI: naik (ride_mount) → duduk diam (ride_idle) / bergerak
        (ride_move) → turun (ride_dismount). Prioritas di atas gerak biasa.
@@ -1282,7 +1338,8 @@ const Player={
       Dipanggil RPG.useActive saat skill berhasil dipakai; memutar pose singkat
       yang khas per skill (slam/whirl/roar/herb). */
   playSkillAnim(id){
-    const dur={slam:0.5,whirl:0.55,roar:0.7,herb:0.6}[id]||0.5;
+    /* slam tidak lewat sini: fase animasinya digerakkan slamQuick */
+    const dur={whirl:0.55,roar:0.90,herb:0.6}[id]||0.5;
     this.skillAnim={id,t:dur,max:dur};
   },
 };

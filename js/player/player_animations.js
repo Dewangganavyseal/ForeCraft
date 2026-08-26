@@ -28,6 +28,10 @@ class PlayerAnimator {
       dash: 0.35, death: 2.2,
       skill_fireball: 1.30, skill_dash: 0.45, skill_heal: 1.60,
       skill_shield_bash: 0.65, skill_whirlwind: 1.10, skill_thunder: 1.50,
+      // Hantam Bumi cepat: fase jongkok & fase hantam-mendarat
+      slam_windup: 0.16, slam_land: 0.50,
+      // Teriakan Perang (animasi berdiri sendiri, bukan lompatan)
+      roar: 0.90,
       // Menunggangi (one-shot naik & turun)
       ride_mount: 0.55, ride_dismount: 0.45
     };
@@ -147,6 +151,11 @@ class PlayerAnimator {
       case 'ride_idle':     this.animRideIdle(t, P); break;
       case 'ride_move':     this.animRideMove(t, P); break;
       case 'ride_dismount': this.animRideDismount(p, P); break;
+      // Hantam Bumi cepat (fase mengikuti fisika lompatan nyata)
+      case 'slam_windup': this.animSlamWindup(p, P); break;
+      case 'slam_land':   this.animSlamLand(p, P); break;
+      // Teriakan Perang
+      case 'roar': this.animRoar(t, P); break;
       case 'sequence': this.animSequence(dt, P); break;
       default: this.animIdle(t, P);
     }
@@ -830,6 +839,124 @@ class PlayerAnimator {
         if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = foreX;
       }
     }
+  }
+
+  /* ================= HANTAM BUMI CEPAT (fase fisika) =================
+     Dipisah dari combo5 karena lompatannya digerakkan FISIKA nyata:
+     windup = jongkok statis di tanah, land = pose hantam saat MENDARAT. */
+  animSlamWindup(p, P) {
+    // jongkok dalam & stabil: paha menekuk, torso condong, tangan ke belakang
+    const k = this.easeOut(this.clamp(p * 2, 0, 1));   // cepat masuk pose
+    if (P.body) P.body.position.set(0, -0.28 * k, 0);
+    if (P.torso) P.torso.rotation.set(0.38 * k, 0, 0);
+    if (P.head) P.head.rotation.x = -0.22 * k;
+    if (P.legL) {
+      P.legL.rotation.x = 0.55 * k;
+      if (P.legL.userData.shin) P.legL.userData.shin.rotation.x = 0.75 * k;
+    }
+    if (P.legR) {
+      P.legR.rotation.x = -0.45 * k;
+      if (P.legR.userData.shin) P.legR.userData.shin.rotation.x = 0.62 * k;
+    }
+    if (P.armL) { P.armL.rotation.set(0.55 * k, 0, 0.30 * k); }
+    if (P.armR) { P.armR.rotation.set(0.60 * k, 0, -0.32 * k); }
+  }
+  animSlamLand(p, P) {
+    // FASE A (0-0.3): benturan hantaman — badan rendah, kedua tangan menumbuk
+    // FASE B (0.3-1): bangkit berdiri
+    let bodyY, torsoX, headX, armX, legL, legRX, shin;
+    if (p < 0.3) {
+      const k = this.easeIn(p / 0.3);
+      bodyY = this.lerp(-0.18, -0.34, k);
+      torsoX = this.lerp(0.30, 0.68, k);
+      headX = this.lerp(0.10, 0.26, k);
+      armX = this.lerp(-1.20, 0.95, k);          // terhempas ke bawah depan
+      legL = this.lerp(0.30, 0.58, k);
+      legRX = this.lerp(-0.24, -0.50, k);
+      shin = this.lerp(0.40, 0.72, k);
+    } else {
+      const k = this.easeInOut((p - 0.3) / 0.7);
+      bodyY = this.lerp(-0.34, 0, k);
+      torsoX = this.lerp(0.68, 0, k);
+      headX = this.lerp(0.26, 0, k);
+      armX = this.lerp(0.95, 0, k);
+      legL = this.lerp(0.58, 0, k);
+      legRX = this.lerp(-0.50, 0, k);
+      shin = this.lerp(0.72, 0, k);
+    }
+    if (P.body) P.body.position.set(0, bodyY, 0.14);
+    if (P.torso) P.torso.rotation.set(torsoX, 0, 0);
+    if (P.head) P.head.rotation.x = headX;
+    if (P.legL) {
+      P.legL.rotation.x = legL;
+      if (P.legL.userData.shin) P.legL.userData.shin.rotation.x = shin;
+    }
+    if (P.legR) {
+      P.legR.rotation.x = legRX;
+      if (P.legR.userData.shin) P.legR.userData.shin.rotation.x = shin * 0.92;
+    }
+    if (P.armL) {
+      P.armL.rotation.set(armX, -0.10, 0.22);
+      if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = -0.08;
+    }
+    if (P.armR) {
+      P.armR.rotation.set(armX, 0.10, -0.24);
+      if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = -0.08;
+    }
+  }
+
+  /* ================= TERIAKAN PERANG (roar berdiri) =================
+     Berdiri di tempat: tarik napas → auman meledak (dada maju, kepala ke atas,
+       kepalan di sisi tubuh bergetar) → reda. TIDAK ada lompatan. */
+  animRoar(t, P) {
+    const dur = this.durations.roar || 0.9;
+    const p = this.clamp(t / dur, 0, 1);
+    let torsoX, headX, bodyY, armRX, armRY, armRZ, armLX, armLY, armLZ, fore;
+    let legSpread = 0, brace = 0;
+    if (p < 0.25) {
+      // Tarik napas: dada mengembang sedikit, kepala mulai mendongak
+      const k = this.easeOut(p / 0.25);
+      torsoX = -0.16 * k; headX = -0.28 * k; bodyY = 0.02 * k;
+      armRX = 0.35 * k; armRY = 0; armRZ = -0.45 * k;
+      armLX = 0.35 * k; armLY = 0; armLZ = 0.45 * k;
+      fore = -1.6 * k;
+      brace = k;
+    } else if (p < 0.72) {
+      // AUMAN: dada dorong ke depan-atas, kepalan bergetar di sisi tubuh
+      const k = this.easeOut((p - 0.25) / 0.12);
+      const tremble = Math.sin(t * 46) * 0.05;
+      torsoX = this.lerp(-0.16, -0.30, k);
+      headX = this.lerp(-0.28, -0.44, k);
+      bodyY = this.lerp(0.02, 0.06, k);
+      armRX = this.lerp(0.35, 0.72, k) + tremble;
+      armRZ = this.lerp(-0.45, -0.58, k) + tremble * 0.5;
+      armLX = this.lerp(0.35, 0.70, k) - tremble;
+      armLZ = this.lerp(0.45, 0.58, k) - tremble * 0.5;
+      fore = -1.85 * k;
+      legSpread = 0.16 * k; brace = 1;
+    } else {
+      // Reda: kembali berdiri netral
+      const k = this.easeInOut((p - 0.72) / 0.28);
+      torsoX = -0.30 * (1 - k); headX = -0.44 * (1 - k);
+      bodyY = 0.06 * (1 - k);
+      armRX = 0.72 * (1 - k); armRZ = -0.58 * (1 - k);
+      armLX = 0.70 * (1 - k); armLZ = 0.58 * (1 - k);
+      fore = -1.85 * (1 - k);
+      legSpread = 0.16 * (1 - k); brace = 1 - k;
+    }
+    if (P.body) P.body.position.set(0, bodyY, 0);
+    if (P.torso) P.torso.rotation.set(torsoX, 0, 0);
+    if (P.head) P.head.rotation.set(headX, 0, 0);
+    if (P.armR) {
+      P.armR.rotation.set(armRX, armRY, armRZ);
+      if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = fore;
+    }
+    if (P.armL) {
+      P.armL.rotation.set(armLX, armLY, armLZ);
+      if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = fore;
+    }
+    if (P.legL) { P.legL.rotation.x = -brace * 0.06; P.legL.rotation.z = legSpread; }
+    if (P.legR) { P.legR.rotation.x = brace * 0.06; P.legR.rotation.z = -legSpread; }
   }
 
   /* ================= SEQUENCE (demo) ================= */
