@@ -513,8 +513,9 @@ const Furni={
   place(defId,x,y,z,yaw,auto){
     const def=this.DEFS[defId];
     if(!def)return null;
-    /* RUMAH MODULAR: ditangani jalur khusus (snap ke grid + auto-merge) */
-    if(defId==='house'&&!auto)return this.placeHouse(x,z);
+    /* RUMAH MODULAR: ditangani jalur khusus (snap ke grid + auto-merge);
+       yaw dipakai untuk mengarahkan pintu (diputar per 90°). */
+    if(defId==='house'&&!auto)return this.placeHouse(x,z,yaw);
     /* perabot desa yang pernah dihancurkan tidak dibangkitkan lagi */
     const akey=auto?this.autoKey(defId,x,z):null;
     if(akey&&this.dead[akey])return null;
@@ -672,7 +673,7 @@ const Furni={
       if(near)put(x,h+H,z,B.ROOF);                          // lisplang
     }
   },
-  placeHouse(x,z){
+  placeHouse(x,z,yaw){
     const {cx,cz}=this.cellOf(x,z);
     if(this.houseAtCell(cx,cz)){
       UI.toast('🏠 Sudah ada rumah di petak ini');
@@ -680,6 +681,11 @@ const Furni={
     }
     const site=this.houseSiteCheck(cx,cz);
     if(!site.ok){UI.toast(site.reason);return null;}
+    /* arah pintu mengikuti rotasi ghost: 's'(+z) diputar per 90°.
+       rotation.y positif = berlawanan jarum jam dilihat dari atas →
+       +z berputar ke +x pada 90°. */
+    const q=((Math.round((yaw||0)/(Math.PI/2))%4)+4)%4;
+    const side=['s','e','n','w'][q];
     /* kumpulkan rumah tetangga (sel bersisian) → merge jadi satu kesatuan */
     const hosts=[];
     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
@@ -707,8 +713,8 @@ const Furni={
       Sfx.craft&&Sfx.craft();
       return host;
     }
-    /* rumah baru 1 sel, pintu selatan (+z) */
-    const rec={cells:[{cx,cz}],door:{cx,cz,side:'s'},y:site.y};
+    /* rumah baru 1 sel, pintu sesuai rotasi ghost */
+    const rec={cells:[{cx,cz}],door:{cx,cz,side},y:site.y};
     this.writeHouseBlocks(rec,false);
     this.houses.push(rec);
     this.save();
@@ -866,13 +872,16 @@ const Furni={
     const v=this.computeValid();
     this.placeValid=v.valid;
     const p=this.placeTarget;
-    /* RUMAH: ghost di-snap ke pusat sel grid supaya preview = hasil akhir */
+    /* RUMAH: ghost di-snap ke pusat sel grid supaya preview = hasil akhir.
+       Rotasi TIDAK dinolkan di sini (dulu inilah penyebab tombol 🔄 Putar
+       terasa mati — updateGhost menimpanya tiap frame); placeYaw dipertahankan
+       dan ikut menentukan arah pintu saat dipasang. */
     if(this.placing==='house'){
       const {cx,cz}=this.cellOf(p.x,p.z);
       const c=this.cellCenter(cx,cz);
       const site=this.houseSiteCheck(cx,cz);
-      this.ghost.position.set(c.x,site.ok?site.y:(c.y!==undefined?c.y:Player.pos.y),c.z);
-      this.ghost.rotation.y=0;
+      this.ghost.position.set(c.x,site.ok?site.y:Player.pos.y,c.z);
+      this.ghost.rotation.y=this.placeYaw;
     }else{
       this.ghost.position.set(p.x,p.y>=0?p.y:Player.pos.y,p.z);
       this.ghost.rotation.y=this.placeYaw;
@@ -901,7 +910,28 @@ const Furni={
     for(const c of World.chunks.values())if(c.group)groups.push(c.group);
     const hits=ray.intersectObjects(groups,true);
     if(!hits.length)return;
-    const h=hits[0];
+    /* RUMAH MODULAR: abaikan hit pada blok milik rumah sendiri (dinding/atap/
+       lisplang). Lisplang menjulur 1 blok ke sel tetangga — tanpa ini, klik
+       tanah di samping rumah sering mengenai lisplang dulu sehingga ghost
+       "bergeser" ke sel yang salah. Ray diteruskan ke hit berikutnya. */
+    const inOwnedHouse=(wx,wz)=>{
+      for(const hrec of this.houses){
+        for(const c of hrec.cells){
+          if(wx>=c.cx*this.HOUSE_SIZE-1&&wx<(c.cx+1)*this.HOUSE_SIZE+1&&
+             wz>=c.cz*this.HOUSE_SIZE-1&&wz<(c.cz+1)*this.HOUSE_SIZE+1)
+            return true;
+        }
+      }
+      return false;
+    };
+    let h=null;
+    for(const cand of hits){
+      const p2=cand.point;
+      const cbx=Math.floor(p2.x),cbz=Math.floor(p2.z);
+      if(this.placing==='house'&&inOwnedHouse(cbx,cbz))continue;
+      h=cand;break;
+    }
+    if(!h)return;
     const pt=h.point;
     let bx=Math.floor(pt.x),bz=Math.floor(pt.z);
     /* klik dinding (sisi samping): geser target ke sel udara di depan dinding
