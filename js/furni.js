@@ -1468,17 +1468,22 @@ const Furni={
       if(raw.vaults)this.vaults=raw.vaults;
       this.applyFurniList(raw.f);
       /* RUMAH modular: tulis ulang blok ke dunia dari record tersimpan.
-         setBlock akan memaksa generate data chunk yang belum termuat. */
+         setBlock akan memaksa generate data chunk yang belum termuat.
+         Tiap record dibungkus try sendiri supaya satu record bermasalah
+         tidak menggagalkan record lain (dulu: exception di tengah loop
+         membiarkan sebagian kolom dinding tidak tertulis). */
       if(Array.isArray(raw.houses)){
         for(const h of raw.houses){
-          if(!Array.isArray(h.cells)||!h.cells.length)continue;
-          const rec={
-            cells:h.cells.map(a=>({cx:a[0],cz:a[1]})),
-            door:Array.isArray(h.door)?{cx:h.door[0],cz:h.door[1],side:h.door[2]}
-              :{cx:h.cells[0][0],cz:h.cells[0][1],side:'s'},
-            y:(typeof h.y==='number')?h.y:CFG.SEA};
-          try{this.writeHouseBlocks(rec,false);}catch(e){}
-          this.houses.push(rec);
+          try{
+            if(!Array.isArray(h.cells)||!h.cells.length)continue;
+            const rec={
+              cells:h.cells.map(a=>({cx:a[0],cz:a[1]})),
+              door:Array.isArray(h.door)?{cx:h.door[0],cz:h.door[1],side:h.door[2]}
+                :{cx:h.cells[0][0],cz:h.cells[0][1],side:'s'},
+              y:(typeof h.y==='number')?h.y:CFG.SEA};
+            this.writeHouseBlocks(rec,false);
+            this.houses.push(rec);
+          }catch(err){console.warn('[furni] gagal memuat rumah:',err);}
         }
       }
     }catch(e){}

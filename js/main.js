@@ -331,6 +331,9 @@ const Game={
       if(typeof Capture!=='undefined')Capture.update(dt);
       this.camTarget.set(Player.pos.x,Player.pos.y+1.3,Player.pos.z);
       Cam.update(dt,this.camTarget);
+      /* screen-shake dari ComboVFX dipasang SETELAH Cam.update supaya tidak
+         tertimpa reposisi kamera (lihat player_combo_vfx.updateShake). */
+      if(Player.comboVfx)Player.comboVfx.updateShake(dt);
       UI.updateHUD();
     }catch(err){
       if(!this._errShown){this._errShown=true;

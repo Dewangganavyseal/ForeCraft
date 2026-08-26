@@ -117,9 +117,12 @@ const Player={
     torso.add(this.pl(0.02,0.12,0.02,0x8f6d1c,0.62,0.14));
     torso.add(this.pl(0.05,0.05,0.02,0x4a9fd9,0.56,0.15));
 
-    /* --- lengan: bahu + lengan bawah + tangan --- */
+    /* --- lengan: bahu + lengan bawah + tangan ---
+       Lengan kini ANAK TORSO (y lokal 0.63 = 1.29 dunia) mengikuti prototipe
+       NEW MODEL/New Animation: putaran/condong torso ikut membawa lengan,
+       prasyarat keyframe combo baru (torso.y/z menggerakkan ayunan). */
     const mkArm=(side)=>{
-      const g=new THREE.Group();g.position.set(0.35*side,1.29,0);
+      const g=new THREE.Group();g.position.set(0.35*side,0.63,0);
       /* tutup bahu + lengan atas yang menyempit di siku */
       g.add(this.pl(0.19,0.09,0.20,TUNIC_D,0.01));
       g.add(this.pl(0.20,0.05,0.21,TUNIC_D,0.04));
@@ -150,7 +153,7 @@ const Player={
       /* ibu jari */
       fore.add(this.pl(0.04,0.05,0.06,SKIN_D,-0.29,0.05,0.09*side));
       fore.userData.fist=fist;fore.userData.knuckle=knuckle;
-      g.add(fore);g.userData.fore=fore;body.add(g);return g;
+      g.add(fore);g.userData.fore=fore;torso.add(g);return g;
     };
     const armL=mkArm(1),armR=mkArm(-1);
 
@@ -1178,6 +1181,25 @@ const Player={
     }
     const an=this.animator;
 
+    /* COMBO VFX/SYSTEM (port NEW MODEL/New Animation):
+       - ComboVFX  : trail pedang, slash arc, spark, shockwave, flash, shake.
+       - ComboSystem: mengemudikan animator.update + hit-stop + memicu VFX di
+         frame impact (onHitFrame). Serangan TETAP digerakkan logika game
+         (attack.active/COMBOS); ComboSystem hanya pengamat lewat
+         externalStart() saat animasi combo dimulai. */
+    if(!this.comboSys){
+      if(typeof ComboVFX!=='undefined'&&typeof ComboSystem!=='undefined'){
+        this.comboVfx=new ComboVFX(Game.scene,Cam.cam);
+        this.comboSys=new ComboSystem({animator:this.animator,vfx:this.comboVfx,
+          sword:this.parts.sword||null});
+      }
+    }
+    if(this.comboSys&&this.comboSys.sword!==this.parts.sword)
+      this.comboSys.sword=this.parts.sword;
+    /* satu pintu update animator: lewat ComboSystem bila tersedia (ikut
+       menghitung hit-stop & efek), fallback ke animator langsung */
+    const comboTick=()=>{ if(this.comboSys)this.comboSys.update(dt); else an.update(dt); };
+
     /* SFX langkah kaki: tetap dipicu dari kecepatan gerak (setengah siklus) */
     if(moving&&this.onGround){
       const prevP=this.walkP||0;
@@ -1199,7 +1221,7 @@ const Player={
       else if(moving)              name='ride_move';
       else                         name='ride_idle';
       if(an.currentAnim!==name)an.setAnimation(name);
-      an.update(dt);
+      comboTick();
       this.extraYaw=0;this.moveLean=0;
       return;
     }
@@ -1218,9 +1240,12 @@ const Player={
           :skillKey?this.skillAnimName(this.skillAnim.id)
           :'combo'+(this.attack.combo+1);
         an.setAnimation(name);
+        /* beri tahu ComboSystem bahwa animasi combo dimulai dari driver game
+           (untuk trail pedang + state VFX), tanpa mengubah chaining damage */
+        if(this.comboSys&&/^combo[1-5]$/.test(name))this.comboSys.externalStart(name);
         this._animKey=actionKey;
       }
-      an.update(dt);
+      comboTick();
       this.extraYaw=0;this.moveLean=0;
       return;
     }
@@ -1228,7 +1253,7 @@ const Player={
 
     /* one-shot yang masih bermain (mis. skill lebih panjang dari timer game)
        dibiarkan selesai dulu sebelum kembali ke animasi gerak */
-    if(oneShotPlaying){an.update(dt);this.extraYaw=0;this.moveLean=0;return;}
+    if(oneShotPlaying){comboTick();this.extraYaw=0;this.moveLean=0;return;}
 
     /* ---------- animasi gerak / idle ----------
        Urutan prioritas: renang (di air, pakai pose 'jump' sehingga pemain
@@ -1249,7 +1274,7 @@ const Player={
       else name='idle';
       if(an.currentAnim!==name)an.setAnimation(name);
     }
-    an.update(dt);
+    comboTick();
     /* spin combo/skill kini diputar animator lewat body, jadi yaw mesh bersih */
     this.extraYaw=0;this.moveLean=0;
   },

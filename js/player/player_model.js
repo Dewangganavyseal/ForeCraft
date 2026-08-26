@@ -99,7 +99,7 @@ const PlayerModelBuilder = {
     /* ---------------- LENGAN ---------------- */
     const mkArm = (side) => {
       const g = new THREE.Group();
-      g.position.set(0.35 * side, 1.29, 0);
+      g.position.set(0.35 * side, 0.63, 0);
       g.add(this.pl(0.19, 0.09, 0.20, TUNIC_D, 0.01));
       g.add(this.pl(0.20, 0.05, 0.21, TUNIC_D, 0.04));
       g.add(this.pl(0.17, 0.26, 0.18, TUNIC, -0.13));
@@ -125,15 +125,15 @@ const PlayerModelBuilder = {
       fore.userData.knuckle = knuckle;
       g.add(fore);
       g.userData.fore = fore;
-      body.add(g);
+      torso.add(g);
       return g;
     };
     const armL = mkArm(1), armR = mkArm(-1);
 
     /* ---------------- KEPALA ---------------- */
     const head = new THREE.Group();
-    head.position.set(0, 1.46, 0); // diturunkan 0.04 agar menyatu leher (sinkron js/player.js)
-    body.add(head);
+    head.position.set(0, 0.80, 0); // leher & kepala menyatu di atas torso (y = 0.80)
+    torso.add(head);
     head.add(this.pl(0.4, 0.4, 0.38, SKIN, 0.2));
     head.add(this.pl(0.34, 0.10, 0.34, SKIN_D, 0.04));
     head.add(this.pl(0.26, 0.12, 0.05, SKIN_D, 0.12, 0.19));
@@ -187,7 +187,7 @@ const PlayerModelBuilder = {
     armL.add(armorG.pauldL);
     armR.add(armorG.pauldR);
 
-    this.parts = { legL, legR, armL, armR, head, torso, armorG };
+    this.parts = { legL, legR, armL, armR, head, torso, body, armorG };
     return this.mesh;
   }
 };
