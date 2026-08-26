@@ -109,8 +109,7 @@ const Furni={
 
   /* ukuran satu modul rumah dalam blok (kotak 5×5) */
   HOUSE_SIZE:5,
-  HOUSE_WALL_H:3.0,       // tinggi dinding sebelum atap
-  HOUSE_ROOF_H:1.7,       // tinggi puncak atap dari atas dinding
+  HOUSE_H:4,              // tinggi dinding dalam blok (setara rumah 'hut' desa)
 
 
   /* beristirahat di api unggun: +HP & stamina, jeda 30 dtk per api */
@@ -359,112 +358,128 @@ const Furni={
   cellKey(cx,cz){return cx+','+cz;},
   cellCenter(cx,cz){const S=this.HOUSE_SIZE;return {x:cx*S,z:cz*S};},
 
-  /* Model satu rumah/gugus rumah. `cells` = array {cx,cz} relatif (0,0=asal),
-     `door` = {cx,cz,side} lubang pintu, `originCx/Cz` = sel dunia asal.
-     Semua sel digambar relatif terhadap sel asal supaya mesh berpusat di f.x. */
-  buildHouseMesh(cells,door,originCx,originCz){
-    const S=this.HOUSE_SIZE, WH=this.HOUSE_WALL_H, RH=this.HOUSE_ROOF_H;
-    const beam=this.M('wood',0x6f4a26),
-          plank=this.M('wood',0x9d6a35),
-          plankL=this.M('wood',0xb0804a),
-          wall=this.M('cloth',0xdcc8a0),
-          roof=this.M('wood',0x8a3b2b),
-          roofD=this.M('wood',0x6f2c20),
-          floor=this.M('wood',0x7a5230);
-    const g=new THREE.Group();
-    const has=(cx,cz)=>cells.some(c=>c.cx===cx&&c.cz===cz);
-    const T=0.16;                       // tebal dinding
-    const half=S/2;
+  /* Model satu rumah/gugus rumah — GAYA RUMAH DESA.
+     Rumah desa (worldgen buildVillagePart) tersusun dari blok voxel sungguhan:
+     dinding PLANK berhiaskan tiang sudut & balok atas kayu (WOOD), jendela
+     bolong di baris ke-2 dengan pola selang-seling, pintu bolong selebar 2
+     blok, dan atap bertangga dari blok ROOF yang menjulur 1 blok keluar
+     (lisplang). Builder ini meniru algoritme itu persis, hanya saja digambar
+     sebagai mesh box di atas tanah alih-alih menulis blok ke chunk dunia.
 
-    /* satu segmen dinding sepanjang sumbu, dengan opsi lubang pintu di tengah */
-    const wallSeg=(cx,cz,side)=>{
-      const c=this.cellCenter(cx-originCx,cz-originCz);   // pusat sel relatif
-      const grp=new THREE.Group();
-      /* arah: side 'n'(-z) 's'(+z) 'e'(+x) 'w'(-x) */
-      const horiz=(side==='n'||side==='s');
-      const len=S;
-      const doorHere=door&&door.cx===cx&&door.cz===cz&&door.side===side;
-      /* dinding = tumpukan papan; bila ada pintu, sisakan celah tengah 1.6 lebar & 2.2 tinggi */
-      const segMat=wall;
-      const build=(cxpos,czpos,rotY)=>{
-        const w=new THREE.Group();
-        if(doorHere){
-          const gap=1.7,post=(len-gap)/2;
-          for(const sgn of[-1,1]){
-            const b=this.vb(post,WH,T,segMat);
-            b.position.set(sgn*(gap/2+post/2),WH/2,0);
-            w.add(b);
-          }
-          /* ambang atas pintu */
-          const lintel=this.vb(gap,WH-2.2,T,plank);
-          lintel.position.set(0,2.2+(WH-2.2)/2,0);
-          w.add(lintel);
-          /* bingkai pintu */
-          for(const sgn of[-1,1]){
-            const fr=this.vb(0.12,2.25,T+0.04,beam);
-            fr.position.set(sgn*gap/2,2.25/2,0);w.add(fr);
-          }
-        }else{
-          const b=this.vb(len,WH,T,segMat);
-          b.position.set(0,WH/2,0);w.add(b);
-        }
-        /* rangka kayu: tiang sudut + balok atas */
-        const top=this.vb(len,0.18,T+0.05,beam);top.position.set(0,WH-0.09,0);w.add(top);
-        const bot=this.vb(len,0.16,T+0.05,beam);bot.position.set(0,0.08,0);w.add(bot);
-        w.rotation.y=rotY;
-        return w;
-      };
-      let px=c.x,pz=c.z,rotY=0;
-      if(side==='n'){pz=c.z-half;rotY=0;}
-      else if(side==='s'){pz=c.z+half;rotY=0;}
-      else if(side==='e'){px=c.x+half;rotY=Math.PI/2;}
-      else if(side==='w'){px=c.x-half;rotY=Math.PI/2;}
-      const w=build(px,pz,rotY);
-      w.position.set(px,0,pz);
-      grp.add(w);
-      return grp;
+     Keunggulan pendekatan per-kolom-blok: atap bertangga otomatis MENYATU
+     mengikuti bentuk gabungan mana pun (lurus, L, T) karena kedalaman tangga
+     dihitung dari jarak kolom ke tepi luar footprint gabungan — sama seperti
+     rumus lvl rumah desa untuk kotak.
+
+     cells   : array {cx,cz} sel grid milik rumah ini,
+     door    : {cx,cz,side} lubang pintu ('n'|'s'|'e'|'w'),
+     originCx/Cz : sel asal; mesh dipusatkan di pusat sel asal. */
+  buildHouseMesh(cells,door,originCx,originCz){
+    const S=this.HOUSE_SIZE,H=this.HOUSE_H;
+    /* warna = BLOCK_INFO desa: PLANK 0xb98a55, WOOD 0x6e4f2f, ROOF 0x9c5a3c */
+    const wallMat=this.M('wood',0xb98a55),
+          beamMat=this.M('wood',0x6e4f2f),
+          roofMat=this.M('roof',0x9c5a3c);
+    const g=new THREE.Group();
+
+    /* ---- footprint gabungan dalam koordinat BLOK dunia (integer) ---- */
+    const fp=new Set(),K=(x,z)=>x+','+z;
+    for(const c of cells)
+      for(let dx=0;dx<S;dx++)for(let dz=0;dz<S;dz++)
+        fp.add(K(c.cx*S+dx,c.cz*S+dz));
+    const inF=(x,z)=>fp.has(K(x,z));
+    let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
+    for(const k of fp){const [x,z]=k.split(',').map(Number);
+      if(x<minX)minX=x;if(x>maxX)maxX=x;if(z<minZ)minZ=z;if(z>maxZ)maxZ=z;}
+
+    /* asal mesh = pusat sel asal */
+    const ox=originCx*S+S/2,oz=originCz*S+S/2;
+    const boxAt=(x,y,z,w,h,d,mat)=>{
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+      m.castShadow=true;m.receiveShadow=true;
+      m.position.set(x+0.5-ox,y+h/2,z+0.5-oz);
+      g.add(m);
+      return m;
     };
 
-    /* lantai + langit atap per sel */
-    for(const cell of cells){
-      const c=this.cellCenter(cell.cx-originCx,cell.cz-originCz);
-      /* lantai papan */
-      const fl=this.vb(S,0.12,S,floor);fl.position.set(c.x,0.06,c.z);g.add(fl);
-      /* tiang sudut sel */
-      for(const sx of[-1,1])for(const sz of[-1,1]){
-        const post=this.vb(0.2,WH,0.2,beam);
-        post.position.set(c.x+sx*half,WH/2,c.z+sz*half);g.add(post);
+    /* ---- blok PINTU: dua blok di tengah sisi door (ala desa dc & dc2).
+       Hanya dibolongkan bila kolomnya memang dinding luar; bila setelah merge
+       posisi itu jadi interior, lubang hilang dengan sendirinya. ---- */
+    const doorBlocks=new Set();
+    if(door){
+      const cand=[];
+      if(door.side==='s'||door.side==='n'){
+        const z=door.cz*S+(door.side==='s'?S-1:0);
+        cand.push([door.cx*S+2,z],[door.cx*S+3,z]);
+      }else{
+        const x=door.cx*S+(door.side==='e'?S-1:0);
+        cand.push([x,door.cz*S+2],[x,door.cz*S+3]);
       }
-      /* atap limas per sel: 4 bidang miring bertemu di puncak */
-      const roofG=new THREE.Group();roofG.position.set(c.x,WH,c.z);
-      for(let i=0;i<4;i++){
-        const slope=this.vb(S+0.4,0.14,half+0.3,i%2?roof:roofD);
-        /* miringkan tiap sisi ke puncak */
-        const ang=i*Math.PI/2;
-        const pitch=Math.atan2(RH,half);
-        slope.position.set(Math.sin(ang)*half/2,RH/2,Math.cos(ang)*half/2);
-        slope.rotation.y=ang;
-        slope.rotation.x=(ang===0||ang===Math.PI)?-pitch:0;
-        /* untuk sisi timur/barat pakai rotasi z */
-        if(ang===Math.PI/2||ang===Math.PI*1.5)slope.rotation.z=pitch;
-        roofG.add(slope);
+      for(const [x,z] of cand){
+        /* harus tepat di garis tepi footprint (dinding luar) */
+        const outward=door.side==='s'?!inF(x,z+1):door.side==='n'?!inF(x,z-1):
+                      door.side==='e'?!inF(x+1,z):!inF(x-1,z);
+        if(inF(x,z)&&outward)doorBlocks.add(K(x,z));
       }
-      /* puncak atap */
-      const cap=this.vb(0.4,0.4,0.4,roofD);cap.position.set(c.x,WH+RH,c.z);g.add(cap);
-      g.add(roofG);
     }
 
-    /* DINDING: hanya digambar pada tepi sel yang TIDAK bersebelahan dengan sel
-       lain milik rumah yang sama → sisi dalam terbuka, sisi luar tertutup. */
-    for(const cell of cells){
-      const {cx,cz}=cell;
-      if(!has(cx,cz-1))g.add(wallSeg(cx,cz,'n'));
-      if(!has(cx,cz+1))g.add(wallSeg(cx,cz,'s'));
-      if(!has(cx+1,cz))g.add(wallSeg(cx,cz,'e'));
-      if(!has(cx-1,cz))g.add(wallSeg(cx,cz,'w'));
+    /* ---- DINDING per kolom blok tepi (meniru buildVillagePart) ---- */
+    for(const k of fp){
+      const [x,z]=k.split(',').map(Number);
+      const openN=!inF(x,z-1),openS=!inF(x,z+1),
+            openW=!inF(x-1,z),openE=!inF(x+1,z);
+      if(!(openN||openS||openW||openE))continue;          // bukan dinding
+      const corner=(openW||openE)&&(openN||openS);        // tiang sudut
+      const isDoor=doorBlocks.has(k);
+      /* susun kolom: jenis per baris y (air = bolong jendela/pintu) */
+      const rows=[];
+      for(let wy=0;wy<H;wy++){
+        let t='wall';
+        if(corner)t='beam';
+        else if(isDoor&&wy<2)t='air';                     // lubang pintu (tinggi 2)
+        else if(wy===H-1)t='beam';                        // balok atas
+        else if(wy===1&&(x+z)%2===0)t='air';              // jendela selang-seling
+        rows.push(t);
+      }
+      /* gabungkan baris berurutan sejenis jadi satu box (hemat mesh) */
+      let y0=0;
+      for(let i=1;i<=rows.length;i++){
+        if(i<rows.length&&rows[i]===rows[y0])continue;
+        const t=rows[y0],hh=i-y0;
+        if(t!=='air')boxAt(x,y0,z,1,hh,1,t==='beam'?beamMat:wallMat);
+        y0=i;
+      }
     }
 
-    g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    /* ---- LANTAI papan per sel ---- */
+    for(const c of cells){
+      const bx=c.cx*S,bz=c.cz*S;
+      boxAt(bx,0,bz,S,0.12,S,wallMat);
+    }
+
+    /* ---- ATAP ROOF bertangga + lisplang (meniru roof 'pyramid') ----
+       lvl kolom = min langkah ke tepi luar footprint di 4 arah (rumus desa:
+       floor(min(mx-|lx-mx|,...)) ekuivalen utk kotak; versi ini bekerja untuk
+       bentuk gabungan apa pun). Blok luar yang menempel dapat lvl 0 → atap
+       datar 1 lapis = lisplang menjulur, persis overhang desa. */
+    const runLen=(x,z,dx,dz)=>{let n=0;while(inF(x+dx*n,z+dz*n))n++;return n;};
+    for(const k of fp){
+      const [x,z]=k.split(',').map(Number);
+      const lvl=Math.min(runLen(x,z,1,0),runLen(x,z,-1,0),
+                         runLen(x,z,0,1),runLen(x,z,0,-1))-1;
+      if(lvl>=0)boxAt(x,H,z,1,lvl+1,1,roofMat);           // kolom atap penuh
+    }
+    /* lisplang: blok luar yang menempel footprint (8-neighbor, termasuk sudut
+       — sama seperti ekspansi ov=1 di buildVillagePart) */
+    for(let x=minX-1;x<=maxX+1;x++)for(let z=minZ-1;z<=maxZ+1;z++){
+      if(inF(x,z))continue;
+      let near=false;
+      for(let dx=-1;dx<=1&&!near;dx++)for(let dz=-1;dz<=1&&!near;dz++)
+        if((dx||dz)&&inF(x+dx,z+dz))near=true;
+      if(!near)continue;
+      boxAt(x,H,z,1,1,1,roofMat);
+    }
+
     return g;
   },
 
@@ -1273,7 +1288,7 @@ const Furni={
           const cc=this.cellCenter(cell.cx,cell.cz);
           const dx=cc.x-pos.x,dz=cc.z-pos.z;
           const d=Math.hypot(dx,dz);
-          if(d>3.4||Math.abs(f.y-pos.y)>3.0)continue;
+          if(d>3.4||Math.abs(f.y-pos.y)>4.6)continue;
           let diff=Math.abs(Math.atan2(dx,dz)-facing);
           if(diff>Math.PI)diff=Math.PI*2-diff;
           if(diff>1.4)continue;
