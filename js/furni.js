@@ -353,10 +353,18 @@ const Furni={
      ========================================================================= */
   cellOf(x,z){
     const S=this.HOUSE_SIZE;
-    return {cx:Math.round(x/S),cz:Math.round(z/S)};
+    /* FOOTPRINT sel = blok [cx*S .. cx*S+S-1] → rentang dunia [cx*S, cx*S+S).
+       Pemetaan yang benar adalah FLOOR, bukan round: dengan round, titik di
+       pusat sel (cx*S+2.5) jatuh tepat di batas .5 dan MELONCAT ke sel
+       tetangga — inilah penyebab rumah 'bergeser' saat dipasang. */
+    return {cx:Math.floor(x/S),cz:Math.floor(z/S)};
   },
   cellKey(cx,cz){return cx+','+cz;},
-  cellCenter(cx,cz){const S=this.HOUSE_SIZE;return {x:cx*S,z:cz*S};},
+  /* pusat GEOMETRIS sel: footprint blok menempati [cx*S .. cx*S+S-1],
+     jadi tengahnya = cx*S + S/2. Ghost preview memakai nilai ini sehingga
+     posisinya PERSIS sama dengan rumah yang terpasang (bug dulu: ghost
+     memakai pojok sel → bergeser setengah modul saat terpasang). */
+  cellCenter(cx,cz){const S=this.HOUSE_SIZE;return {x:cx*S+S/2,z:cz*S+S/2};},
 
   /* Model satu rumah/gugus rumah — GAYA RUMAH DESA.
      Rumah desa (worldgen buildVillagePart) tersusun dari blok voxel sungguhan:
@@ -559,20 +567,31 @@ const Furni={
     return null;
   },
   /* permukaan kolom; null bila tidak rata/di air utk bangunan.
-     Semua 25 kolom sel harus bertempatan sama persis & tanah asli. */
+     Semua 25 kolom sel harus bertempatan sama persis & tanah asli.
+     PENGUKURAN melewati B.ROOF (lisplang rumah modular sendiri menjulur 1
+     blok ke sel tetangga — tanpa ini, merge selalu ditolak), tetapi
+     tetap MENOLAK bila ada PLANK/WOOD di kolom (dinding bangunan apa pun:
+     rumah sendiri maupun desa tidak boleh tertimpa). */
   houseSiteCheck(cx,cz){
     const S=this.HOUSE_SIZE;
     let y=null;
     for(let dx=0;dx<S;dx++)for(let dz=0;dz<S;dz++){
       const bx=cx*S+dx,bz=cz*S+dz;
-      const t=World.topY(bx,bz);
-      if(t<=CFG.WATER_Y)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
-      /* puncak kolom harus tanah alami (rumput/tanah/pasir/batu/salju);
-         kalau ada pohon/bangunan/blok lain, topY akan membaca WOOD/LEAF/dll */
-      const under=World.getBlock(bx,t-1,bz);
-      const natural=(under===B.GRASS||under===B.DIRT||under===B.SAND||
-                     under===B.SNOW||under===B.STONE||under===B.FARM);
+      /* turuni kolom: lewati udara/air/atap; berhenti di blok pertama lain */
+      let ty=CFG.WORLD_H-1,base=B.AIR;
+      while(ty>=0){
+        const id=World.getBlock(bx,ty,bz);
+        if(id===B.AIR||id===B.WATER||id===B.ROOF){ty--;continue;}
+        base=id;break;
+      }
+      if(base===B.AIR)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
+      if(ty+1<=CFG.SEA)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
+      if(base===B.PLANK||base===B.WOOD)
+        return {ok:false,reason:'🌳 Ada halangan di petak ini (tebang dulu)'};
+      const natural=(base===B.GRASS||base===B.DIRT||base===B.SAND||
+                     base===B.SNOW||base===B.STONE||base===B.FARM);
       if(!natural)return {ok:false,reason:'🌳 Ada halangan di petak ini (tebang dulu)'};
+      const t=ty+1;
       if(y===null)y=t;
       else if(t!==y)return {ok:false,reason:'⛰️ Daratan tidak rata — ratakan dulu'};
     }
