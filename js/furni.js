@@ -98,11 +98,10 @@ const Furni={
       use(f){Furni.warm(f);}},
 
     /* ---------- RUMAH MODULAR 5×5 ----------
-       Kotak 5×5 blok berdinding + atap limas + satu lubang pintu. Dibangun
-       dari SEGMEN dinding voxel (Furni.buildHouse) sehingga saat dua rumah
-       digabung, segmen dinding yang saling berhadapan bisa dibuka menjadi
-       ruang menyatu (lihat mergeHouse/rebuildHouseMesh). Tidak punya aksi
-       `use`; fungsinya sebagai bangunan yang bisa disusun modular. */
+       Saat dipasang, rumah DITULIS sebagai blok dunia sungguhan
+       (B.PLANK/B.WOOD/B.ROOF) memakai algoritme persis rumah desa — lihat
+       writeHouseBlocks(). DEFS ini hanya menyediakan model ghost utk preview;
+       tidak punya aksi `use` dan tidak masuk Furni.list. */
     house:{n:'Rumah Kayu',e:'🏠',item:'f_house',r:3.4,decor:true,
       build(){return Furni.buildHouse();}},
   },
@@ -338,15 +337,16 @@ const Furni={
   /* =========================================================================
      RUMAH MODULAR 5×5
      -------------------------------------------------------------------------
-     Sebuah rumah adalah satu objek Furni (def:'house') dengan properti khusus:
-       f.cells  : Set berisi "cx,cz" — sel grid dunia (unit HOUSE_SIZE) yang
-                  ditempati rumah ini. Rumah tunggal = 1 sel; setelah digabung
-                  bisa banyak sel.
-       f.group  : id kelompok merge. Rumah dengan group sama = satu kesatuan.
-       f.door   : {cx,cz,side} sel & sisi tempat lubang pintu (hanya 1 per grup).
-     Mesh dibangun ulang (rebuildHouseMesh) tiap kali komposisi sel berubah,
-     sehingga dinding yang menghadap sel tetangga (milik grup yang sama) dibuka
-     dan atapnya menyambung mulus.
+     Rumah modular TIDAK berupa mesh Furni — ia ditulis sebagai BLOK DUNIA
+     sungguhan (B.PLANK/B.WOOD/B.ROOF) lewat writeHouseBlocks(), memakai
+     algoritme yang sama persis dengan rumah desa (buildVillagePart):
+       rec.cells : array {cx,cz} sel grid (unit HOUSE_SIZE) milik gugus ini;
+                   setelah digabung bisa banyak sel.
+       rec.door  : {cx,cz,side} posisi lubang pintu ('n'|'s'|'e'|'w').
+       rec.y     : ketinggian lantai (hasil houseSiteCheck saat dipasang).
+     Karena berupa blok dunia: tampilan identik rumah desa, punya collision,
+     bisa dihancurkan per blok lewat sistem tambang biasa, dan atapnya ikut
+     transparan saat pemain masuk (updateRoof pada B.ROOF).
 
      GRID: dunia dibagi kotak HOUSE_SIZE×HOUSE_SIZE. cellOf(x,z) memetakan
      posisi dunia ke indeks sel. Sel disimpan sebagai string "cx,cz".
@@ -535,101 +535,174 @@ const Furni={
   },
 
   /* =========================================================================
-     PENEMPATAN & PENGGABUNGAN RUMAH MODULAR
+     PENEMPATAN & PENGGABUNGAN RUMAH MODULAR (BLOK SUNGGUHAN)
      -------------------------------------------------------------------------
-     placeHouse(x,z): snap posisi ke grid sel HOUSE_SIZE. Bila sel target (atau
-     sel yang bersebelahan/tumpang tindih) sudah menjadi bagian rumah pemain,
-     sel baru DIGABUNG ke rumah itu (mesh dibangun ulang tanpa dinding dalam,
-     atap menyambung). Bila tidak, dibuat rumah baru 1 sel.
-     Hanya rumah milik pemain (f.def==='house', bukan f.auto) yang bisa
-     digabung — bangunan desa (f.auto) & perabot lain diabaikan. ========= */
-  HOUSE_FLOOR(x,z){
-    /* tinggi lantai rumah = permukaan tanah di pusat sel */
-    const g=World.groundAt(x,z,CFG.WORLD_H);
-    return (g>CFG.WATER_Y)?g:CFG.SEA;
-  },
-  /* cari rumah pemain yang memiliki sel (cx,cz) */
+     Rumah TIDAK lagi berupa mesh Furni — ia ditulis sebagai BLOK DUNIA
+     (B.PLANK/B.WOOD/B.ROOF) memakai algoritme yang sama persis dengan rumah
+     desa (buildVillagePart di worldgen). Keuntungannya:
+       - tampilan identik rumah desa (atlas tekstur + pencahayaan mesher),
+       - collision otomatis (blockedAt menganggap PLANK/WOOD/STONE padat),
+       - bisa dihancurkan per blok lewat sistem tambang biasa,
+       - atap transparan saat pemain masuk (updateRoof bekerja pada B.ROOF).
+     Data modul (cells+door) tetap disimpan ke localStorage supaya blok bisa
+     ditulis ulang setelah game dimuat ulang.
+
+     GRID: dunia dibagi kotak HOUSE_SIZE×HOUSE_SIZE. cellOf(x,z) memetakan
+     posisi dunia ke indeks sel. ============================================= */
+  /* catatan semua rumah modular yang sudah dibangun */
+  houses:[],
+  /* cari record rumah pemain yang memiliki sel (cx,cz) */
   houseAtCell(cx,cz){
     const key=this.cellKey(cx,cz);
-    for(const f of this.list){
-      if(f.def!=='house'||f.auto)continue;
-      if(f.cells&&f.cells.some(c=>this.cellKey(c.cx,c.cz)===key))return f;
-    }
+    for(const h of this.houses)
+      if(h.cells.some(c=>this.cellKey(c.cx,c.cz)===key))return h;
     return null;
+  },
+  /* permukaan kolom; null bila tidak rata/di air utk bangunan.
+     Semua 25 kolom sel harus bertempatan sama persis & tanah asli. */
+  houseSiteCheck(cx,cz){
+    const S=this.HOUSE_SIZE;
+    let y=null;
+    for(let dx=0;dx<S;dx++)for(let dz=0;dz<S;dz++){
+      const bx=cx*S+dx,bz=cz*S+dz;
+      const t=World.topY(bx,bz);
+      if(t<=CFG.WATER_Y)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
+      /* puncak kolom harus tanah alami (rumput/tanah/pasir/batu/salju);
+         kalau ada pohon/bangunan/blok lain, topY akan membaca WOOD/LEAF/dll */
+      const under=World.getBlock(bx,t-1,bz);
+      const natural=(under===B.GRASS||under===B.DIRT||under===B.SAND||
+                     under===B.SNOW||under===B.STONE||under===B.FARM);
+      if(!natural)return {ok:false,reason:'🌳 Ada halangan di petak ini (tebang dulu)'};
+      if(y===null)y=t;
+      else if(t!==y)return {ok:false,reason:'⛰️ Daratan tidak rata — ratakan dulu'};
+    }
+    return {ok:true,y};
+  },
+  /* ---- tulis/hapus satu gugus rumah ke dunia, meniru buildVillagePart ---- */
+  writeHouseBlocks(rec,erase){
+    const S=this.HOUSE_SIZE,H=this.HOUSE_H;
+    const cells=rec.cells,door=rec.door,h=rec.y;
+    const fp=new Set(),K=(x,z)=>x+','+z;
+    for(const c of cells)
+      for(let dx=0;dx<S;dx++)for(let dz=0;dz<S;dz++)
+        fp.add(K(c.cx*S+dx,c.cz*S+dz));
+    const inF=(x,z)=>fp.has(K(x,z));
+    let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9;
+    for(const k of fp){const [x,z]=k.split(',').map(Number);
+      if(x<minX)minX=x;if(x>maxX)maxX=x;if(z<minZ)minZ=z;if(z>maxZ)maxZ=z;}
+    const put=(x,y,z,id)=>{
+      const cur=World.getBlock(x,y,z);
+      if(erase){if(cur===B.PLANK||cur===B.WOOD||cur===B.ROOF)World.setBlock(x,y,z,B.AIR);}
+      else World.setBlock(x,y,z,id);
+    };
+    /* blok pintu: dua blok tengah sisi door (ala desa dc & dc2) */
+    const doorBlocks=new Set();
+    if(door&&!erase){
+      const cand=[];
+      if(door.side==='s'||door.side==='n'){
+        const z=door.cz*S+(door.side==='s'?S-1:0);
+        cand.push([door.cx*S+2,z],[door.cx*S+3,z]);
+      }else{
+        const x=door.cx*S+(door.side==='e'?S-1:0);
+        cand.push([x,door.cz*S+2],[x,door.cz*S+3]);
+      }
+      for(const [x,z] of cand){
+        const outward=door.side==='s'?!inF(x,z+1):door.side==='n'?!inF(x,z-1):
+                      door.side==='e'?!inF(x+1,z):!inF(x-1,z);
+        if(inF(x,z)&&outward)doorBlocks.add(K(x,z));
+      }
+    }
+    /* lantai + dinding per kolom footprint.
+       Pola jendela memakai koordinat LOKAL modul (0..S-1, seperti lx/lz desa)
+       supaya polanya identik rumah desa di posisi dunia mana pun. */
+    const base=new Map();
+    for(const c of cells)
+      for(let dx=0;dx<S;dx++)for(let dz=0;dz<S;dz++)
+        base.set(K(c.cx*S+dx,c.cz*S+dz),[c.cx,c.cz]);
+    for(const k of fp){
+      const [x,z]=k.split(',').map(Number);
+      const [bcx,bcz]=base.get(k);
+      const lx=x-bcx*S,lz=z-bcz*S;
+      put(x,h-1,z,B.PLANK);                                 // lantai papan
+      const openN=!inF(x,z-1),openS=!inF(x,z+1),
+            openW=!inF(x-1,z),openE=!inF(x+1,z);
+      if(!(openN||openS||openW||openE))continue;            // interior
+      const corner=(openW||openE)&&(openN||openS);          // tiang sudut kayu
+      for(let wy2=0;wy2<H;wy2++){
+        let id=B.PLANK;
+        if(corner)id=B.WOOD;                                // tiang sudut
+        else if(doorBlocks.has(k)&&wy2<2)id=B.AIR;          // lubang pintu
+        else if(wy2===H-1)id=B.WOOD;                        // balok atas
+        else if(wy2===1&&(lx+lz)%2===0)id=B.AIR;            // jendela
+        put(x,h+wy2,z,id);
+      }
+    }
+    /* atap ROOF bertangga + lisplang ov=1 (rumus desa, umum utk bentuk apa pun) */
+    const runLen=(x,z,dx,dz)=>{let n=0;while(inF(x+dx*n,z+dz*n))n++;return n;};
+    for(const k of fp){
+      const [x,z]=k.split(',').map(Number);
+      const lvl=Math.min(runLen(x,z,1,0),runLen(x,z,-1,0),
+                         runLen(x,z,0,1),runLen(x,z,0,-1))-1;
+      for(let kk=0;kk<=lvl;kk++)put(x,h+H+kk,z,B.ROOF);
+    }
+    for(let x=minX-1;x<=maxX+1;x++)for(let z=minZ-1;z<=maxZ+1;z++){
+      if(inF(x,z))continue;
+      let near=false;
+      for(let dx=-1;dx<=1&&!near;dx++)for(let dz=-1;dz<=1&&!near;dz++)
+        if((dx||dz)&&inF(x+dx,z+dz))near=true;
+      if(near)put(x,h+H,z,B.ROOF);                          // lisplang
+    }
   },
   placeHouse(x,z){
     const {cx,cz}=this.cellOf(x,z);
-    /* sel sudah ditempati rumah sendiri → tolak (tidak menambah apa-apa) */
     if(this.houseAtCell(cx,cz)){
       UI.toast('🏠 Sudah ada rumah di petak ini');
       return null;
     }
-    /* cari SEMUA rumah tetangga (sel bersisian). Bila lebih dari satu, sel baru
-       menjembatani beberapa rumah → semuanya digabung jadi satu kesatuan. */
+    const site=this.houseSiteCheck(cx,cz);
+    if(!site.ok){UI.toast(site.reason);return null;}
+    /* kumpulkan rumah tetangga (sel bersisian) → merge jadi satu kesatuan */
     const hosts=[];
     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const h=this.houseAtCell(cx+dx,cz+dz);
-      if(h&&hosts.indexOf(h)<0)hosts.push(h);
+      const hh=this.houseAtCell(cx+dx,cz+dz);
+      if(hh&&hosts.indexOf(hh)<0)hosts.push(hh);
     }
     if(hosts.length){
       const host=hosts[0];
+      /* hapus blok lama gugus host sebelum menulis komposisi baru supaya
+         dinding batas lama ikut terbuka & atap tersusun ulang */
+      this.writeHouseBlocks(host,true);
       host.cells.push({cx,cz});
-      /* serap rumah tetangga lain ke host (merge grup) */
       for(let i=1;i<hosts.length;i++){
         const other=hosts[i];
+        this.writeHouseBlocks(other,true);
         for(const c of other.cells)
           if(!host.cells.some(hc=>hc.cx===c.cx&&hc.cz===c.cz))host.cells.push(c);
-        /* buang objek other dari dunia & daftar */
-        const idx=this.list.indexOf(other);
-        if(idx>=0)this.list.splice(idx,1);
-        if(other.mesh){
-          this.scene.remove(other.mesh);
-          other.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
-        }
+        other.cells=[];                                     // kosongkan
+        const oi=this.houses.indexOf(other);
+        if(oi>=0)this.houses.splice(oi,1);
       }
-      this.rebuildHouse(host);
+      this.writeHouseBlocks(host,false);
       this.save();
       UI.toast('🏠 Rumah digabung — total '+host.cells.length+' petak');
       Sfx.craft&&Sfx.craft();
       return host;
     }
-    /* rumah baru 1 sel: pintu menghadap selatan (+z) secara default */
-    const c=this.cellCenter(cx,cz);
-    const y=this.HOUSE_FLOOR(c.x,c.z);
-    const f={id:this.uid++,def:'house',x:c.x,y,z:c.z,yaw:0,mesh:null,
-      auto:false,cells:[{cx,cz}],door:{cx,cz,side:'s'}};
-    this.rebuildHouse(f);
-    this.list.push(f);
+    /* rumah baru 1 sel, pintu selatan (+z) */
+    const rec={cells:[{cx,cz}],door:{cx,cz,side:'s'},y:site.y};
+    this.writeHouseBlocks(rec,false);
+    this.houses.push(rec);
     this.save();
-    return f;
+    return rec;
   },
-  /* bangun/segarkan mesh rumah dari daftar selnya. Sel asal = sel pertama;
-     mesh dipusatkan di sel asal (f.x,f.z). */
-  rebuildHouse(f){
-    if(f.mesh){
-      this.scene.remove(f.mesh);
-      f.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
-    }
-    const origin=f.cells[0];
-    const oc=this.cellCenter(origin.cx,origin.cz);
-    f.x=oc.x;f.z=oc.z;
-    f.y=this.HOUSE_FLOOR(oc.x,oc.z);
-    const mesh=this.buildHouseMesh(f.cells,f.door,origin.cx,origin.cz);
-    mesh.position.set(f.x,f.y,f.z);
-    this.scene.add(mesh);
-    f.mesh=mesh;
-  },
+
   remove(f,drop){
     const i=this.list.indexOf(f);
     if(i<0)return;
     this.list.splice(i,1);
     this.scene.remove(f.mesh);
     f.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
-    if(drop&&this.DEFS[f.def]){
-      /* rumah gabungan menjatuhkan 1 item per sel yang dibangun */
-      const qty=(f.def==='house'&&f.cells)?f.cells.length:1;
-      RPG.addItem(this.DEFS[f.def].item,qty);
-    }
+    if(drop&&this.DEFS[f.def])RPG.addItem(this.DEFS[f.def].item,1);
     /* peti dibongkar → isinya tidak boleh ikut hilang */
     if(drop&&f.inv)for(const s of f.inv)if(s)RPG.addItem(s.id,s.n);
     if(this.chest===f){this.chest=null;if(UI.open==='chest')UI.toggle('chest');}
@@ -741,18 +814,14 @@ const Furni={
       valid=false;reason=`Terlalu jauh dari pemain (maks ${this.PLACE_R} blok)`;
     }
     else if(this.placing==='house'){
-      /* RUMAH: petak digeser ke grid. Boleh dempet/menyatu dengan rumah sendiri
+      /* RUMAH: petak digeser ke grid. Boleh dempet dengan rumah sendiri
          (justru itu tujuannya), tapi TIDAK boleh menimpa sel rumah yang sudah
-         ada, dan tidak boleh menimpa bangunan desa. */
+         ada, dan tanah harus rata di seluruh 25 kolom. */
       const {cx,cz}=this.cellOf(p.x,p.z);
       if(this.houseAtCell(cx,cz)){valid=false;reason='🏠 Petak ini sudah jadi rumah';}
       else{
-        const c=this.cellCenter(cx,cz);
-        if(this.HOUSE_FLOOR(c.x,c.z)<CFG.WATER_Y){valid=false;reason='🌊 Tidak bisa membangun di air';}
-        /* tolak bila menutup rumah desa (auto) di sel yang sama */
-        else for(const f of this.list){
-          if(f.auto&&f.def==='house'){/* desa tak punya def house, aman */}
-        }
+        const site=this.houseSiteCheck(cx,cz);
+        if(!site.ok){valid=false;reason=site.reason;}
       }
       return {valid,reason};
     }
@@ -782,8 +851,8 @@ const Furni={
     if(this.placing==='house'){
       const {cx,cz}=this.cellOf(p.x,p.z);
       const c=this.cellCenter(cx,cz);
-      const gy=this.HOUSE_FLOOR(c.x,c.z);
-      this.ghost.position.set(c.x,gy,c.z);
+      const site=this.houseSiteCheck(cx,cz);
+      this.ghost.position.set(c.x,site.ok?site.y:(c.y!==undefined?c.y:Player.pos.y),c.z);
       this.ghost.rotation.y=0;
     }else{
       this.ghost.position.set(p.x,p.y>=0?p.y:Player.pos.y,p.z);
@@ -1277,25 +1346,10 @@ const Furni={
      menjatuhkan kembali itemnya, sehingga isi rumah desa bisa dipanen.
      ========================================================================= */
   HP:{table:14,chair:10,bed:18,chest:24,boat:20,board:14,
-    workbench:16,anvil:30,stove:24,campfire:10,house:40},
+    workbench:16,anvil:30,stove:24,campfire:10},
   hitNearest(pos,facing){
     let best=null,bd=1e9;
     for(const f of this.list){
-      /* RUMAH: jarak dihitung ke pusat SEL terdekat (bukan pusat rumah),
-         supaya dinding rumah besar tetap bisa dipukul dari dekat. */
-      if(f.def==='house'&&f.cells){
-        for(const cell of f.cells){
-          const cc=this.cellCenter(cell.cx,cell.cz);
-          const dx=cc.x-pos.x,dz=cc.z-pos.z;
-          const d=Math.hypot(dx,dz);
-          if(d>3.4||Math.abs(f.y-pos.y)>4.6)continue;
-          let diff=Math.abs(Math.atan2(dx,dz)-facing);
-          if(diff>Math.PI)diff=Math.PI*2-diff;
-          if(diff>1.4)continue;
-          if(d<bd){bd=d;best=f;best._hitCell=cell;}
-        }
-        continue;
-      }
       const dx=f.x-pos.x,dz=f.z-pos.z;
       const d=Math.hypot(dx,dz);
       if(d>2.2||Math.abs(f.y-pos.y)>2.2)continue;
@@ -1326,19 +1380,6 @@ const Furni={
     }
     if(this.sitting===f)this.stand();
     if(this.riding===f)this.disembark();
-    /* RUMAH gabungan: hancurkan hanya SATU sel yang dipukul; sisanya tetap.
-       Sel yang dihancurkan menjatuhkan 1 modul rumah. */
-    if(f.def==='house'&&f.cells&&f.cells.length>1&&f._hitCell){
-      const hc=f._hitCell;
-      f.cells=f.cells.filter(cc=>!(cc.cx===hc.cx&&cc.cz===hc.cz));
-      f._hitCell=null;f.hp=undefined;
-      this.rebuildHouse(f);
-      RPG.addItem(this.DEFS.house.item,1);
-      FX.debris(c,col,10,3);Sfx.smash();
-      UI.toast('🪓 Satu petak rumah dibongkar');
-      this.save();
-      return true;
-    }
     FX.debris(c,col,12,3.2);
     Sfx.smash();
     UI.toast('🪓 '+this.DEFS[f.def].n+' hancur');
@@ -1354,19 +1395,18 @@ const Furni={
           const o={d:f.def,x:f.x,y:f.y,z:f.z,r:f.yaw};
           /* isi peti ikut disimpan (slot kosong tetap null agar posisinya tetap) */
           if(f.inv)o.inv=f.inv.map(s=>s?{i:s.id,n:s.n}:null);
-          /* RUMAH modular: simpan daftar sel & posisi pintu */
-          if(f.def==='house'&&f.cells){
-            o.cells=f.cells.map(c=>[c.cx,c.cz]);
-            if(f.door)o.door=[f.door.cx,f.door.cz,f.door.side];
-          }
           return o;
         });
+      /* RUMAH modular (blok dunia): simpan daftar sel + pintu + ketinggian */
+      const houses=this.houses.map(h=>({
+        cells:h.cells.map(c=>[c.cx,c.cz]),
+        door:[h.door.cx,h.door.cz,h.door.side],y:h.y}));
 
       /* isi peti desa yang masih dimuat ikut disegarkan sebelum ditulis */
       for(const f of this.list)
         if(f.akey&&f.inv)this.vaults[f.akey]=f.inv.map(s=>s?{i:s.id,n:s.n}:null);
       localStorage.setItem(this.SAVE_KEY,
-        JSON.stringify({f:data,dead:this.dead,vaults:this.vaults}));
+        JSON.stringify({f:data,dead:this.dead,vaults:this.vaults,houses}));
     }catch(e){}
   },
   load(){
@@ -1374,36 +1414,42 @@ const Furni={
       const raw=JSON.parse(localStorage.getItem(this.SAVE_KEY));
       if(!raw)return;
       /* format lama = array perabot saja; format baru = objek bertag */
-      const data=Array.isArray(raw)?raw:raw.f;
-      if(!Array.isArray(data))return;
-      if(raw&&!Array.isArray(raw)){
-        if(raw.dead)this.dead=raw.dead;
-        if(raw.vaults)this.vaults=raw.vaults;
-      }
-      for(const f of data){
-        /* RUMAH modular: bangun ulang langsung dari sel tersimpan */
-        if(f.d==='house'&&Array.isArray(f.cells)){
-          const cells=f.cells.map(a=>({cx:a[0],cz:a[1]}));
-          const door=f.door?{cx:f.door[0],cz:f.door[1],side:f.door[2]}
-            :{cx:cells[0].cx,cz:cells[0].cz,side:'s'};
-          const hf={id:this.uid++,def:'house',x:f.x,y:f.y,z:f.z,yaw:0,mesh:null,
-            auto:false,cells,door};
-          this.rebuildHouse(hf);
-          this.list.push(hf);
-          continue;
+      if(Array.isArray(raw)){this.applyFurniList(raw);return;}
+      if(raw.dead)this.dead=raw.dead;
+      if(raw.vaults)this.vaults=raw.vaults;
+      this.applyFurniList(raw.f);
+      /* RUMAH modular: tulis ulang blok ke dunia dari record tersimpan.
+         setBlock akan memaksa generate data chunk yang belum termuat. */
+      if(Array.isArray(raw.houses)){
+        for(const h of raw.houses){
+          if(!Array.isArray(h.cells)||!h.cells.length)continue;
+          const rec={
+            cells:h.cells.map(a=>({cx:a[0],cz:a[1]})),
+            door:Array.isArray(h.door)?{cx:h.door[0],cz:h.door[1],side:h.door[2]}
+              :{cx:h.cells[0][0],cz:h.cells[0][1],side:'s'},
+            y:(typeof h.y==='number')?h.y:CFG.SEA};
+          try{this.writeHouseBlocks(rec,false);}catch(e){}
+          this.houses.push(rec);
         }
-        const o=this.place(f.d,f.x,f.y,f.z,f.r,false);
-        /* pulihkan isi peti pada slot aslinya */
-        if(o&&o.inv&&Array.isArray(f.inv))
-          for(let i=0;i<o.inv.length&&i<f.inv.length;i++)
-            o.inv[i]=f.inv[i]?{id:f.inv[i].i,n:f.inv[i].n}:null;
       }
-
     }catch(e){}
+  },
+  applyFurniList(data){
+    if(!Array.isArray(data))return;
+    for(const f of data){
+      const o=this.place(f.d,f.x,f.y,f.z,f.r,false);
+      /* pulihkan isi peti pada slot aslinya */
+      if(o&&o.inv&&Array.isArray(f.inv))
+        for(let i=0;i<o.inv.length&&i<f.inv.length;i++)
+          o.inv[i]=f.inv[i]?{id:f.inv[i].i,n:f.inv[i].n}:null;
+    }
   },
   clearSave(){
     try{localStorage.removeItem(this.SAVE_KEY);}catch(e){}
     this.dead={};this.vaults={};
+    /* hapus blok rumah modular dari dunia */
+    for(const h of this.houses)this.writeHouseBlocks(h,true);
+    this.houses=[];
     for(let i=this.list.length-1;i>=0;i--)
       if(!this.list[i].auto)this.remove(this.list[i],false);
   },

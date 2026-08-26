@@ -612,5 +612,7 @@ const I18N_PHRASE={
   'Petak ini sudah jadi rumah':['This plot is already a house','此格已是房屋','この区画はすでに家だ'],
   'Tidak bisa membangun di air':['Cannot build on water','无法在水上建造','水上には建てられない'],
   'Satu petak rumah dibongkar':['One house plot dismantled','拆除了一格房屋','家を一区画取り壊した'],
+  'Ada halangan di petak ini (tebang dulu)':['Something blocks this plot (clear it first)','此格有障碍物（请先清除）','この区画に障害物がある（先に取り除け）'],
+  'Daratan tidak rata — ratakan dulu':['Uneven ground — flatten it first','地面不平 — 请先整平','地面が平らでない — 先に整えよう'],
 };
 
