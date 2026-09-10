@@ -517,7 +517,7 @@ const MainMenu={
     this.el.innerHTML=`
       <div class="menu-wrap">
         <h1 class="menu-title">FORECRAFT</h1>
-        <div class="menu-sub">Voxel Survival</div>
+        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.3'}</div>
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>

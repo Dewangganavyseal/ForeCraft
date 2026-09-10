@@ -30,6 +30,7 @@ tes_air.html
 flow_generator.py
 promopt.txt
 .agents/
+.opencode/
 scripts/studio.js
 
 # ============ OS / Editor ============
