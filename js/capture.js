@@ -13,18 +13,23 @@
    ============================================================================= */
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
-  scorpion:'🦂',lizard:'🦎',dragon:'🐉',cow:'🐄',horse:'🐎'};
+  scorpion:'🦂',lizard:'🦎',dragon:'🐉',cow:'🐄',horse:'🐎',
+  kumbang:'🪲',yeti:'❄️',semut:'🐜'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
   rabbit:'carrot',scorpion:'meat',lizard:'meat',cow:'wheat',horse:'wheat',
-  dragon:'cmeat'};
+  dragon:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard'};
 
+/* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
+   reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
-  scorpion:180,lizard:220,golem:320,dragon:520};
+  scorpion:180,lizard:220,golem:320,dragon:520,
+  kumbang:240,yeti:300,semut:150,reaper:360};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
-  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3};
+  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,
+  kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45};
 
 /* panjang maksimum tali saat tarik-tarikan.
    Dikurangi 11 -> 8 supaya mob tidak menjauh terlalu jauh saat meronta;
@@ -44,6 +49,10 @@ const Capture={
   _pendingDeploy:-1,
   _pendingT:0,
   _teamT:0,
+  /* Pengali ukuran PET yang berasal dari mini boss, terhadap ukuran alami
+     modelnya. 1.18 = sedikit lebih besar dari mob biasa (1.0) tapi jauh di
+     bawah skala boss (1.75+). Lihat catatan di deploy(). */
+  PET_BOSS_SCALE:1.18,
 
   /* ---------- init DOM & rope ---------- */
   init(){
@@ -157,22 +166,25 @@ const Capture={
     if(this.ropeLine.parent!==Game.scene)Game.scene.add(this.ropeLine);
   },
 
-  /* ---------- skill catch ---------- */
+  /* ---------- skill catch ----------
+     Nilai per-rank dibagi mengikuti max rank baru (lihat catatan di SKILLS,
+     config.js): catch_pow 3×20% → 6×10%, catch_rope 3×15% → 6×7.5%,
+     catch_calm 2×15% → 4×7.5%. Total di rank maksimum tetap sama. */
   sk(id){return (typeof RPG!=='undefined'&&RPG.skillVal)?RPG.skillVal(id):0;},
   canCatch(){return true;},
   drainMult(){
-    let v=1+0.2*this.sk('catch_pow');
+    let v=1+0.10*this.sk('catch_pow');
     if(this.sk('catcher')>0)v+=0.10;
     if(this.sk('catch_master')>0)v+=0.25;
     return v;
   },
   tensionMult(){
-    let v=Math.max(0.25,1-0.15*this.sk('catch_rope'));
+    let v=Math.max(0.25,1-0.075*this.sk('catch_rope'));
     if(this.sk('catcher')>0)v*=0.9;
     if(this.sk('catch_master')>0)v*=0.9;
     return v;
   },
-  calmMult(){return Math.max(0.4,1-0.15*this.sk('catch_calm'));},
+  calmMult(){return Math.max(0.4,1-0.075*this.sk('catch_calm'));},
 
   mobName(type){return (typeof MOB_NAME!=='undefined'&&MOB_NAME[type])?MOB_NAME[type]:type;},
   petFood(type){return PET_FOOD[type]||'bread';},
@@ -188,6 +200,7 @@ const Capture={
     let best=null,bd=10;
     for(const m of Monsters.list){
       if(m.dead||m.pet||m.catchFailed||m.catchActive)continue;
+      if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part')continue; // kelabang tidak bisa ditangkap
       if(m.hp/m.maxhp>0.2001)continue;
       const d=m.pos.distanceTo(Player.pos);
       if(d<bd){best=m;bd=d;}
@@ -199,6 +212,7 @@ const Capture={
   start(m){
     if(this.active)return;
     if(!m||m.dead)return;
+    if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part'){UI.toast('🚫 Kelabang tidak bisa ditangkap!');return;}
     if(!this.canCatch()){UI.toast('🪢 Pelajari skill Pawang Pemula dulu!');return;}
     if(RPG.mobSlots.findIndex(s=>!s)<0){UI.toast('🐾 Slot mob penuh — jual/lepaskan dulu');return;}
     const slot=RPG.hotbar[RPG.sel];
@@ -406,7 +420,14 @@ const Capture={
        Semakin tinggi bintang, semakin tinggi stat pet. */
     let stars=this.rollStars(!!m.boss);
     const power=1+(stars-1)*0.22+rand(0,0.08)+(m.boss?0.25:0);
-    const baseDmg=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].dmg:8);
+    /* Damage dasar mengikuti LEVEL mob yang ditangkap, sama seperti HP-nya
+       (pet.maxhp diturunkan dari m.maxhp yang sudah berlevel). Tanpa pengali
+       ini, menangkap kumbang Lv 50 di Tanah Merah menghasilkan pet ber-HP 800+
+       tapi damage-nya masih 16 seperti kumbang Lv 1 — tebal tapi tak berguna.
+       Yang dipakai tetap dmg DASAR tipe (bukan m.dmg) supaya pet dari mini boss
+       tidak ikut membawa pengali boss 2.2x; bonus boss sudah ada di `power`. */
+    const lm=(typeof Monsters.lvlStatMul==='function')?Monsters.lvlStatMul(m.lvl||1):1;
+    const baseDmg=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].dmg:8)*lm;
 
     const pet={
       type:m.type,
@@ -551,10 +572,39 @@ const Capture={
     m.catchFailed=false;
     m.alert=0;
     m.state='wander';
-    /* naga tangkapan menyusut 50% */
+    /* ---------- UKURAN PET DARI MINI BOSS ----------
+       Mob yang ditangkap saat berwujud mini boss membawa `pet.boss=true`, dan
+       Monsters.make(...,true) memberinya skala boss penuh (1.75x ukuran alami,
+       atau lebih untuk model berskala kecil). Sebagai PELIHARAAN itu kelewat
+       besar: reaper boss menjadi setinggi 5 blok, memenuhi layar, menutupi
+       pandangan pemain, dan tersangkut di pintu rumah.
+
+       Pet boss sekarang memakai PET_BOSS_SCALE (1.18x ukuran mob biasa) —
+       masih terlihat jelas lebih besar & berwibawa daripada versi liarnya,
+       tapi tetap wajar untuk berjalan di samping pemain. Stat-nya TIDAK
+       disentuh: kekuatannya tetap dari data pet (power/bintang/level).
+
+       Dihitung dari m.sizeMul (pengali terhadap ukuran alami model, diisi
+       make()) supaya berlaku benar untuk semua tipe: golem yang skala alaminya
+       0.41 maupun serigala yang 1.0. */
+    if(pet.boss&&m.sizeMul>this.PET_BOSS_SCALE){
+      const k=this.PET_BOSS_SCALE/m.sizeMul;
+      m.mesh.scale.multiplyScalar(k);
+      m.baseScale=(m.baseScale||1)*k;
+      m.sizeMul=this.PET_BOSS_SCALE;
+      /* radius tabrakan ikut menyusut supaya hitbox & tubuh tetap sejalan */
+      const T=Monsters.TYPES[m.type];
+      if(T)m.r=T.r*this.PET_BOSS_SCALE;
+      /* penanda titik kuning boss dibuang: pet bukan ancaman yang perlu ditandai */
+      if(m.parts&&m.parts.bossDot){
+        m.parts.bossDot.visible=false;
+      }
+    }
+    /* naga tangkapan menyusut 50% (model naga sudah raksasa dari sananya) */
     if(pet.type==='dragon'){
       m.mesh.scale.multiplyScalar(0.5);
       m.baseScale=(m.baseScale||1)*0.5;
+      m.sizeMul=(m.sizeMul||1)*0.5;
     }
     Monsters.list.push(m);
     this.pet=m;
@@ -597,6 +647,30 @@ const Capture={
      Monsters.petAttack(). Serangan ditargetkan ke monster musuh terdekat,
      tidak pernah ke pemain. */
   petAI(m,dt,dp){
+    /* ---------- PET TELEPORT SAAT TERTINGGAL ----------
+       Rekan tim NPC punya NPC.TELEPORT_R (34 blok) — bila tertinggal lebih jauh
+       dari itu, mereka dipanggil ulang ke belakang pemain. Pet tidak punya
+       mekanisme seperti itu, jadi bila pemain sprint panjang pet akan tertinggal
+       dan tidak pernah mengejar. Sekarang pet diperlakukan sama: melewati
+       ambang, ia teleport ke belakang pemain. Tidak dipakai saat pet sedang
+       bertarung (ada target & jarak ke target dekat) supaya tidak melepaskan
+       pertarungan yang sedang berjalan. */
+    if(dp>34&&!m.dead){
+      const target=m.target&&!m.target.dead?m.target:null;
+      const busy=target&&target.pos.distanceTo(m.pos)<14;
+      if(!busy){
+        const a=Cam.yaw+Math.PI;
+        const nx=Player.pos.x+Math.sin(a)*2,nz=Player.pos.z+Math.cos(a)*2;
+        const g=World.groundAt(nx,nz,Player.pos.y+3);
+        m.pos.set(nx,Math.max(g,Player.pos.y-1),nz);
+        m.vel.set(0,0,0);
+        m.mesh.position.copy(m.pos);
+        FX.ring(nx,Math.max(g,Player.pos.y-1)+0.1,nz,0x9fd7ff,0.7,3);
+        if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+        return;
+      }
+    }
+
     if(this.riding&&this.pet===m)return;
     if(m.flash>0)m.flash=Math.max(0,m.flash); // flash diurus Monsters.update
 
@@ -604,16 +678,60 @@ const Capture={
     let target=null,bd=9.5;
     for(const o of Monsters.list){
       if(o===m||o.dead||o.pet||o.catchActive)continue;
+      if(o.type==='kelabang_part')continue; // ruas kelabang terlepas bukan target
       if(typeof Monsters.isAnimal==='function'&&Monsters.isAnimal(o))continue;
       const d=o.pos.distanceTo(m.pos);
       if(d<bd){bd=d;target=o;}
+    }
+
+    /* ---------- MOB BERJURUS BERTIMELINE (kumbang / yeti / semut / reaper) ----------
+       Jurus mereka berjalan lewat mesin fase (m.kumAtk / m.yAct / m.aAct / m.rAct).
+       Selama jurus berlangsung, mesin itu yang memegang kendali gerak & arah
+       hadap — persis seperti versi liarnya (lihat Monsters.aiKumbang/aiYeti/
+       aiSemut/aiReaper). Tanpa cabang ini, jurus yang dimulai petAttack() tidak
+       pernah maju sehingga pet hanya mematung setelah serangan pertama. */
+    {
+      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget;
+      const live=(foe&&!foe.dead)?foe:target;
+      const ref=live||Player;
+      const ang=Math.atan2(ref.pos.x-m.pos.x,ref.pos.z-m.pos.z);
+      const d=live?live.pos.distanceTo(m.pos):dp;
+      if(m.kumAtk&&typeof Monsters.kumbangAtk==='function'){
+        Monsters.kumbangAtk(m,dt,d,ang);return;
+      }
+      if(m.yAct&&typeof Monsters.yetiAct==='function'){
+        Monsters.yetiAct(m,dt,d,ang,live);return;
+      }
+      if(m.aAct&&typeof Monsters.semutAtk==='function'){
+        Monsters.semutAtk(m,dt,d,ang,live);return;
+      }
+      if(m.rAct&&typeof Monsters.reaperAct==='function'){
+        Monsters.reaperAct(m,dt,d,ang,live);return;
+      }
     }
 
     if(target&&dp<20){
       const to=new THREE.Vector3().subVectors(target.pos,m.pos).setY(0);
       const ang=Math.atan2(to.x,to.z);
       m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ang,dt*7);
-      if(bd>1.8){
+      /* kumbang punya jurus jarak jauh (lempar batu) & jarak dekat (seruduk),
+         keduanya diundi. Ia berhenti di jarak menengah supaya kedua jurusnya
+         punya peluang dipakai — merapat seperti pet lain membuat seruduk saja
+         yang keluar. Yeti sama: lompat+hantam butuh ruang ancang-ancang, dan
+         semut butuh jarak untuk terjangan cepatnya. Reaper juga: panggilan 3
+         arwahnya hanya berguna bila ia menjaga jarak menengah.
+         Naga, golem, dan lizard ikut ditambahkan: semburan api, hantaman tanah,
+         serta sapuan ekor & semburan asam semuanya punya jangkauan sendiri —
+         kalau pet merapat sampai 1.8 blok seperti dulu, jurus-jurus itu tidak
+         pernah terpilih dan pet hanya mencakar/menggigit. */
+      const holdR=(m.type==='kumbang')?4.0:
+                  (m.type==='yeti')?3.6:
+                  (m.type==='semut')?3.2:
+                  (m.type==='reaper')?3.4:
+                  (m.type==='dragon')?3.4:
+                  (m.type==='golem')?3.0:
+                  (m.type==='lizard')?2.6:1.8;
+      if(bd>holdR){
         const spd=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
         m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(7*dt,0,1));
         m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(7*dt,0,1));
@@ -625,22 +743,50 @@ const Capture={
       return;
     }
 
-    /* ikuti pemain */
-    if(dp>3.4){
-      const to=new THREE.Vector3().subVectors(Player.pos,m.pos).setY(0);
+    /* ikuti pemain / tunggu di luar jika pemain masuk ke dalam rumah */
+    let targetPos=Player.pos;
+    let waitForPlayer=false;
+    if(typeof WGEN!=='undefined'&&WGEN.buildingAt){
+      const pb=WGEN.buildingAt(Player.pos.x,Player.pos.z,0);
+      if(pb){
+        waitForPlayer=true;
+        const dr=(typeof NPCS!=='undefined'&&NPCS.doorOf)?NPCS.doorOf(pb):null;
+        if(dr){
+          targetPos=new THREE.Vector3(dr.ox,Player.pos.y,dr.oz);
+        }
+      }
+    }
+
+    const distTarget=m.pos.distanceTo(targetPos);
+    const stopDist=waitForPlayer?1.3:3.4;
+
+    if(distTarget>stopDist){
+      const to=new THREE.Vector3().subVectors(targetPos,m.pos).setY(0);
       const ang=Math.atan2(to.x,to.z);
       m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ang,dt*5);
       const spd=Math.min(m.speed*1.05,CFG.PLAYER.sprint);
       m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(5*dt,0,1));
       m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(5*dt,0,1));
     }else{
-      m.vel.x*=Math.exp(-4*dt);
-      m.vel.z*=Math.exp(-4*dt);
+      m.vel.x*=Math.exp(-5*dt);
+      m.vel.z*=Math.exp(-5*dt);
+      if(waitForPlayer){
+        /* menghadap ke arah pintu rumah tempat pemain berada */
+        const toP=new THREE.Vector3().subVectors(Player.pos,m.pos).setY(0);
+        if(toP.lengthSq()>0.1){
+          m.mesh.rotation.y=angLerp(m.mesh.rotation.y,Math.atan2(toP.x,toP.z),dt*4);
+        }
+      }
     }
   },
 
   hurtPet(m,dmg){
     if(!m||m.dead)return;
+    /* aura pasif tim (Guardian Aegis + Mage Support) & buff Aura Perisai
+       melindungi pet sama seperti pemain dan rekan */
+    let auraD=(typeof NPCS!=='undefined'&&NPCS.auraDef)?NPCS.auraDef(m.pos):0;
+    if(auraD>0)dmg*=1-Math.min(0.85,auraD);
+    if(m.shieldT>0)dmg*=1-Math.min(0.85,m.shieldV||0);
     m.hp-=dmg;
     m.flash=0.18;
     FX.text(m.pos.clone().add(new THREE.Vector3(0,2,0)),String(Math.round(dmg)),'#ff9d8a');
@@ -666,7 +812,7 @@ const Capture={
     RPG.removeItems({saddle:1});
     pet.saddle=true;
     if(this.pet&&this.deployedSlot===i)this.pet.saddle=true;
-    UI.toast(`🐴 Sadel dipasang ke ${pet.name}. Tekan G untuk naik.`);
+    UI.toast(`🐴 Sadel dipasang ke ${pet.name}. Tekan F untuk naik.`);
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
   },
 
@@ -784,10 +930,20 @@ const Capture={
     const mv=Input.moveVec();
     const mvLen=Math.hypot(mv.x,mv.z);
     const moving=mvLen>0.12;                 // deadzone anti-drift joystick
-    /* kecepatan mount diperhalus supaya tidak terlalu kencang & tidak sliding */
-    const base=m.type==='horse'?5.0:m.type==='dragon'?6.0:m.type==='wolf'?4.8:4.3;
+    /* ---------- KECEPATAN TUNGGANGAN ----------
+       Tunggangan lebih cepat dari lari pemain (CFG.PLAYER.sprint), tapi tidak
+       berlebihan — tercepat 1.5× lari pemain:
+         · naga            → 1.5× kecepatan lari pemain (tunggangan tercepat)
+         · tunggangan lain → 1.3× kecepatan lari pemain
+         · sapi / golem / slime → memakai kecepatan ASLI mob (m.speed); ketiganya
+           memang lambat sesuai karakternya, jadi tidak dipercepat. */
+    const run=CFG.PLAYER.sprint;                       // kecepatan lari pemain
+    const slowRide=(m.type==='cow'||m.type==='golem'||m.type==='slime');
+    const base=slowRide?m.speed:(m.type==='dragon'?run*1.5:run*1.3);
     const sprint=Input.sprintHeld()?1.08:1;
-    const spd=base*sprint;
+    /* batas atas 1.5× lari pemain untuk tunggangan cepat (sprint tidak boleh
+       mendorong melampauinya); tunggangan lambat tidak dibatasi run. */
+    const spd=slowRide?base*sprint:Math.min(run*1.5,base*sprint);
 
     if(moving){
       const nx=mv.x/mvLen,nz=mv.z/mvLen;
@@ -891,8 +1047,9 @@ const Capture={
   },
 
   levelRate(pet){
-    let rate=92-((pet.lvl||1)-1)*8-((pet.stars||1)-1)*6;
-    return clamp(Math.round(rate),18,95);
+    /* Peluang dasar lebih bersahabat: mulai 95%, melandai ke 45% */
+    let rate=95-((pet.lvl||1)-1)*3-((pet.stars||1)-1)*3;
+    return clamp(Math.round(rate),45,98);
   },
 
   petGainXp(m,amt){
@@ -907,6 +1064,11 @@ const Capture={
   tryLevelUp(i){
     const pet=RPG.mobSlots[i];
     if(!pet)return;
+    /* Cap PET_MAX_LEVEL (50). Di level itu pet tidak bisa naik lagi. */
+    if((pet.lvl||1)>=CFG.PET_MAX_LEVEL){
+      UI.toast(`⭐ ${pet.name} sudah mencapai level maksimum (${CFG.PET_MAX_LEVEL}).`);
+      return;
+    }
     const xpMax=this.petXpMax(pet);
     if((pet.xp||0)<xpMax){
       UI.toast(`⭐ ${pet.name} butuh XP ${Math.floor(pet.xp||0)}/${xpMax} dulu.`);
@@ -943,8 +1105,9 @@ const Capture={
       UI.toast(`🎉 ${pet.name} naik ke Lv ${pet.lvl}! (+12% stat)`);
       if(typeof Sfx!=='undefined'&&Sfx.levelup)Sfx.levelup();
     }else{
-      pet.xp=Math.floor((pet.xp||0)*0.5);
-      UI.toast(`❌ Gagal menaikkan ${pet.name}. Bahan habis, XP berkurang.`);
+      /* Penalti kegagalan diringankan: XP hanya berkurang 15% (dulu 50%) */
+      pet.xp=Math.floor((pet.xp||0)*0.85);
+      UI.toast(`❌ Gagal menaikkan ${pet.name}. Bahan habis, XP berkurang sedikit.`);
       if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
     }
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
@@ -997,7 +1160,7 @@ const Capture={
       d.className='pet-card'+(active?' active':'');
       d.innerHTML=`
         <div class="pc-head">
-          <div class="pc-ico">${emoji}</div>
+          <div class="pc-ico">${(typeof UI!=='undefined'&&UI.petIcon)?UI.petIcon(pet.type, emoji):emoji}</div>
           <div class="pc-title">
             <b>${pet.name}${pet.boss?' 👑':''}${active?' · Aktif':''}</b>
             <span class="pc-stars">${stars}</span>

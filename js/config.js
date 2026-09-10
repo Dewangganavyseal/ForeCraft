@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /* ================= util global ================= */
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -13,12 +13,38 @@ const CFG={
      dunia sehingga rumah tampak bolong dari dalam. */
   CHUNK:16, WORLD_H:24,
 
+  /* ---------- BATAS LEVEL & KURVA XP (SINGLE SOURCE) ----------
+     Level cap & kurva XP didefinisikan SEKALI di sini, lalu dipakai semua
+     sistem (player.js, charpanel.js, ui.js, quest.js, dungeon.js). Sebelumnya
+     rumus 70·L^1.4 di-hardcode di lima tempat, sehingga menaikkan cap atau
+     menyesuaikan kurva berarti mengubah lima file dan mudah luput satu.
+
+     MAX_LEVEL: 200. KURVA: 55·L^1.35 — dua penyesuaian dari 70·L^1.4:
+       (a) basis 70→55 dan pangkat 1.4→1.35 membuat XP yang dibutuhkan tumbuh
+           lebih lambat, jadi naik level tidak "seret" di level tinggi;
+       (b) di level awal hampir sama (Lv1: 55 vs 70), jadi onboarding tidak
+           berubah drastis. Contoh: Lv50 butuh 10.900 (dulu 16.700), Lv100
+           butuh 28.500, Lv200 butuh 66.000. */
+  MAX_LEVEL:200,
+  playerXpNeed(L){return Math.round(55*Math.pow(Math.max(1,L),1.35));},
+  /* cap level untuk entitas lain. Nilai dipakai NPCS.gainXp, petGainXp, dst.
+     Dinaikkan agar NPC di biome level tinggi (Pegunungan Lv 50-75) bisa tumbuh */
+  NPC_MAX_LEVEL:100,     // rekan tim biasa (penjaga, pemburu, dst.)
+  NPC_RARE_MAX_LEVEL:150,// rekan langka (penyihir elf, raksasa, singa, goblin, kelinci, mage)
+  PET_MAX_LEVEL:60,      // peliharaan
+
   /* SEA=5: permukaan air di y=5. Sungai/danau digali ke y=1 (dalam 4 blok) atau
      y=2 (dalam 3 blok) — y=0 selalu bedrock. Daratan SELALU >= SEA (5..7)
      sehingga tidak ada lagi genangan tipis 1-2 blok. */
   SEA:5,                      // air mengisi kolom dgn tinggi < 5
   WATER_Y:4.82,               // tinggi permukaan air
   VIEW_R:4,                   // radius chunk
+  /* GRASS_R: radius chunk (dari chunk pemain) tempat RUMPUT DUNIA dekoratif
+     dirender. Lebih kecil dari VIEW_R supaya rumput yang jauh — yang nyaris
+     tak terlihat tapi menyumbang jutaan wajah — tidak ikut digambar. Chunk di
+     luar radius ini tetap punya terrain, hanya mesh rumputnya disembunyikan.
+     Mobile lebih ketat lagi (di-set di bawah). */
+  GRASS_R:2,
   DAY_LEN:480,                // detik per hari penuh
   GRAV:26,
   PLAYER:{speed:4.7,sprint:7.4,jump:8.8,radius:0.35},
@@ -105,7 +131,128 @@ const CFG={
 };
 
 const IS_MOBILE=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-if(IS_MOBILE){CFG.VIEW_R=3;document.body.classList.add('touch');CFG.NPC.LION_DETAIL=false;}
+if(IS_MOBILE){CFG.VIEW_R=3;CFG.GRASS_R=1;document.body.classList.add('touch');CFG.NPC.LION_DETAIL=false;}
+
+/* =============================================================================
+   PRESET GRAFIS — Low / Medium / High / Ultra
+   -----------------------------------------------------------------------------
+   Satu tempat untuk semua tombol performa. Nilainya diterapkan ke CFG dan ke
+   renderer/lampu saat preset diganti (lihat Gfx.apply). Yang paling berpengaruh:
+
+     viewR       radius chunk yang dimuat & dirender (kuadratik: 3→49 chunk,
+                 5→121 chunk) — pengaruh terbesar ke CPU (mesh) & GPU.
+     grassR      radius chunk yang menampilkan RUMPUT DUNIA. Rumput jauh lebih
+                 mahal dari terrain, jadi radiusnya dipisah & dibuat lebih kecil.
+     grassHeatMin ambang "heat" agar sebuah blok menumbuhkan rumput. heat datang
+                 dari RUMPUN lokal (WGEN.grassHeat): 1 di pusat rumpun → 0 di
+                 tepinya. Menaikkan ambang ini MEMANGKAS TEPI setiap rumpun
+                 (rumpun jadi lebih kecil) tanpa menghapus gradasinya, karena
+                 sisa rentangnya dipetakan ulang ke seluruh tingkat tinggi.
+     grassClump  pengali radius rumput. <1 = rumpun lebih kecil & tanah gundul
+                 lebih luas (lebih ringan); 1 = ukuran penuh.
+     shadow      shadow map aktif atau tidak (shadow pass = render kedua)
+     shadowSize  resolusi shadow map (biaya kuadratik)
+     pixelRatio  batas device pixel ratio (biaya kuadratik pada jumlah piksel)
+     antialias   MSAA saat membuat renderer (butuh restart untuk berubah)
+     waterSub    subdivisi permukaan air per blok (ombak lebih halus)
+     rainN       jumlah garis hujan
+
+   Default: mobile → 'low', desktop → 'high'.
+   ============================================================================= */
+const GFX_PRESETS={
+  low:{
+    name:'Low',viewR:IS_MOBILE?2:3,grassR:1,grassHeatMin:0.30,grassClump:0.55,
+    shadow:false,shadowSize:512,pixelRatio:1.0,antialias:false,
+    waterSub:1,rainN:200,
+  },
+  medium:{
+    name:'Medium',viewR:IS_MOBILE?3:4,grassR:2,grassHeatMin:0.18,grassClump:0.75,
+    shadow:false,shadowSize:1024,pixelRatio:IS_MOBILE?1.3:1.5,antialias:false,
+    waterSub:2,rainN:350,
+  },
+  high:{
+    name:'High',viewR:IS_MOBILE?3:4,grassR:3,grassHeatMin:0.08,grassClump:1,
+    shadow:true,shadowSize:1024,pixelRatio:IS_MOBILE?1.6:2,antialias:true,
+    waterSub:3,rainN:700,
+  },
+  ultra:{
+    name:'Ultra',viewR:5,grassR:5,grassHeatMin:0.02,grassClump:1,
+    shadow:true,shadowSize:2048,pixelRatio:2,antialias:true,
+    waterSub:4,rainN:1000,
+  },
+};
+
+/* Gfx: state preset aktif + penerapannya.
+   `grassHeatMin` & `grassClump` dibaca langsung oleh mesher/WGEN tiap kali
+   membangun chunk, jadi mengganti preset lalu me-remesh dunia sudah cukup. */
+const Gfx={
+  KEY:'forecraft_gfx_v1',
+  level:IS_MOBILE?'low':'high',
+  /* dibaca mesher (ambang gundul) & WGEN.grassHeat (skala radius rumpun);
+     disinkronkan oleh sync() */
+  grassHeatMin:0.08,
+  grassClump:1,
+
+  preset(){return GFX_PRESETS[this.level]||GFX_PRESETS.high;},
+  levels(){return ['low','medium','high','ultra'];},
+
+  load(){
+    try{
+      const v=localStorage.getItem(this.KEY);
+      if(v&&GFX_PRESETS[v])this.level=v;
+    }catch(e){}
+    this.sync();
+  },
+  /* salin nilai preset ke CFG & properti yang dibaca modul lain.
+     TIDAK menyentuh renderer/scene — aman dipanggil sebelum Game.init(). */
+  sync(){
+    const p=this.preset();
+    CFG.VIEW_R=p.viewR;
+    CFG.GRASS_R=p.grassR;
+    this.grassHeatMin=p.grassHeatMin;
+    this.grassClump=(p.grassClump!==undefined)?p.grassClump:1;
+    return p;
+  },
+
+  /* Terapkan preset penuh: CFG + renderer + bayangan + air + hujan, lalu
+     bangun ulang seluruh mesh dunia supaya rumput/air mengikuti pengaturan
+     baru. `rebuild=false` dipakai saat pemanggilan awal (dunia belum ada). */
+  apply(level,rebuild){
+    if(level&&GFX_PRESETS[level])this.level=level;
+    const p=this.sync();
+    try{localStorage.setItem(this.KEY,this.level);}catch(e){}
+
+    /* --- renderer --- */
+    if(typeof Game!=='undefined'&&Game.renderer){
+      /* preset diganti → skala resolusi dinamis direset ke 100% agar
+         pemain merasakan kualitas penuh preset barunya dulu */
+      if(Game.perf){Game.perf.scale=1;document.body.classList.remove('perf-hud');}
+      Game.renderer.setPixelRatio(Math.min(window.devicePixelRatio,p.pixelRatio));
+      Game.renderer.shadowMap.enabled=p.shadow;
+    }
+    /* --- matahari & shadow map --- */
+    if(typeof Weather!=='undefined'&&Weather.sun){
+      const sun=Weather.sun;
+      sun.castShadow=p.shadow;
+      if(p.shadow&&sun.shadow){
+        sun.shadow.mapSize.set(p.shadowSize,p.shadowSize);
+        /* map lama harus dibuang agar resolusi baru benar-benar dipakai */
+        if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
+        const sc=sun.shadow.camera;
+        sc.left=-34;sc.right=34;sc.top=34;sc.bottom=-34;sc.near=1;sc.far=180;
+        sun.shadow.bias=-0.0006;
+      }
+    }
+    /* --- jumlah garis hujan (butuh re-init geometri hujan) --- */
+    if(typeof Weather!=='undefined'&&Weather.setRainCount)Weather.setRainCount(p.rainN);
+
+    /* --- bangun ulang dunia: mesh air & rumput bergantung preset --- */
+    if(rebuild&&typeof World!=='undefined'&&World.rebuildAll)World.rebuildAll();
+    return p;
+  },
+};
+Gfx.load();
+
 
 /* ================= blok ================= */
 const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
@@ -114,14 +261,16 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
      sehingga bisa dibuat transparan saat pemain masuk ke dalam bangunan. */
   ROOF:13,
   /* FARM: tanah ladang hasil cangkul; bisa ditanami */
-  FARM:14};
+  FARM:14,
+  /* RED_SOIL: tanah merah biome langka REDLANDS (habitat Kelabang Raksasa) */
+  RED_SOIL:15};
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
   [B.STONE]:{name:'Batu',  hp:6.0,drop:'stone',color:0x8a8f98},
   [B.WOOD] :{name:'Kayu',  hp:4.0,drop:'wood',color:0x6e4f2f},
   [B.LEAF] :{name:'Daun',  hp:0.6,drop:null,color:0x3f7d2f},
-  [B.SAND] :{name:'Pasir', hp:1.6,drop:'sand',color:0xdcc78d},
+  [B.SAND] :{name:'Pasir', hp:1.6,drop:'sand',color:0xe3d29a},
   [B.SNOW] :{name:'Salju', hp:1.4,drop:null,color:0xe8f2fa},
   /* bijih: makin langka makin keras ditambang */
   [B.ORE_IRON]   :{name:'Bijih Besi',   hp:9.0, drop:'iron_ore',   color:0xb08a6a},
@@ -130,6 +279,8 @@ const BLOCK_INFO={
   [B.PLANK]:{name:'Papan', hp:3.4,drop:'wood',color:0xb98a55},
   [B.ROOF] :{name:'Atap',  hp:3.4,drop:'wood',color:0x9c5a3c},
   [B.FARM] :{name:'Ladang',hp:2.0,drop:null,color:0x6f4a26},
+  /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
+  [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
 };
 /* blok bijih → dipakai worldgen & UI penambangan */
 const ORE_BLOCKS=[B.ORE_IRON,B.ORE_GOLD,B.ORE_CRYSTAL];
@@ -138,21 +289,30 @@ const ORE_BLOCKS=[B.ORE_IRON,B.ORE_GOLD,B.ORE_CRYSTAL];
 /* 3 biome dipilih dari noise suhu; memengaruhi warna kabut, blok
    permukaan, kepadatan pohon, jenis bijih, dan monster yang muncul. */
 const BIOME={
-  FOREST:0, DESERT:1, TUNDRA:2, MOUNTAIN:3, OCEAN:4, BEACH:5,
+  FOREST:0, DESERT:1, TUNDRA:2, MOUNTAIN:3, OCEAN:4, BEACH:5, REDLANDS:6,
 };
 const BIOME_INFO={
   /* mobW = bobot kemunculan tiap monster di biome ini.
      Bobot serigala DITURUNKAN drastis (hutan 3.4→1.2, tundra 4.5→1.8,
      pegunungan 4.5→1.5) karena dulu serigala terlalu sering muncul dan
-     mendominasi populasi. */
+     mendominasi populasi.
+
+     mobFix = PELUANG TETAP (bukan bobot) untuk mob tertentu. Diundi lebih dulu
+     oleh Monsters.pickType, jadi angkanya benar-benar persentase kemunculan apa
+     pun bobot mob lain & apa pun waktu (siang/malam). Dipakai untuk mob yang
+     peluangnya sudah ditentukan pasti, mis. Yeti 30% di tundra. */
   [BIOME.FOREST]:{name:'Hutan Rimba',e:'🌳',surface:B.GRASS,sub:B.DIRT,
-    fog:0x9fc8e8,tree:1.0,ore:B.ORE_IRON,mobs:['slime','boar','golem','wolf'],
-    mobW:{slime:3.4,boar:2.8,golem:1.2,wolf:1.2}},
+    fog:0x9fc8e8,tree:1.0,ore:B.ORE_IRON,mobs:['slime','boar','golem','wolf','rabbit'],
+    mobW:{rabbit:4.0,slime:2.8,boar:2.2,golem:1.2,wolf:1.2}},
   [BIOME.DESERT]:{name:'Gurun Pasir',e:'🏜️',surface:B.SAND,sub:B.SAND,
-    fog:0xe4d7a8,tree:0.12,ore:B.ORE_GOLD,mobs:['scorpion','boar','golem']},
+    fog:0xe4d7a8,tree:0.12,ore:B.ORE_GOLD,mobs:['scorpion','boar','golem','rabbit'],
+    mobW:{scorpion:3.5,boar:2.0,golem:1.5,rabbit:1.2}},
+  /* TUNDRA: habitat YETI. Peluangnya dipatok 30% lewat mobFix; 70% sisanya
+     dibagi serigala/slime/golem/kelinci memakai bobot seperti biasa. */
   [BIOME.TUNDRA]:{name:'Tundra Salju',e:'🏔️',surface:B.SNOW,sub:B.DIRT,
-    fog:0xd8e8f4,tree:0.45,ore:B.ORE_CRYSTAL,mobs:['wolf','slime','golem'],
-    mobW:{wolf:1.8,slime:3.2,golem:1.6}},
+    fog:0xd8e8f4,tree:0.45,ore:B.ORE_CRYSTAL,mobs:['yeti','wolf','slime','golem','rabbit'],
+    mobW:{wolf:1.8,slime:2.8,golem:1.4,rabbit:1.8},
+    mobFix:{yeti:0.30}},
   /* PEGUNUNGAN: dataran tinggi berbatu, habitat NAGA. Naga kini LANGKA
      (bobot 0.3 dari total ~9.3 ≈ 3% kemunculan) agar tidak sering muncul.
      Permukaan batu, sedikit pohon, bijih kristal. */
@@ -168,8 +328,16 @@ const BIOME_INFO={
     fog:0x9ec9e8,tree:0,ore:B.ORE_IRON,mobs:['slime'],
     mobW:{slime:1}},
   [BIOME.BEACH]:{name:'Pantai',e:'🏖️',surface:B.SAND,sub:B.SAND,
-    fog:0xdCe8f0,tree:0.10,ore:B.ORE_IRON,mobs:['slime','boar','scorpion'],
-    mobW:{slime:3.0,boar:2.0,scorpion:1.2}},
+    fog:0xdCe8f0,tree:0.10,ore:B.ORE_IRON,mobs:['slime','boar'],
+    mobW:{slime:3.0,boar:2.0}},
+  /* ---------- REDLANDS (Tanah Merah) ----------
+     Biome LANGKA (~10% dari daratan) bertanah merah dengan tumbuhan merah.
+     Dua mob biasa dengan peluang SAMA 50:50 — KUMBANG TANDUK & SEMUT RAKSASA.
+     Kelabang Raksasa TIDAK muncul liar di sini; ia hanya bisa dipanggil lewat
+     ritual Altar memakai 4 ingredient langka (1% drop) dari mob di biome ini. */
+  [BIOME.REDLANDS]:{name:'Tanah Merah',e:'🩸',surface:B.RED_SOIL,sub:B.RED_SOIL,
+    fog:0xc85436,tree:0.10,ore:B.ORE_IRON,mobs:['kumbang','semut'],
+    mobW:{kumbang:1,semut:1}},
 };
 
 
@@ -229,7 +397,9 @@ const LANG_KEYS=['mm_new','mm_load','mm_music','mm_slot','mm_empty','mm_info',
   'settings_title','settings_tip','settings_on','settings_off','settings_volume',
   'settings_music','settings_music_play','settings_sfx','settings_sfx_play',
   'settings_custom','settings_custom_tip','settings_custom_open',
-  'settings_save','settings_save_now','settings_saved','settings_lang','settings_lang_set'];
+  'settings_save','settings_save_now','settings_saved','settings_lang','settings_lang_set',
+  'settings_gfx','settings_gfx_tip','settings_gfx_set','settings_gfx_reload',
+  'gfx_low','gfx_medium','gfx_high','gfx_ultra'];
 
 /* CATATAN PLACEHOLDER: pakai HANYA bentuk $nama (huruf/angka/underscore, tanpa
    spasi dan tanpa kurung kurawal). Bentuk "$ n" atau "${n}" TIDAK akan
@@ -258,7 +428,12 @@ const locales={
     settings_custom_open:'Buka UI Studio',
     settings_save:'Simpan Manual',settings_save_now:'Simpan Sekarang',
     settings_saved:'Permainan disimpan!',
-    settings_lang:'Bahasa',settings_lang_set:'Bahasa: $name'
+    settings_lang:'Bahasa',settings_lang_set:'Bahasa: $name',
+    settings_gfx:'Grafis',
+    settings_gfx_tip:'Turunkan bila permainan terasa berat.',
+    settings_gfx_set:'Grafis: $name',
+    settings_gfx_reload:'Anti-aliasing berubah saat game dibuka ulang.',
+    gfx_low:'Rendah',gfx_medium:'Sedang',gfx_high:'Tinggi',gfx_ultra:'Ultra'
   },
   en:{
     mm_new:'🌱 New Game',mm_load:'📂 Load Game',mm_music:'🎵 Music',
@@ -278,7 +453,12 @@ const locales={
     settings_custom_open:'Open UI Studio',
     settings_save:'Manual Save',settings_save_now:'Save Now',
     settings_saved:'Game saved!',
-    settings_lang:'Language',settings_lang_set:'Language: $name'
+    settings_lang:'Language',settings_lang_set:'Language: $name',
+    settings_gfx:'Graphics',
+    settings_gfx_tip:'Lower this if the game feels heavy.',
+    settings_gfx_set:'Graphics: $name',
+    settings_gfx_reload:'Anti-aliasing changes after you reopen the game.',
+    gfx_low:'Low',gfx_medium:'Medium',gfx_high:'High',gfx_ultra:'Ultra'
   },
   zh:{
     mm_new:'🌱 新游戏',mm_load:'📂 读取游戏',mm_music:'🎵 音乐',
@@ -298,7 +478,12 @@ const locales={
     settings_custom_open:'打开 UI 工作室',
     settings_save:'手动保存',settings_save_now:'立即保存',
     settings_saved:'游戏已保存！',
-    settings_lang:'语言',settings_lang_set:'语言：$name'
+    settings_lang:'语言',settings_lang_set:'语言：$name',
+    settings_gfx:'画质',
+    settings_gfx_tip:'如果游戏卡顿请降低画质。',
+    settings_gfx_set:'画质：$name',
+    settings_gfx_reload:'抗锯齿将在重新打开游戏后生效。',
+    gfx_low:'低',gfx_medium:'中',gfx_high:'高',gfx_ultra:'极高'
   },
   ja:{
     mm_new:'🌱 新しいゲーム',mm_load:'📂 セーブをロード',mm_music:'🎵 音楽',
@@ -318,7 +503,12 @@ const locales={
     settings_custom_open:'UI スタジオを開く',
     settings_save:'手動セーブ',settings_save_now:'今すぐセーブ',
     settings_saved:'ゲームを保存しました！',
-    settings_lang:'言語',settings_lang_set:'言語：$name'
+    settings_lang:'言語',settings_lang_set:'言語：$name',
+    settings_gfx:'グラフィック',
+    settings_gfx_tip:'重いと感じたら下げてください。',
+    settings_gfx_set:'グラフィック：$name',
+    settings_gfx_reload:'アンチエイリアスは再起動後に反映されます。',
+    gfx_low:'低',gfx_medium:'中',gfx_high:'高',gfx_ultra:'ウルトラ'
   }
 };
 
@@ -358,66 +548,108 @@ const ITEMS={
   /* CATATAN EMOJI: seluruh ikon item memakai Unicode ≤6.0. Emoji baru seperti
      🪵 🪨 🫐 🟫 🟡 🦺 🦿 🪖 🩹 belum tersedia di font sistem Android lama,
      sehingga sebelumnya beberapa item (mis. kayu) tampil sebagai kotak kosong. */
-  wood:{n:'Kayu',e:'🌲'}, stone:{n:'Batu',e:'⛰️'}, fiber:{n:'Serat',e:'🌾'},
-  berry:{n:'Beri',e:'🍇',food:{hunger:8,hp:2}}, mush:{n:'Jamur',e:'🍄',food:{hunger:6,hp:0}},
-  gel:{n:'Gel Slime',e:'💧'}, meat:{n:'Daging Mentah',e:'🥩',food:{hunger:10,hp:-3}},
-  cmeat:{n:'Daging Panggang',e:'🍖',food:{hunger:35,hp:12}},
-  bread:{n:'Roti',e:'🍞',food:{hunger:25,hp:5}},
-  salad:{n:'Salad Buah',e:'🥗',food:{hunger:22,hp:18}},
-  pie:{n:'Pai Beri',e:'🥧',food:{hunger:50,hp:15,buff:'speed'}},
-  bandage:{n:'Perban',e:'💊',food:{hunger:0,hp:35}},
+  wood:{n:'Kayu',e:'🌲',rarity:'common'}, stone:{n:'Batu',e:'⛰️',rarity:'common'}, fiber:{n:'Serat',e:'🌾',rarity:'common'},
+  berry:{n:'Beri',e:'🍇',food:{hunger:8,hp:2},rarity:'common'}, mush:{n:'Jamur',e:'🍄',food:{hunger:6,hp:0},rarity:'common'},
+  gel:{n:'Gel Slime',e:'💧',rarity:'common'}, meat:{n:'Daging Mentah',e:'🥩',food:{hunger:10,hp:-3},rarity:'common'},
+  cmeat:{n:'Daging Panggang',e:'🍖',food:{hunger:35,hp:12},rarity:'common'},
+  bread:{n:'Roti',e:'🍞',food:{hunger:25,hp:5},rarity:'common'},
+  salad:{n:'Salad Buah',e:'🥗',food:{hunger:22,hp:18},rarity:'common'},
+  pie:{n:'Pai Beri',e:'🥧',food:{hunger:50,hp:15,buff:'speed'},rarity:'uncommon'},
+  /* ---------- tebu → gula → kue ----------
+     Tebu dipanen dari rumpun tanaman liar tipe 9 (WGEN.caneAt). Batangnya bisa
+     dikunyah langsung untuk sedikit lapar, diolah jadi Gula, lalu Gula + Gandum
+     + Susu-pengganti (Beri) jadi Kue: makanan paling mengenyangkan. */
+  sugar_cane:{n:'Tebu',e:'🎋',food:{hunger:4,hp:0},rarity:'common'},
+  sugar:{n:'Gula',e:'🍬',rarity:'common'},
+  cake:{n:'Kue',e:'🍰',food:{hunger:60,hp:25,buff:'speed'},rarity:'uncommon'},
+  bandage:{n:'Perban',e:'💊',food:{hunger:0,hp:35},rarity:'common'},
+  /* Ramuan stamina: memulihkan +30% stamina seketika (pemain & rekan NPC) */
+  potion_stam:{n:'Ramuan Stamina',e:'⚡',food:{hunger:0,hp:0,buff:'stam'},potion:{stamina:0.30},rarity:'uncommon'},
   /* ikan: ditangkap dari perairan (sistem FishSys di js/ports.js) */
-  fish:{n:'Ikan Segar',e:'🐟',food:{hunger:12,hp:3}},
-  cfish:{n:'Ikan Bakar',e:'🍢',food:{hunger:34,hp:12}},
-  resin:{n:'Getah Pohon',e:'🍯'},
-  leather:{n:'Kulit',e:'📜'},
+  fish:{n:'Ikan Segar',e:'🐟',food:{hunger:12,hp:3},rarity:'common'},
+  cfish:{n:'Ikan Bakar',e:'🍢',food:{hunger:34,hp:12},rarity:'common'},
+  resin:{n:'Getah Pohon',e:'🍯',rarity:'uncommon'},
+  leather:{n:'Kulit',e:'📜',rarity:'uncommon'},
   /* ---------- pertanian ---------- */
-  hoe:{n:'Cangkul',e:'⛏️',tool:'hoe'},
+  hoe:{n:'Cangkul',e:'⛏️',tool:'hoe',rarity:'common'},
+  /* ---------- LOG PASS: penanda lokasi pribadi ----------
+     `tool` membuatnya TIDAK BISA di-stack (stackCap → 1) sehingga setiap Log
+     Pass menempati slotnya sendiri dan bisa menyimpan tandanya masing-masing
+     di field per-slot `mark` ({name,x,y,z}). Lihat js/logpass.js. */
+  log_pass:{n:'Log Pass',e:'🧭',tool:'logpass',rarity:'uncommon'},
   /* ---------- pawang / menangkap mob ---------- */
-  rope:{n:'Tali',e:'➰'},
-  saddle:{n:'Sadel',e:'🐴'},
-  pet_charm:{n:'Jimat Pawang',e:'🧿'},
-  seed_wheat:{n:'Benih Gandum',e:'…'},
-  seed_carrot:{n:'Benih Wortel',e:'…'},
-  seed_cabbage:{n:'Benih Kubis',e:'…'},
-  seed_tomato:{n:'Benih Tomat',e:'…'},
-  seed_watermelon:{n:'Benih Semangka',e:'…'},
-  wheat:{n:'Gandum',e:'🌾',food:{hunger:8,hp:0}},
-  carrot:{n:'Wortel',e:'🥕',food:{hunger:10,hp:2}},
-  cabbage:{n:'Kubis',e:'🥬',food:{hunger:12,hp:4}},
-  tomato:{n:'Tomat',e:'🍅',food:{hunger:10,hp:6}},
-  watermelon:{n:'Semangka',e:'🍉',food:{hunger:20,hp:10}},
+  rope:{n:'Tali',e:'➰',rarity:'common'},
+  saddle:{n:'Sadel',e:'🐴',rarity:'uncommon'},
+  pet_charm:{n:'Jimat Pawang',e:'🧿',rarity:'rare'},
+  seed_wheat:{n:'Benih Gandum',e:'…',rarity:'common'},
+  seed_carrot:{n:'Benih Wortel',e:'…',rarity:'common'},
+  seed_cabbage:{n:'Benih Kubis',e:'…',rarity:'common'},
+  seed_tomato:{n:'Benih Tomat',e:'…',rarity:'common'},
+  seed_watermelon:{n:'Benih Semangka',e:'…',rarity:'common'},
+  wheat:{n:'Gandum',e:'🌾',food:{hunger:8,hp:0},rarity:'common'},
+  carrot:{n:'Wortel',e:'🥕',food:{hunger:10,hp:2},rarity:'common'},
+  cabbage:{n:'Kubis',e:'🥬',food:{hunger:12,hp:4},rarity:'common'},
+  tomato:{n:'Tomat',e:'🍅',food:{hunger:10,hp:6},rarity:'common'},
+  watermelon:{n:'Semangka',e:'🍉',food:{hunger:20,hp:10},rarity:'common'},
   /* ---------- hasil tambang & peleburan ---------- */
-  sand:{n:'Pasir',e:'⏳'},
+  sand:{n:'Pasir',e:'⏳',rarity:'common'},
   /* batu bara: hasil sampingan menambang batu, dipakai bahan bakar & syarat
      rekrut NPC penambang */
-  coal:{n:'Batu Bara',e:'🖤'},
-  iron_ore:{n:'Bijih Besi',e:'🔘'},
-  gold_ore:{n:'Bijih Emas',e:'🔶'},
-  crystal:{n:'Kristal Beku',e:'💎'},
-  iron_ingot:{n:'Batang Besi',e:'🔩'},
-  gold_ingot:{n:'Batang Emas',e:'🥇'},
+  coal:{n:'Batu Bara',e:'🖤',rarity:'common'},
+  iron_ore:{n:'Bijih Besi',e:'🔘',rarity:'common'},
+  gold_ore:{n:'Bijih Emas',e:'🔶',rarity:'uncommon'},
+  crystal:{n:'Kristal Beku',e:'💎',rarity:'rare'},
+  iron_ingot:{n:'Batang Besi',e:'🔩',rarity:'common'},
+  gold_ingot:{n:'Batang Emas',e:'🥇',rarity:'uncommon'},
   /* drop mob baru */
-  pelt:{n:'Bulu Serigala',e:'🐺'},
-  venom:{n:'Racun Kalajengking',e:'🧪'},
+  pelt:{n:'Bulu Serigala',e:'🐺',rarity:'uncommon'},
+  venom:{n:'Racun Kalajengking',e:'🧪',rarity:'uncommon'},
+  /* kulit keras ruas tubuh kelabang raksasa — bahan tameng & armor berat */
+  centipede_shell:{n:'Kulit Kelabang',e:'🐛',rarity:'uncommon'},
+  /* ---------- 4 BAHAN RITUAL ALTAR (khusus biome Tanah Merah) ----------
+     Masing-masing hanya 1% drop dari mob biasa (Kumbang Tanduk) yang mati di
+     dalam biome REDLANDS. Keempatnya wajib untuk ritual pemanggilan kelabang. */
+  insect_leg:{n:'Kaki Serangga',e:'🦵',rarity:'rare'},
+  hard_shell:{n:'Kulit Keras',e:'🛡',rarity:'rare'},
+  green_blood:{n:'Darah Hijau',e:'🧪',rarity:'rare'},
+  toxic_venom:{n:'Racun Berbisa',e:'☠',rarity:'rare'},
+  /* pecahan jiwa: drop khas REAPER, penjaga reruntuhan/dungeon */
+  soul_shard:{n:'Pecahan Jiwa',e:'👻',rarity:'rare'},
+  /* ---------- DUNGEON CHANGER: dijual NPC Dungeon Master ----------
+     Mengubah level dungeon yang sedang dimasuki pemain. `tool` membuatnya
+     TIDAK bisa di-stack (stackCap → 1) sehingga tiap item menyimpan level
+     dungeonya sendiri di field PER-INSTANCE `lvl` (pola yang sama dipakai
+     senjata tempa — lihat RPG.addItem & anvil.js). Dipakai lewat
+     RPG.useDungeonChanger() (dijangkau hook RPG.useSelected saat klik). */
+  dungeon_changer:{n:'Dungeon Changer',e:'🗝️',tool:'dchange',rarity:'epic'},
   /* drop boss */
-  boss_core:{n:'Inti Boss',e:'🔮'},
+  boss_core:{n:'Inti Boss',e:'🔮',rarity:'epic'},
   /* ---------- set emas: tier tertinggi hasil tempa ---------- */
-  helm_gold  :{n:'Helm Emas',e:'👑',armor:{slot:'helm', def:0.17,tier:'gold'}},
-  plate_gold :{n:'Zirah Emas',e:'🎽',armor:{slot:'chest',def:0.26,tier:'gold'}},
-  greaves_gold:{n:'Pelindung Kaki Emas',e:'👖',armor:{slot:'boots',def:0.14,tier:'gold'}},
+  helm_gold  :{n:'Helm Emas',e:'👑',rarity:'epic',armor:{slot:'helm', def:0.17,tier:'gold'}},
+  plate_gold :{n:'Zirah Emas',e:'🎽',rarity:'epic',armor:{slot:'chest',def:0.26,tier:'gold'}},
+  greaves_gold:{n:'Pelindung Kaki Emas',e:'👖',rarity:'epic',armor:{slot:'boots',def:0.14,tier:'gold'}},
   /* ---------- set kristal: butuh inti boss ---------- */
-  helm_crystal :{n:'Helm Kristal',e:'🔷',armor:{slot:'helm', def:0.22,tier:'crystal'}},
-  plate_crystal:{n:'Zirah Kristal',e:'🛡',armor:{slot:'chest',def:0.32,tier:'crystal'}},
-  greaves_crystal:{n:'Pelindung Kaki Kristal',e:'❄️',armor:{slot:'boots',def:0.18,tier:'crystal'}},
+  helm_crystal :{n:'Helm Kristal',e:'🔷',rarity:'epic',armor:{slot:'helm', def:0.22,tier:'crystal'}},
+  plate_crystal:{n:'Zirah Kristal',e:'🛡',rarity:'epic',armor:{slot:'chest',def:0.32,tier:'crystal'}},
+  greaves_crystal:{n:'Pelindung Kaki Kristal',e:'❄️',rarity:'epic',armor:{slot:'boots',def:0.18,tier:'crystal'}},
 
   /* ---------- armor yang bisa dipasang ---------- */
-  cap_leather  :{n:'Topi Kulit',e:'🧢',armor:{slot:'helm', def:0.06,tier:'leather'}},
-  vest_leather :{n:'Rompi Kulit',e:'👚',armor:{slot:'chest',def:0.11,tier:'leather'}},
-  boots_leather:{n:'Sepatu Kulit',e:'👟',armor:{slot:'boots',def:0.05,tier:'leather'}},
-  helm_iron    :{n:'Helm Besi',e:'⛑️',armor:{slot:'helm', def:0.12,tier:'iron'}},
-  plate_iron   :{n:'Zirah Besi',e:'🛡️',armor:{slot:'chest',def:0.20,tier:'iron'}},
-  greaves_iron :{n:'Pelindung Kaki Besi',e:'👢',armor:{slot:'boots',def:0.10,tier:'iron'}},
+  cap_leather  :{n:'Topi Kulit',e:'🧢',rarity:'common',armor:{slot:'helm', def:0.06,tier:'leather'}},
+  vest_leather :{n:'Rompi Kulit',e:'👚',rarity:'common',armor:{slot:'chest',def:0.11,tier:'leather'}},
+  boots_leather:{n:'Sepatu Kulit',e:'👟',rarity:'common',armor:{slot:'boots',def:0.05,tier:'leather'}},
+  helm_iron    :{n:'Helm Besi',e:'⛑️',rarity:'uncommon',armor:{slot:'helm', def:0.12,tier:'iron'}},
+  plate_iron   :{n:'Zirah Besi',e:'🛡️',rarity:'uncommon',armor:{slot:'chest',def:0.20,tier:'iron'}},
+  greaves_iron :{n:'Pelindung Kaki Besi',e:'👢',rarity:'uncommon',armor:{slot:'boots',def:0.10,tier:'iron'}},
+
+  /* ---------- set karapas kelabang (dari Kulit Kelabang, boss REDLANDS) ----------
+     Setara tier besi-plus: pertahanan tinggi tanpa perlu inti boss. Model 3D
+     memakai tier 'iron' (belum ada set voxel khusus) tapi warna drop merah. */
+  helm_carapace :{n:'Helm Karapas Kelabang',e:'🐛',rarity:'rare',
+    armor:{slot:'helm', def:0.16,tier:'iron'}},
+  plate_carapace:{n:'Zirah Karapas Kelabang',e:'🐛',rarity:'rare',
+    armor:{slot:'chest',def:0.27,tier:'iron'}},
+  shield_carapace:{n:'Tameng Karapas Kelabang',e:'🛡️',rarity:'rare',
+    armor:{slot:'shield',def:0.14,tier:'iron',blk:0.20,bkp:0.52}},
 
   /* ================= PEDANG =================
      weapon: { dmg  = damage dasar per pukulan (base 12 = pedang awal)
@@ -461,21 +693,28 @@ const ITEMS={
   /* ================= TAMENG (slot shield — khusus karakter utama) =================
      Tujuh tameng dari NEW MODEL/Tameng.html. `tier` menentukan bahan
      enchant di Landasan Tempa (anvil), bukan warna model — tiap tameng
-     punya model voxel unik sendiri di js/player/shields.js. */
+     punya model voxel unik sendiri di js/player/shields.js.
+
+     STAT BLOCK (baru):
+       blk = peluang dasar MENANGKIS serangan (0..1)
+       bkp = porsi damage yang ditahan saat tangkisan berhasil (0..1)
+     Keduanya dinaikkan rarity item, level tempa, skill pasif cabang perisai,
+     dan proficiency 'blocking'. Total akhir dibatasi RPG.blockChance() ke 55%
+     dan RPG.blockPower() ke 85%. */
   shield_wood:  {n:'Tameng Kayu',      e:'🛡️',rarity:'common',
-    armor:{slot:'shield',def:0.05,tier:'leather'}},
+    armor:{slot:'shield',def:0.05,tier:'leather',blk:0.12,bkp:0.35}},
   shield_iron:  {n:'Tameng Ksatria Besi',e:'🛡️',rarity:'uncommon',
-    armor:{slot:'shield',def:0.10,tier:'iron'}},
+    armor:{slot:'shield',def:0.10,tier:'iron',blk:0.16,bkp:0.45}},
   shield_flame: {n:'Tameng Bara',      e:'🛡️',rarity:'rare',
-    armor:{slot:'shield',def:0.13,tier:'gold'}},
+    armor:{slot:'shield',def:0.13,tier:'gold',blk:0.19,bkp:0.50}},
   shield_venom: {n:'Tameng Bisa',      e:'🛡️',rarity:'rare',
-    armor:{slot:'shield',def:0.12,tier:'iron'}},
+    armor:{slot:'shield',def:0.12,tier:'iron',blk:0.18,bkp:0.48}},
   shield_storm: {n:'Tameng Badai',     e:'🛡️',rarity:'epic',
-    armor:{slot:'shield',def:0.15,tier:'gold'}},
+    armor:{slot:'shield',def:0.15,tier:'gold',blk:0.22,bkp:0.55}},
   shield_frost: {n:'Tameng Fajar Beku',e:'🛡️',rarity:'epic',
-    armor:{slot:'shield',def:0.17,tier:'crystal'}},
+    armor:{slot:'shield',def:0.17,tier:'crystal',blk:0.24,bkp:0.60}},
   shield_dark:  {n:'Tameng Bayangan',  e:'🛡️',rarity:'legendary',
-    armor:{slot:'shield',def:0.20,tier:'crystal'}},
+    armor:{slot:'shield',def:0.20,tier:'crystal',blk:0.28,bkp:0.68}},
 };
 /* rarity default untuk item lama agar UI tetap konsisten */
 (function(){
@@ -519,10 +758,12 @@ function stackCap(id){
 
 const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
   rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,
-  meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,
+  meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,potion_stam:0xffd24d,
+  sugar_cane:0xc9c157,sugar:0xf2ecdf,cake:0xf5d9a8,
   fish:0x93adc0,cfish:0xd98a4d,
   resin:0xd9a13c,leather:0x8a5f35,
   hoe:0x8a5f35,
+  log_pass:0xd94a4a,
   seed_wheat:0xd4a431,seed_carrot:0xe07f1d,seed_cabbage:0x5f9e30,
   seed_tomato:0xe2451e,seed_watermelon:0x3a7d23,
   wheat:0xd4a431,carrot:0xe07f1d,cabbage:0x5f9e30,tomato:0xe2451e,watermelon:0x3a7d23,
@@ -530,6 +771,9 @@ const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mus
   helm_iron:0x9aa2ac,plate_iron:0x9aa2ac,greaves_iron:0x6d747d,
   sand:0xdcc78d,iron_ore:0xb08a6a,gold_ore:0xd9b23a,crystal:0x7fd8ff,
   iron_ingot:0xd2d9e2,gold_ingot:0xffe07a,pelt:0x9a8b7a,venom:0x9ad84f,
+  centipede_shell:0x9e3b2c,
+  insect_leg:0x7a4f24,hard_shell:0x9e3b2c,green_blood:0x6fe05c,toxic_venom:0x8dff3a,
+  helm_carapace:0x9e3b2c,plate_carapace:0x9e3b2c,shield_carapace:0xb0432f,
   coal:0x2c2c30,
   boss_core:0xff6bd6,
   helm_gold:0xd9b23a,plate_gold:0xd9b23a,greaves_gold:0x9c7c1e,
@@ -552,7 +796,12 @@ const RECIPES=[
   {out:'bread',need:{fiber:3},name:'Roti'},
   {out:'salad',need:{berry:2,mush:1},skill:'cook',prof:{cooking:3},name:'Salad Buah'},
   {out:'bandage',need:{fiber:2,mush:1},skill:'alchem',name:'Perban'},
+  {out:'potion_stam',need:{berry:2,sugar:1,fiber:1},name:'Ramuan Stamina'},
   {out:'pie',need:{berry:3,fiber:2},skill:'gourmet',prof:{cooking:6},name:'Pai Beri'},
+  /* tebu: 2 batang → 1 Gula. Kue butuh gandum (pertanian) + gula + beri,
+     jadi ia hadiah untuk pemain yang sudah bertani & memasak. */
+  {out:'sugar',need:{sugar_cane:2},name:'Gula'},
+  {out:'cake',need:{wheat:3,sugar:2,berry:2},skill:'gourmet',prof:{cooking:8},name:'Kue'},
   {out:'leather',need:{gel:2,fiber:2},name:'Kulit'},
   /* ---------- pawang ---------- */
   {out:'rope',need:{fiber:4,leather:1},name:'Tali'},
@@ -560,6 +809,9 @@ const RECIPES=[
   {out:'pet_charm',need:{boss_core:1,gold_ingot:2,crystal:2},skill:'catch_master',name:'Jimat Pawang'},
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
   {out:'hoe',need:{wood:3,stone:2},name:'Cangkul'},
+  /* Log Pass: penanda lokasi. Murah & bisa dibuat berulang supaya pemain bisa
+     menandai banyak tempat sekaligus (tiap Log Pass menyimpan 1 tanda). */
+  {out:'log_pass',need:{wood:2,fiber:2,resin:1},name:'Log Pass'},
   {out:'seed_wheat',need:{wheat:1},name:'Benih Gandum'},
   {out:'seed_carrot',need:{carrot:1},name:'Benih Wortel'},
   {out:'seed_cabbage',need:{cabbage:1},name:'Benih Kubis'},
@@ -614,6 +866,13 @@ const RECIPES=[
   {out:'shield_storm',need:{shield_flame:1,gold_ingot:4,crystal:2},skill:'smith',prof:{mining:15},name:'Tameng Badai'},
   {out:'shield_frost',need:{shield_storm:1,crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Tameng Fajar Beku'},
   {out:'shield_dark',need:{shield_frost:1,boss_core:2,crystal:4},skill:'smith',prof:{mining:22},name:'Tameng Bayangan'},
+
+  /* ================= TEMPA BAHAN KELABANG =================
+     Kulit kelabang (dari boss Kelabang Raksasa) membuka armor karapas berat:
+     zirah kokoh setara set emas tanpa perlu inti boss. */
+  {out:'plate_carapace',need:{centipede_shell:6,iron_ingot:2,leather:2},skill:'smith',prof:{mining:12},name:'Zirah Karapas Kelabang'},
+  {out:'helm_carapace',need:{centipede_shell:4,iron_ingot:1},skill:'smith',prof:{mining:12},name:'Helm Karapas Kelabang'},
+  {out:'shield_carapace',need:{centipede_shell:5,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Tameng Karapas Kelabang'},
 ];
 
 
@@ -622,27 +881,67 @@ const RECIPES=[
    `active:true` menandai skill yang harus ditekan manual (muncul sebagai
    tombol di HUD dan punya cooldown di RPG.activeCD). Skill tanpa flag itu
    bersifat pasif: efeknya langsung jalan begitu dipelajari.
-   `cd` = cooldown detik untuk skill aktif. */
+   `cd` = cooldown detik untuk skill aktif.
+   `lvl` = LEVEL PEMAIN MINIMUM untuk mempelajarinya (gerbang level).
+
+   ---------------------------------------------------------------------------
+   PENYELARASAN KE LEVEL CAP 200
+   ---------------------------------------------------------------------------
+   Masalah: dengan 1 SP per level, seluruh pohon dulu hanya butuh 78 SP —
+   artinya tuntas di Lv 79, dan di Lv 50 pemain sudah bisa membeli 63% isinya.
+   Sisa 121 SP sampai Lv 200 tidak ada gunanya.
+
+   Dua penyesuaian, dan KEDUANYA TIDAK MENAIKKAN KEKUATAN PUNCAK PEMAIN:
+
+   1. RANK DIPERBANYAK, NILAI PER-RANK DIBAGI. Contoh 'Bilah Tajam': dulu
+      3 rank × +20% = +60%; sekarang 6 rank × +10% = +60% yang sama. Pemain
+      Lv 200 sama kuatnya dengan pemain Lv 79 versi lama — hanya perjalanan
+      menuju ke sana yang lebih bertahap. Ini penting karena kalibrasi mob
+      dungeon dihitung dari kekuatan puncak pemain (lihat Dungeon._dpsRef);
+      kalau ceiling ikut naik, seluruh kalibrasi ambruk.
+
+   2. GERBANG LEVEL (`lvl`). Skill puncak tiap cabang tidak bisa lagi dibeli
+      di awal permainan hanya karena SP-nya cukup. 'Benteng Tak Goyah' butuh
+      Lv 100, 'Pawang Agung' Lv 120. Ini yang membuat cabang tetap punya
+      tujuan jangka panjang.
+
+   Total SP sekarang 147 (dari 78), jadi pohon tuntas di sekitar Lv 148 —
+   dan gerbang terakhir di Lv 120, sehingga tidak ada lompatan yang terasa
+   kosong di antara keduanya.
+   =========================================================================== */
 const SKILLS=[
   /* ---------- COMBAT ---------- */
-  {id:'dmg',br:'combat',icon:'⚔️',name:'Bilah Tajam',desc:'+20% damage / rank',max:3,cost:1},
-  {id:'combo',br:'combat',icon:'🌀',name:'Aliran Combo',desc:'Serangan 12% lebih cepat / rank',max:2,cost:1,req:'dmg'},
-  {id:'slam',br:'combat',icon:'💥',name:'Hantaman Kuat',desc:'Hit ke-5 +40% damage / rank · membuka Hantam Bumi',max:2,cost:1,req:'dmg',active:true,cd:10},
-  {id:'vamp',br:'combat',icon:'🩸',name:'Bilah Vampir',desc:'Pulihkan HP 8% dari damage',max:1,cost:2,req:'combo',prof:{combat:15}},
+  {id:'dmg',br:'combat',icon:'⚔️',name:'Bilah Tajam',desc:'+10% kerusakan / rank',max:6,cost:1},
+  {id:'combo',br:'combat',icon:'🌀',name:'Aliran Combo',desc:'Serangan 6% lebih cepat / rank',max:4,cost:1,req:'dmg'},
+  {id:'slam',br:'combat',icon:'💥',name:'Hantaman Kuat',desc:'Pukulan ke-5 +20% kerusakan / rank · membuka Hantam Bumi',max:4,cost:1,req:'dmg',lvl:15,active:true,cd:10},
+  {id:'vamp',br:'combat',icon:'🩸',name:'Bilah Vampir',desc:'Pulihkan HP 2.7% dari kerusakan / rank',max:3,cost:2,req:'combo',lvl:50,prof:{combat:15}},
   /* aktif baru: tebasan berputar 360° mengenai semua musuh sekeliling */
   {id:'whirl',br:'combat',icon:'🌪️',name:'Tebasan Angin Puyuh',
     desc:'Berputar menebas semua musuh di sekeliling (radius 3.6) · 30 stamina',
-    max:2,cost:2,req:'combo',prof:{combat:8},active:true,cd:12},
+    max:4,cost:2,req:'combo',lvl:35,prof:{combat:8},active:true,cd:12},
   /* aktif baru: teriakan perang menakuti monster & menaikkan damage sesaat */
   {id:'roar',br:'combat',icon:'🦁',name:'Teriakan Perang',
-    desc:'Monster sekitar mundur ketakutan · +35% damage 8 detik',
-    max:1,cost:2,req:'dmg',prof:{combat:12},active:true,cd:26},
+    desc:'Monster sekitar mundur ketakutan · +35% kerusakan 8 detik',
+    max:2,cost:2,req:'dmg',lvl:45,prof:{combat:12},active:true,cd:26},
+  /* ---------- PASIF PERISAI (block) ----------
+     Tiga skill pasif yang khusus menaikkan efektivitas tameng. Semuanya
+     hanya berguna bila slot Tameng terisi; dibaca RPG.blockChance(),
+     RPG.blockPower(), dan RPG.blockNoStagger(). */
+  {id:'blk_guard',br:'combat',icon:'🛡️',name:'Kuda-kuda Bertahan',
+    desc:'+3% peluang menangkis / rank saat memakai tameng',
+    max:6,cost:1,req:'dmg',lvl:20},
+  {id:'blk_solid',br:'combat',icon:'🧱',name:'Tameng Kokoh',
+    desc:'Tangkisan menahan +5% kerusakan lebih banyak / rank',
+    max:6,cost:1,req:'blk_guard',lvl:55,prof:{blocking:5}},
+  {id:'blk_bastion',br:'combat',icon:'🏯',name:'Benteng Tak Goyah',
+    desc:'Tangkisan berhasil = tanpa terpental & +8% peluang menangkis',
+    max:1,cost:4,req:'blk_solid',lvl:100,prof:{blocking:15}},
   /* ---------- MOVEMENT ---------- */
-  {id:'run',br:'move',icon:'🏃',name:'Pelari',desc:'+6% kecepatan / rank',max:3,cost:1},
-  {id:'stam',br:'move',icon:'⚡',name:'Daya Tahan',desc:'Konsumsi stamina -15% / rank',max:3,cost:1},
+  {id:'run',br:'move',icon:'🏃',name:'Pelari',desc:'+3% kecepatan / rank',max:6,cost:1},
+  {id:'stam',br:'move',icon:'⚡',name:'Daya Tahan',desc:'Konsumsi stamina -7.5% / rank',max:6,cost:1},
   /* skill aktif 'roll' (Guling Cepat) DIHAPUS — dodge kini memakai animasi dash
      bawaan tanpa perlu skill. */
-  {id:'swim',br:'move',icon:'🏊',name:'Perenang',desc:'Berenang jauh lebih cepat',max:1,cost:2,req:'stam',prof:{agility:8}},
+  {id:'swim',br:'move',icon:'🏊',name:'Perenang',desc:'Berenang jauh lebih cepat',max:1,cost:3,req:'stam',lvl:25,prof:{agility:8}},
   /* skill aktif 'leap' (Lompatan Rusa) DIHAPUS — digantikan penuh oleh skill
      pasif Lompat Ganda di bawah: cukup dipelajari dari skill tree, lalu tekan
      lompat dua kali kapan saja tanpa cooldown. */
@@ -650,54 +949,54 @@ const SKILLS=[
      di udara sehingga bisa mencapai ketinggian ~3 blok. Tanpa cooldown. */
   {id:'djump',br:'move',icon:'🪽',name:'Lompat Ganda',
     desc:'Tekan lompat sekali lagi di udara untuk melompat kedua · capai ~3 blok · tanpa cooldown',
-    max:1,cost:2,req:'run',prof:{agility:4}},
+    max:1,cost:3,req:'run',lvl:25,prof:{agility:4}},
   /* ---------- CRAFTING / SURVIVAL ---------- */
-  {id:'harv',br:'craft',icon:'🌿',name:'Pemanen',desc:'+30% hasil panen / rank',max:3,cost:1},
-  {id:'axe',br:'craft',icon:'🪓',name:'Penebang',desc:'Tebang pohon +35% cepat & +1 kayu / rank',max:3,cost:1},
-  {id:'cook',br:'craft',icon:'🍳',name:'Koki',desc:'Buka Salad · makanan +25% hunger',max:2,cost:1,req:'harv',prof:{cooking:3}},
-  {id:'smith',br:'craft',icon:'🔧',name:'Pandai Besi',desc:'Buka set armor besi',max:1,cost:2,req:'axe',prof:{mining:5}},
-  {id:'gourmet',br:'craft',icon:'👨‍🍳',name:'Juru Rasa',desc:'Buka Pai Beri (buff lari)',max:1,cost:2,req:'cook',prof:{cooking:8}},
-  {id:'alchem',br:'craft',icon:'⚗️',name:'Tabib',desc:'Buka Perban penyembuh',max:1,cost:1,req:'harv',prof:{harvesting:5}},
+  {id:'harv',br:'craft',icon:'🌿',name:'Pemanen',desc:'+15% hasil panen / rank',max:6,cost:1},
+  {id:'axe',br:'craft',icon:'🪓',name:'Penebang',desc:'Tebang pohon +18% lebih cepat & +9% peluang kayu ekstra / rank',max:6,cost:1},
+  {id:'cook',br:'craft',icon:'🍳',name:'Koki',desc:'Buka Salad · makanan +25% hunger',max:3,cost:1,req:'harv',lvl:10,prof:{cooking:3}},
+  {id:'smith',br:'craft',icon:'🔧',name:'Pandai Besi',desc:'Buka set armor besi',max:1,cost:3,req:'axe',lvl:30,prof:{mining:5}},
+  {id:'gourmet',br:'craft',icon:'👨‍🍳',name:'Juru Rasa',desc:'Buka Pai Beri & Kue (buff lari)',max:1,cost:3,req:'cook',lvl:40,prof:{cooking:8}},
+  {id:'alchem',br:'craft',icon:'⚗️',name:'Tabib',desc:'Buka Perban penyembuh',max:1,cost:2,req:'harv',lvl:10,prof:{harvesting:5}},
   /* aktif baru: penyembuhan instan dari ramuan herbal */
   {id:'herb',br:'craft',icon:'🌱',name:'Ramuan Herbal',
-    desc:'Pulihkan 35 HP seketika tanpa memakai item',
-    max:2,cost:2,req:'alchem',prof:{harvesting:10},active:true,cd:30},
+    desc:'Pulihkan 35 HP seketika tanpa memakai item (+13% / rank)',
+    max:4,cost:2,req:'alchem',lvl:60,prof:{harvesting:10},active:true,cd:30},
   /* ---------- GATHER (terhubung PROFICIENCY) ----------
      Cabang ini "dikunci" oleh level proficiency (field `prof`): untuk
      membukanya pemain harus benar-benar sering melakukan aksi gathering
      (menebang/menambang/memanen/bertani) — inti rasa ala Durango. Efeknya
      menambah peluang hasil ekstra, dihitung RPG.gatherBonus(dropId). */
   {id:'groot',br:'gather',icon:'🧺',name:'Naluri Pengumpul',
-    desc:'Pembuka jalur pengumpul · +5% hasil semua gathering',max:1,cost:1},
+    desc:'Pembuka jalur pengumpul · +5% hasil semua gathering',max:1,cost:2},
   {id:'logm',br:'gather',icon:'🪓',name:'Penebang Terampil',
-    desc:'+10% peluang kayu ekstra / rank',max:3,cost:1,req:'groot',prof:{logging:5}},
+    desc:'+5% peluang kayu ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{logging:5}},
   {id:'minm',br:'gather',icon:'⛏️',name:'Penambang Terampil',
-    desc:'+10% peluang batu & bijih ekstra / rank',max:3,cost:1,req:'groot',prof:{mining:5}},
+    desc:'+5% peluang batu & bijih ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{mining:5}},
   {id:'wildm',br:'gather',icon:'🌿',name:'Pemanen Terampil',
-    desc:'+10% peluang serat, berry & jamur ekstra / rank',max:3,cost:1,req:'groot',prof:{harvesting:5}},
+    desc:'+5% peluang serat, berry & jamur ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{harvesting:5}},
   {id:'greenthumb',br:'gather',icon:'🌾',name:'Tangan Hijau',
-    desc:'+12% peluang hasil ladang ekstra / rank',max:2,cost:1,req:'groot',prof:{farming:5}},
+    desc:'+6% peluang hasil ladang ekstra / rank',max:4,cost:1,req:'groot',lvl:30,prof:{farming:5}},
   {id:'mgather',br:'gather',icon:'🌳',name:'Penguasa Alam',
-    desc:'+25% hasil semua gathering',max:1,cost:3,req:'groot',
+    desc:'+25% hasil semua gathering',max:1,cost:4,req:'groot',lvl:80,
     prof:{logging:15,mining:15,harvesting:15}},
   /* ---------- CATCH / PAWANG ----------
      Cabang menangkap monster: membuka Tali & Sadel, memperkuat tarikan,
      mengurangi risiko tali putus, dan memperlambat kaburnya monster. */
   {id:'catcher',br:'catch',icon:'🪢',name:'Pawang Pemula',
     desc:'+10% drain stamina & -10% ketegangan · membuka resep Sadel',
-    max:1,cost:1},
+    max:1,cost:2},
   {id:'catch_pow',br:'catch',icon:'💪',name:'Tarikan Kuat',
-    desc:'+20% drain stamina monster saat tarik-tarikan / rank',
-    max:3,cost:1,req:'catcher'},
+    desc:'+10% drain stamina monster saat tarik-tarikan / rank',
+    max:6,cost:1,req:'catcher',lvl:25},
   {id:'catch_rope',br:'catch',icon:'🧵',name:'Tali Lentur',
-    desc:'-15% kenaikan ketegangan tali / rank',
-    max:3,cost:1,req:'catcher'},
+    desc:'-7.5% kenaikan ketegangan tali / rank',
+    max:6,cost:1,req:'catcher',lvl:25},
   {id:'catch_calm',br:'catch',icon:'🕊️',name:'Suara Tenang',
-    desc:'Monster 15% lebih lambat kabur saat proses menangkap / rank',
-    max:2,cost:1,req:'catch_pow'},
+    desc:'Monster 7.5% lebih lambat kabur saat proses menangkap / rank',
+    max:4,cost:1,req:'catch_pow',lvl:60},
   {id:'catch_master',br:'catch',icon:'🐉',name:'Pawang Agung',
     desc:'+25% drain stamina & -10% ketegangan · memudahkan menangkap boss/naga',
-    max:1,cost:3,req:'catch_rope'},
+    max:1,cost:4,req:'catch_rope',lvl:120},
 ];
 /* label kategori skill untuk ditampilkan di sudut kiri atas kartu skill */
 const SKILL_KIND={
@@ -809,6 +1108,28 @@ const NPC_ROLES=[
     skill:{id:'backstab',name:'Backstab Leap',e:'🗡️',
       desc:'Loncat ke punggung monster · 5 tusukan beruntun (total damage 5×) · monster yang ditunggangi tak bisa membalas'},
     ask:['gold_ore','gold_ingot','meat','leather']},
+  /* Mage Support: imam berkerudung putih-emas dari prototipe NEW MODEL
+     (js/entities/npc_magesupport.js). Pendukung MURNI — ketiga skillnya
+     menyasar SELURUH TIM (pemain + rekan + pet): HEALING AURA (HoT persen
+     max-HP), AURA PERISAI (reduksi damage sementara), dan HUJAN BINTANG
+     SPIRIT (bola cahaya → DoT persen max-HP musuh). Pengembara langka. */
+  {id:'magesupport', name:'Mage Support', e:'🔯', recruit:true, rare:true, weight:8,
+    robe:0x3a5a8c, hood:0x6a8fd0,
+    hp:140, dmg:14, speed:3.4,
+    skill:{id:'support',name:'Dukungan Arcane',e:'🔯',
+      desc:'Aura Pasif +10-15% DEF tim saat direkrut · Healing Aura memulihkan tim bertahap · Aura Perisai aktif · Hujan Bintang'},
+    ask:['crystal','resin','soul_shard','gold_ingot']},
+  /* Royal Guard: pengawal kerajaan berzirah merah (NEW MODEL/Royal Guard.html).
+     TANK pengembara langka seperti singa/raksasa: HP besar, membawa perisai,
+     dua skill — SHIELD BASH (stun kerucut depan 8 blok) & PROVOKE (taunt).
+     Senjata & perisai yang diberi pemain ikut tampil di tangannya (armor tetap
+     milik karakternya). */
+  {id:'royalguard', name:'Royal Guard', e:'🛡️', recruit:true, rare:true, weight:8,
+    robe:0xb02a26, hood:0xe0b048,
+    hp:300, dmg:24, speed:3.0,
+    skill:{id:'royalbash',name:'Shield Bash',e:'👑',
+      desc:'BASH: hantaman perisai membuat mob di kerucut depan pingsan (stun) · PROVOKE: menantang mob di sekitar untuk menyerangnya · damage diterima -70% selama menantang'},
+    ask:['iron_ingot','gold_ingot','pelt','leather']},
   /* Pedagang desa: tidak bisa direkrut. Menetap di desa dan membuka toko —
      pemain membeli item dengan koin atau menjual item untuk dapat koin. */
   {id:'merchant',name:'Pedagang',e:'🏪',recruit:false,
@@ -816,6 +1137,16 @@ const NPC_ROLES=[
     hp:100, dmg:6, speed:2.6,
     skill:{id:'trade',name:'Jiwa Dagang',e:'🪙',
       desc:'Menjual barang & membeli hasil buruanmu'},
+    ask:[]},
+  /* Dungeon Master: penyihir berjubah ungu tua yang menetap satu per desa
+     (seperti pedagang) dan menjual DUNGEON CHANGER — kunci ajaib yang
+     mengubah level dungeon. Stoknya per desa & deterministik (lihat
+     genDungeonChangerStock); tidak bisa direkrut. */
+  {id:'dungeonmaster', name:'Dungeon Master', e:'🧙', recruit:false,
+    robe:0x4a2a6a, hood:0x2a1a3a,
+    hp:150, dmg:10, speed:2.8,
+    skill:{id:'dchange',name:'Penjaga Reruntuhan',e:'🗝️',
+      desc:'Menjual Dungeon Changer — mengubah level dungeon'},
     ask:[]},
 ];
 
@@ -827,24 +1158,30 @@ const SHOP_GOODS=[
   {id:'bread',      price:6},
   {id:'cmeat',      price:10},
   {id:'bandage',    price:14},
+  {id:'potion_stam',price:16},
   {id:'pie',        price:22},
+  {id:'sugar',      price:11},
+  {id:'cake',       price:28},
   {id:'fish',       price:8},
   {id:'cfish',      price:12},
   {id:'leather',    price:9},
   {id:'iron_ingot', price:18},
   {id:'gold_ingot', price:30},
-  {id:'sword_iron', price:60},
-  {id:'sword_storm',price:140},
-  {id:'helm_iron',  price:40},
-  {id:'plate_iron', price:70},
-  {id:'greaves_iron',price:45},
-  {id:'cloak_swift',price:90},
+  /* PEDAGANG HANYA MENJUAL SENJATA & ARMOR LEVEL RENDAH / COMMON */
+  {id:'sword_wood', price:15},
+  {id:'shield_wood',price:18},
+  {id:'cap_leather', price:12},
+  {id:'vest_leather',price:20},
+  {id:'boots_leather',price:12},
 ];
 /* nilai dasar koin per item saat dijual (fallback bila tak ada di toko) */
 const SHOP_VALUE={
   wood:1,stone:1,fiber:1,berry:2,mush:1,gel:2,meat:3,cmeat:5,bread:3,salad:6,
-  pie:11,bandage:7,fish:4,cfish:6,resin:3,leather:5,sand:1,coal:3,
+  pie:11,bandage:7,potion_stam:8,fish:4,cfish:6,resin:3,leather:5,sand:1,coal:3,
+  sugar_cane:2,sugar:5,cake:14,
   iron_ore:5,gold_ore:8,crystal:12,iron_ingot:9,gold_ingot:15,pelt:4,venom:7,
+  centipede_shell:14,
+  insect_leg:35,hard_shell:40,green_blood:45,toxic_venom:50,
   boss_core:40,
 };
 function shopPrice(id){
@@ -875,6 +1212,8 @@ function genShopStock(bagTier){
     const idx=Math.floor(Math.random()*pool.length);
     const g=pool.splice(idx,1)[0];
     const it=ITEMS[g.id];if(!it)continue;
+    /* pedagang hanya menjual equipment level rendah atau common */
+    if((it.weapon||it.armor)&&((it.rarity&&it.rarity!=='common')||(it.armor&&it.armor.tier&&it.armor.tier!=='leather')||(it.weapon&&it.weapon.tier&&it.weapon.tier!=='wood')))continue;
     /* consumable dijual beberapa; senjata/armor satuan */
     const n=(it.weapon||it.armor)?1:(3+Math.floor(Math.random()*4));
     out.push({id:g.id,price:g.price,n});
@@ -883,6 +1222,34 @@ function genShopStock(bagTier){
   if((bagTier||0)<5&&Math.random()<0.25){
     out.push({id:'bag',price:BAG_PRICES[(bagTier||0)],n:1});
   }
+  return out;
+}
+
+/* ================= STOK DUNGEON MASTER (Dungeon Changer) =================
+   Tiap desa menjual SATU SET BERBEDA berisi sampai 5 level Dungeon Changer,
+   dipilih DETERMINISTIK dari posisi desa lewat WGEN.hash — desa yang sama
+   selalu menjual 5 level yang sama. Tiap level di-clamp 1..100.
+   Harga mengikuti level: 1000 + level*40 → termurah Lv 1 = 1040 🪙,
+   termahal Lv 100 = 5000 🪙. Stok per level maks 10 (restock ditangani
+   NPCS.checkDshopRestock tiap 30 menit). */
+const DCHANGER_MAX_LVL=100;
+const DCHANGER_STOCK_MAX=10;
+/* jumlah JENIS level berbeda yang dijual satu Dungeon Master (dulu 5) */
+const DCHANGER_SLOTS=10;
+function dchangerPrice(lvl){return 1000+clamp(Math.round(lvl)||1,1,DCHANGER_MAX_LVL)*40;}
+function genDungeonChangerStock(vx,vz){
+  const out=[],seen={};
+  /* 10 LEVEL UNIK per desa (dulu 5). Kandidat diundi jauh lebih banyak dari
+     kuota supaya tetap terpenuhi walau banyak undian menghasilkan level yang
+     sama. Semuanya deterministik dari posisi desa, jadi satu desa selalu
+     menjual daftar level yang sama. */
+  for(let i=0;i<40&&out.length<DCHANGER_SLOTS;i++){
+    const lvl=1+Math.floor(WGEN.hash(vx,vz,777+i*17)*DCHANGER_MAX_LVL);
+    if(seen[lvl])continue;
+    seen[lvl]=1;
+    out.push({lvl,price:dchangerPrice(lvl),stock:DCHANGER_STOCK_MAX,maxStock:DCHANGER_STOCK_MAX});
+  }
+  out.sort((a,b)=>a.lvl-b.lvl);
   return out;
 }
 
@@ -921,6 +1288,14 @@ function itemStats(id){
   }
   if(it.armor){
     out.push({k:'DEF',v:'+'+Math.round(it.armor.def*mul*100)+'%',e:'🛡️',css:'#8fe0ff'});
+    /* stat block hanya ada di tameng: peluang menangkis & porsi damage
+       yang ditahan saat tangkisan berhasil */
+    if(it.armor.blk!==undefined){
+      out.push({k:'Block',v:Math.round(Math.min(0.55,it.armor.blk*mul)*100)+'%',
+        e:'🎲',css:'#9fd7ff'});
+      out.push({k:'Tahan',v:Math.round(Math.min(0.85,it.armor.bkp||0)*100)+'%',
+        e:'🧱',css:'#c8e6a0'});
+    }
     const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
     if(slots.some(s=>s.id===it.armor.slot)){
       const sl=slots.find(s=>s.id===it.armor.slot);
@@ -1077,6 +1452,22 @@ const NPC_DIALOG={
     intro:['Aku Goblin Emas, penunggang monster tercepat di hutan ini.',
       'Bawakan emas yang kumau, lalu saksikan aku melompat ke punggung monstermu.',
       'Lima tusukan sebelum monster sadar ada apa di punggungnya. Mau lihat langsung?']},
+  magesupport:{
+    chat:['Aura hijau ini bukan sihir serangan — ia doa yang menjaga teman-temanku.',
+      'Permata staffku berpendar saat ada jiwa yang butuh ditolong.',
+      'Kerudung putih ini tua... ia sudah menemani seribu pemberkatan.',
+      'Biarkan yang lain maju. Aku memastikan mereka pulang utuh.'],
+    intro:['Aku Mage Support, imam pengembara. Pedangku adalah doa dan auraku perisaimu.',
+      'Bawakan kristal & pecahan jiwa, dan seluruh timmu akan kujaga sepanjang jalan.',
+      'Bintang-bintang yang kujatuhkan hanya menyentuh musuh. Temanmu? Mereka kupulihkan.']},
+  royalguard:{
+    chat:['Zirah merah ini warna panji kerajaan. Aku satu-satunya yang tersisa memakainya.',
+      'Perisaiku pernah menahan tanduk naga. Telingaku masih berdenging sampai sekarang.',
+      'Tugas seorang pengawal bukan membunuh — tugasnya membuat yang dilindunginya selamat.',
+      'Serang mereka dari depan. Dari depan, tamengku selalu lebih keras.'],
+    intro:['Aku Royal Guard dari istana yang telah runtuh. Perisai ini masih bertugas.',
+      'Butuh pengawal? Perisaiku bisa membius gerombolan monster, dan teriakanku memanggil semuanya padaku.',
+      'Bawakan besi & emas untuk perisai ini, dan dia akan berdiri di depanmu selamanya.']},
 };
 
 

@@ -1,26 +1,38 @@
 # ============ Dependencies ============
 node_modules/
 
-# ============ Build artifacts (bisa digenerate ulang) ============
-# www/ dibuat oleh scripts/build.js, android/ oleh npx cap sync
+# ============ Build artifacts ============
 www/
 android/
 *.apk
 
-# ============ File personal / ekspor besar ============
+# ============ Personal & Batch Scripts ============
 chat-export-*.json
+opencode.json
+opencode-config.bat
+*.bat
 
-# ============ Backup & checkpoint manual ============
-# Sudah tergantikan oleh git; file tetap ada di disk, hanya tidak dilacak.
+# ============ Backup & Checkpoints ============
 js/backup/
 CHECKPOINT_*/
-# salinan "(backup)" dari file yang sudah dilacak, mis. player_animations(backup).js
 *(backup)*
+__pycache__/
 
-# ============ Proyek referensi pihak ketiga (besar) ============
-Modeling/LinearAbiltyCastingThreeJS-main/
+# ============ 3D Studio, Modeling & Prototype Tools ============
+3D Studio/
+Button UI/
+Modeling/
+NEW MODEL/
+tools/
+Model.html
+Qwen_html_*.html
+tes_air.html
+flow_generator.py
+promopt.txt
+.agents/
+scripts/studio.js
 
-# ============ OS / editor ============
+# ============ OS / Editor ============
 .DS_Store
 Thumbs.db
 desktop.ini

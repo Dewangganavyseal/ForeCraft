@@ -77,6 +77,8 @@ class PlayerAnimator {
     if (P.head) P.head.rotation.set(0, 0, 0);
     if (P.torso) P.torso.rotation.set(0, 0, 0);
     if (P.body) { P.body.position.set(0, 0, 0); P.body.rotation.set(0, 0, 0); }
+    /* mulut selalu kembali tertutup saat animasi berganti (dibuka animRoar) */
+    if (P.mouth) this._setMouthOpen(P, 0);
   }
 
   /* ================= API ================= */
@@ -905,58 +907,106 @@ class PlayerAnimator {
     }
   }
 
-  /* ================= TERIAKAN PERANG (roar berdiri) =================
-     Berdiri di tempat: tarik napas → auman meledak (dada maju, kepala ke atas,
-       kepalan di sisi tubuh bergetar) → reda. TIDAK ada lompatan. */
+  /* ================= TERIAKAN PERANG (berteriak) =================
+     Bentuk gerakan mengikuti bahasa tubuh orang BERTERIAK, bukan pose kuda-kuda:
+       0.00-0.22  ancang: badan sedikit membungkuk, dada tarik napas dalam,
+                  kedua tangan mengepal ditarik ke belakang-bawah.
+       0.22-0.68  TERIAKAN: torso melengkung ke belakang, kepala mendongak &
+                  MULUT TERBUKA lebar, kedua lengan terhempas terbuka lebar
+                  ke samping-belakang, badan terangkat & bergetar (raung).
+       0.68-1.00  reda: napas turun, tangan kembali, mulut menutup.
+     Mulut digerakkan lewat parts.mouth (dibuka dengan menggeser & meregangkan
+     bibir + rongga gelap di belakangnya) sehingga teriakannya terlihat. */
   animRoar(t, P) {
     const dur = this.durations.roar || 0.9;
     const p = this.clamp(t / dur, 0, 1);
-    let torsoX, headX, bodyY, armRX, armRY, armRZ, armLX, armLY, armLZ, fore;
-    let legSpread = 0, brace = 0;
-    if (p < 0.25) {
-      // Tarik napas: dada mengembang sedikit, kepala mulai mendongak
-      const k = this.easeOut(p / 0.25);
-      torsoX = -0.16 * k; headX = -0.28 * k; bodyY = 0.02 * k;
-      armRX = 0.35 * k; armRY = 0; armRZ = -0.45 * k;
-      armLX = 0.35 * k; armLY = 0; armLZ = 0.45 * k;
-      fore = -1.6 * k;
-      brace = k;
-    } else if (p < 0.72) {
-      // AUMAN: dada dorong ke depan-atas, kepalan bergetar di sisi tubuh
-      const k = this.easeOut((p - 0.25) / 0.12);
-      const tremble = Math.sin(t * 46) * 0.05;
-      torsoX = this.lerp(-0.16, -0.30, k);
-      headX = this.lerp(-0.28, -0.44, k);
-      bodyY = this.lerp(0.02, 0.06, k);
-      armRX = this.lerp(0.35, 0.72, k) + tremble;
-      armRZ = this.lerp(-0.45, -0.58, k) + tremble * 0.5;
-      armLX = this.lerp(0.35, 0.70, k) - tremble;
-      armLZ = this.lerp(0.45, 0.58, k) - tremble * 0.5;
-      fore = -1.85 * k;
-      legSpread = 0.16 * k; brace = 1;
+    let torsoX, headX, bodyY, bodyZ;
+    let armX, armY, armZ, fore;
+    let legSpread = 0, brace = 0, mouthOpen = 0, shoulder = 0;
+
+    if (p < 0.22) {
+      // ANCANG: membungkuk sedikit sambil menarik napas, tangan mengepal ditarik
+      const k = this.easeOut(p / 0.22);
+      torsoX = 0.20 * k;                 // bungkuk ke depan
+      headX = 0.10 * k;                  // dagu turun (menunduk sesaat)
+      bodyY = -0.05 * k;                 // badan merendah
+      bodyZ = 0;
+      armX = 0.85 * k;                   // lengan ditarik ke belakang-bawah
+      armY = 0.10 * k;
+      armZ = 0.18 * k;
+      fore = -0.55 * k;
+      shoulder = 0.10 * k;
+      legSpread = 0.06 * k;
+      brace = k * 0.4;
+      mouthOpen = 0.15 * k;              // mulut mulai terbuka menarik napas
+    } else if (p < 0.68) {
+      // TERIAKAN: dada terbuka, kepala mendongak, mulut lebar, lengan mengembang
+      const k = this.easeOut(this.clamp((p - 0.22) / 0.14, 0, 1));
+      const tremble = Math.sin(t * 52) * 0.045;     // getaran suara
+      const holler = 0.5 + 0.5 * Math.sin(t * 26);  // denyut raungan
+      torsoX = this.lerp(0.20, -0.34, k);           // melengkung ke belakang
+      headX = this.lerp(0.10, -0.62, k) + tremble * 0.5;  // mendongak kuat
+      bodyY = this.lerp(-0.05, 0.10, k);            // badan terangkat (jinjit)
+      bodyZ = 0;
+      armX = this.lerp(0.85, -0.30, k) + tremble;   // lengan terhempas terbuka
+      armY = this.lerp(0.10, -0.55, k);             // membuka ke samping
+      armZ = this.lerp(0.18, 1.05, k) + tremble * 0.6;
+      fore = this.lerp(-0.55, -0.30, k);            // siku hampir lurus
+      shoulder = this.lerp(0.10, -0.22, k);
+      legSpread = this.lerp(0.06, 0.22, k);
+      brace = 1;
+      mouthOpen = this.lerp(0.15, 0.85 + 0.15 * holler, k);
     } else {
-      // Reda: kembali berdiri netral
-      const k = this.easeInOut((p - 0.72) / 0.28);
-      torsoX = -0.30 * (1 - k); headX = -0.44 * (1 - k);
-      bodyY = 0.06 * (1 - k);
-      armRX = 0.72 * (1 - k); armRZ = -0.58 * (1 - k);
-      armLX = 0.70 * (1 - k); armLZ = 0.58 * (1 - k);
-      fore = -1.85 * (1 - k);
-      legSpread = 0.16 * (1 - k); brace = 1 - k;
+      // REDA: napas turun, mulut menutup, tangan kembali ke sisi tubuh
+      const k = this.easeInOut((p - 0.68) / 0.32);
+      torsoX = this.lerp(-0.34, 0, k);
+      headX = this.lerp(-0.62, 0, k);
+      bodyY = this.lerp(0.10, 0, k);
+      bodyZ = 0;
+      armX = this.lerp(-0.30, 0, k);
+      armY = this.lerp(-0.55, 0, k);
+      armZ = this.lerp(1.05, 0, k);
+      fore = this.lerp(-0.30, -0.15, k);
+      shoulder = this.lerp(-0.22, 0, k);
+      legSpread = 0.22 * (1 - k);
+      brace = 1 - k;
+      mouthOpen = 0.85 * (1 - k);
     }
-    if (P.body) P.body.position.set(0, bodyY, 0);
+
+    if (P.body) { P.body.position.set(0, bodyY, 0); P.body.rotation.z = bodyZ; }
     if (P.torso) P.torso.rotation.set(torsoX, 0, 0);
     if (P.head) P.head.rotation.set(headX, 0, 0);
+    /* lengan simetris terbuka ke samping (Y & Z dicerminkan kiri/kanan) */
     if (P.armR) {
-      P.armR.rotation.set(armRX, armRY, armRZ);
+      P.armR.rotation.set(armX + shoulder, -armY, -armZ);
       if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = fore;
     }
     if (P.armL) {
-      P.armL.rotation.set(armLX, armLY, armLZ);
+      P.armL.rotation.set(armX + shoulder, armY, armZ);
       if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = fore;
     }
-    if (P.legL) { P.legL.rotation.x = -brace * 0.06; P.legL.rotation.z = legSpread; }
-    if (P.legR) { P.legR.rotation.x = brace * 0.06; P.legR.rotation.z = -legSpread; }
+    if (P.legL) { P.legL.rotation.x = -brace * 0.10; P.legL.rotation.z = legSpread; }
+    if (P.legR) { P.legR.rotation.x = brace * 0.10; P.legR.rotation.z = -legSpread; }
+    this._setMouthOpen(P, mouthOpen);
+  }
+
+  /* Buka/tutup mulut karakter. `k` 0=tertutup, 1=terbuka lebar.
+     Bibir digeser turun & rongga gelap di belakangnya diregangkan sehingga
+     mulut terbaca terbuka walau modelnya kotak. Aman bila parts.mouth tidak
+     ada (model lain / karakter lama). */
+  _setMouthOpen(P, k) {
+    const m = P.mouth;
+    if (!m) return;
+    k = this.clamp(k, 0, 1);
+    const baseY = (m.userData.baseY !== undefined) ? m.userData.baseY : m.position.y;
+    m.position.y = baseY - 0.035 * k;         // bibir bawah turun
+    m.scale.set(1 + 0.35 * k, 1 + 1.2 * k, 1);
+    const inner = m.userData.inner;
+    if (inner) {
+      inner.visible = k > 0.05;
+      inner.position.y = baseY - 0.018 * k;
+      inner.scale.set(1 + 0.5 * k, Math.max(0.001, 0.4 + 5.5 * k), 1);
+    }
   }
 
   /* ================= SEQUENCE (demo) ================= */

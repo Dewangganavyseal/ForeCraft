@@ -11,6 +11,57 @@ const HPBars={
   group:null,
   bars:new Map(),
   _seq:0,
+  /* ---------- LABEL LEVEL ----------
+     Tekstur angka level dibuat SEKALI per level lalu dipakai ulang (levels 1..50
+     berarti maksimum 50 tekstur kecil untuk seluruh permainan). Tanpa cache,
+     setiap mob akan membuat canvas+tekstur sendiri tiap kali bar-nya muncul —
+     itu membebani GPU & memori di perangkat mobile.
+     Boss diberi penanda mahkota 👑 agar pemain tahu ia menghadapi boss agung,
+     bukan sekadar penjaga biasa di dungeon. */
+  _lvlTex:{},
+  lvlTexture(lvl,isBoss){
+    const k=(isBoss?'B':'L')+lvl;
+    if(this._lvlTex[k])return this._lvlTex[k];
+    const cv=document.createElement('canvas');cv.width=isBoss?80:64;cv.height=32;
+    const c=cv.getContext('2d');
+    c.textAlign='center';c.textBaseline='middle';
+    c.lineWidth=5;c.strokeStyle='rgba(0,0,0,0.85)';
+    if(isBoss){
+      /* Gambar mahkota vektor 2D langsung di canvas — TIDAK memakai string emoji 👑
+         karena font monospace di Android Canvas 2D tidak punya glif 👑 sehingga
+         dirender sebagai tanda tanya (?) */
+      const cx=16,cy=17,cw=18,ch=14;
+      c.beginPath();
+      c.moveTo(cx-cw/2,cy+ch/2);
+      c.lineTo(cx+cw/2,cy+ch/2);
+      c.lineTo(cx+cw/2,cy-ch/4);
+      c.lineTo(cx+cw/4,cy+ch/8);
+      c.lineTo(cx,cy-ch/2);
+      c.lineTo(cx-cw/4,cy+ch/8);
+      c.lineTo(cx-cw/2,cy-ch/4);
+      c.closePath();
+      c.fillStyle='#ff6bd6';
+      c.fill();
+      c.stroke();
+      /* Angka level di sebelah kanan mahkota (angka murni tanpa emoji) */
+      c.font='bold 20px monospace';
+      const text=String(lvl);
+      const tx=cx+cw/2+2+(cv.width-(cx+cw/2+2))/2;
+      c.strokeText(text,tx,17);
+      c.fillStyle='#ff6bd6';
+      c.fillText(text,tx,17);
+    }else{
+      c.font='bold 22px monospace';
+      const text=String(lvl);
+      c.strokeText(text,cv.width/2,17);
+      c.fillStyle='#ffd76b';
+      c.fillText(text,cv.width/2,17);
+    }
+    const t=new THREE.CanvasTexture(cv);
+    t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;
+    this._lvlTex[k]=t;
+    return t;
+  },
 
   init(){
     if(typeof THREE==='undefined'||typeof Game==='undefined'||!Game.scene)return false;
@@ -39,7 +90,19 @@ const HPBars={
     fill.position.z=0.01;
     g.add(bg);
     g.add(fill);
-    g.userData={bg,fill};
+    /* angka LEVEL di kiri bar: memberi tahu pemain apakah mob ini sepadan
+       sebelum ia memutuskan bertarung. Materialnya dibuat per bar (tekstur
+       bersama), sehingga tiap bar bisa menampilkan angka berbeda. */
+    const lvl=new THREE.Mesh(
+      new THREE.PlaneGeometry(0.42,0.21),
+      new THREE.MeshBasicMaterial({transparent:true,depthTest:false,
+        depthWrite:false,side:THREE.DoubleSide})
+    );
+    lvl.renderOrder=992;
+    lvl.position.z=0.02;
+    lvl.visible=false;
+    g.add(lvl);
+    g.userData={bg,fill,lvl,lvlNum:0};
     return g;
   },
 
@@ -59,7 +122,25 @@ const HPBars={
     ud.fill.material.color.setHSL(0.33*clamp(ratio,0,1),0.85,0.5);
   },
 
-  show(key,pos,hp,maxhp,width,heightAbove){
+  /* Pasang angka level di ujung kiri bar. lvl<=0 / undefined menyembunyikannya
+     (mis. pet & ternak yang levelnya tidak relevan). */
+  setLevel(b,w,lvl,isBoss){
+    const ud=b.userData;
+    if(!ud.lvl)return;
+    if(!(lvl>0)){ud.lvl.visible=false;return;}
+    ud.lvl.visible=true;
+    const key=(isBoss?'B':'L')+lvl;
+    if(ud.lvlNum!==key){
+      ud.lvlNum=key;
+      ud.lvl.material.map=this.lvlTexture(lvl,isBoss);
+      ud.lvl.material.needsUpdate=true;
+      if(isBoss)ud.lvl.scale.set(1.25,1,1);
+      else ud.lvl.scale.set(1,1,1);
+    }
+    ud.lvl.position.x=-w/2-(isBoss?0.32:0.26);
+  },
+
+  show(key,pos,hp,maxhp,width,heightAbove,lvl,isBoss){
     if(!this.init())return;
     let b=this.bars.get(key);
     if(!b){
@@ -72,6 +153,7 @@ const HPBars={
     if(typeof Cam!=='undefined'&&Cam.cam)b.quaternion.copy(Cam.cam.quaternion);
     const max=Math.max(1,maxhp);
     this.layout(b,width,clamp(hp/max,0,1));
+    this.setLevel(b,width,lvl,isBoss);
   },
 
   hide(key){
@@ -120,8 +202,13 @@ const HPBars={
         seen.add(key);
 
         const h=(typeof meshHeight==='function')?meshHeight(m.type):1.2;
-        const w=m.boss?1.9:1.0;
-        this.show(key,m.pos,m.hp,m.maxhp,w,h+0.55);
+        const isBoss=!!(m.boss||m.dboss);
+        const w=isBoss?1.9:1.0;
+        /* level ditampilkan untuk mob LIAR & penjaga dungeon; pet tidak (level
+           pet punya tampilannya sendiri di kartu pet).
+           TINGGI BAR mengikuti pembesaran tubuh (m.sizeMul, diisi make()):
+           tanpa ini bar boss menempel di dada, bukan di atas kepala. */
+        this.show(key,m.pos,m.hp,m.maxhp,w,h*(m.sizeMul||1)+0.55,m.pet?0:m.lvl,isBoss);
       }
     }
 

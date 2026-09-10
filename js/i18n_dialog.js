@@ -220,4 +220,24 @@ Object.assign(I18N_DIALOG,{
     {en:'Thank you, I will keep this for now.',
      zh:'谢谢，我先收下了。',
      ja:'ありがとう、これは預かっておく。'},
+
+  /* ---------------- TAMBAHAN CELETUKAN & SHOUT ---------------- */
+  'KE SINI KALIAN!':
+    {en:'OVER HERE, ALL OF YOU!',zh:'到这里来，你们这群家伙！',ja:'こっちに来い、お前ら！'},
+  'BASH!':
+    {en:'SHIELD BASH!',zh:'盾击！',ja:'シールドバッシュ！'},
+  'Reruntuhan menyimpan rahasia... levelnya bisa kuubah untukmu.':
+    {en:'The ruins hold secrets... I can alter their level for you.',
+     zh:'废墟隐藏着秘密……我可以为你改变它们的等级。',
+     ja:'遺跡には秘密が眠っている…お前のためにレベルを変えてやろう。'},
+  'Terima kasih, staminaku pulih!':
+    {en:'Thank you, my stamina is restored!',
+     zh:'多谢，我的体力恢复了！',
+     ja:'ありがとう、スタミナが回復した！'},
+  'Healing Aura!':
+    {en:'Healing Aura!',zh:'治愈光环！',ja:'ヒーリングオーラ！'},
+  'Aura Perisai!':
+    {en:'Shield Aura!',zh:'护盾光环！',ja:'シールドオーラ！'},
+  'Hujan Bintang Spirit!':
+    {en:'Spirit Star Rain!',zh:'灵星之雨！',ja:'スピリットスターレイン！'},
 });

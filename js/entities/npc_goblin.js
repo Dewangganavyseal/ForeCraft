@@ -196,12 +196,11 @@ const NPC_Goblin={
         for(let i=A.lastHit+1;i<5;i++){
           if(tr<this.GB_HITS[i])break;
           A.lastHit=i;
-          const wasDead=m.dead;
           Monsters.hurt(m,npcDmgSafe(n),new THREE.Vector3(0,-0.5,0),1,n);
           PortFX.spark(m.pos.x,bp.y+0.25,m.pos.z,5,0xffd24d,5);
           Sfx.at(m.pos,'hit');
-          if(!wasDead&&m.dead&&NPCS.isTeam(n))
-            NPCS.gainXp(n,CFG.NPC.XP_PER_KILL);
+          /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat
+             XP penuh. Grant ganda lama di sini dihapus. */
         }
       }else if(T<tEnd){
         /* lompat turun: salto belakang ke titik di belakang mob */
@@ -233,16 +232,18 @@ const NPC_Goblin={
       return true;
     }
 
-    /* ---------- picu BACKSTAB LEAP ---------- */
+    /* ---------- picu BACKSTAB LEAP (butuh stamina 30) ---------- */
     if(!m||m.dead)return false;
     const d=m.pos.distanceTo(n.pos);
-    if(gb.cd<=0&&d<GB.range&&d>0.8){
+    if(gb.cd<=0&&d<GB.range&&d>0.8&&((n.stamina||0)>=30)){
+      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
       gb.action={name:'leap',t:0,lastHit:-1,startPos:n.pos.clone(),
         arc:clamp(0.9+d*0.22,1.0,2.6)};
       gb.cd=GB.cd;
       NPCS.say(n,'BACKSTAB LEAP!',1.6);
       UI.toast(`👺 ${n.name}: Backstab Leap!`);
       FX.ring(n.pos.x,n.pos.y+0.1,n.pos.z,0xffd24d,0.5,2);
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
       Sfx.at(n.pos,'dash');
       return true;
     }

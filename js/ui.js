@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /* HUD & semua panel */
 const UI={
   open:null,picked:null,hotEls:[],activeSig:'',
@@ -14,7 +14,7 @@ const UI={
       body.className='panel-body';
       const keep=[];                       // node yang tetap di luar (header/tab)
       Array.from(p.childNodes).forEach(n=>{
-        const isHead=n.nodeType===1&&(n.tagName==='H2'||n.id==='craft-tabs');
+        const isHead=n.nodeType===1&&(n.tagName==='H2'||n.id==='craft-tabs'||n.id==='sp-info');
         if(isHead)keep.push(n);else body.appendChild(n);
       });
       p.appendChild(body);                 // body di bawah header/tab
@@ -86,6 +86,35 @@ const UI={
     const DEAD=7;                       // px minimum sebelum dianggap drag
     const HOLD=1000;                    // ms tahan untuk mulai drag di mobile
     const SCROLL_MOVE=12;               // gerak sebelum hold = scroll
+    /* ---------- TOOLTIP SAAT TAP (MOBILE) ----------
+       Di desktop nama item sudah terlihat lewat atribut title saat hover.
+       Di mobile tidak ada hover; solusinya: TAP biasa (lepas sebelum HOLD)
+       menampilkan gelembung tooltip kecil berisi nama item di atas slot.
+       TAP lama (≥HOLD) tetap untuk drag. Tooltip menutup saat tap berikutnya. */
+    let tip=null;
+    const hideTip=()=>{if(tip){tip.remove();tip=null;}};
+    const showTip=(sl)=>{
+      hideTip();
+      const g=+sl.dataset.g,i=+sl.dataset.i;
+      const arr=g===0?RPG.hotbar:RPG.bag;
+      const s=arr[i];
+      if(!s||!ITEMS[s.id])return;
+      const it=ITEMS[s.id];
+      const r=sl.getBoundingClientRect();
+      tip=document.createElement('div');
+      tip.className='slot-tip';
+      tip.innerHTML=`<b>${it.e} ${it.n}</b>`+(s.lvl?` <i>+${s.lvl}</i>`:'');
+      document.body.appendChild(tip);
+      /* posisi: tepat di atas slot, terpusat; bila mentok layar atas → di bawah */
+      const w=tip.offsetWidth,h=tip.offsetHeight;
+      let tx=r.left+r.width/2-w/2, ty=r.top-h-8;
+      if(ty<4)ty=r.bottom+8;
+      tx=Math.max(4,Math.min(window.innerWidth-w-4,tx));
+      tip.style.left=tx+'px';tip.style.top=ty+'px';
+      /* tutup saat tap di mana pun (kecuali pada tooltip itu sendiri) */
+      const off=ev=>{if(tip&&!tip.contains(ev.target))hideTip();};
+      setTimeout(()=>document.addEventListener('pointerdown',off,{once:true}),0);
+    };
     let d=null;
 
     const cleanup=()=>{
@@ -109,8 +138,11 @@ const UI={
       if(!s){cleanup();return;}
       d.ghost=document.createElement('div');
       d.ghost.className='drag-ghost';
-      d.ghost.textContent=ITEMS[s.id].e;
+      /* ikon yang sama dengan slot: <img> PNG kustom bila ada, emoji bila
+         tidak — dulu selalu emoji sehingga item bergambar terlihat berubah */
+      d.ghost.innerHTML=this.itemIcon(s.id);
       document.body.appendChild(d.ghost);
+      this.applyItemIcons(d.ghost);
       d.sl.classList.remove('press');
       d.sl.classList.add('dragging');
     };
@@ -185,6 +217,10 @@ const UI={
           }
         }
         this._skipClick=true;           // cegah handler klik ikut jalan
+      }else if(e.pointerType==='touch'){
+        /* TAP biasa (bukan scroll, bukan drag): tampilkan tooltip nama item */
+        const dist=Math.hypot(e.clientX-d.x0,e.clientY-d.y0);
+        if(dist<DEAD)showTip(d.sl);
       }
       cleanup();
     });
@@ -195,7 +231,7 @@ const UI={
   confirmDropPlayer(g,i,s){
     const it=ITEMS[s.id];
     this.modal({
-      icon:it.e,
+      icon:this.itemIcon(s.id),
       text:`Buang <b>${it.n}</b> ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
       okLabel:'✔ Buang',cancelLabel:'✖ Batal',
@@ -205,13 +241,18 @@ const UI={
         const cur=arr[i];
         if(!cur||cur.id!==s.id)return;          // slot berubah sejak modal dibuka
         const take=Math.min(n,cur.n);
+        /* data per-instance ikut jatuh: Log Pass yang dibuang TETAP menyimpan
+           tandanya, dan pedang tempa tetap membawa levelnya */
+        const inst={owner:true};
+        if(cur.lvl)inst.lvl=cur.lvl;
+        if(cur.mark)inst.mark=cur.mark;
         cur.n-=take;
         if(cur.n<=0)arr[i]=null;
         /* jatuhkan di depan pemain supaya mudah dipungut kembali; owner=true
            memberi jeda ambil agar tidak langsung tersedot balik ke tas */
         const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
         const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
-        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,{owner:true});
+        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,inst);
         this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take}`);
         Sfx.click();
         this.renderBag();this.renderHotbar();
@@ -223,7 +264,7 @@ const UI={
     const n=this.npcSel;if(!n)return;
     const it=ITEMS[s.id];
     this.modal({
-      icon:it.e,
+      icon:this.itemIcon(s.id),
       text:`Buang <b>${it.n}</b> milik ${n.name} ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
       okLabel:'✔ Buang',cancelLabel:'✖ Batal',
@@ -270,7 +311,8 @@ const UI={
         const n=this.npcSel;const s=n&&n.bag[d.i];
         if(!s){cleanup();return;}
         d.ghost=document.createElement('div');d.ghost.className='drag-ghost';
-        d.ghost.textContent=ITEMS[s.id].e;document.body.appendChild(d.ghost);
+        d.ghost.innerHTML=this.itemIcon(s.id);document.body.appendChild(d.ghost);
+        this.applyItemIcons(d.ghost);
         d.sl.classList.add('dragging');
         this._npcSkipClick=true;        // cegah click 'ambil' ikut jalan
       }
@@ -297,9 +339,12 @@ const UI={
     const to=toG===0?RPG.hotbar:RPG.bag;
     const a=from[fromI],b=to[toI];
     if(!a)return false;
-    /* equipment (pedang/armor/tameng) maks 1 per slot -> tidak pernah digabung */
+    /* equipment (pedang/armor/tameng) maks 1 per slot -> tidak pernah digabung.
+       Item ber-data-instance (level tempa `lvl`, tanda lokasi Log Pass `mark`)
+       juga tidak boleh digabung: menggabungkannya membuang data salah satunya. */
     const cap=(typeof stackCap==='function')?stackCap(a.id):64;
-    if(b&&b.id===a.id&&b.n<cap){
+    const inst=a.lvl||a.mark||(b&&(b.lvl||b.mark));
+    if(b&&b.id===a.id&&b.n<cap&&!inst){
       const mv=Math.min(a.n,cap-b.n);b.n+=mv;a.n-=mv;
       if(a.n<=0)from[fromI]=null;
     }else{to[toI]=a;from[fromI]=b;}
@@ -313,41 +358,58 @@ const UI={
   toast(msg){
     const t=document.getElementById('toast');
     const d=document.createElement('div');d.className='toast-item';
-    /* notifikasi ikut bahasa aktif (data item/mob sudah ter-patch, sisanya
-       ditukar lewat pemetaan frasa I18N) */
-    d.textContent=(typeof I18N!=='undefined'&&I18N.lang!=='id')
-      ? I18N.translateText(msg,I18N.lang) : msg;
+    const isHtml=/<[a-z][\s\S]*>/i.test(msg);
+    if(isHtml){
+      d.innerHTML=msg;
+      this.applyItemIcons(d);
+      if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(d,I18N.lang);
+    }else{
+      d.textContent=(typeof I18N!=='undefined'&&I18N.lang!=='id')
+        ? I18N.translateText(msg,I18N.lang) : msg;
+    }
     t.appendChild(d);
-    /* buang notifikasi terlama bila melebihi batas */
     while(t.childElementCount>this.TOAST_MAX)t.firstElementChild.remove();
     setTimeout(()=>d.remove(),2600);
   },
   /* ---------- modal konfirmasi generik ----------
-     opt: {icon, text, count, input:{value,min,max}, okLabel, cancelLabel,
-           allLabel, onOk(n), onCancel}. `input` bila hadir menampilkan kotak
-           angka yang nilainya dikirim ke onOk. `allLabel` (hanya bila `input`
-           ada) menambah tombol yang langsung mengirim nilai maksimum — dipakai
-           utk "Jual Semua". Dipakai utk konfirmasi buang item & input jumlah. */
+     opt: {icon, text, count, input:{value,min,max}, textInput:{value,placeholder,
+           maxlength}, okLabel, cancelLabel, allLabel, onOk(v), onCancel}.
+     `input`     → kotak ANGKA, nilainya (number) dikirim ke onOk.
+     `textInput` → kotak TEKS, nilainya (string, sudah di-trim) dikirim ke onOk.
+                   Dipakai Log Pass untuk memberi nama tanda lokasi.
+     `allLabel` (hanya bila `input` ada) menambah tombol yang langsung mengirim
+     nilai maksimum — dipakai utk "Jual Semua". */
   modal(opt){
     this.closeModal();                    // hanya satu modal pada satu waktu
     const ov=document.createElement('div');ov.id='modal-ov';
     const box=document.createElement('div');box.id='modal-box';
     let h='';
-    if(opt.icon)h+=`<span class="m-ico">${opt.icon}</span>`;
+    if(opt.icon){
+      h+=`<span class="m-ico">${opt.icon}</span>`;
+      this.applyItemIcons(ov);
+    }
     if(opt.text)h+=`<div class="m-txt">${opt.text}</div>`;
     if(opt.input)h+=`<input type="number" id="modal-num" min="${opt.input.min||1}" `+
       `max="${opt.input.max||999}" value="${opt.input.value||1}">`;
+    else if(opt.textInput)h+=`<input type="text" id="modal-txt" class="m-text"`+
+      ` maxlength="${opt.textInput.maxlength||24}"`+
+      ` placeholder="${this.esc(opt.textInput.placeholder||'')}"`+
+      ` value="${this.esc(opt.textInput.value||'')}">`;
     else if(opt.count!==undefined)h+=`<div class="m-count">Jumlah: ×${opt.count}</div>`;
     h+=`<div id="modal-btns">`+
        ((opt.allLabel&&opt.input)?`<button id="modal-all">${opt.allLabel}</button>`:'')+
        `<button id="modal-ok">${opt.okLabel||'✔ OK'}</button>`+
        `<button id="modal-cancel">${opt.cancelLabel||'✖ Batal'}</button></div>`;
     box.innerHTML=h;ov.appendChild(box);document.body.appendChild(ov);
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(ov,I18N.lang);
     const numEl=document.getElementById('modal-num');
+    const txtEl=document.getElementById('modal-txt');
     const maxV=(opt.input&&opt.input.max)||99999;
     const finish=(ok,all)=>{
-      const v=all?maxV:(numEl?clamp(Math.floor(+numEl.value)||0,
-        (opt.input&&opt.input.min)||0,maxV):opt.count);
+      /* kotak teks mengirim string; kotak angka mengirim number */
+      const v=txtEl?txtEl.value.trim()
+        :(all?maxV:(numEl?clamp(Math.floor(+numEl.value)||0,
+          (opt.input&&opt.input.min)||0,maxV):opt.count));
       this.closeModal();
       if(ok)opt.onOk&&opt.onOk(v);else opt.onCancel&&opt.onCancel();
     };
@@ -356,26 +418,128 @@ const UI={
     const allEl=document.getElementById('modal-all');
     if(allEl)allEl.addEventListener('click',()=>finish(true,true));
     ov.addEventListener('pointerdown',e=>{if(e.target===ov)finish(false);});
-    if(numEl){
-      numEl.addEventListener('keydown',e=>{
+    /* Fokus + Enter/Escape untuk kedua jenis kotak. stopPropagation WAJIB:
+       tanpa itu tombol yang diketik diteruskan ke Input (karakter bergerak,
+       panel terbuka) — sama seperti yang dilakukan kolom chat. */
+    const field=numEl||txtEl;
+    if(field){
+      field.addEventListener('keydown',e=>{
         e.stopPropagation();
         if(e.key==='Enter'){e.preventDefault();finish(true);}
         if(e.key==='Escape'){e.preventDefault();finish(false);}
       });
-      setTimeout(()=>{numEl.focus();numEl.select&&numEl.select();},30);
+      field.addEventListener('keyup',e=>e.stopPropagation());
+      setTimeout(()=>{field.focus();field.select&&field.select();},30);
     }
   },
   closeModal(){
     const ov=document.getElementById('modal-ov');
     if(ov)ov.remove();
   },
+  /* true bila sebuah modal sedang terbuka — dipakai untuk menahan aksi game
+     (menyerang, dsb.) selama dialog tampil. UI.open TIDAK ikut terisi oleh
+     modal, jadi pemeriksaan ini dibutuhkan terpisah. */
+  modalOpen(){return !!document.getElementById('modal-ov');},
+  /* escape teks buatan pemain sebelum masuk innerHTML/atribut */
+  esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g,c=>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
   flashVignette(){
     const v=document.getElementById('vignette');
     v.style.opacity=1;setTimeout(()=>v.style.opacity=0,260);
   },
+  /* kilau biru singkat di tepi layar saat tameng berhasil menangkis serangan */
+  flashBlock(){
+    let el=document.getElementById('block-flash');
+    if(!el){
+      el=document.createElement('div');
+      el.id='block-flash';
+      document.body.appendChild(el);
+    }
+    el.classList.remove('on');void el.offsetWidth;el.classList.add('on');
+  },
   levelUpBanner(){
     const l=document.getElementById('levelup');
     l.classList.remove('show');void l.offsetWidth;l.classList.add('show');
+  },
+  /* =========================================================================
+     BANNER DUNGEON — tulisan besar di tengah layar saat memasuki dungeon
+     -------------------------------------------------------------------------
+     Dungeon BELUM ditaklukkan → "DUNGEON LV n" + rentang level pemain yang
+     cocok, mis. "Untuk pemain Lv 21-25", beserta peringatan terlalu kuat /
+     di bawah level.
+
+     Dungeon SUDAH ditaklukkan → judulnya berganti menjadi "DUNGEON CLEAR"
+     supaya sekali lihat pemain tahu tempat ini sudah beres. Peringatan level
+     tidak lagi ditampilkan karena tantangannya sudah selesai.
+
+     `bossDown`  = boss akhir sudah dikalahkan (Dungeon.bossKilled)
+     `cleared`   = benar-benar tuntas: boss tumbang, semua peti terkuras, dan
+                   tidak ada penjaga hidup (Dungeon.cleared)
+     `kindName`  = 'Benteng' atau 'Gua' — jenis reruntuhannya, supaya pemain
+                   tahu ia berada di gua bermineral atau benteng persegi.
+     Keduanya dipisah supaya baris bawah bisa memberi tahu bahwa masih ada peti
+     yang belum dikuras — tanpa mengubah judul besarnya.
+
+     Elemennya dibuat sekali (lazy) lalu dipakai ulang; animasinya CSS
+     (#dgbanner.show) sehingga tidak membebani frame.
+     ========================================================================= */
+  dungeonBanner(lvl,cleared,bossDown,kindName,resetIn){
+    let el=document.getElementById('dgbanner');
+    if(!el){
+      el=document.createElement('div');
+      el.id='dgbanner';
+      document.body.appendChild(el);
+    }
+    /* BAND LEVEL PEMAIN YANG BENAR. Dulu rumus datar (lvl-1)*5+1..lvl*5 dipakai
+       untuk SEMUA level — D78 menampilkan "Lv 386-390" padahal player max 200.
+       Band asli: D1-D10 tetap 5 level/tingkat (1-5, 6-10, ... 46-50), D11+
+       dipadatkan lewat midLevel() agar D100 tepat berakhir di cap 200.
+       D78 = Lv 162-163, D80 = Lv 166, D86 = Lv 176.
+       Fallback formula internal menjamin TIDAK PERNAH memakai rumus datar lama. */
+    const b=(typeof Dungeon!=='undefined'&&Dungeon.bandRange)?Dungeon.bandRange(lvl):
+            (typeof WGEN!=='undefined'&&WGEN.bandRange)?WGEN.bandRange(lvl):
+            (function(L){
+              const m=D=>(D<=10?D*5-2:48+Math.round((D-10)*(152/90)));
+              const lo=L<=10?((L-1)*5+1):(m(L-1)+1);
+              const hi=L<=10?(L*5):m(L);
+              const minL=Math.max(1,lo),maxL=Math.max(minL,hi);
+              return {lo:minL,hi:maxL,text:minL===maxL?('Lv '+minL):('Lv '+minL+'-'+maxL)};
+            })(lvl);
+    const lo=b.lo,hi=b.hi,bandTxt=b.text;
+    const pl=(typeof Player!=='undefined')?Player.level:1;
+    const kind=kindName||'Dungeon';
+    /* sisa waktu pulih (detik) — dungeon yang boss-nya tumbang akan reset
+       otomatis setelah RESET_MS; pemain langsung lihat hitung mundurnya */
+    const rt=(typeof resetIn==='number'&&resetIn>=0)
+      ?`<u>Pulih kembali dalam ${Math.floor(resetIn/60)}:${String(resetIn%60).padStart(2,'0')}</u>`:'';
+    el.className='';
+    if(cleared||bossDown){
+      el.classList.add('clear');
+      el.innerHTML=
+        `<b>DUNGEON CLEAR</b>`+
+        `<i>${kind} Lv ${lvl} sudah ditaklukkan</i>`+
+        (cleared?`<u>Semua peti terkuras — tempat ini aman</u>`
+                :`<u>Penjaga Agung tumbang · masih ada peti tersisa</u>`)+rt;
+    }else{
+      /* Bebas emoji agar tidak dirender sebagai tanda tanya (?) di WebView Android */
+      const warn=pl<lo?'Terlalu kuat untukmu':(pl>hi?'Di bawah levelmu':'');
+      if(pl<lo)el.classList.add('hard');
+      else if(pl>hi)el.classList.add('easy');
+      const badge=pl<lo?'<span style="color:#ff6b6b;font-weight:bold">[!]</span> ':pl>hi?'<span style="color:#63d471;font-weight:bold">[✓]</span> ':'';
+      el.innerHTML=
+        `<b>${kind.toUpperCase()} LV ${lvl}</b>`+
+        `<i>Untuk pemain ${bandTxt}</i>`+
+        (warn?`<u>${badge}${warn}</u>`:`<u>Levelmu ${pl} (sepadan)</u>`);
+    }
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(el,I18N.lang);
+    /* restart animasi */
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(this._dgbT);
+    this._dgbT=setTimeout(()=>el.classList.remove('show'),3200);
   },
   showCombo(n){
     const c=document.getElementById('combo');
@@ -397,27 +561,112 @@ const UI={
     document.getElementById('st-num').textContent=Math.ceil(Player.stamina)+'/'+mSt;
 
     document.getElementById('hu-num').textContent=Math.ceil(Player.hunger);
-    const need=Math.round(70*Math.pow(Player.level,1.4));
+    const need=CFG.playerXpNeed(Player.level);
     document.getElementById('xp-fill').style.width=(Player.xp/need*100)+'%';
     document.getElementById('lvl').textContent=`⭐ Lv ${Player.level}`;
     const mins=Math.floor(Weather.time*1440);
     const hh=String(Math.floor(mins/60)).padStart(2,'0'),mm=String(mins%60).padStart(2,'0');
-    const icon=Weather.nightF>0.5?'🌙':'☀️';
-    document.getElementById('clock').textContent=`${Weather.rain>0.4?'🌧️ ':''}${icon} ${hh}:${mm}`;
+    /* ikon matahari/bulan memakai PNG kustom; jam dirender ulang tiap frame,
+       jadi innerHTML hanya ditulis saat ikon/rainstate berubah (hemat DOM). */
+    const night=Weather.nightF>0.5;
+    const raining=Weather.rain>0.4;
+    const clkEl=document.getElementById('clock');
+    const clkSig=(night?'m':'s')+(raining?'r':'');
+    if(this._clkSig!==clkSig){
+      this._clkSig=clkSig;
+      const fb=night?'🌙':'☀️';
+      const ico=`<img class="hud-ico" src="buttons/${night?'ui_moon':'ui_sun'}.png" alt="" onerror="this.outerHTML='${fb}'">`;
+      const rain=raining?'<img class="hud-ico" src="buttons/eff_swift.png" alt="" onerror="this.outerHTML=\'🌧️\'"> ':'';
+      clkEl.innerHTML=`${rain}${ico} <span id="clock-t">${hh}:${mm}</span>`;
+    }else{
+      const t=clkEl.querySelector('#clock-t');
+      if(t)t.textContent=`${hh}:${mm}`;
+    }
     document.getElementById('daynum').textContent='Hari '+Weather.day;
     this.renderCompass();
     this.renderHotbar();
     this.renderActiveSkills();
     this.renderTeam();
+    /* LIVE UPDATE STAMINA REKAN: panel NPC/Party tidak di-render ulang tiap
+       frame (mahal), tapi bar stamina-nya diperbarui langsung via DOM tiap
+       0.4 dtk supaya pemain benar-benar melihat stamina berkurang saat
+       rekan memakai skill lalu pulih pelan-pelan.
+       PENTING: updateHUD TIDAK menerima delta waktu, jadi hitung sendiri
+       dari performance.now() — dulu memakai `dt` yang undefined → NaN →
+       blok ini TIDAK PERNAH jalan (stamina rekan tampak tak berubah). */
+    const nowMs=performance.now();
+    if(!this._stamT||nowMs-this._stamT>=400){
+      this._stamT=nowMs;
+      if(this.open==='npc'&&this.npcSel&&!this.npcSel.dead)this.tickNpcBars();
+      else if(this.open==='party')this.tickPartyBars();
+    }
+    /* potret pemain di kiri atas (render 3D kecil, di-throttle sendiri).
+       Panel Karakter yang terbuka juga digambar ulang agar pose & stat-nya
+       hidup mengikuti keadaan sekarang. */
+    if(typeof CharView!=='undefined'&&CharView.ready){
+      CharView.updatePortrait();
+      if(this.open==='char')CharView.tickPanel();
+    }
+  },
+
+  /* ---------- live update bar HP & stamina panel rekan (tanpa re-render) --
+     Dipanggil berkala dari update() saat panel NPC/Party terbuka. Hanya
+     menyetel width bar & teks persentase, jadi sangat murah untuk DOM. */
+  tickNpcBars(){
+    const n=this.npcSel;if(!n||n.dead)return;
+    const body=document.getElementById('npc-body');if(!body)return;
+    const bars=body.querySelectorAll('.npc-bar');
+    const need=(typeof npcXpNeed==='function')?npcXpNeed(n.level):100;
+    /* urutan bar yang dibuat renderNpcPanel: HP, STAM, XP */
+    const st=bars[1],xp=bars[2];
+    if(st){
+      const fill=st.querySelector('i'),txt=st.querySelector('span');
+      const pct=Math.max(0,Math.min(100,(n.stamina||0)/(n.maxStamina||100)*100));
+      if(fill)fill.style.width=pct+'%';
+      if(txt)txt.textContent=Math.ceil(n.stamina||0)+'/'+(n.maxStamina||100)+' STAM';
+    }
+    if(xp){
+      const fill=xp.querySelector('i'),txt=xp.querySelector('span');
+      if(fill)fill.style.width=Math.max(0,Math.min(100,n.xp/need*100))+'%';
+      if(txt)txt.textContent=Math.floor(n.xp)+'/'+need+' XP';
+    }
+  },
+  tickPartyBars(){
+    const body=document.getElementById('party-body');if(!body)return;
+    body.querySelectorAll('.party-card[data-npc]').forEach(card=>{
+      const n=(typeof NPCS!=='undefined')?NPCS.team.find(x=>String(x.id)===card.dataset.npc):null;
+      if(!n||n.dead)return;
+      const st=card.querySelector('.pc-bar.st');
+      if(st){
+        const fill=st.querySelector('i'),txt=st.querySelector('span');
+        const pct=Math.max(0,Math.min(100,(n.stamina||0)/(n.maxStamina||100)*100));
+        if(fill)fill.style.width=pct+'%';
+        if(txt)txt.textContent=Math.ceil(n.stamina||0)+'/'+(n.maxStamina||100)+' STAM';
+      }
+    });
   },
 
   /* ================= KOMPAS ARAH MATA ANGIN =================
      Strip 360° dibangun sekali (label N/NE/E/... + garis derajat), lalu tiap
-     frame hanya digeser (translateX) sesuai yaw kamera. Penanda ▼ di tengah
-     menunjukkan arah pandang saat ini. */
+     frame hanya digeser (translateX). Penanda ▼ di tengah menunjukkan arah
+     yang sedang DIHADAPI KARAKTER.
+
+     ACUAN = ARAH HADAP PEMAIN (Player.facing), bukan yaw kamera.
+     Dulu kompas mengikuti kamera, sehingga memutar kamera membuat kompas
+     berputar walau karakter berdiri diam menghadap arah yang sama — dan
+     sebaliknya, berjalan berbelok tidak mengubah kompas sama sekali. Itu
+     membuat penanda arah tidak bisa dipakai untuk navigasi. Sekarang kompas
+     benar-benar "kompas di tangan karakter": ▼ = arah badan menghadap, jadi
+     apa pun yang berada di tengah kompas ada TEPAT DI DEPAN pemain. */
   compassBuilt:false,
   COMPASS_W:168,          // lebar jendela kompas (px) — samakan dgn CSS
   COMPASS_PPD:1.6,        // piksel per derajat
+  /* arah acuan kompas (radian). Memakai arah hadap karakter; jatuh ke yaw
+     kamera hanya bila Player belum ada (mis. panorama main menu). */
+  compassYaw(){
+    if(typeof Player!=='undefined'&&Player.facing!==undefined)return Player.facing;
+    return (typeof Cam!=='undefined'&&Cam.yaw!==undefined)?Cam.yaw:0;
+  },
   renderCompass(){
     const strip=document.getElementById('compass-strip');
     if(!strip)return;
@@ -438,12 +687,95 @@ const UI={
       strip.innerHTML=html;
       this.compassBuilt=true;
     }
-    /* yaw kamera → derajat kompas (0=N). Cam.yaw adalah arah pandang. */
-    let yaw=(typeof Cam!=='undefined'&&Cam.yaw!==undefined)?Cam.yaw:0;
-    let deg=(yaw*180/Math.PI)%360;if(deg<0)deg+=360;
+    /* arah hadap pemain → derajat kompas (0=N) */
+    let deg=(this.compassYaw()*180/Math.PI)%360;if(deg<0)deg+=360;
     /* offset: strip dimulai dari -360°, jadi titik 0° ada di 360*PPD */
     const off=360*PPD+deg*PPD-this.COMPASS_W/2;
     strip.style.transform=`translateX(${-off}px)`;
+    this.renderCompassMark(deg);
+  },
+
+  /* ---------- PENANDA LOG PASS DI KOMPAS ----------
+     Dua bagian yang saling melengkapi:
+       1. GARIS MERAH di dalam #compass — arah tanda relatif arah hadap pemain.
+          Karena acuannya arah hadap, garis di tengah = tanda TEPAT DI DEPAN,
+          jadi pemain cukup berjalan maju.
+       2. BARIS KETERANGAN KECIL di atas frame kompas — nama tanda, jarak, dan
+          panah tren (⯆ mendekat / ⯅ menjauh). Tanpa tren, pemain tidak bisa
+          tahu apakah langkahnya sudah benar; inilah yang membuat penanda lama
+          membingungkan.
+
+     `deg` = arah hadap pemain (derajat) yang sedang berada di tengah kompas. */
+  renderCompassMark(deg){
+    const box=document.getElementById('compass');
+    if(!box)return;
+    let el=this._compassMarkEl;
+    if(!el||!el.parentNode){
+      el=document.getElementById('compass-target');
+      if(!el){
+        el=document.createElement('div');
+        el.id='compass-target';
+        el.innerHTML='<span class="ct-line"></span>';
+        box.appendChild(el);
+      }
+      this._compassMarkEl=el;
+    }
+    const info=document.getElementById('compass-info');
+    /* tanda aktif hanya bila Log Pass yang dipegang punya tanda tersimpan */
+    const mk=(typeof LogPass!=='undefined'&&LogPass.heldMark)?LogPass.heldMark():null;
+    if(!mk){
+      if(el.style.display!=='none')el.style.display='none';
+      if(info&&info.style.display!=='none'){info.style.display='none';info._t='';}
+      this._lpDist=null;this._lpTrend=0;
+      return;
+    }
+    /* heading dari pemain ke titik tanda — konvensi atan2(dx,dz) sama dengan
+       Player.facing di seluruh game */
+    const dx=mk.x-Player.pos.x,dz=mk.z-Player.pos.z;
+    let b=Math.atan2(dx,dz)*180/Math.PI;
+    /* selisih ke arah HADAP pemain, dinormalkan ke (-180,180] */
+    let rel=(b-deg)%360;
+    if(rel>180)rel-=360;
+    if(rel<=-180)rel+=360;
+    const half=this.COMPASS_W/2;
+    const x=half+rel*this.COMPASS_PPD;
+    /* di luar jendela kompas: tempel di tepi (garisnya menebal & memudar) */
+    const outside=x<4||x>this.COMPASS_W-4;
+    const px=clamp(x,4,this.COMPASS_W-4);
+    const dist=Math.hypot(dx,dz);
+    el.style.display='';
+    el.style.left=px+'px';
+    el.classList.toggle('edge',outside);
+    /* garis berubah hijau saat pemain sudah menghadap tepat ke tanda (±12°),
+       jadi "jalan lurus saja" terbaca tanpa membaca teks */
+    el.classList.toggle('aim',!outside&&Math.abs(rel)<12);
+    if(el._nm!==mk.name){el._nm=mk.name;el.title=mk.name;}
+
+    /* ---------- TREN JARAK ----------
+       Dibandingkan tiap 0.3 detik dengan ambang 0.35 blok supaya panahnya tidak
+       berkedip saat pemain berdiri diam atau bergeser sedikit. */
+    const now=performance.now();
+    if(this._lpT===undefined||now-this._lpT>300){
+      if(this._lpDist!==null&&this._lpDist!==undefined){
+        const d=dist-this._lpDist;
+        if(d<-0.35)this._lpTrend=-1;
+        else if(d>0.35)this._lpTrend=1;
+        else this._lpTrend=0;
+      }
+      this._lpDist=dist;this._lpT=now;
+    }
+
+    if(info){
+      /* panah arah relatif ikut ditulis supaya jelas harus berbelok ke mana
+         saat tandanya di luar jendela kompas */
+      const side=outside?(rel<0?'← ':'→ '):'';
+      const arrow=dist<3?'📍':this._lpTrend<0?'▼':this._lpTrend>0?'▲':'·';
+      const cls=dist<3?'here':this._lpTrend<0?'near':this._lpTrend>0?'far':'';
+      const txt=`${side}🧭 ${mk.name} · ${Math.round(dist)}m ${arrow}`;
+      info.style.display='';
+      if(info._t!==txt){info._t=txt;info.textContent=txt;}
+      if(info._c!==cls){info._c=cls;info.className=cls;}
+    }
   },
 
   /* ================= REKAN TIM =================
@@ -456,7 +788,7 @@ const UI={
     const root=document.getElementById('team');if(!root)return;
     const team=(typeof NPCS!=='undefined')?NPCS.team.filter(n=>!n.dead):[];
     const pet=(typeof Capture!=='undefined'&&Capture.pet&&!Capture.pet.dead)?Capture.pet:null;
-    let sig=team.map(n=>`${n.id}:${n.level}:${Math.ceil(n.hp)}:${n.order}:${n.aggr===false?0:1}`).join('|');
+    let sig=team.map(n=>`${n.id}:${n.level}:${Math.ceil(n.hp)}:${Math.round((n.stamina||0)/5)*5}:${n.order}:${n.aggr===false?0:1}`).join('|');
     if(pet){
       const pd=(Capture.deployedSlot>=0&&RPG.mobSlots[Capture.deployedSlot])||{};
       sig+='|pet:'+pet.type+':'+Math.ceil(pet.hp)+':'+(pd.lvl||1)+':'+(pd.stars||1);
@@ -467,9 +799,11 @@ const UI={
     for(const n of team){
       const d=document.createElement('div');
       d.className='tmate'+(n.order==='gather'?' busy':'');
-      d.innerHTML=`<span class="tface">${n.role.e}</span>`+
+      const stPct=Math.max(0,Math.min(100,((n.stamina||0)/(n.maxStamina||100))*100));
+      d.innerHTML=`<span class="tface">${this.npcIcon(n.role.id, n.role.e)}</span>`+
         `<span class="tlv">Lv${n.level}</span>`+
         `<div class="thp"><i style="width:${Math.max(0,n.hp/n.maxhp*100)}%"></i></div>`+
+        `<div class="tst"><i style="width:${stPct}%"></i></div>`+
         `<span class="tmode" title="${n.aggr===false?'Pasif':'Agresif'}">${n.aggr===false?'🕊️':'⚔️'}</span>`+
         `<span class="tord">${n.order==='gather'?'⛏️':n.order==='wait'?'⏸️':'👣'}</span>`;
       const fn=e=>{e.preventDefault();e.stopPropagation();this.openNpc(n);};
@@ -485,7 +819,7 @@ const UI={
       d.className='tmate pet'+(Capture.riding?' busy':'');
       const emoji=(typeof PET_EMOJI!=='undefined'&&PET_EMOJI[pet.type])?PET_EMOJI[pet.type]:'🐾';
       const stars='⭐'.repeat(pd.stars||1);
-      d.innerHTML=`<span class="tface">${emoji}</span>`+
+      d.innerHTML=`<span class="tface">${this.petIcon(pet.type, emoji)}</span>`+
         `<span class="tlv">Lv${pd.lvl||1}</span>`+
         `<div class="thp"><i style="width:${Math.max(0,pet.hp/pet.maxhp*100)}%"></i></div>`+
         `<span class="tmode" title="${stars}">${Capture.riding?'🐾':'⭐'}</span>`+
@@ -507,6 +841,89 @@ const UI={
     this.renderNpcPanel();
     this.syncPanels();
   },
+  /* =========================================================================
+     PANEL PARTY — daftar seluruh rekan tim + pet (dibuka tombol G)
+     -------------------------------------------------------------------------
+     Responsif: kartu memakai grid auto-fill sehingga rapi di layar kecil
+     (satu kolom) maupun besar (banyak kolom). Ketuk kartu rekan untuk membuka
+     panel kontrol detail (renderNpcPanel); ketuk kartu pet untuk membuka panel
+     mob (halaman pet di Tas).
+     ========================================================================= */
+  renderParty(){
+    const body=document.getElementById('party-body');if(!body)return;
+    const team=(typeof NPCS!=='undefined'&&NPCS.team)?NPCS.team.filter(n=>!n.dead):[];
+    const pet=(typeof Capture!=='undefined'&&Capture.pet&&!Capture.pet.dead)?Capture.pet:null;
+    let h='';
+    /* ringkasan jumlah anggota */
+    const cap=(typeof CFG!=='undefined'&&CFG.NPC)?CFG.NPC.TEAM_MAX:3;
+    h+=`<div class="party-count">👥 Rekan: <b>${team.length}/${cap}</b>`+
+       (pet?` &nbsp;•&nbsp; 🐾 Pet aktif: <b>1</b>`:'')+`</div>`;
+
+    if(!team.length&&!pet){
+      h+='<p class="tip">Belum ada anggota party. Dekati penduduk desa lalu '+
+         'tekan <b>F</b> untuk merekrut, atau tangkap monster untuk dijadikan peliharaan.</p>';
+      body.innerHTML=h;
+      return;
+    }
+
+    h+='<div class="party-grid">';
+    /* kartu rekan NPC */
+    /* perintah rekan di panel party: ikon kustom bila tersedia */
+    const ordIcon=o=>o==='gather'?'prof_mining':o==='farm'?'prof_farming':
+      o==='wait'?'eff_guard':'prof_agility';
+    for(const n of team){
+      const hpPct=Math.max(0,Math.min(100,n.hp/n.maxhp*100));
+      const need=(typeof npcXpNeed==='function')?npcXpNeed(n.level):100;
+      const xpPct=Math.max(0,Math.min(100,(n.xp/need)*100));
+      const mode=n.aggr===false?'🕊️ Pasif':'⚔️ Agresif';
+      const ord=n.order==='gather'?'⛏️ Cari resource':n.order==='wait'?'⏸️ Menunggu':
+        n.order==='farm'?'🌾 Farming':'👣 Mengikuti';
+      h+=`<div class="party-card" data-npc="${n.id}">
+        <div class="pc-top">
+          <span class="pc-face">${this.npcIcon(n.role.id, n.role.e)}</span>
+          <div class="pc-id"><b>${n.name}</b><span class="pc-lv">Lv ${n.level}</span></div>
+        </div>
+        <div class="pc-role">${n.role.name}</div>
+        <div class="pc-bar hp"><i style="width:${hpPct}%"></i><span>${Math.ceil(n.hp)}/${n.maxhp}</span></div>
+        <div class="pc-bar st"><i style="width:${Math.max(0,Math.min(100,((n.stamina||0)/(n.maxStamina||100))*100))}%"></i><span>${Math.ceil(n.stamina||0)}/${n.maxStamina||100} STAM</span></div>
+        <div class="pc-bar xp"><i style="width:${xpPct}%"></i><span>XP ${n.xp}/${need}</span></div>
+        <div class="pc-tags"><span>${mode}</span><span>${ord}</span></div>
+      </div>`;
+    }
+    /* kartu pet aktif */
+    if(pet){
+      const pd=(Capture.deployedSlot>=0&&RPG.mobSlots[Capture.deployedSlot])||{};
+      const emoji=(typeof PET_EMOJI!=='undefined'&&PET_EMOJI[pet.type])?PET_EMOJI[pet.type]:'🐾';
+      const nm=(typeof MOB_NAME!=='undefined'&&MOB_NAME[pet.type])?MOB_NAME[pet.type]:pet.type;
+      const hpPct=Math.max(0,Math.min(100,pet.hp/pet.maxhp*100));
+      const stars='⭐'.repeat(pd.stars||1);
+      h+=`<div class="party-card pet" data-pet="1">
+        <div class="pc-top">
+          <span class="pc-face">${this.petIcon(pet.type, emoji)}</span>
+          <div class="pc-id"><b>${pd.name||nm}</b><span class="pc-lv">Lv ${pd.lvl||1}</span></div>
+        </div>
+        <div class="pc-role">Peliharaan ${stars}</div>
+        <div class="pc-bar hp"><i style="width:${hpPct}%"></i><span>${Math.ceil(pet.hp)}/${pet.maxhp}</span></div>
+        <div class="pc-tags"><span>⚔️ ${pd.dmg||pet.dmg||0}</span><span>${pd.saddle?'🐴 Bersadel':'➰ Tanpa sadel'}</span></div>
+      </div>`;
+    }
+    h+='</div>';
+    body.innerHTML=h;
+
+    /* interaksi kartu */
+    body.querySelectorAll('.party-card[data-npc]').forEach(card=>{
+      card.addEventListener('click',()=>{
+        const id=card.dataset.npc;
+        const n=team.find(x=>String(x.id)===String(id));
+        if(n)this.openNpc(n);         // buka panel kontrol rekan detail
+      });
+    });
+    const petCard=body.querySelector('.party-card[data-pet]');
+    if(petCard)petCard.addEventListener('click',()=>{
+      this.open='bag';this.picked=null;this.renderBag();
+      this.setBagPage('pet');this.syncPanels();
+    });
+  },
   /* Panel kontrol rekan: stat, skill pasif, perlengkapan, perintah, tas rekan,
      dan daftar item pemain yang bisa diberikan. */
   renderNpcPanel(){
@@ -514,18 +931,20 @@ const UI={
     const n=this.npcSel;
     if(!n||n.dead||!NPCS.team.includes(n)){
       body.innerHTML='<p class="tip">Tidak ada rekan yang dipilih. '+
-        'Dekati penduduk desa lalu tekan <b>G</b> untuk merekrut '+
+        'Dekati penduduk desa lalu tekan <b>F</b> untuk merekrut '+
         `(maks ${CFG.NPC.TEAM_MAX} rekan).</p>`;
       return;
     }
     const sk=n.role.skill;
     const need=npcXpNeed(n.level);
     let h=`<div class="npc-head">
-      <span class="npc-face">${n.role.e}</span>
+      <span class="npc-face">${this.npcIcon(n.role.id, n.role.e)}</span>
       <div class="npc-meta">
         <b>${n.name}</b> <span class="npc-lv">Lv ${n.level}</span>
         <div class="npc-bar"><i style="width:${n.hp/n.maxhp*100}%"></i>
           <span>${Math.ceil(n.hp)}/${n.maxhp} HP</span></div>
+        <div class="npc-bar st"><i style="width:${((n.stamina||0)/(n.maxStamina||100))*100}%"></i>
+          <span>${Math.ceil(n.stamina||0)}/${n.maxStamina||100} STAM</span></div>
         <div class="npc-bar xp"><i style="width:${n.xp/need*100}%"></i>
           <span>${n.xp}/${need} XP</span></div>
       </div>
@@ -535,7 +954,7 @@ const UI={
       <span>🛡️ DEF ${Math.round(NPCS.npcDef(n)*100)}%</span>
       <span>👣 ${n.speed.toFixed(1)}</span>
     </div>
-    <div class="npc-skill">${sk.e} <b>${sk.name}</b> — ${sk.desc}</div>`;
+    <div class="npc-skill"><img class="sk-ico" src="buttons/eff_guard.png" alt="" style="width:18px;height:18px" onerror="this.outerHTML='${sk.e}'"> <b>${sk.name}</b> — ${sk.desc}</div>`;
 
     /* mode bertarung: aggressive / passive */
     h+='<div class="sub">Mode bertarung</div><div class="npc-cmd">'+
@@ -544,14 +963,24 @@ const UI={
       `<p class="tip">Agresif: menyerang monster yang mendekatimu. `+
       `Pasif: tidak menyerang sendiri; hanya mengejar target yang kamu serang sampai target mati.</p>`;
 
-    /* perlengkapan yang sedang dipakai rekan (masih termasuk senjata rekan) */
+    /* perlengkapan yang sedang dipakai rekan (masih termasuk senjata rekan).
+       ROYAL GUARD punya slot TAMENG: perisai yang diberi pemain dipasang di
+       lengan kirinya (NPC_Royalguard.refreshGear). Dulu slotnya tidak ada di
+       panel sehingga tameng itu tak terlihat & tak bisa dilepas kembali. */
+    const gearSlots=(typeof NPC_GEAR_SLOTS!=='undefined'?NPC_GEAR_SLOTS:ARMOR_SLOTS).slice();
+    if(n.role&&n.role.id==='royalguard')
+      gearSlots.push({id:'shield',name:'Tameng',e:'🛡️'});
     h+='<div class="sub">Perlengkapan rekan</div><div class="npc-gear">';
-    for(const s of (typeof NPC_GEAR_SLOTS!=='undefined'?NPC_GEAR_SLOTS:ARMOR_SLOTS)){
+    for(const s of gearSlots){
       const id=n.gear[s.id];
-      h+=`<div class="ngear" data-slot="${s.id}" title="${
-        id?ITEMS[id].n:'Kosong — beri item dari daftar bawah'}">`+
-        `<span class="ge">${id?ITEMS[id].e:s.e}</span>`+
-        `<span class="gn">${s.name}</span></div>`;
+      const it=id?ITEMS[id]:null;
+      const rar=it?(it.rarity||'common'):null;
+      const rarCls=rar?` r-${rar}`:'';
+      const borderSt=rar&&RARITY[rar]?` style="border-color:${RARITY[rar].css}"`:'';
+      h+=`<div class="ngear${id?' filled'+rarCls:' empty'}" data-slot="${s.id}"${borderSt} title="${
+        id?(it.n+' · '+(RARITY[rar]?RARITY[rar].n:'')):'Kosong — beri item dari daftar bawah'}">`+
+        `<span class="ge">${id?this.itemIcon(id):s.e}</span>`+
+        `<span class="gn">${id?it.n:s.name}</span></div>`;
     }
     h+='</div>';
 
@@ -577,18 +1006,21 @@ const UI={
     }
     h+='</div>';
 
-    /* item pemain yang bisa diberikan */
-    h+='<div class="sub">Beri item (klik item milikmu)</div><div class="grid npc-give">';
+    /* item pemain yang bisa diberikan: HANYA dari tas (bukan hotbar & bukan equipment terpasang) */
+    h+='<div class="sub">Beri item dari tas (klik item)</div><div class="grid npc-give">';
     const push=(arr,g)=>{
       for(let i=0;i<arr.length;i++){
         const s=arr[i];if(!s)continue;
         const it=ITEMS[s.id];
+        if(!it)continue;
+        /* tameng hanya bisa diberikan ke Royal Guard */
+        if(it.armor&&it.armor.slot==='shield'&&(!n.role||n.role.id!=='royalguard'))continue;
         const kind=it.food?'🍖':(it.weapon?'⚔️':(it.armor?'🛡️':'📦'));
         h+=`<div class="slot ng" data-give="${g}:${i}" title="${it.n} ${kind}">`+
           `<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span></div>`;
       }
     };
-    push(RPG.hotbar,0);push(RPG.bag,1);
+    push(RPG.bag,1);
     h+='</div>';
     body.innerHTML=h;
     this.applyItemIcons(body);
@@ -614,7 +1046,7 @@ const UI={
         /* senjata/armor selalu 1 & langsung dipakai — tidak perlu dialog jumlah */
         if(it.weapon||it.armor){NPCS.give(n,g,i,1);return;}
         this.modal({
-          icon:it.e,
+          icon:this.itemIcon(s.id),
           text:`Berapa <b>${it.n}</b> untuk ${n.name}?`,
           input:{value:1,min:1,max:s.n},
           okLabel:'✔ Beri',cancelLabel:'✖ Batal',
@@ -627,9 +1059,18 @@ const UI={
         const sl=b.dataset.slot,id=n.gear[sl];
         if(!id)return;
         n.gear[sl]=null;RPG.addItem(id,1);
+        /* ROYAL GUARD: perisai/pedang dilepas → tangannya dikosongkan */
+        if(n.role&&n.role.id==='royalguard'&&
+           typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
+          NPC_Royalguard.refreshGear(n);
         this.toast(`${ITEMS[id].e} ${ITEMS[id].n} diambil kembali`);
         this.renderNpcPanel();this.renderAll();
       }));
+  },
+
+  /* ikon koin kustom untuk toko & dialog */
+  coinIcoHtml(size=14){
+    return `<img class="coin-ico" src="buttons/ui_coin.png" alt="🪙" style="width:${size}px;height:${size}px;vertical-align:middle;display:inline-block">`;
   },
 
   /* ================= PANEL TOKO / PEDAGANG =================
@@ -638,12 +1079,30 @@ const UI={
   renderShop(){
     const coinEl=document.getElementById('shop-coin');
     if(coinEl)coinEl.textContent=RPG.coin;
+    /* panel toko khusus Dungeon Master: daftar Dungeon Changer per level */
+    if(this.shopNpc&&this.shopNpc.role&&this.shopNpc.role.id==='dungeonmaster'){
+      this.renderDungeonShop();return;
+    }
     const merchant=this.shopNpc;
     const stock=(merchant&&merchant.shop)?merchant.shop:[];
+    /* judul & label sub-panel dikembalikan ke bawaan pedagang (Dungeon Master
+       mengubahnya di renderDungeonShop) */
+    const panel=document.getElementById('panel-shop');
+    const h2=panel?panel.querySelector('h2'):null;
+    if(h2)h2.innerHTML='<img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML=\'🏪\'"> Pedagang Desa <button class="x" data-close="shop">✕</button>';
+    const xh=h2?h2.querySelector('[data-close]'):null;
+    if(xh)xh.addEventListener('click',()=>this.toggle('shop'));
+    if(panel){
+      const subs=panel.querySelectorAll('.sub');
+      if(subs[0])subs[0].textContent='Beli';
+      if(subs[1])subs[1].style.display='';
+    }
     /* --- daftar beli (stok acak pedagang ini) --- */
     const buyEl=document.getElementById('shop-buy');
     if(buyEl){
       buyEl.innerHTML='';
+      /* lepas kelas daftar khusus Dungeon Master bila panel sebelumnya miliknya */
+      buyEl.classList.remove('dm-list');
       if(!stock.length)
         buyEl.innerHTML='<p class="tip">Stok pedagang ini kosong.</p>';
       for(const g of stock){
@@ -659,16 +1118,17 @@ const UI={
         const info=isBag
           ?`<b>${it.n}</b> <i>+${RPG.BAG_PER_TIER} slot tas</i> <i>(tier ${RPG.bagTier}/${RPG.BAG_MAX_TIER})</i>`
           :`<b>${it.n}</b>${rar}${g.n>1?` <i>×${g.n}</i>`:''}`;
-        d.innerHTML=`<span class="s-ico">${isBag?it.e:this.itemIcon(g.id)}</span>`+
+        d.innerHTML=`<span class="s-ico">${isBag?`<img class="iico" src="buttons/bag.png" alt="" data-iico="buttons/bag.png">`:this.itemIcon(g.id)}</span>`+
           `<div class="s-info">${info}</div>`+
           `<button class="s-buy" ${(afford&&!soldOut)?'':'disabled'}>`+
-          `${soldOut?'Habis':'🪙 '+g.price}</button>`;
+          `${soldOut?'Habis':this.coinIcoHtml(15)+' '+g.price}</button>`;
         if(!soldOut)d.querySelector('.s-buy').addEventListener('click',()=>this.shopBuy(g));
         buyEl.appendChild(d);
       }
       this.applyItemIcons(buyEl);
     }
     /* --- daftar jual: semua item di hotbar+tas --- */
+    /* --- daftar jual: HANYA dari tas (bukan hotbar & bukan equipment terpasang) --- */
     const sellEl=document.getElementById('shop-sell-bag');
     if(sellEl){
       sellEl.innerHTML='';
@@ -677,21 +1137,99 @@ const UI={
         const it=ITEMS[s.id],price=sellPrice(s.id);
         const d=document.createElement('div');
         d.className='slot sell';
-        d.title=`${it.n} — klik untuk menjual (punya ×${s.n}, ${price} 🪙/item)`;
-        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span><span class="pr">${price}🪙</span>`;
+        d.title=`${it.n} — klik untuk menjual (punya ×${s.n}, ${price} koin/item)`;
+        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span><span class="pr">${this.coinIcoHtml(11)} ${price}</span>`;
         if(it.rarity&&RARITY[it.rarity]){d.classList.add('r-'+it.rarity);d.style.borderColor=RARITY[it.rarity].css;}
         d.addEventListener('click',()=>this.shopSell(arr,idx));
         sellEl.appendChild(d);
       });
-      push(RPG.hotbar);push(RPG.bag);
+      push(RPG.bag);
       if(!sellEl.childElementCount)
-        sellEl.innerHTML='<p class="tip">Tasmu kosong — tidak ada yang bisa dijual.</p>';
+        sellEl.innerHTML='<p class="tip">Tasmu kosong — tidak ada yang bisa dijual (item hotbar terlindungi).</p>';
       else this.applyItemIcons(sellEl);
     }
   },
+
+  /* ================= PANEL TOKO DUNGEON MASTER =================
+     Daftar Dungeon Changer yang dijual di desa ini: level berbeda per desa
+     (deterministik), stok maks 10 per level dan terisi ulang tiap 30 menit.
+     Baris menampilkan LEVEL dungeon & harga dengan jelas; stok 0 = Habis. */
+  renderDungeonShop(){
+    const n=this.shopNpc;
+    const it=ITEMS.dungeon_changer||{n:'Dungeon Changer',e:'🗝️'};
+    /* judul panel diganti (h2 pertama) supaya jelas ini bukan pedagang biasa */
+    const panel=document.getElementById('panel-shop');
+    const h2=panel?panel.querySelector('h2'):null;
+    if(h2)h2.innerHTML=`<img class="ph-ico" src="buttons/npc_dungeonmaster.png" alt="" onerror="this.outerHTML='${n.role.e}'"> Dungeon Master — Dungeon Changer <button class="x" data-close="shop">✕</button>`;
+    const x=h2?h2.querySelector('[data-close]'):null;
+    if(x)x.addEventListener('click',()=>this.toggle('shop'));
+    const buyEl=document.getElementById('shop-buy');
+    if(buyEl){
+      buyEl.innerHTML='';
+      /* 10 baris changer: daftar diberi scroll sendiri (lihat .dm-list di CSS)
+         supaya judul & tombol tutup panel tetap terlihat di layar ponsel. */
+      buyEl.classList.add('dm-list');
+      /* label sub-panel disesuaikan: "Beli" → Dungeon Changer, "Jual" disembunyikan
+         (Dungeon Master tidak membeli barang) */
+      const subs=panel?panel.querySelectorAll('.sub'):[];
+      if(subs[0])subs[0].textContent='🗝️ Dungeon Changer — mengubah level dungeon';
+      if(subs[1])subs[1].style.display='none';
+      /* stok terikat ke DESA (villageAnchor), bukan koordinat lapak —
+         home DM tertimpa posisi lapak sehingga kunci stok lama tidak cocok */
+      const va=n.villageAnchor||n.home;
+      const stock=NPCS.dshopStock(va.x,va.z);
+      if(!stock.length)
+        buyEl.innerHTML='<p class="tip">Stok pedagang ini kosong.</p>';
+      for(const g of stock){
+        const soldOut=g.stock<=0;
+        const afford=RPG.coin>=g.price;
+        const d=document.createElement('div');
+        d.className='shop-row';
+        d.innerHTML=`<span class="s-ico">${this.itemIcon('dungeon_changer')}</span>`+
+          `<div class="s-info"><b>${it.n}</b> <b style="color:#c9a0ff">Lv ${g.lvl}</b> `+
+          `<i>· mengubah level dungeon → Lv ${g.lvl} · stok ${g.stock}/${g.maxStock}</i></div>`+
+          `<button class="s-buy" ${(afford&&!soldOut)?'':'disabled'}>`+
+          `${soldOut?'Habis':this.coinIcoHtml(15)+' '+g.price}</button>`;
+        if(!soldOut)
+          d.querySelector('.s-buy').addEventListener('click',()=>this.dungeonShopBuy(g));
+        buyEl.appendChild(d);
+      }
+      this.applyItemIcons(buyEl);
+    }
+    /* Dungeon Master tidak membeli barang — sembunyikan daftar jual */
+    const sellEl=document.getElementById('shop-sell-bag');
+    if(sellEl)sellEl.innerHTML='<p class="tip">Dungeon Master tidak membeli barang.</p>';
+  },
+  /* beli satu Dungeon Changer level g.lvl dari Dungeon Master yang sedang
+     dibuka. Stok dikurangi lewat NPCS.dshopBuy (persisten per desa). */
+  dungeonShopBuy(g){
+    if(this._buyLock)return;                    // anti-spam / debounce double-tap layar sentuh
+    const n=this.shopNpc;
+    if(!n||n.role.id!=='dungeonmaster')return;
+    if(!RPG.spendCoin(g.price)){this.toast('🪙 Koin tidak cukup');return;}
+    this._buyLock=true;
+    setTimeout(()=>{this._buyLock=false;},350);
+    /* item memakai field PER-INSTANCE lvl (seperti senjata tempa) sehingga
+       tiap Dungeon Changer membawa level dungeonya sendiri */
+    const left=RPG.addItem('dungeon_changer',1,g.lvl);
+    if(left>0){ /* tas penuh → koin dikembalikan, item jatuh ke tanah */
+      RPG.coin+=g.price;
+      World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,'dungeon_changer',1,{owner:true,lvl:g.lvl});
+      this.toast('🎒 Tas penuh — item dijatuhkan, koin kembali');
+      return;
+    }
+    const va=n.villageAnchor||n.home;
+    NPCS.dshopBuy(va.x,va.z,g.lvl);
+    this.toast(`🗝️ Membeli Dungeon Changer Lv ${g.lvl} (−${g.price} 🪙)`);
+    Sfx.craft();
+    this.renderShop();this.renderAll();RPG.save();
+  },
   /* beli satu entri dari stok pedagang (g = {id,price,n}); kurangi stok */
   shopBuy(g){
+    if(this._buyLock)return;
     if(!g||g.n<=0)return;
+    this._buyLock=true;
+    setTimeout(()=>{this._buyLock=false;},350);
     /* upgrade tas: tambah 7 slot, maks 5 tingkat */
     if(g.id==='bag'){
       if(RPG.bagTier>=RPG.BAG_MAX_TIER){this.toast('🎒 Tas sudah maksimum');return;}
@@ -721,9 +1259,9 @@ const UI={
     const s=arr[idx];if(!s)return;
     const it=ITEMS[s.id],price=sellPrice(s.id),id=s.id;
     this.modal({
-      icon:it.e,
+      icon:this.itemIcon(s.id),
       text:`Jual <b style="color:#fff">${it.n}</b>?<br>`+
-        `<span style="font-size:12px;opacity:.85">${price} 🪙 / item · kamu punya ×${s.n}</span>`,
+        `<span style="font-size:12px;opacity:.85">${this.coinIcoHtml(13)} ${price} / item · kamu punya ×${s.n}</span>`,
       input:{value:1,min:1,max:s.n},
       allLabel:'💰 Semua',
       okLabel:'✔ Jual',
@@ -756,10 +1294,68 @@ const UI={
     herb:'buttons/heal.png',       // Ramuan Herbal
   },
 
+  /* ikon gambar untuk skill (PNG kustom bila tersedia, emoji fallback) */
+  skillIcon(sk){
+    const map={
+      dmg:'prof_combat',combo:'eff_swift',slam:'slam',vamp:'eff_bleed',
+      whirl:'tornado',roar:'battlecry',
+      blk_guard:'eff_guard',blk_solid:'prof_blocking',blk_bastion:'eff_guard',
+      run:'prof_agility',stam:'eff_swift',swim:'eff_swift',djump:'prof_agility',
+      harv:'prof_harvesting',axe:'prof_logging',cook:'prof_cooking',
+      smith:'prof_mining',gourmet:'prof_farming',alchem:'eff_regen',herb:'heal',
+      groot:'prof_harvesting',logm:'prof_logging',
+    };
+    const file=map[sk.id];
+    if(!file)return sk.icon;
+    return `<img class="sk-ico" src="buttons/${file}.png" alt="" onerror="this.outerHTML='${sk.icon}'">`;
+  },
+
+  /* ---------- pelacak seretan tombol Hantam Bumi (mobile) ----------
+     Didaftarkan SEKALI di window, bukan tiap renderActiveSkills(). Versi lama
+     memasang touchmove/touchend baru setiap kali daftar skill digambar ulang,
+     sehingga listener menumpuk dan `tid` lokal milik listener lama ikut
+     bereaksi. Identifier sentuhan disimpan di UI._slamTid agar satu-satunya
+     sumber kebenaran. */
+  _slamTid:null,
+  _slamUnpress:null,
+  _slamBound:false,
+  bindSlamDrag(){
+    if(this._slamBound)return;
+    this._slamBound=true;
+    const clear=()=>{
+      this._slamTid=null;
+      if(this._slamUnpress){this._slamUnpress();this._slamUnpress=null;}
+    };
+    window.addEventListener('touchmove',e=>{
+      if(this._slamTid===null||typeof SlamAim==='undefined')return;
+      for(const t of e.changedTouches)if(t.identifier===this._slamTid){
+        SlamAim.drag(t.clientX,t.clientY);
+        /* cegah browser men-scroll/refresh selama membidik */
+        if(e.cancelable)e.preventDefault();
+      }
+    },{passive:false});
+    const end=e=>{
+      if(this._slamTid===null)return;
+      for(const t of e.changedTouches)if(t.identifier===this._slamTid){
+        clear();
+        if(typeof SlamAim!=='undefined')SlamAim.release();
+      }
+    };
+    window.addEventListener('touchend',end,{passive:false});
+    /* touchcancel = sentuhan dibatalkan sistem: batalkan bidikan, jangan
+       mengeksekusi lompatan yang tidak diminta pemain. */
+    window.addEventListener('touchcancel',e=>{
+      if(this._slamTid===null)return;
+      for(const t of e.changedTouches)if(t.identifier===this._slamTid){
+        clear();
+        if(typeof SlamAim!=='undefined')SlamAim.cancel();
+      }
+    },{passive:false});
+  },
+
   /* skill aktif yang sudah dipelajari, urut sesuai daftar SKILLS.
      Urutan ini dipakai bersama oleh tombol HUD dan tombol keyboard Q/E/R/T. */
-  activeList(){return SKILLS.filter(s=>s.active&&RPG.skillVal(s.id));},
-  /* id skill di slot aktif ke-i (atau null) — dipakai Input untuk SlamAim */
+  activeList(){return SKILLS.filter(s=>s.active&&RPG.skillVal(s.id));},  /* id skill di slot aktif ke-i (atau null) — dipakai Input untuk SlamAim */
   activeSlotSkill(i){const s=this.activeList()[i];return s?s.id:null;},
   /* dipanggil Input saat menekan Q/E/R/T (slot 0–3) */
   useActiveSlot(i){
@@ -791,34 +1387,26 @@ const UI={
           if(s.id==='slam'&&typeof SlamAim!=='undefined'){
             /* MOBA: tahan tombol lalu seret untuk membidik, lepas = eksekusi.
                Tekan cepat tetap menghantam di tempat. Seretan dilacak lewat
-               window memakai identifier sentuhan, sehingga membidik tetap
-               berjalan walau jari keluar dari area tombol. */
-            let tid=null;
+               window memakai identifier sentuhan (lihat bindSlamDrag) sehingga
+               membidik tetap berjalan walau jari keluar dari area tombol. */
             b.addEventListener('touchstart',e=>{
               e.preventDefault();e.stopPropagation();
               press();
               const t=e.changedTouches[0];
-              tid=t.identifier;
-              SlamAim.dragStart={x:t.clientX,y:t.clientY};
-              SlamAim.dragCur={x:t.clientX,y:t.clientY};
-              SlamAim.press();
+              this._slamTid=t.identifier;
+              this._slamUnpress=unpress;
+              /* titik awal seret diserahkan ke press() — menyetelnya sebelum
+                 press() dulu selalu tertimpa null di dalam press(). */
+              SlamAim.press({x:t.clientX,y:t.clientY});
             },{passive:false});
-            const mv=e=>{
-              if(tid===null)return;
-              for(const t of e.changedTouches)if(t.identifier===tid){
-                SlamAim.dragCur={x:t.clientX,y:t.clientY};
-                if(e.cancelable)e.preventDefault();
-              }
-            };
-            const end=e=>{
-              if(tid===null)return;
-              for(const t of e.changedTouches)if(t.identifier===tid){
-                tid=null;unpress();SlamAim.release();
-              }
-            };
-            window.addEventListener('touchmove',mv,{passive:false});
-            window.addEventListener('touchend',end,{passive:false});
-            window.addEventListener('touchcancel',end,{passive:false});
+            /* PC / mouse: klik tetap bisa memakai bidikan kursor */
+            b.addEventListener('mousedown',e=>{
+              if(e.button)return;
+              e.preventDefault();press();
+              SlamAim.press(null);
+            });
+            b.addEventListener('mouseup',()=>{unpress();SlamAim.release();});
+            this.bindSlamDrag();
           }else{
             const fn=e=>{e.preventDefault();e.stopPropagation();RPG.useActive(s.id);};
             b.addEventListener('touchstart',e=>{press();fn(e);},{passive:false});
@@ -878,6 +1466,19 @@ const UI={
       el.querySelector('.cnt').textContent=s&&s.n>1?s.n:'';
       /* badge level tempa (Landasan Tempa) */
       el.querySelector('.lvl').textContent=s&&s.lvl?'+'+s.lvl:'';
+      /* Log Pass yang sudah bertanda diberi bingkai merah agar mudah dikenali
+         di hotbar (warnanya sama dengan garis penanda di kompas) */
+      el.classList.toggle('marked',!!(s&&s.mark));
+      /* warna & bingkai rarity di slot hotbar */
+      const it=s?ITEMS[s.id]:null;
+      const rar=(it&&it.rarity)||'common';
+      ['r-common','r-uncommon','r-rare','r-epic','r-legendary'].forEach(c=>el.classList.remove(c));
+      if(s&&RARITY[rar]){
+        el.classList.add('r-'+rar);
+        el.style.borderColor=RARITY[rar].css;
+      }else{
+        el.style.borderColor='';
+      }
     }
     this.updateAttackIcon();
   },
@@ -947,6 +1548,13 @@ const UI={
     this.setButtonImage(document.getElementById('m-jump'),'buttons/jump.png');
     this.setButtonImage(document.getElementById('m-roll'),'buttons/dash.png');
     this.setButtonImage(document.getElementById('m-talk'),'buttons/talk.png');
+    this.setButtonImage(document.getElementById('m-bag'),'buttons/bag.png');
+    this.setButtonImage(document.getElementById('m-craft'),'buttons/craft.png');
+    this.setButtonImage(document.getElementById('m-skill'),'buttons/skills.png');
+    this.setButtonImage(document.getElementById('m-party'),'buttons/ui_party.png');
+    this.setButtonImage(document.getElementById('m-chat'),'buttons/chat.png');
+    this.setButtonImage(document.getElementById('btn-gear'),'buttons/gear.png');
+    this.setButtonImage(document.getElementById('chat-send'),'buttons/talk.png');
     this.updateAttackIcon();
   },
 
@@ -955,6 +1563,13 @@ const UI={
      tetap memakai emoji. PNG dipotong otomatis ke area pixel yang terlihat
      (croppedButtonImage) supaya gambar pas di tengah slot. */
   ITEM_IMG:{
+    /* bahan dasar */
+    wood:'buttons/wood.png',
+    stone:'buttons/stone.png',
+    fiber:'buttons/fiber.png',
+    gel:'buttons/gel.png',
+    resin:'buttons/resin.png',
+    leather:'buttons/leather.png',
     berry:'buttons/berry.png',
     mush:'buttons/mush.png',
     meat:'buttons/meat.png',
@@ -963,6 +1578,7 @@ const UI={
     salad:'buttons/salad.png',
     pie:'buttons/pie.png',
     bandage:'buttons/bandage.png',
+    potion_stam:'buttons/ui_stam.png',
     fish:'buttons/fish.png',
     cfish:'buttons/cfish.png',
     wheat:'buttons/wheat.png',
@@ -975,7 +1591,115 @@ const UI={
     seed_carrot:'buttons/seed_carrot.png',
     seed_cabbage:'buttons/seed_cabbage.png',
     seed_tomato:'buttons/seed_tomato.png',
-    seed_watermelon:'buttons/seed_watermelon.png',
+        seed_watermelon:'buttons/seed_watermelon.png',
+    hoe:'buttons/hoe.png',
+    /* tambang & batangan (Set 4) */
+    sand:'buttons/sand.png',
+    coal:'buttons/coal.png',
+    iron_ore:'buttons/iron_ore.png',
+    gold_ore:'buttons/gold_ore.png',
+    crystal:'buttons/crystal.png',
+    iron_ingot:'buttons/iron_ingot.png',
+    gold_ingot:'buttons/gold_ingot.png',
+    /* drop monster & hewan (Set 5) */
+    f_house:'buttons/f_house.png',
+    f_campfire:'buttons/f_campfire.png',
+    f_stove:'buttons/f_stove.png',
+    f_anvil:'buttons/f_anvil.png',
+    f_workbench:'buttons/f_workbench.png',
+    f_board:'buttons/f_board.png',
+    f_boat:'buttons/f_boat.png',
+    f_chest:'buttons/f_chest.png',
+    f_bed:'buttons/f_bed.png',
+    f_chair:'buttons/f_chair.png',
+    f_table:'buttons/f_table.png',
+    skills:'buttons/skills.png',
+    craft:'buttons/craft.png',
+    bag:'buttons/bag.png',
+    build:'buttons/build.png',
+    dungeon_changer:'buttons/dungeon_changer.png',
+    log_pass:'buttons/log_pass.png',
+    pet_charm:'buttons/pet_charm.png',
+    saddle:'buttons/saddle.png',
+    rope:'buttons/rope.png',
+    cake:'buttons/cake.png',
+    sugar:'buttons/sugar.png',
+    sugar_cane:'buttons/sugar_cane.png',
+    sword_wood:'buttons/sword_wood.png',
+    pelt:'buttons/pelt.png',
+    venom:'buttons/venom.png',
+    centipede_shell:'buttons/centipede_shell.png',
+    insect_leg:'buttons/insect_leg.png',
+    hard_shell:'buttons/hard_shell.png',
+    green_blood:'buttons/green_blood.png',
+    toxic_venom:'buttons/toxic_venom.png',
+    soul_shard:'buttons/soul_shard.png',
+    boss_core:'buttons/boss_core.png',
+    shield_iron:'buttons/shield_iron.png',
+    shield_wood:'buttons/shield_wood.png',
+    shield_flame:'buttons/shield_flame.png',
+    shield_frost:'buttons/shield_frost.png',
+    shield_venom:'buttons/shield_venom.png',
+    shield_storm:'buttons/shield_storm.png',
+    shield_dark:'buttons/shield_dark.png',
+    shield_carapace:'buttons/shield_carapace.png',
+    sword_iron:'buttons/sword_iron.png',
+    sword_storm:'buttons/sword_storm.png',
+    sword_venom:'buttons/sword_venom.png',
+    sword_frost:'buttons/sword_frost.png',
+    sword_titan:'buttons/sword_titan.png',
+    cap_leather:'buttons/cap_leather.png',
+    helm_iron:'buttons/helm_iron.png',
+    helm_gold:'buttons/helm_gold.png',
+    helm_crystal:'buttons/helm_crystal.png',
+    helm_guard:'buttons/helm_guard.png',
+    helm_thorns:'buttons/helm_thorns.png',
+    helm_carapace:'buttons/helm_carapace.png',
+    vest_leather:'buttons/vest_leather.png',
+    plate_iron:'buttons/plate_iron.png',
+    plate_gold:'buttons/plate_gold.png',
+    plate_crystal:'buttons/plate_crystal.png',
+    cloak_swift:'buttons/cloak_swift.png',
+    plate_regen:'buttons/plate_regen.png',
+    plate_carapace:'buttons/plate_carapace.png',
+    boots_leather:'buttons/boots_leather.png',
+    greaves_iron:'buttons/greaves_iron.png',
+    greaves_gold:'buttons/greaves_gold.png',
+    greaves_crystal:'buttons/greaves_crystal.png',
+    boots_greed:'buttons/boots_greed.png',
+    chat:'buttons/chat.png',
+    gear:'buttons/gear.png',
+    prof_logging:'buttons/prof_logging.png',
+    prof_mining:'buttons/prof_mining.png',
+    prof_harvesting:'buttons/prof_harvesting.png',
+    prof_combat:'buttons/prof_combat.png',
+    prof_blocking:'buttons/prof_blocking.png',
+    prof_crafting:'buttons/prof_crafting.png',
+    prof_cooking:'buttons/prof_cooking.png',
+    prof_farming:'buttons/prof_farming.png',
+    prof_agility:'buttons/prof_agility.png',
+    eff_bleed:'buttons/eff_bleed.png',
+    eff_shock:'buttons/eff_shock.png',
+    eff_venom:'buttons/eff_venom.png',
+    eff_frost:'buttons/eff_frost.png',
+    eff_quake:'buttons/eff_quake.png',
+    eff_swift:'buttons/eff_swift.png',
+    eff_guard:'buttons/eff_guard.png',
+    eff_greed:'buttons/eff_greed.png',
+    eff_regen:'buttons/eff_regen.png',
+    eff_thorns:'buttons/eff_thorns.png',
+    ui_coin:'buttons/ui_coin.png',
+    ui_hp:'buttons/ui_hp.png',
+    ui_stam:'buttons/ui_stam.png',
+    ui_hunger:'buttons/ui_hunger.png',
+    ui_scroll:'buttons/ui_scroll.png',
+    ui_party:'buttons/ui_party.png',
+    ui_team:'buttons/ui_team.png',
+    ui_shop:'buttons/ui_shop.png',
+    ui_altar:'buttons/ui_altar.png',
+    ui_char:'buttons/ui_char.png',
+    ui_sun:'buttons/ui_sun.png',
+    ui_moon:'buttons/ui_moon.png',
   },
 
   /* HTML ikon satu item: <img> bila ada PNG, emoji bila tidak */
@@ -985,6 +1709,38 @@ const UI={
     const src=this.ITEM_IMG[id];
     if(!src)return it.e;
     return `<img class="iico" src="${src}" data-iico="${src}" alt="">`;
+  },
+
+  /* HTML ikon potret NPC team (render 3D bust portrait) */
+  npcIcon(roleId, fallbackEmoji = '👤'){
+    if(!roleId)return fallbackEmoji;
+    return `<img class="tico" src="buttons/npc_${roleId}.png" alt="" onerror="this.outerHTML='${fallbackEmoji}'">`;
+  },
+
+  /* HTML ikon Pet peliharaan (render 3D isometric) */
+  petIcon(type, fallbackEmoji = '🐾'){
+    if(!type)return fallbackEmoji;
+    return `<img class="tico" src="buttons/pet_${type}.png" alt="" onerror="this.outerHTML='${fallbackEmoji}'">`;
+  },
+
+  /* HTML ikon keahlian profisiensi */
+  profIcon(id){
+    const s = (typeof SUBSKILLS !== 'undefined') ? SUBSKILLS[id] : null;
+    const fb = s ? s.icon : '📈';
+    return `<img class="prof-ico" src="buttons/prof_${id}.png" alt="" onerror="this.outerHTML='${fb}'">`;
+  },
+
+  /* HTML ikon status effect / buff */
+  effectIcon(fx){
+    const map = {
+      bleed:'eff_bleed', shock:'eff_shock', venomB:'eff_venom', venom:'eff_venom',
+      frost:'eff_frost', quake:'eff_quake', swift:'eff_swift', guard:'eff_guard',
+      greed:'eff_greed', regen:'eff_regen', thorns:'eff_thorns'
+    };
+    const file = map[fx];
+    const fb = (typeof EFFECTS !== 'undefined' && EFFECTS[fx]) ? EFFECTS[fx].e : '✨';
+    if(!file) return fb;
+    return `<img class="eff-ico" src="buttons/${file}.png" alt="" onerror="this.outerHTML='${fb}'">`;
   },
 
   /* tukar src <img class="iico"> ke versi yang sudah dipotong (sekali per URL) */
@@ -1012,7 +1768,7 @@ const UI={
     }
   },
   /* ---------- panel ---------- */
-  PANELS:['bag','skills','craft','help','npc','chest','shop','term','anvil','settings'],
+  PANELS:['bag','skills','craft','help','npc','party','chest','shop','term','anvil','altar','settings','char'],
   toggle(name){
     if(this.open===name)this.open=null;
     else{
@@ -1027,10 +1783,13 @@ const UI={
         if(name==='skills')this.renderSkills();
         if(name==='craft')this.renderCraft();
         if(name==='npc')this.renderNpcPanel();
+        if(name==='party')this.renderParty();
         if(name==='chest')this.renderChest();
         if(name==='shop')this.renderShop();
         if(name==='anvil'&&typeof Anvil!=='undefined')Anvil.render();
+        if(name==='altar'&&typeof Altar!=='undefined')Altar.render();
         if(name==='settings'&&typeof Settings!=='undefined')Settings.render();
+        if(name==='char'&&typeof CharView!=='undefined')CharView.openPanel();
         /* terminal rahasia: isinya dibangun dinamis oleh modul chat */
         if(name==='term'&&typeof Chat!=='undefined')Chat.renderTerm();
       }catch(err){
@@ -1085,17 +1844,66 @@ const UI={
     }
     this.renderBag();this.renderHotbar();
   },
+  /* kategori filter kantong/tas */
+  bagCat:'all',
+  BAG_CATS:[
+    {k:'all',    t:'Semua',   icon:'🎒'},
+    {k:'weapon', t:'Senjata', icon:'⚔️'},
+    {k:'armor',  t:'Armor',   icon:'🛡️'},
+    {k:'food',   t:'Makanan', icon:'🍖'},
+    {k:'mat',    t:'Bahan',   icon:'📦'},
+    {k:'furni',  t:'Furnitur',icon:'🪑'},
+  ],
+  itemCategory(it){
+    if(!it)return 'mat';
+    if(it.food)return 'food';
+    if(it.weapon||it.tool)return 'weapon';
+    if(it.armor)return 'armor';
+    if(it.place)return 'furni';
+    return 'mat';
+  },
   renderBag(){
+    /* render tab kategori di atas grid kantong */
+    const tabEl=document.getElementById('bag-cat-tabs');
+    if(tabEl){
+      tabEl.innerHTML='';
+      for(const tb of this.BAG_CATS){
+        const b=document.createElement('button');
+        b.type='button';
+        b.className='bag-cat-tab'+(this.bagCat===tb.k?' active':'');
+        b.innerHTML=`<span>${tb.icon}</span> ${tb.t}`;
+        b.addEventListener('click',e=>{
+          e.preventDefault();e.stopPropagation();
+          this.bagCat=tb.k;
+          this.renderBag();
+          if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+        });
+        tabEl.appendChild(b);
+      }
+    }
+
     const mk=(arr,g,el)=>{
+      if(!el)return;
       el.innerHTML='';
+      let shown=0;
       arr.forEach((s,i)=>{
+        /* jika filter kategori aktif pada kantong (g===1), hanya tampilkan item yang cocok */
+        if(g===1&&this.bagCat&&this.bagCat!=='all'){
+          if(!s||!ITEMS[s.id])return;
+          const cat=this.itemCategory(ITEMS[s.id]);
+          if(cat!==this.bagCat)return;
+        }
+        shown++;
         const d=document.createElement('div');d.className='slot';d.dataset.i=i;d.dataset.g=g;
         if(this.picked&&this.picked.i===i&&this.picked.g===g)d.classList.add('picked');
         if(s){
           const it=ITEMS[s.id];
           d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`+
             (s.lvl?`<span class="lvl">+${s.lvl}</span>`:'');
-          d.title=this.itemTip(s.id)+(s.lvl?`\n⚒️ Level tempa ${s.lvl}`:'');
+          d.title=this.itemTip(s.id)+(s.lvl?`\n⚒️ Level tempa ${s.lvl}`:'')
+            +(s.mark?`\n🧭 ${s.mark.name} (${Math.round(s.mark.x)}, ${Math.round(s.mark.z)})`:'');
+          /* Log Pass bertanda: bingkai merah + titik penanda */
+          if(s.mark)d.classList.add('marked');
           /* bingkai slot memakai warna rarity agar item langka mudah dikenali */
           if(it.rarity&&RARITY[it.rarity]){
             d.classList.add('r-'+it.rarity);
@@ -1105,6 +1913,15 @@ const UI={
 
         el.appendChild(d);
       });
+      if(g===1&&this.bagCat&&this.bagCat!=='all'&&shown===0){
+        const emptyMsg=document.createElement('div');
+        emptyMsg.className='tip';
+        emptyMsg.style.gridColumn='1 / -1';
+        emptyMsg.style.textAlign='center';
+        emptyMsg.style.padding='12px 0';
+        emptyMsg.textContent='Tidak ada item di kategori ini.';
+        el.appendChild(emptyMsg);
+      }
       this.applyItemIcons(el);
     };
     mk(RPG.hotbar,0,document.getElementById('bag-hotbar'));
@@ -1202,7 +2019,7 @@ const UI={
       }
       bEl.appendChild(d);
     });
-    push(RPG.hotbar,0);push(RPG.bag,1);
+    push(RPG.bag,1);
     this.applyItemIcons(bEl);
 
     /* tombol titip semua: dipasang sekali saja */
@@ -1251,7 +2068,8 @@ const UI={
           (((+d.sl.dataset.cg)===0?RPG.hotbar:RPG.bag)[+d.sl.dataset.ci]);
         if(!s){cleanup();return;}
         d.ghost=document.createElement('div');d.ghost.className='drag-ghost';
-        d.ghost.textContent=ITEMS[s.id].e;document.body.appendChild(d.ghost);
+        d.ghost.innerHTML=this.itemIcon(s.id);document.body.appendChild(d.ghost);
+        this.applyItemIcons(d.ghost);
         d.sl.classList.add('dragging');
         this._chestSkipClick=true;
       }
@@ -1302,7 +2120,7 @@ const UI={
     const f=Furni.chest;if(!f||!f.inv)return;
     const it=ITEMS[s.id];
     this.modal({
-      icon:it.e,
+      icon:this.itemIcon(s.id),
       text:`Buang <b>${it.n}</b> dari peti ke tanah?`,
       input:{value:s.n,min:1,max:s.n},
       okLabel:'✔ Buang',cancelLabel:'✖ Batal',
@@ -1338,7 +2156,12 @@ const UI={
         lines.push(`${EFFECTS[w.fx].e} ${EFFECTS[w.fx].n}: ${EFFECTS[w.fx].desc}`);
       lines.push('Klik kanan untuk memakai');
     }else if(it.armor){
-      lines.push(`🛡 +${Math.round(it.armor.def*100)}% pertahanan`);
+      /* Angka DEF disamakan dengan panel stat (config.js itemStats): keduanya
+         mengalikan rarityMul. BUGFIX: tooltip ini dulu memakai def MENTAH,
+         sehingga item yang sama memperlihatkan dua angka berbeda tergantung
+         panel mana yang dilihat pemain. */
+      const rm=(typeof RPG!=='undefined'&&RPG.rarityMul)?RPG.rarityMul(id):1;
+      lines.push(`🛡 +${Math.round(it.armor.def*rm*100)}% pertahanan`);
       if(it.armor.fx&&EFFECTS[it.armor.fx])
         lines.push(`${EFFECTS[it.armor.fx].e} ${EFFECTS[it.armor.fx].n}: ${EFFECTS[it.armor.fx].desc}`);
 
@@ -1398,6 +2221,14 @@ const UI={
     /* tampilkan damage senjata aktif bila elemennya tersedia */
     const dmgEl=document.getElementById('dmg-num');
     if(dmgEl)dmgEl.textContent=Math.round(RPG.weaponDmg());
+    /* ringkasan block dari tameng yang dipakai (peluang × kekuatan) */
+    const blkEl=document.getElementById('blk-num');
+    if(blkEl&&RPG.blockChance){
+      const bc=RPG.blockChance();
+      blkEl.textContent=bc>0
+        ?Math.round(bc*100)+'% / '+Math.round(RPG.blockPower()*100)+'%'
+        :'0%';
+    }
   },
 
   renderAll(){
@@ -1406,20 +2237,37 @@ const UI={
     if(this.open==='craft')this.renderCraft();
     if(this.open==='skills')this.renderSkills();
     if(this.open==='npc')this.renderNpcPanel();
+    if(this.open==='party')this.renderParty();
     if(this.open==='shop'&&this.renderShop)this.renderShop();
+    /* ---------- PANEL YANG DULU TERLEWAT ----------
+       Panel peti, landasan tempa, dan altar TIDAK ikut digambar ulang di sini,
+       padahal renderAll() adalah jalur yang dipakai Settings.setLang saat
+       bahasa diganti. Akibatnya: dengan panel PETI terbuka lalu bahasa
+       ditukar, atribut `title` tiap slot (tooltip yang muncul saat kursor
+       menyentuh item) tetap memakai bahasa lama — nama item, rarity, dan
+       deskripsi efeknya tidak ikut berubah sampai pemain mengambil/menitipkan
+       sesuatu (yang memicu renderChest sendiri). Tooltip dibangun ulang dari
+       ITEMS/RARITY/EFFECTS yang sudah ter-patch, jadi cukup digambar ulang. */
+    if(this.open==='chest')this.renderChest();
+    if(this.open==='anvil'&&typeof Anvil!=='undefined'&&Anvil.render)Anvil.render();
+    if(this.open==='altar'&&typeof Altar!=='undefined'&&Altar.render)Altar.render();
     this.renderEquip();
     this.teamSig='';                 // paksa HUD rekan digambar ulang
     this.renderTeam();
     if(typeof I18N!=='undefined'&&I18N.refresh)I18N.refresh();
   },
 
-  /* label & ikon tiap cabang untuk header pohon */
+  /* label & ikon tiap cabang untuk header pohon.
+     Nama WAJIB bahasa Indonesia (bahasa dasar game). Dulu di sini tertulis
+     'Combat'/'Movement'/'Crafting'/'Gather'/'Catch' — Inggris — sehingga panel
+     Skill tampak campur Indonesia-Inggris saat bahasa ID dipilih. Terjemahan
+     ke en/zh/ja disediakan I18N_PHRASE. */
   BRANCH_META:{
-    combat:{icon:'⚔️',name:'Combat'},
-    move:{icon:'🏃',name:'Movement'},
-    craft:{icon:'🛠️',name:'Crafting'},
-    gather:{icon:'🧺',name:'Gather'},
-    catch:{icon:'🪢',name:'Catch'},
+    combat:{icon:'⚔️',img:'prof_combat',name:'Tempur'},
+    move:{icon:'🏃',img:'prof_agility',name:'Gerak'},
+    craft:{icon:'🛠️',img:'prof_crafting',name:'Kerajinan'},
+    gather:{icon:'🧺',img:'prof_harvesting',name:'Pengumpul'},
+    catch:{icon:'🪢',img:'prof_blocking',name:'Pawang'},
   },
   /* SKILL TREE berbentuk pohon-akar: tiap branch digambar sebagai node yang
      saling terhubung garis sesuai prasyarat (req). Node disusun per "kedalaman"
@@ -1437,7 +2285,7 @@ const UI={
       const meta=this.BRANCH_META[br]||{icon:'🌿',name:br};
       const sec=document.createElement('div');
       sec.className='branch tree';
-      sec.innerHTML=`<h3>${meta.icon} ${meta.name}</h3>`;
+      sec.innerHTML=`<h3><img class="branch-ico" src="buttons/${meta.img||''}.png" alt="" onerror="this.outerHTML='${meta.icon}'"> ${meta.name}</h3>`;
       const body=document.createElement('div');
       body.className='tree-body';
 
@@ -1484,7 +2332,9 @@ const UI={
     const rank=RPG.skillVal(sk.id);
     const needSkill=sk.req&&RPG.skillVal(sk.req)<=0;
     const needProf=!RPG.meetsProf(sk);
-    const locked=needSkill||needProf;
+    /* GERBANG LEVEL (sk.lvl): skill puncak butuh level pemain minimum */
+    const needLvl=sk.lvl&&Player.level<sk.lvl;
+    const locked=needSkill||needProf||needLvl;
     const maxed=rank>=sk.max;
     const afford=RPG.sp>=sk.cost;
     const learnable=!locked&&!maxed&&afford;
@@ -1492,14 +2342,15 @@ const UI={
     let cls='tnode';
     if(maxed)cls+=' max';
     if(locked)cls+=' locked';
-    if(needProf&&!needSkill&&!maxed)cls+=' proflock';
+    if(needProf&&!needSkill&&!needLvl&&!maxed)cls+=' proflock';
     if(learnable)cls+=' can';
     if(sk.active)cls+=' active';
     d.className=cls;
     d.dataset.id=sk.id;
-    const badge=maxed?'✔ Maks':locked?(needProf?'📈 '+RPG.profReqText(sk):'🔒')
+    const badge=maxed?'✔ Maks':needLvl?('🔒 Lv '+sk.lvl)
+      :locked?(needProf?'📈 '+RPG.profReqText(sk):'🔒')
       :(sk.active?'⚡ ':'')+sk.cost+' SP';
-    d.innerHTML=`<div class="t-ico">${sk.icon}</div>
+    d.innerHTML=`<div class="t-ico">${this.skillIcon(sk)}</div>
       <div class="t-nm">${sk.name}</div>
       <div class="t-rk">Rank ${rank}/${sk.max}</div>
       <div class="t-badge">${badge}</div>`;
@@ -1535,24 +2386,29 @@ const UI={
     const rank=RPG.skillVal(sk.id);
     const maxed=rank>=sk.max;
     const reqMet=!sk.req||RPG.skillVal(sk.req)>0;
+    const lvlMet=!sk.lvl||Player.level>=sk.lvl;
     const afford=RPG.sp>=sk.cost;
     const kind=sk.active?'<span class="st-type act">⚡ AKTIF</span>':'<span class="st-type pas">🔷 Pasif</span>';
-    let html=`<div class="st-nm">${sk.icon} ${sk.name} ${kind}</div>
+    let html=`<div class="st-nm">${this.skillIcon(sk)} ${sk.name} ${kind}</div>
       <div class="st-rk">Rank ${rank}/${sk.max}</div>
       <div class="st-desc">${sk.desc}</div>`;
     if(sk.req){
       const p=SKILLS.find(s=>s.id===sk.req);
       html+=`<div class="st-line ${reqMet?'ok':'no'}">${reqMet?'✔':'🔒'} Butuh skill: ${p?p.name:sk.req}</div>`;
     }
+    if(sk.lvl){
+      html+=`<div class="st-line ${lvlMet?'ok':'no'}">${lvlMet?'✔':'🔒'} Butuh Level ${sk.lvl} (kini ${Player.level})</div>`;
+    }
     if(sk.prof&&typeof SUBSKILLS!=='undefined'&&typeof Prof!=='undefined'){
       for(const id in sk.prof){
         const s=SUBSKILLS[id];const have=Prof.level(id);const need=sk.prof[id];
         const ok=have>=need;
-        html+=`<div class="st-line ${ok?'ok':'no'}">${ok?'✔':'📈'} ${s?s.icon+' '+s.name:id} Lv ${have}/${need}</div>`;
+        html+=`<div class="st-line ${ok?'ok':'no'}">${ok?'✔':'📈'} ${(typeof UI!=='undefined'&&this.profIcon)?this.profIcon(id):(s?s.icon:'')} ${s?s.name:id} Lv ${have}/${need}</div>`;
       }
     }
     html+=`<div class="st-line ${afford?'ok':'no'}">💠 Biaya: ${sk.cost} SP (punya ${RPG.sp})</div>`;
-    const status=maxed?'✔ Sudah maksimal':(!reqMet)?'🔒 Terkunci — penuhi syarat dulu':
+    const status=maxed?'✔ Sudah maksimal':(!lvlMet)?`🔒 Terkunci — butuh Level ${sk.lvl}`:
+      (!reqMet)?'🔒 Terkunci — penuhi syarat dulu':
       (afford?'✅ Klik untuk mempelajari':'⚠ Skill Point kurang');
     html+=`<div class="st-status">${status}</div>`;
     el.innerHTML=html;
@@ -1609,7 +2465,7 @@ const UI={
       const pct=maxed?100:Math.min(100,Math.round(100*xp/need));
       const d=document.createElement('div');
       d.className='prof-row';
-      d.innerHTML=`<div class="prof-nm"><span>${s.icon} ${s.name}</span>`+
+      d.innerHTML=`<div class="prof-nm"><span>${this.profIcon(id)} ${s.name}</span>`+
         `<b>${maxed?'Lv MAX':'Lv '+lv}</b></div>`+
         `<div class="prof-track"><div style="width:${pct}%"></div></div>`;
       el.appendChild(d);
@@ -1626,11 +2482,11 @@ const UI={
   /* kategori crafting yang sedang dipilih (tab) */
   craftTab:'food',
   CRAFT_TABS:[
-    {k:'food',  t:'🍖 Makanan'},
-    {k:'weapon',t:'🗡️ Senjata'},
-    {k:'armor', t:'🛡️ Armor'},
-    {k:'furni', t:'🪑 Furnitur'},
-    {k:'mat',   t:'📦 Bahan'},
+    {k:'food',  t:'Makanan', img:'cmeat',          fb:'🍖'},
+    {k:'weapon',t:'Senjata', img:'sword_wood',      fb:'🗡️'},
+    {k:'armor', t:'Armor',   img:'plate_iron',      fb:'🛡️'},
+    {k:'furni', t:'Furnitur',img:'f_chair',         fb:'🪑'},
+    {k:'mat',   t:'Bahan',   img:'wood',            fb:'📦'},
   ],
   renderCraft(){
     /* kelompokkan resep per kategori agar mudah dicari */
@@ -1649,7 +2505,7 @@ const UI={
         const n=groups[tb.k].length;
         const b=document.createElement('button');
         b.className='craft-tab'+(this.craftTab===tb.k?' active':'');
-        b.innerHTML=tb.t+(n?` <i>${n}</i>`:'');
+        b.innerHTML=`<img class="tab-ico" src="buttons/${tb.img}.png" alt="" onerror="this.outerHTML='${tb.fb}'"> ${tb.t}`+(n?` <i>${n}</i>`:'');
         b.disabled=!n;
         b.addEventListener('click',()=>{
           this.craftTab=tb.k;this.renderCraft();Sfx.click&&Sfx.click();
@@ -1672,26 +2528,36 @@ const UI={
         el.appendChild(p);
       }
       for(const r of list){
-        const unlocked=RPG.canRecipe(r);
-        const can=unlocked&&Object.keys(r.need).every(id=>RPG.countItem(id)>=r.need[id]);
+        const learned=RPG.isLearned?RPG.isLearned(r):(!r.skill||RPG.skillVal(r.skill)>0);
+        const st=RPG.stationReq?RPG.stationReq(r):null;
+        const hasSt=RPG.hasStation?RPG.hasStation(st):true;
+        const unlocked=learned&&hasSt;
+        const hasNeed=Object.keys(r.need).every(id=>RPG.countItem(id)>=r.need[id]);
+        const can=unlocked&&hasNeed;
         const needStr=Object.keys(r.need).map(id=>{
           const have=RPG.countItem(id);
           const cls=have>=r.need[id]?'ok':'no';
           return `<span class="${cls}">${this.itemIcon(id)}${r.need[id]} (punya ${have})</span>`;
         }).join(' ');
         const d=document.createElement('div');d.className='recipe';
-        const statStr=unlocked?this.statChips(r.out):'';
+        const statStr=learned?this.statChips(r.out):'';
         /* nama resep memakai nama ITEM (ikut bahasa aktif), bukan label resep */
         const rName=(ITEMS[r.out]&&ITEMS[r.out].n)||r.name;
-        /* input jumlah + tombol Buat. Jumlah maksimum = perkiraan dari bahan
-           yang paling terbatas (dihitung saat klik agar selalu akurat). */
-        d.innerHTML=`<div class="out">${unlocked?this.itemIcon(r.out):'🔒'}</div>
-          <div class="info"><div class="nm">${rName}${unlocked?'':' — butuh '+RPG.recipeReqText(r)}</div>
+        let lockReason='';
+        if(!learned)lockReason=' — butuh '+RPG.recipeReqText(r);
+        else if(!hasSt)lockReason=' — butuh '+(st==='stove'?'🍲 Kompor / Tungku':'🔨 Meja Kerja');
+        let btnText='Buat';
+        if(!learned)btnText='🔒';
+        else if(!hasSt)btnText=(st==='stove'?'🔒 Butuh Kompor':'🔒 Butuh Meja Kerja');
+
+        /* input jumlah + tombol Buat. */
+        d.innerHTML=`<div class="out">${learned?this.itemIcon(r.out):'🔒'}</div>
+          <div class="info"><div class="nm">${rName}${lockReason}</div>
           ${statStr}
-          <div class="need">${unlocked?needStr:'🔒 '+RPG.recipeReqText(r)}</div></div>
+          <div class="need">${learned?needStr:'🔒 '+RPG.recipeReqText(r)}</div></div>
           ${unlocked?'<input type="number" class="craft-qty" min="1" max="64" value="1">':''}
-          <button ${can?'':'disabled'}>${unlocked?'Buat':'🔒'}</button>`;
-        if(unlocked)d.querySelector('.out').title=this.itemTip(r.out);
+          <button ${can?'':'disabled'}>${btnText}</button>`;
+        if(learned)d.querySelector('.out').title=this.itemTip(r.out);
         if(can){
           const btn=d.querySelector('button');
           const qtyEl=d.querySelector('.craft-qty');

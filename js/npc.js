@@ -19,21 +19,101 @@ const NPCS={
 
   /* ---------- helper arketipe ---------- */
   role(n){return n.role;},
-  isTeam(n){return n.state==='follow'||n.state==='gather'||n.state==='wait';},
+  /* =========================================================================
+     REKAN HILANG TAPI IKONNYA MASIH ADA — perbaikan menyeluruh
+     -------------------------------------------------------------------------
+     Laporan pemain: rekan tiba-tiba hilang entah ke mana, berlari menjauh
+     tidak membuatnya muncul lagi, tapi ikonnya tetap terdaftar di party.
+
+     Akar masalah: keanggotaan tim ditentukan dari STATE (isTeam membaca
+     n.state). Bila state rekan sempat keluar dari follow/gather/wait —
+     cukup satu frame — maka:
+
+       1. isTeam(n) = false → cabang recall (teleport ke pemain) TIDAK jalan,
+          dan karena wander=false, rekan di-despawn saat >70 blok:
+          mesh dibuang dari scene. Yang tidak ikut dibuang: entri di
+          this.team & UI ikon. Hasilnya persis yang dilaporkan: ikon ada,
+          tubuhnya tidak.
+
+     Tiga lapis perbaikan:
+
+       a. isTeam memeriksa keanggotaan this.team LANGSUNG (indexOf), bukan
+          menebak dari state. Rekan yang di-dismiss sengaja dikeluarkan dari
+          this.team lebih dulu di dismiss(), jadi perilaku lain tidak berubah.
+       b. Pemeriksaan despawn memakai keanggotaan tim juga — rekan TIDAK PERNAH
+          dibuang karena jarak, apa pun statenya; yang tertinggal jauh cukup
+          di-teleport.
+       c. Penjaga mesh di akhir update: bila mesh rekan entah bagaimana tidak
+          lagi berada di scene (referensi hilang), ia dibuat ulang dari
+          buildModel + refreshGear dan diletakkan di samping pemain. Ini jaring
+          pengaman untuk jalur yang belum kita ketahui.
+
+     isTeam dipanggil ±18 kali per frame (tim maks 3 + list penduduk), jadi
+     indexOf pada array ≤3 elemen biayanya dapat diabaikan.
+     ========================================================================= */
+  isTeam(n){return this.team.indexOf(n)>=0;},
   teamFull(){return this.team.length>=CFG.NPC.TEAM_MAX;},
 
-  /* Permintaan rekrut: 2–3 bahan dari daftar arketipe, jumlah acak.
-     Diacak sekali saat NPC lahir sehingga tiap NPC punya syarat berbeda. */
-  rollDemand(role){
+  /* ---------- PERLENGKAPAN ACAK ROYAL GUARD ----------
+     Setiap RG yang lahir mengundi pedang & tamengnya sendiri. Bobot menentukan
+     kelangkaan: common paling sering, legendaris paling jarang
+     (pedang: legendaris ±8% · tameng: legendaris ±3%, epik ±14%). */
+  RG_WEAPON_POOL:[
+    {id:'sword_wood',  w:24},   // common
+    {id:'sword_iron',  w:18},   // uncommon
+    {id:'sword_storm', w:10},   // rare
+    {id:'sword_venom', w:6},    // epic
+    {id:'sword_frost', w:3},    // legendary
+    {id:'sword_titan', w:2},    // legendary
+  ],
+  RG_SHIELD_POOL:[
+    {id:'shield_wood',  w:24},  // common
+    {id:'shield_iron',  w:18},  // uncommon
+    {id:'shield_flame', w:10},  // rare
+    {id:'shield_venom', w:8},   // rare
+    {id:'shield_storm', w:6},   // epic
+    {id:'shield_frost', w:4},   // epic
+    {id:'shield_dark',  w:2},   // legendary
+  ],
+  rollWeighted(pool){
+    let total=0;
+    for(const e of pool)total+=e.w;
+    let p=Math.random()*total;
+    for(const e of pool){p-=e.w;if(p<=0)return e.id;}
+    return pool[pool.length-1].id;
+  },
+  rollRoyalGuardGear(n){
+    if(!n.gear)n.gear={weapon:null,helm:null,chest:null,boots:null};
+    if(!n.gear.weapon)n.gear.weapon=this.rollWeighted(this.RG_WEAPON_POOL);
+    if(!n.gear.shield)n.gear.shield=this.rollWeighted(this.RG_SHIELD_POOL);
+    if(typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
+      NPC_Royalguard.refreshGear(n);
+  },
+
+  /* Permintaan rekrut: jumlah & variasi bahan SCALING dengan level NPC.
+     Makin besar level NPC, makin banyak & makin berat permintaannya. */  rollDemand(role, lvl=1){
     if(!role.recruit||!role.ask.length)return null;
+    const L=Math.max(1,Math.round(lvl||1));
     const pool=role.ask.slice();
     const need={};
-    const cnt=2+(Math.random()<0.5?0:1);
+    /* NPC level tinggi meminta lebih banyak macam bahan (3-4 jenis untuk Lv 40+) */
+    const cnt=L>=45?Math.min(pool.length,3+(Math.random()<0.5?1:0))
+             :L>=20?Math.min(pool.length,2+(Math.random()<0.5?1:0))
+             :Math.min(pool.length,2);
     for(let i=0;i<cnt&&pool.length;i++){
       const id=pool.splice(Math.floor(Math.random()*pool.length),1)[0];
-      /* bahan umum diminta lebih banyak, bahan langka lebih sedikit */
-      const rare=(id==='iron_ore'||id==='pelt'||id==='resin'||id==='leather');
-      need[id]=rare?2+Math.floor(Math.random()*3):3+Math.floor(Math.random()*8);
+      const rare=(id==='iron_ore'||id==='gold_ore'||id==='iron_ingot'||id==='gold_ingot'||
+                  id==='pelt'||id==='resin'||id==='leather'||id==='crystal'||id==='soul_shard');
+      /* Jumlah scaling dengan level:
+         - bahan langka: 2..4 di Lv 1, naik s.d. 8..15 di Lv 75
+         - bahan biasa: 4..10 di Lv 1, naik s.d. 18..40 di Lv 75 */
+      if(rare){
+        const base=2+Math.floor(Math.random()*3);
+        need[id]=Math.max(2,Math.round(base*(1+0.045*(L-1))));
+      }else{
+        const base=4+Math.floor(Math.random()*6);
+        need[id]=Math.max(3,Math.round(base*(1+0.065*(L-1))));
+      }
     }
     return need;
   },
@@ -61,6 +141,7 @@ const NPCS={
     return d;
   },
   npcMaxHp(n){return Math.round(n.role.hp*(1+0.15*(n.level-1)));},
+  npcMaxStamina(n){return Math.round(100+2*(n.level-1));},
   npcReach(n){return CFG.NPC.REACH+(n.role.skill.id==='keen'?0.9:0)+(n.role.skill.id==='lionclaw'?0.7:0);},
   npcDef(n){
     let d=0;
@@ -72,32 +153,61 @@ const NPCS={
     if(n.role.skill.id==='aegis')d+=NPC_AEGIS_DEF;       // Guardian melindungi diri juga
     if(n.role.skill.id==='lionclaw')d+=0.15;             // zirah emas Manusia Singa
     d+=this.auraDef(n.pos);                              // aura Guardian di tim
-    return Math.min(0.7,d);
+    /* buff Aura Perisai dari Mage Support (n.shieldT/shieldV diisi
+       NPC_Magesupport.applyShieldAura, di-tick NPCS.update di bawah) */
+    if(n.shieldT>0)d+=n.shieldV||0;
+    return Math.min(0.85,d);
   },
 
   /* =========================================================================
-     AURA GUARDIAN (Aegis)
+     AURA PERTAHANAN TIM (Guardian Aegis + Mage Support Passive Aura)
      ------------------------------------------------------------------------- 
-     Selama ada Guardian hidup di dalam tim dan berada dalam AEGIS_R blok,
-     seluruh anggota tim DAN pemain menerima damage lebih kecil. Dipanggil
-     oleh NPCS.npcDef dan Player.takeDamage.
+     1. Guardian (skill 'aegis'): +10% DEF (NPC_AEGIS_DEF) dalam radius 10 blok.
+     2. Mage Support: aura pasif +10% (Lv 1) -> +15% (Lv 100) DEF dalam radius
+        14 blok untuk SELURUH tim (pemain, rekan, dan pet).
+     Syarat mutlak: HANYA berlaku bila SUDAH DIREKRUT ke dalam tim (ada di
+     dalam this.team). Mage Support liar/pengembara yang belum direkrut
+     tidak memberikan aura perlindungan ini.
      ========================================================================= */
   AEGIS_R:10,
+  MAGE_AURA_R:14,
   auraDef(pos){
+    let def=0;
+    /* 1. Aura Guardian */
     for(const g of this.team){
       if(g.dead||g.role.skill.id!=='aegis')continue;
-      if(g.pos.distanceTo(pos)<=this.AEGIS_R)return NPC_AEGIS_DEF;
+      if(g.pos.distanceTo(pos)<=this.AEGIS_R){def+=NPC_AEGIS_DEF;break;}
     }
-    return 0;
+    /* 2. Aura Pasif Mage Support (hanya jika sudah direkrut ke dalam tim) */
+    for(const m of this.team){
+      if(m.dead||m.role.id!=='magesupport')continue;
+      if(m.pos.distanceTo(pos)<=this.MAGE_AURA_R){
+        const k=clamp(((m.level||1)-1)/99,0,1);
+        def+=(0.10+0.05*k);                     // +10% (Lv 1) -> +15% (Lv 100)
+        break;
+      }
+    }
+    return def;
   },
 
   /* ---------- XP & level rekan ---------- */
+  /* cap berbeda untuk rekan biasa vs langka (rare). NPC biasa (penjaga, pemburu,
+     petani, dll.) dibatasi NPC_MAX_LEVEL (50); arketipe `rare:true` (penyihir
+     elf, raksasa batu, manusia singa, goblin, kelinci cakar, mage support)
+     dibatasi NPC_RARE_MAX_LEVEL (100) supaya mereka tetap berkembang di end-game
+     sejalan dengan mob dungeon Lv 100. */
+  npcLevelCap(n){
+    return (n.role&&n.role.rare)?CFG.NPC_RARE_MAX_LEVEL:CFG.NPC_MAX_LEVEL;
+  },
   gainXp(n,amount){
     n.xp+=amount;
+    const cap=this.npcLevelCap(n);
     let need=npcXpNeed(n.level);
-    while(n.xp>=need){
+    while(n.xp>=need&&n.level<cap){
       n.xp-=need;n.level++;
-      n.maxhp=this.npcMaxHp(n);n.hp=n.maxhp;
+    n.maxhp=this.npcMaxHp(n);n.hp=n.maxhp;
+    n.maxStamina=this.npcMaxStamina(n);n.stamina=n.maxStamina;
+      n.maxStamina=this.npcMaxStamina(n);n.stamina=n.maxStamina;
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2.1,0)),'LV '+n.level,'#ffe066');
       if(this.isTeam(n))UI.toast(`${n.role.e} ${n.name} naik ke Lv ${n.level}!`);
       need=npcXpNeed(n.level);
@@ -128,19 +238,25 @@ const NPCS={
       if(y>=CFG.SEA&&y<=CFG.SEA+2)ok=true;
     }
     if(!ok)return;
-    if(!here)UI.toast('🏘️ Ada penduduk desa di sekitar sini — dekati dan tekan G');
+    if(!here)UI.toast('🏘️ Ada penduduk desa di sekitar sini — dekati dan tekan F');
 
     /* Penjaga selalu ada; pedagang menetap satu per desa (slot kedua bila belum
        ada); sisanya arketipe yang bisa direkrut. Slot pertama di tiap desa
        dipaksa penjaga agar desa tidak pernah tanpa pelindung. Arketipe dengan
-       `weight` kecil (mis. Manusia Singa) muncul lebih jarang. */
-    const hasMerchant=this.list.some(o=>!o.dead&&o.role.id==='merchant'&&
-      o.home.x===v.x&&o.home.z===v.z);
-    const hasFarmer=this.list.some(o=>!o.dead&&o.role.id==='farmer'&&
-      o.home.x===v.x&&o.home.z===v.z);
+       `weight` kecil (mis. Manusia Singa) muncul lebih jarang.
+       Pemeriksa per desa memakai VILLAGE ANCHOR (home asli sebelum ditimpa
+       lapak) dengan fallback home langsung — tanpa itu DM yang sudah
+       ditambatkan ke kios (home = koordinat lapak) tidak pernah dikenali
+       dan terus di-spawn ulang (bug "DM banyak di kios"). */
+    const atVillage=(o)=>{const h=o.villageAnchor||o.home;
+      return h&&h.x===v.x&&h.z===v.z;};
+    const hasMerchant=this.list.some(o=>!o.dead&&o.role.id==='merchant'&&atVillage(o));
+    const hasDMaster=this.list.some(o=>!o.dead&&o.role.id==='dungeonmaster'&&atVillage(o));
+    const hasFarmer=this.list.some(o=>!o.dead&&o.role.id==='farmer'&&atVillage(o));
     let role;
     if(here===0){role=NPC_ROLES[0];}                    // penjaga
     else if(!hasMerchant){role=NPC_ROLES.find(r=>r.id==='merchant')||NPC_ROLES[0];}
+    else if(!hasDMaster){role=NPC_ROLES.find(r=>r.id==='dungeonmaster')||NPC_ROLES[0];}
     else if(!hasFarmer){role=NPC_ROLES.find(r=>r.id==='farmer')||NPC_ROLES[0];}
     else{
       /* arketipe `rare:true` (pengembara) & non-rekrut (penjaga/pedagang)
@@ -159,6 +275,7 @@ const NPCS={
     const n=this.make(role,x,y,z,{x:v.x,z:v.z},null,v);
     this.list.push(n);
     if(role.id==='merchant')UI.toast('🏪 Seorang pedagang membuka lapak di desa ini');
+    if(role.id==='dungeonmaster')UI.toast('🧙 Seorang Dungeon Master singgah di desa ini');
   },
 
   /* =========================================================================
@@ -182,11 +299,29 @@ const NPCS={
     return {mesh:new THREE.Group(),
       parts:{body:null,head:null,armL:null,armR:null,legs:null,bodyY:0.78}};
   },
+  /* Level NPC mengikuti band biome tempat ia berada / desa spawn:
+     Pegunungan [50, 75], Tanah Merah [30, 50], Gurun [20, 30], lainnya [1, 20].
+     Dengan begini penjaga dan penduduk desa bisa bertahan melawan mob liar setempat. */
+  rollBiomeLevel(biome,x,z){
+    if(typeof Monsters!=='undefined'&&Monsters.rollLevel){
+      return Monsters.rollLevel(biome,x,z);
+    }
+    const bands=(typeof BIOME!=='undefined')?{
+      [BIOME.MOUNTAIN]:[50,75],
+      [BIOME.REDLANDS]:[30,50],
+      [BIOME.DESERT]:[20,30],
+    }:{};
+    const b=(typeof BIOME!=='undefined'&&bands[biome])||[1,20];
+    return b[0]+Math.floor(Math.random()*(b[1]-b[0]+1));
+  },
   make(role,x,y,z,home,lvlOverride,village){
     const {mesh,parts}=this.buildModel(role);
     mesh.position.set(x,y,z);
     Game.scene.add(mesh);
-    const lvl=lvlOverride||1+Math.floor(Math.random()*Math.max(1,Math.min(5,Player.level)));
+    const biome=(village&&village.biome!==undefined)?village.biome:
+                (typeof WGEN!=='undefined'&&WGEN.biomeAt)?WGEN.biomeAt(x,z):
+                (typeof BIOME!=='undefined'?BIOME.FOREST:0);
+    const lvl=lvlOverride||this.rollBiomeLevel(biome,x,z);
     const n={
       id:this.uid++,role,name:role.name,mesh,parts,
       home:home||{x,z},
@@ -197,8 +332,8 @@ const NPCS={
       dead:false,deathT:0,onGround:false,inWater:false,
       bag:new Array(CFG.NPC.BAG).fill(null),
       gear:{weapon:null,helm:null,chest:null,boots:null},
-      demand:this.rollDemand(role),
-      mineT:0,mineAt:null,healT:0,
+      demand:this.rollDemand(role,lvl),
+      mineT:0,mineAt:null,healT:0,working:false,
       /* ---- MODE BERTARUNG: aggressive (default) / passive ---- */
       aggr:true,focus:false,
       /* ---- TAVERN: sebagian penduduk "berkumpul di tavern" ----
@@ -211,14 +346,77 @@ const NPCS={
       n.tavernSpot={x:tv.cx+rand(-3.5,3.5),z:tv.cz+rand(-3,3)};
       n.home={x:n.tavernSpot.x,z:n.tavernSpot.z};
     }
+    /* ROYAL GUARD: undi peralatan bawaannya SENDIRI sejak lahir —
+       pedang & tameng acak dengan rarity tinggi makin jarang. Dulu semua RG
+       memakai prototipe sword_frost + shield_flame sehingga tampak "menyamai"
+       peralatan pemain. */
+    if(role.id==='royalguard')this.rollRoyalGuardGear(n);
     n.maxhp=this.npcMaxHp(n);n.hp=n.maxhp;
+    n.maxStamina=this.npcMaxStamina(n);n.stamina=n.maxStamina;
     /* Pedagang mendapat stok barang ACAK sendiri saat diciptakan (tiap desa
        bisa berbeda). Upgrade tas muncul dgn peluang 25% di genShopStock. */
     if(role.id==='merchant'&&!n.shop){
       n.shop=(typeof genShopStock==='function')
         ?genShopStock(typeof RPG!=='undefined'?RPG.bagTier:0):[];
     }
+    /* Dungeon Master: stok changer diambil PER-DESA (persisten + restock
+       berkala) — bukan milik NPC-nya — supaya tidak hilang saat NPC despawn
+       dan tidak bisa direset dengan membunuhnya. */
+    if(role.id==='dungeonmaster')this.checkDshopRestock(n.home.x,n.home.z);
     return n;
+  },
+
+  /* =========================================================================
+     STOK DUNGEON MASTER (per desa, persisten, restock 30 menit)
+     -------------------------------------------------------------------------
+     Daftar level changer deterministik dari posisi desa (genDungeonChangerStock
+     di config.js). Yang tersimpan per desa hanya {key → {lvl: sisa stok}} plus
+     timestamp restock terakhir; harga & maxStock selalu dihitung ulang dari
+     config. Disimpan ke localStorage terpisah (pola Dungeon.save) sehingga
+     stok bertahan antar sesi dan tidak terikat pada slot save pemain.
+     ========================================================================= */
+  DSHOP:{},             // 'vx,vz' → {s:{lvl:stock}, t:timestamp restock}
+  DSHOP_KEY:'forest_survival_dshop_v1',
+  DSHOP_RESET_MS:30*60*1000,       // stok penuh kembali tiap 30 menit (real time)
+  checkDshopRestock(vx,vz){
+    const key=vx+','+vz;
+    let e=this.DSHOP[key];
+    if(!e){e=this.DSHOP[key]={s:{},t:Date.now()};}
+    if(Date.now()-e.t>=this.DSHOP_RESET_MS){
+      e.s={};e.t=Date.now();       // kosongkan catatan → terisi penuh saat dibaca
+      this.saveDshop();
+      if(typeof UI!=='undefined'&&UI.open==='shop'&&UI.shopNpc&&
+         UI.shopNpc.role.id==='dungeonmaster'&&
+         UI.shopNpc.home.x===vx&&UI.shopNpc.home.z===vz)UI.renderShop();
+    }
+    return e;
+  },
+  /* stok gabungan untuk panel toko: entri config (lvl/price/maxStock) +
+     sisa stok tersimpan. Memanggil checkDshopRestock lebih dulu. */
+  dshopStock(vx,vz){
+    this.checkDshopRestock(vx,vz);
+    const e=this.DSHOP[vx+','+vz];
+    return genDungeonChangerStock(vx,vz).map(g=>({
+      lvl:g.lvl,price:g.price,maxStock:g.maxStock,
+      stock:(e.s[g.lvl]!==undefined)?e.s[g.lvl]:g.maxStock,
+    }));
+  },
+  /* beli satu changer level `lvl` di desa (vx,vz): mengurangi sisa stok */
+  dshopBuy(vx,vz,lvl){
+    const row=this.dshopStock(vx,vz).find(r=>r.lvl===lvl);
+    if(!row||row.stock<=0)return false;
+    this.DSHOP[vx+','+vz].s[lvl]=row.stock-1;
+    this.saveDshop();
+    return true;
+  },
+  saveDshop(){
+    try{localStorage.setItem(this.DSHOP_KEY,JSON.stringify(this.DSHOP));}catch(e){}
+  },
+  loadDshop(){
+    try{
+      const o=JSON.parse(localStorage.getItem(this.DSHOP_KEY));
+      if(o&&typeof o==='object')this.DSHOP=o;
+    }catch(e){}
   },
 
 
@@ -260,9 +458,27 @@ const NPCS={
       UI.toggle('shop');
       return;
     }
+    /* Dungeon Master: membuka panel TOKO KHUSUS Dungeon Changer (daftar level
+       per desa), bukan toko pedagang biasa. */
+    if(n.role.id==='dungeonmaster'){
+      this.say(n,'Reruntuhan menyimpan rahasia... levelnya bisa kuubah untukmu.',2.8);
+      UI.shopNpc=n;
+      UI.toggle('shop');
+      return;
+    }
     /* NPC penjaga: hanya obrolan biasa */
     if(!n.role.recruit||!n.demand){
       UI.bubble.show(n,npcLine(n.role.id,'chat'));
+      return;
+    }
+    /* ATURAN REKRUT LEVEL: pemain tidak bisa merekrut NPC dengan level > Player.level + 10 */
+    const pLvl=(typeof Player!=='undefined')?Player.level:1;
+    if(n.level>pLvl+10){
+      UI.bubble.show(n,`Kau terlalu lemah (Lv ${pLvl}) untuk memimpinku (Lv ${n.level})!<br>`+
+        `Capai minimal <b>Lv ${n.level-10}</b> dulu, baru aku mau mengikutimu.`);
+      if(typeof UI!=='undefined'&&UI.toast)
+        UI.toast(`❌ ${n.name} (Lv ${n.level}) menolak: levelmu (Lv ${pLvl}) terlalu rendah!`);
+      if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit();
       return;
     }
     if(this.teamFull()){
@@ -294,6 +510,15 @@ const NPCS={
     /* mode default: agresif (bertarung otomatis melindungi pemain) */
     n.aggr=true;n.focus=false;
     this.team.push(n);
+    /* ROYAL GUARD: peralatan bawaannya sendiri (hasil undian sejak spawn)
+       dipasang ke model — pemain tetap bisa menggantinya lewat panel NPC. */
+    if(n.role&&n.role.id==='royalguard'){
+      /* RG membawa peralatan undiannya sendiri sejak spawn (rollRoyalGuardGear
+         di make()) — JANGAN menimpanya. Cukup segarkan tampilan agar pedang &
+         tameng bawaannya terlihat di tangannya. */
+      if(typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
+        NPC_Royalguard.refreshGear(n);
+    }
     FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.2,0)),0xffe066,12,2.4);
     UI.toast(`${n.role.e} ${n.name} (Lv ${n.level}) bergabung ke timmu!`);
     UI.renderTeam();
@@ -307,12 +532,17 @@ const NPCS={
       if(it){RPG.addItem(it.id,it.n);n.bag[s]=null;}
     }
     n.state='patrol';n.home={x:n.pos.x,z:n.pos.z};
-    n.demand=this.rollDemand(n.role);
+    n.demand=this.rollDemand(n.role,n.level);
     UI.toast(`${n.role.e} ${n.name} keluar dari tim`);
     UI.renderTeam();UI.renderNpcPanel();
   },
   setOrder(n,order){
+    /* getaran blok yang sedang digarap harus dibersihkan, kalau tidak bloknya
+       tertinggal bergetar selamanya setelah perintahnya diganti */
+    if(n.mineAt&&typeof FX!=='undefined'&&FX.clearBlockShake)
+      FX.clearBlockShake(n.mineAt.x,n.mineAt.y,n.mineAt.z);
     n.order=order;n.mineAt=null;n.mineT=0;n.farmTask=null;n.farmT=0;
+    n.working=false;n.minePulse=0;
     n.state=order==='gather'?'gather':order==='wait'?'wait':
             order==='farm'?'farm':'follow';
     const t={follow:'mengikutimu',gather:'mencari resource di sekitarmu',
@@ -335,6 +565,7 @@ const NPCS={
   onPlayerAttack(m){
     if(!m||m.dead)return;
     if(m.pet)return;
+    if(m.type==='kelabang_part')return; // ruas kelabang terlepas bukan target
     if(typeof Monsters!=='undefined'&&Monsters.isAnimal&&Monsters.isAnimal(m))return;
     for(const n of this.team){
       if(n.dead||n.aggr!==false||n.retreat)continue;
@@ -378,6 +609,18 @@ const NPCS={
     const isEquip=!!(it.weapon||it.armor);
     const giveN=isEquip?1:clamp(Math.floor(count)||1,1,s.n);
     if(!isEquip){
+      /* Ramuan stamina langsung diminum untuk memulihkan stamina rekan */
+      if(it.id==='potion_stam'||(it.potion&&it.potion.stamina)){
+        const maxStam=n.maxStamina||100;
+        const addStam=Math.round(maxStam*0.30);
+        n.stamina=Math.min(maxStam,(n.stamina!==undefined?n.stamina:maxStam)+addStam);
+        FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`+${addStam} STAM`,'#ffd24d');
+        UI.toast(`⚡ ${n.name} meminum ${it.n} (+30% Stamina)`);
+        this.say(n,'Terima kasih, staminaku pulih!');
+        s.n-=1;if(s.n<=0)arr[idx]=null;
+        UI.renderNpcPanel();UI.renderAll();
+        return;
+      }
       /* Makanan TIDAK langsung dimakan: ia masuk ke tas bekal rekan, sama
          seperti resource. Rekan sendiri yang memutuskan kapan memakannya
          (lihat autoEat) sehingga pemain bisa menitipkan perbekalan. */
@@ -389,10 +632,23 @@ const NPCS={
       this.say(n,'Terima kasih, ini kusimpan dulu.');
     }else{
       const slot=it.weapon?'weapon':it.armor.slot;
+      /* TAMENG HANYA BISA DIGUNAKAN ROYAL GUARD:
+         Arketipe lain tidak memiliki slot atau model tameng sehingga perisai akan lenyap. */
+      if(slot==='shield'&&(!n.role||n.role.id!=='royalguard')){
+        UI.toast('🛡️ Hanya Royal Guard yang bisa memakai tameng!');
+        if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit();
+        return;
+      }
       const old=n.gear[slot];
       n.gear[slot]=s.id;
       if(old)RPG.addItem(old,1);                     // tukar, item lama kembali
       UI.toast(`${n.name} memakai ${it.e} ${it.n}`);
+      /* ROYAL GUARD: senjata & perisai yang diberi pemain langsung tampil di
+         tangannya (model yang sama dengan milik pemain). Armor tidak — zirah
+         merah Royal Guard adalah bagian karakternya. */
+      if(n.role&&n.role.id==='royalguard'&&
+         typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
+        NPC_Royalguard.refreshGear(n);
     }
     s.n-=giveN;if(s.n<=0)arr[idx]=null;
     UI.renderNpcPanel();UI.renderAll();
@@ -407,6 +663,7 @@ const NPCS={
          tidak pernah menjadi target NPC */
       if(m.pet)continue;
       if(m.catchActive)continue;
+      if(m.type==='kelabang_part')continue; // ruas kelabang terlepas: bukan target
       if(Monsters.isAnimal&&Monsters.isAnimal(m))continue;
       const d=m.pos.distanceTo(n.pos);
       if(d>=bd)continue;
@@ -427,8 +684,18 @@ const NPCS={
     }
     return best;
   },
-  hurt(n,dmg){
+  hurt(n,dmg,src){
     if(n.dead)return;
+    /* DUNGEON MASTER tidak boleh terdorong dari lapaknya: serangan monster
+       tidak merugikannya (dia penjaga toko, bukan kombatan) — iklas di tempat. */
+    if(n.shopSpot){
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,1.9,0)),'⭕','#9fb7c8');
+      return;
+    }
+    /* PROVOKE Royal Guard: selama menantang, damage yang diterima dipotong
+       70% (nilai `dr` file asli). Dipasang lewat n.provDr oleh
+       NPC_Royalguard._doProvoke dan dilepas saat durasi habis. */
+    if(n.provDr>0)dmg*=(1-n.provDr);
     n.hp-=dmg*(1-this.npcDef(n));n.flash=0.18;
     n.hpT=6; /* durasi tampil HP bar setelah terkena serangan */
     FX.text(n.pos.clone().add(new THREE.Vector3(0,1.9,0)),
@@ -474,6 +741,18 @@ const NPCS={
     this.timer-=dt;
     if(this.timer<=0){this.timer=1.2;this.spawn();}   // lebih sering mengisi desa
 
+    /* restock Dungeon Master: diperiksa tiap 30 detik (murah) — tiap desa
+       yang tercatat di DSHOP diisi ulang bila sudah lewat 30 menit */
+    this._dshopT=(this._dshopT||0)-dt;
+    if(this._dshopT<=0){
+      this._dshopT=30;
+      for(const k in this.DSHOP){
+        const p=k.split(',');
+        this.checkDshopRestock(+p[0],+p[1]);
+      }
+    }
+    this.supportBuffs(dt);
+
     for(let i=this.list.length-1;i>=0;i--){
       const n=this.list[i];
       if(n.dead){
@@ -483,11 +762,31 @@ const NPCS={
         if(n.deathT>0.55)this.despawn(i);
         continue;
       }
+      /* regenerasi stamina NPC dengan JEDA (stamRegenT):
+         setelah memakai skill, stamina baru mulai pulih setelah jeda habis.
+         Di luar pertarungan 8/dtk, saat bertarung (ada target) 4.5/dtk —
+         biaya skill 30-45 terasa nyata, bukan langsung penuh lagi. */
+      n.maxStamina = n.maxStamina || this.npcMaxStamina(n);
+      if(n.stamina === undefined) n.stamina = n.maxStamina;
+      n.stamRegenT = Math.max(0, (n.stamRegenT || 0) - dt);
+      if(n.stamRegenT <= 0)
+        n.stamina = Math.min(n.maxStamina, n.stamina + (n.target&&!n.target.dead ? 4.5 : 8) * dt);
+      /* ROYAL GUARD: cooldown skill & sisa durasi provoke harus turun walau
+         guard sedang tidak bertarung (combat() hanya jalan saat ada target) */
+      if(n.role&&n.role.id==='royalguard'&&
+         typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.tick)
+        NPC_Royalguard.tick(n,dt);
       /* rekan tidak pernah dibuang; yang tertinggal jauh dipanggil kembali.
          Pengembara langka (n.wander) juga tidak dibuang di sini — RareNPC
          sendiri yang menyembunyikan/menampilkan meshnya sesuai jarak. */
       if(this.isTeam(n)){
-        if(n.pos.distanceTo(Player.pos)>CFG.NPC.TELEPORT_R)this.recall(n);
+        /* recall dua tingkat: lembut di TELEPORT_R, PAKSA di 1.5× itu.
+           Recall paksa menimpa Y dengan tanah aktual & membersihkan flag
+           khusus (mine/retreat) supaya rekan benar-benar muncul di samping,
+           bukan sekadar "pindah koordinat di dalam kegelapan chunk". */
+        const dd=n.pos.distanceTo(Player.pos);
+        if(dd>CFG.NPC.TELEPORT_R*1.5)this.forcedRecall(n);
+        else if(dd>CFG.NPC.TELEPORT_R)this.recall(n);
       }else if(!n.wander&&n.pos.distanceTo(Player.pos)>70){this.despawn(i);continue;}
 
 
@@ -501,9 +800,103 @@ const NPCS={
       this.unstickTavern(n);
       n.mesh.position.copy(n.pos);
       this.animate(n,dt);
+      /* ---------- PENJAGA MESH REKAN ----------
+         Bila mesh rekan entah bagaimana lepas dari scene (jalur pembersihan
+         yang belum kita ketahui), buat ulang & tempatkan di samping pemain.
+         Murah: this.team maks 3, dan pembandingnya hanya O(parent). */
+      if(this.isTeam(n)&&n.mesh.parent!==Game.scene){
+        Game.scene.add(n.mesh);
+        n.pos.set(Player.pos.x+rand(-1.5,1.5),Player.pos.y,Player.pos.z+rand(-1.5,1.5));
+        n.pos.y=World.groundAt(n.pos.x,n.pos.z,Player.pos.y+2);
+        n.mesh.position.copy(n.pos);
+        FX.ring(n.pos.x,n.pos.y+0.1,n.pos.z,0x9fd7ff,0.6,3);
+      }
     }
     this.updateArrows(dt);
     this.passives(dt);
+  },
+
+  /* =========================================================================
+     BUFF MAGE SUPPORT (🔯)
+     -------------------------------------------------------------------------
+     Mage Support (js/entities/npc_magesupport.js) memberi buff ke SELURUH
+     tim — pemain (Player), seluruh rekan (NPCS.team), dan pet yang sedang
+     dikeluarkan (Capture.pet). Karena ketiganya disimpan di objek berbeda,
+     tick-nya dipusatkan di sini:
+
+       healHot = {rem, dur, left} — HoT Healing Aura: memulihkan HP sebesar
+                  `rem` yang disebar merata selama `dur` detik. Angkanya
+                  persen max-HP MASING-MASING penerima (dihitung saat cast).
+       shieldT / shieldV — Aura Perisai: reduksi damage `shieldV` selama
+                  `shieldT` detik. Dibaca NPCS.npcDef (rekan), Player.takeDamage
+                  (pemain), dan Capture.hurtPet (pet).
+
+     DoT bintang (m.starDot = {rate, left, src}) juga di-tick di sini karena
+     menempel pada MONSTER — damage di-route lewat Monsters.hurt supaya
+     threat/aggro tetap konsisten.
+     ========================================================================= */
+  supportBuffs(dt){
+    /* ---------- pemain ---------- */
+    if(typeof Player!=='undefined'&&!Player.dead){
+      Player.shieldT=Math.max(0,(Player.shieldT||0)-dt);
+      if(Player.healHot){
+        const h=Player.healHot;h.left-=dt;
+        if(h.left<=0)Player.healHot=null;
+        else{
+          const rate=h.rem/h.dur;
+          Player.hp=Math.min(Player.maxHp(),Player.hp+rate*dt);
+          this._healFx(Player.pos,dt);
+        }
+      }
+    }
+    /* ---------- rekan tim ---------- */
+    for(const n of this.team){
+      if(n.dead)continue;
+      n.shieldT=Math.max(0,(n.shieldT||0)-dt);
+      if(n.healHot){
+        const h=n.healHot;h.left-=dt;
+        if(h.left<=0)n.healHot=null;
+        else{
+          const rate=h.rem/h.dur;
+          n.hp=Math.min(this.npcMaxHp(n),n.hp+rate*dt);
+          this._healFx(n.pos,dt);
+        }
+      }
+    }
+    /* ---------- pet yang dikeluarkan ---------- */
+    if(typeof Capture!=='undefined'&&Capture.pet&&!Capture.pet.dead){
+      const p=Capture.pet;
+      p.shieldT=Math.max(0,(p.shieldT||0)-dt);
+      if(p.healHot){
+        const h=p.healHot;h.left-=dt;
+        if(h.left<=0)p.healHot=null;
+        else{
+          const rate=h.rem/h.dur;
+          p.hp=Math.min(p.maxhp,p.hp+rate*dt);
+          this._healFx(p.pos,dt);
+        }
+      }
+    }
+    /* ---------- DoT Hujan Bintang Spirit pada monster ---------- */
+    if(typeof Monsters!=='undefined'){
+      for(const m of Monsters.list){
+        if(m.dead||!m.starDot)continue;
+        const s=m.starDot;s.left-=dt;
+        if(s.left<=0){m.starDot=null;continue;}
+        /* tick damage 1×/detik supaya HP bar & flash tidak spam tiap frame */
+        s.acc=(s.acc||0)+dt;
+        if(s.acc>=1){
+          s.acc=0;
+          Monsters.hurt(m,s.rate,new THREE.Vector3(0,0.1,0),0,s.src);
+        }
+      }
+    }
+  },
+  /* percikan hijau kecil di atas penerima HoT (agar aura terasa hidup) */
+  _healFx(pos,dt){
+    if(typeof FX==='undefined'||!FX.debris)return;
+    if(Math.random()<dt*2.5)
+      FX.debris(pos.clone().add(new THREE.Vector3(0,1.3,0)),0x9dffb8,1,1.1);
   },
   despawn(i){
     const n=this.list[i];
@@ -520,15 +913,37 @@ const NPCS={
     n.pos.y=Math.max(n.pos.y,World.groundAt(n.pos.x,n.pos.z,n.pos.y+1.8));
     n.vel.set(0,0,0);n.mineAt=null;
   },
+  /* ---------- RECALL PAKSA — jaring pengaman rekan hilang ----------
+     Bila rekan melewati 1.5×TELEPORT_R dan recall lembut tidak membawanya
+     pulang (pos terjebak di chunk belum termuat, tertahan tabrakan, atau
+     mesh sudah lepas dari scene), recall ini memindahkannya dengan TANPA
+     syarat: Y dihitung ulang dari tanah aktual, semua flag pekerjaan
+     dibersihkan, dan mesh dipastikan ada di scene. */
+  forcedRecall(n){
+    const a=Cam.yaw+Math.PI;
+    const x=Player.pos.x+Math.sin(a)*2,z=Player.pos.z+Math.cos(a)*2;
+    n.pos.set(x,World.groundAt(x,z,Player.pos.y+2.5),z);
+    n.vel.set(0,0,0);
+    n.mineAt=null;n.mineT=0;n.retreat=false;n.working=false;
+    n.state='follow';n.target=null;n.stuckT=0;
+    /* mesh wajib di scene */
+    if(!n.mesh.parent){Game.scene.add(n.mesh);}
+    n.onGround=false;
+    FX.ring(n.pos.x,n.pos.y+0.1,n.pos.z,0x9fd7ff,0.7,3);
+    if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+  },
 
   /* efek pasif rekan yang bekerja terus-menerus */
   passives(dt){
     for(const n of this.team){
       if(n.dead)continue;
-      if(n.role.skill.id==='mend'&&n.pos.distanceTo(Player.pos)<8&&!Player.dead){
+      if(n.role.skill.id==='mend'&&n.pos.distanceTo(Player.pos)<8&&!Player.dead&&((n.stamina||0)>=5)){
         n.healT+=dt;
-        if(n.healT>=1){n.healT=0;
-          Player.hp=Math.min(Player.maxHp(),Player.hp+1.5);}
+        if(n.healT>=1){
+          n.healT=0;
+          n.stamina=(n.stamina||0)-5;
+          Player.hp=Math.min(Player.maxHp(),Player.hp+1.5);
+        }
       }
       this.autoEat(n,dt);
     }
@@ -562,6 +977,21 @@ const NPCS={
   },
   autoEat(n,dt){
     n.eatCd=Math.max(0,(n.eatCd||0)-dt);
+    /* minum ramuan stamina bila stamina kritis (<40%) dan tidak terdesak */
+    const maxStam=n.maxStamina||100;
+    if((n.stamina||0)<maxStam*0.40&&n.eatCd<=0&&(!n.target||n.target.pos.distanceTo(n.pos)>=3.2)){
+      for(let j=0;j<n.bag.length;j++){
+        const bs=n.bag[j];
+        if(bs&&(bs.id==='potion_stam'||(ITEMS[bs.id]&&ITEMS[bs.id].potion&&ITEMS[bs.id].potion.stamina))){
+          const addStam=Math.round(maxStam*0.30);
+          n.stamina=Math.min(maxStam,(n.stamina||0)+addStam);
+          n.eatCd=this.EAT_CD;
+          bs.n--;if(bs.n<=0)n.bag[j]=null;
+          FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`+${addStam} STAM`,'#ffd24d');
+          return;
+        }
+      }
+    }
     if(n.hp>=n.maxhp*0.65||n.eatCd>0)return;
     /* jangan makan saat sedang beradu pukul dengan monster */
     if(n.target&&n.target.pos.distanceTo(n.pos)<3.2)return;
@@ -678,6 +1108,7 @@ const NPCS={
            atau mob yang sedang dalam proses tangkap */
         if(m.pet)continue;
         if(m.catchActive)continue;
+        if(m.type==='kelabang_part')continue; // ruas kelabang terlepas bukan target
         if(Monsters.isAnimal&&Monsters.isAnimal(m))continue;
         if(m.pos.distanceTo(a.pos)<1.0){hit=m;break;}
       }
@@ -691,8 +1122,9 @@ const NPCS={
         /* bunyi panah menancap: hanya terdengar bila kejadiannya dekat */
         Sfx.at(a.pos,'hit');
 
-        if(!wasDead&&hit.dead&&this.isTeam(a.owner))
-          this.gainXp(a.owner,CFG.NPC.XP_PER_KILL);
+        /* XP kill kini diberikan oleh Monsters.shareKillXp() (dipanggil dari
+           Monsters.kill) — semua rekan tim + pet dapat XP penuh, bukan hanya
+           pemilik panah. Grant ganda lama di sini dihapus. */
       }
       if(hit||a.life<=0||(blocked&&blocked!==B.AIR&&blocked!==B.WATER)){
         Game.scene.remove(a.mesh);
@@ -761,7 +1193,52 @@ const NPCS={
     }
     if(n.state==='gather'){this.aiGather(n,dt);return;}
     if(this.isTeam(n)){this.aiFollow(n,dt);return;}
+    /* PENJAGA LAPAK: NPC yang punya `shopSpot` (Dungeon Master) tidak
+       berpatroli — ia berdiri di belakang meja tokonya. Lihat aiShopkeeper. */
+    if(n.shopSpot){this.aiShopkeeper(n,dt);return;}
     this.aiPatrol(n,dt);
+  },
+
+  /* =========================================================================
+     PENJAGA LAPAK — BERDIRI DI TOKONYA
+     -------------------------------------------------------------------------
+     Dungeon Master punya bangunan toko sendiri (Furni 'dmshop'), jadi ia tidak
+     boleh berkeliaran seperti penduduk lain: pemain harus bisa menemukannya di
+     tempat yang sama setiap kali. NPC ditambatkan ke n.shopSpot {x,z,yaw}:
+
+       - bila tergeser dari titiknya (terdorong pemain/mob, atau chunk baru
+         dimuat), ia berjalan pulang;
+       - bila sudah di tempat, ia berdiri diam dan MENGHADAP PEMAIN saat pemain
+         dekat (biar terasa melayani), atau menghadap arah lapak (yaw) saat
+         tidak ada siapa-siapa.
+     ========================================================================= */
+  SHOP_SNAP:0.55,          // jarak dianggap "sudah di tempat"
+  SHOP_FACE_R:7,           // radius mulai menghadap pemain
+  aiShopkeeper(n,dt){
+    n.state='shop';
+    const s=n.shopSpot;
+    const dx=s.x-n.pos.x, dz=s.z-n.pos.z;
+    const d=Math.hypot(dx,dz);
+    if(d>this.SHOP_SNAP){
+      /* pulang ke belakang meja */
+      n.dir=Math.atan2(dx,dz);
+      n.walking=true;
+      n.mesh.rotation.y=angLerp(n.mesh.rotation.y,n.dir,dt*5);
+      const sp=n.speed*0.5;
+      n.vel.x=lerp(n.vel.x,Math.sin(n.dir)*sp,clamp(5*dt,0,1));
+      n.vel.z=lerp(n.vel.z,Math.cos(n.dir)*sp,clamp(5*dt,0,1));
+      return;
+    }
+    /* di tempat: berhenti total */
+    n.walking=false;
+    n.vel.x*=0.6;n.vel.z*=0.6;
+    let face=s.yaw||0;
+    if(typeof Player!=='undefined'&&!Player.dead){
+      const pd=Math.hypot(Player.pos.x-n.pos.x,Player.pos.z-n.pos.z);
+      if(pd<this.SHOP_FACE_R)
+        face=Math.atan2(Player.pos.x-n.pos.x,Player.pos.z-n.pos.z);
+    }
+    n.mesh.rotation.y=angLerp(n.mesh.rotation.y,face,dt*4);
   },
 
   /* =========================================================================
@@ -779,16 +1256,24 @@ const NPCS={
      tidak menembus blok padat, atau bila halangannya hanya setinggi satu blok
      (masih bisa dilompati) dan di depannya bukan jurang. */
   stepFree(n,x,z){
-    /* Batas pencarian lantai = setinggi kepala NPC. Tanpa batas ini ambang
-       atas pintu terbaca sebagai lantai setinggi atap, sehingga NPC menolak
-       melangkah ke ambang pintu desanya sendiri. */
     const hy=n.pos.y+1.8;
-    if(!World.blockedAt(x,n.pos.y,z,this.BODY_R)){
-      return World.groundAt(x,z,hy)>=n.pos.y-3.2;
+    const gy=World.groundAt(x,z,hy);
+    /* HALANGAN TINGGI 2+ BLOK (tebing, dinding batu/tanah/kayu):
+       NPC tidak bisa melompati rintangan lebih dari 1.25 blok di atas kaki.
+       Bila tanah di depan > 1.25 blok, anggap BUNTU agar steer() mencari jalan lain. */
+    if(gy > n.pos.y + 1.25) return false;
+    /* JURANG DALAM: jangan terjun bebas ke jurang > 3.5 blok */
+    if(gy < n.pos.y - 3.5) return false;
+    /* CEK BLOK RINTANGAN (batang pohon, perabot, tembok bangunan) */
+    if(World.blockedAt(x,n.pos.y,z,this.BODY_R)){
+      /* jika rintangan ada di ketinggian kepala/dada (2 blok), pasti buntu */
+      if(World.blockedAt(x,n.pos.y+1,z,this.BODY_R)) return false;
+      /* jika rintangan 1 blok tapi tanahnya terlalu tinggi */
+      if(gy > n.pos.y + 1.25) return false;
     }
-    /* halangan pendek: bebas asal ada ruang di atasnya */
-    return !World.blockedAt(x,n.pos.y+1,z,this.BODY_R)&&
-           World.groundAt(x,z,hy)<=n.pos.y+1.3;
+    /* CEK HEADROOM: pastikan ada ruang berdiri setinggi tubuh di atas tanah baru */
+    if(World.headroomOK && !World.headroomOK(x,z,gy)) return false;
+    return true;
   },
   /* Meraba SELURUH ruas jalur (bukan hanya titik ujung) — inilah sebab NPC
      dulu masih menyeruduk tembok: sudut belokannya lolos uji satu titik,
@@ -891,6 +1376,9 @@ const NPCS={
   SEP_R:0.86,                    // jarak kontak dua badan (2 × BODY_R ≈ 0.84)
   separate(n,dt){
     const R=this.SEP_R;
+    /* PENJAGA LAPAK (Dungeon Master): tidak digeser NPC lain — hanya lawan
+       yang menyingkir; kalau dia ikut didorong, ia tergeser dari lapaknya. */
+    const immovable=!!n.shopSpot;
     for(const o of this.list){
       if(o===n||o.dead)continue;
       const dx=n.pos.x-o.pos.x,dz=n.pos.z-o.pos.z;
@@ -904,6 +1392,13 @@ const NPCS={
          berdekatan; pemisahan tetap terjadi beberapa frame */
       if(d>R-0.02)continue;
       const push=(R-d)*0.28;              // sebagian kecil penetrasi per frame
+      if(immovable){
+        /* dorong HANYA lawan menjauh, posisi n tetap */
+        const ox=o.pos.x-ux*push,oz=o.pos.z-uz*push;
+        if(!World.blockedAt(ox,o.pos.y,oz,o.BODY_R||this.BODY_R))o.pos.x=ox;
+        if(!World.blockedAt(o.pos.x,o.pos.y,oz,o.BODY_R||this.BODY_R))o.pos.z=oz;
+        continue;
+      }
       const nx=n.pos.x+ux*push,nz=n.pos.z+uz*push;
       /* dorongan tidak boleh menyorong NPC menembus tembok */
       if(!World.blockedAt(nx,n.pos.y,n.pos.z,this.BODY_R))n.pos.x=nx;
@@ -916,21 +1411,62 @@ const NPCS={
       const dp=Math.sqrt(dp2);
       if(dp<0.83){
         const push=(0.85-dp)*0.35;
-        const nx=n.pos.x+dx/dp*push,nz=n.pos.z+dz/dp*push;
-        if(!World.blockedAt(nx,n.pos.y,n.pos.z,this.BODY_R))n.pos.x=nx;
-        if(!World.blockedAt(n.pos.x,n.pos.y,nz,this.BODY_R))n.pos.z=nz;
+        /* DUNGEON MASTER tidak pernah digeser dari lapaknya — pemain yang
+           mundur (aiShopkeeper menuntunnya pulang bila tergeser, tapi lebih
+           baik sekali ini dicegah dari sumbernya). */
+        if(!(n.shopSpot&&dp<=0.85)){
+          const nx=n.pos.x+dx/dp*push,nz=n.pos.z+dz/dp*push;
+          if(!World.blockedAt(nx,n.pos.y,n.pos.z,this.BODY_R))n.pos.x=nx;
+          if(!World.blockedAt(n.pos.x,n.pos.y,nz,this.BODY_R))n.pos.z=nz;
+        }
       }
     }
   },
   /* dipanggil physics saat satu langkah ditolak tembok */
   onBump(n,tx,tz){
     /* rintangan setinggi 1 blok (pagar, batu kecil, undakan) cukup dilompati */
-    if(n.onGround&&!World.blockedAt(tx,n.pos.y+1,tz)&&
-       World.groundAt(tx,tz,n.pos.y+1.8)<=n.pos.y+1.3)n.vel.y=6.2;
+    if(this.tryStepUp(n,tx,tz))return;
     /* Tembok sungguhan: sisi belokan yang sedang dipakai jelas salah, jadi
        langsung dibalik dan dikunci sebentar supaya NPC menyusuri dinding
        ke arah baru, bukan menempel terus di titik tabrakan. */
-    else{n.turnSide=-(n.turnSide||1);n.detourT=1.8;}
+    n.turnSide=-(n.turnSide||1);n.detourT=1.8;
+  },
+  /* =========================================================================
+     LOMPAT SATU BLOK (NPC)
+     -------------------------------------------------------------------------
+     Dipakai dua tempat: saat menabrak sesuatu (onBump) dan sebagai pemeriksaan
+     rutin di physics() ketika NPC sedang berjalan. Berhasil bila pijakan di
+     depan lebih tinggi TAPI masih dalam satu blok, dan ruang di atasnya bebas.
+
+     PENTING untuk kasus "dari air ke daratan": saat berada di air, `onGround`
+     bernilai false (NPC mengapung), jadi syarat lama `n.onGround` membuat NPC
+     tidak pernah bisa melompat naik ke tepi darat — ia hanya menempel di
+     dinding air. Karena itu di air lompatan tetap diizinkan, dengan dorongan
+     vertikal yang lebih besar karena kecepatan naik di air dibatasi (clamp
+     3.5) dan gravitasi air hanya 0.3×.
+     ========================================================================= */
+  tryStepUp(n,tx,tz){
+    if(!n.onGround&&!n.inWater)return false;
+    if((n._stepCd||0)>0)return false;
+    const hy=n.pos.y+1.8;
+    const step=World.groundAt(tx,tz,hy);
+    /* pijakan harus lebih tinggi, tapi tidak lebih dari 1 blok penuh */
+    if(step<=n.pos.y+0.12||step>n.pos.y+1.3)return false;
+    /* ruang setinggi badan di atas pijakan harus bebas */
+    if(World.blockedAt(tx,step+0.05,tz,this.BODY_R))return false;
+    n.vel.y=n.inWater?5.4:6.2;
+    /* dorongan mendatar ke arah pijakan supaya benar-benar naik ke atas, bukan
+       melompat lurus lalu jatuh kembali. Di air dorongannya lebih besar karena
+       kecepatan naik dibatasi clamp ±3.5 (physics air). */
+    const dx=tx-n.pos.x,dz=tz-n.pos.z;
+    const dl=Math.hypot(dx,dz);
+    if(dl>0.001){
+      const push=n.inWater?4.2:2.4;
+      n.vel.x+=(dx/dl)*push;
+      n.vel.z+=(dz/dl)*push;
+    }
+    n._stepCd=0.35;                 // jeda supaya tidak melompat tiap frame
+    return true;
   },
   /* deteksi macet: tiap 0.5 detik dicek apakah NPC benar-benar berpindah */
   checkStuck(n,dt){
@@ -940,13 +1476,35 @@ const NPCS={
     if(n.stuckChk<0.5)return;
     const moved=n.pos.distanceTo(n.lastP);
     n.lastP.copy(n.pos);n.stuckChk=0;
+    /* BUGFIX rekan menambang selamanya tanpa blok pecah:
+       NPC yang sedang MENAMBANG / MEMANEN memang berdiri diam di depan
+       bloknya — itu bukan macet. Dulu pemeriksaan ini tidak tahu bedanya,
+       sehingga setelah ~1 detik berdiri ia menganggap NPC nyangkut lalu
+       MEMBUANG n.mineAt (baris di bawah). Target hilang → findNode memilih blok
+       yang sama → n.mineT kembali 0. Karena MINE_TIME (1.5s) lebih lama dari
+       ambang macet, progresnya selalu ter-reset sesaat sebelum selesai: rekan
+       terlihat memukul terus tanpa blok pernah hancur.
+       Itu juga sebabnya "disenggol lalu bisa": dorongan membuat moved>=0.18,
+       stuckT ter-reset, dan rekan mendapat jendela penuh untuk menyelesaikan.
+       `n.working` diisi aiGather/aiForage hanya saat benar-benar dalam
+       jangkauan & sedang mengayun, jadi macet SUNGGUHAN (tak bisa mencapai
+       node) tetap terdeteksi seperti biasa. */
+    if(n.working){n.stuckT=0;n.working=false;return;}
     const wantsToMove=n.state!=='wait'&&(this.isTeam(n)||!!n.target);
     if(!wantsToMove||moved>=0.18){n.stuckT=0;return;}
     n.stuckT=(n.stuckT||0)+0.5;
     /* macet sebentar → balik sisi belokan & paksa repath (detourT di-nol-kan
        supaya steer() langsung memilih arah baru); buang target tambang agar
-       tidak terpaku pada node yang tak tercapai */
-    if(n.stuckT>1.0){n.turnSide=-(n.turnSide||1);n.detourT=0;n.mineAt=null;n.turnCd=0.4;n.lastSteer=undefined;}
+       tidak terpaku pada node yang tak tercapai. Getaran blok dibersihkan
+       supaya tidak tertinggal bergetar setelah nodenya dilepas. */
+    if(n.stuckT>1.0){
+      n.turnSide=-(n.turnSide||1);n.detourT=0;n.turnCd=0.4;n.lastSteer=undefined;
+      if(n.mineAt){
+        if(typeof FX!=='undefined'&&FX.clearBlockShake)
+          FX.clearBlockShake(n.mineAt.x,n.mineAt.y,n.mineAt.z);
+        n.mineAt=null;n.mineT=0;
+      }
+    }
     /* masih macet → berbalik 180° supaya keluar dari kantong buntu, lalu
        sisi belokan dibalik lagi agar memutar lewat sisi sebaliknya */
     if(n.stuckT>2.5){n.dir=(n.dir||0)+Math.PI;n.turnSide=-(n.turnSide||1);n.detourT=0;n.turnCd=0.8;n.lastSteer=undefined;}
@@ -983,22 +1541,19 @@ const NPCS={
     if(typeof SkillsPort!=='undefined'&&SkillsPort.combat(n,dt))return;
     const to=new THREE.Vector3().subVectors(n.target.pos,n.pos).setY(0);
     const ang=Math.atan2(to.x,to.z),d=to.length();
-    n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*7);
+    /* deadzone sudut saat sangat dekat: jangan bergetar kiri-kanan */
+    if(d>0.45)n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*7);
     const reach=this.npcReach(n);
-    /* hysteresis gerak maju/mundur saat bertarung agar tidak bergetar
-       di sekitar batas jangkauan */
-    if(n._fightMove===undefined)n._fightMove=d>reach*0.8;
-    if(d>reach*0.95)n._fightMove=true;
-    else if(d<reach*0.65)n._fightMove=false;
-
-    if(n._fightMove){
+    /* DIAM saat dalam jangkauan serang: tidak terus menyeruduk ke musuh
+       yang menyebabkan saling dorong fisika & glitch geleng kepala kiri-kanan */
+    if(d>reach*0.85){
       const sp=n.speed*(n.inWater?0.5:1);
       /* badan tetap menghadap musuh, tapi kakinya boleh memutari rintangan */
       const wa=this.steer(n,ang);
       n.vel.x=lerp(n.vel.x,Math.sin(wa)*sp,clamp(7*dt,0,1));
       n.vel.z=lerp(n.vel.z,Math.cos(wa)*sp,clamp(7*dt,0,1));
     }else{
-      const damp=Math.exp(-7*dt);
+      const damp=Math.exp(-8*dt);
       n.vel.x*=damp;n.vel.z*=damp;
     }
 
@@ -1016,9 +1571,10 @@ const NPCS={
          Sekarang suara pukulan diredam sesuai jarak ke pemain. */
       Sfx.at(n.target.pos,'hit');
 
-      /* rekan mendapat XP bila pukulannya yang menumbangkan monster */
-      if(!wasDead&&n.target.dead&&this.isTeam(n))
-        this.gainXp(n,CFG.NPC.XP_PER_KILL);
+      /* XP saat pukulannya menumbangkan monster kini diurus SATU PINTU oleh
+         Monsters.shareKillXp() (dipanggil dari Monsters.kill), yang memberi XP
+         penuh ke SELURUH rekan tim + pet — bukan hanya penumbangnya. Grant
+         ganda lama di sini dihapus supaya pembunuh tidak mendapat XP dua kali. */
     }
 
     /* ---------- monster balas menyerang ---------- 
@@ -1045,6 +1601,40 @@ const NPCS={
         per detik. Baru setelah HP ≥ REJOIN_HP ia mau bertarung lagi. */
   aiRetreat(n,dt){
     const maxHp=this.npcMaxHp(n);
+    /* REKAN TIM TIDAK KABUR MENJAUH — pemain melaporkan rekan lari menjauh
+       persis saat paling dibutuhkan. Sekarang rekan yang terluka justru
+       MERAPAT ke pemain (berlindung di belakangnya), berhenti di sisi
+       FOLLOW_R+2, dan pulih di sana. Penduduk desa tetap kabur ke rumahnya. */
+    if(this.isTeam(n)){
+      const pdx=Player.pos.x-n.pos.x,pdz=Player.pos.z-n.pos.z;
+      const pd=Math.hypot(pdx,pdz)||0.001;
+      const hold=CFG.NPC.FOLLOW_R+2;
+      if(pd>hold){
+        const ang=this.steer(n,Math.atan2(pdx,pdz));
+        n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*7);
+        const sp=n.speed*(n.inWater?0.5:1)*CFG.NPC.RETREAT_SPEED;
+        n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(7*dt,0,1));
+        n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(7*dt,0,1));
+      }else{
+        /* sudah di sisi pemain: berhenti & pulihkan diri */
+        const damp=Math.exp(-6*dt);
+        n.vel.x*=damp;n.vel.z*=damp;
+        n.hp=Math.min(maxHp,n.hp+CFG.NPC.RETREAT_REGEN*dt);
+        n.healFxT=(n.healFxT||0)-dt;
+        if(n.healFxT<=0){
+          n.healFxT=0.5;
+          FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.2,0)),0x7dffb0,2,1.2);
+        }
+        UI.renderTeam();
+      }
+      if(n.hp>=maxHp*CFG.NPC.REJOIN_HP){
+        n.retreat=false;
+        this.say(n,NPC_REJOIN_LINE(),2.6);
+        FX.text(n.pos.clone().add(new THREE.Vector3(0,2.3,0)),'⚔ siap lagi','#8fe07a');
+      }
+      return;
+    }
+    /* ---------- penduduk desa: perilaku lama (kabur dari monster) ---------- */
     /* monster terdekat sebagai sumber ancaman */
     let threat=null,td=1e9;
     for(const m of Monsters.list){
@@ -1060,8 +1650,7 @@ const NPCS={
       const away=new THREE.Vector3().subVectors(n.pos,threat.pos).setY(0);
       if(away.lengthSq()<0.0001)away.set(1,0,0);
       away.normalize();
-      const shelter=this.isTeam(n)?Player.pos:
-        new THREE.Vector3(n.home.x,n.pos.y,n.home.z);
+      const shelter=new THREE.Vector3(n.home.x,n.pos.y,n.home.z);
       const toShelter=new THREE.Vector3().subVectors(shelter,n.pos).setY(0);
       if(toShelter.lengthSq()>0.0001)away.addScaledVector(toShelter.normalize(),0.6);
       const ang=this.steer(n,Math.atan2(away.x,away.z));
@@ -1079,7 +1668,6 @@ const NPCS={
         n.healFxT=0.5;
         FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.2,0)),0x7dffb0,2,1.2);
       }
-      if(this.isTeam(n))UI.renderTeam();
     }
     /* syarat kembali bertarung: HP sudah mencapai REJOIN_HP */
     if(n.hp>=maxHp*CFG.NPC.REJOIN_HP){
@@ -1196,6 +1784,44 @@ const NPCS={
 
     const task=n.farmTask;
     if(!task){
+      /* PETANI DESA: bila mengantongi hasil panen, simpan ke peti rumah terdekat */
+      if(!team){
+        const isCrop=id=>id==='wheat'||id==='carrot'||id==='cabbage'||id==='tomato'||id==='watermelon'||
+                         (typeof Farming!=='undefined'&&Farming.CROPS&&Farming.CROPS[id]);
+        const hasCrops=n.bag&&n.bag.some(s=>s&&isCrop(s.id));
+        if(hasCrops){
+          const chest=(typeof Furni!=='undefined'&&Furni.list)
+            ?Furni.list.find(f=>f.def==='chest'&&Math.hypot(f.x-n.pos.x,f.z-n.pos.z)<50):null;
+          if(chest){
+            const cdx=chest.x+0.5-n.pos.x,cdz=chest.z+0.5-n.pos.z;
+            const cd=Math.hypot(cdx,cdz);
+            const ang=this.steer(n,Math.atan2(cdx,cdz));
+            n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*6);
+            if(cd>1.8){
+              const sp=n.speed*(n.inWater?0.5:1)*0.85;
+              n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
+              n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
+              return;
+            }
+            n.vel.x*=0.5;n.vel.z*=0.5;
+            let stored=0;
+            for(let i=0;i<n.bag.length;i++){
+              const s=n.bag[i];
+              if(s&&isCrop(s.id)){
+                Furni.chestAdd(chest,s.id,s.n);
+                stored+=s.n;
+                n.bag[i]=null;
+              }
+            }
+            if(stored>0){
+              if(typeof FX!=='undefined'&&FX.text)
+                FX.text(new THREE.Vector3(chest.x,chest.y+1.2,chest.z),`📦 +${stored} Panen disimpan!`,'#63d471');
+              if(typeof Sfx!=='undefined'&&Sfx.craft)Sfx.craft();
+            }
+            return;
+          }
+        }
+      }
       /* tidak ada kerjaan: jalan santai di sekitar */
       n.t-=dt;
       if(n.t<=0){n.t=rand(2,5);n.dir=Math.random()*Math.PI*2;n.walking=Math.random()<0.55;}
@@ -1263,7 +1889,46 @@ const NPCS={
   /* ---------- perintah: kumpulkan resource ---------- 
      Rekan mencari blok yang boleh dipanen di sekitar PEMAIN (radius
      CFG.NPC.GATHER_R) supaya tidak pernah berkeliaran terlalu jauh, menambang
-     selama MINE_TIME, lalu menyimpan hasilnya ke tasnya sendiri. */
+     selama MINE_TIME, lalu menyimpan hasilnya ke tasnya sendiri.
+
+     KLAIM NODE: tiap rekan MEMBOOKING blok yang sedang dikerjakannya. Tanpa ini
+     dua rekan bisa memilih blok yang sama, lalu separate() saling mendorong
+     mereka keluar-masuk jangkauan tambang sehingga progresnya terus ter-reset
+     dan bloknya tidak pernah hancur. */
+  nodeKey(t){return t.x+','+t.y+','+t.z;},
+  /* apakah node ini sudah diklaim rekan LAIN yang masih hidup & masih menggarapnya? */
+  nodeClaimed(x,y,z,self){
+    const k=x+','+y+','+z;
+    for(const o of this.list){
+      if(o===self||o.dead||!o.mineAt)continue;
+      if(this.nodeKey(o.mineAt)===k)return true;
+    }
+    return false;
+  },
+  /* =========================================================================
+     BLOK MILIK BANGUNAN — TIDAK BOLEH DIPANEN REKAN
+     -------------------------------------------------------------------------
+     Dinding rumah memakai blok WOOD sebagai tiang sudut & balok atas, dan WOOD
+     ada di tabel panen (kayu pohon). Akibatnya rekan yang diperintah "cari
+     resource" ikut membongkar tiang rumah pemain maupun rumah desa — rumah jadi
+     berlubang sendiri. Fungsi ini menandai blok yang merupakan bagian bangunan
+     sehingga findNode melewatinya:
+       · footprint rumah modular pemain (Furni.houses),
+       · footprint bangunan desa (WGEN.buildingAt),
+       · blok bahan bangunan (PLANK & ROOF) di mana pun ia berada — keduanya
+         tidak pernah muncul secara alami di terrain.
+     ========================================================================= */
+  isStructureBlock(x,y,z){
+    const b=World.getBlock(x,y,z);
+    if(b===B.PLANK||b===B.ROOF)return true;
+    /* rumah modular milik pemain */
+    if(typeof Furni!=='undefined'&&Furni.houses&&Furni.houses.length&&
+       Furni.houseFpAt&&Furni.houseFpAt(x,z))return true;
+    /* bangunan desa (rumah penduduk, tavern, menara, sumur) — pad 1 blok
+       supaya tritisan atap & tiang tepi ikut terlindung */
+    if(typeof WGEN!=='undefined'&&WGEN.buildingAt&&WGEN.buildingAt(x,z,1))return true;
+    return false;
+  },
   findNode(n){
     const px=Math.floor(Player.pos.x),pz=Math.floor(Player.pos.z);
     const R=CFG.NPC.GATHER_R;
@@ -1276,6 +1941,8 @@ const NPCS={
       const ddx=x+0.5-n.pos.x,ddz=z+0.5-n.pos.z;
       const dn=ddx*ddx+ddz*ddz;
       if(dn>=bd)continue;
+      /* seluruh kolom ini milik bangunan → lewati tanpa memindai */
+      if(this.isStructureBlock(x,1,z))continue;
       /* Kolom dipindai dari BAWAH ke atas dan berhenti di blok pertama yang
          boleh dipanen — pohon jadi ditebang mulai dari pangkalnya lalu naik,
          bukan dipetik dari pucuk. Blok yang terkubur (tidak bersentuhan
@@ -1286,22 +1953,29 @@ const NPCS={
         if(b===B.AIR||b===B.WATER)continue;
         const g=this.gatherInfo(b);
         if(!g||!this.reachable(x,y,z,n))continue;
+        if(this.isStructureBlock(x,y,z))break;   // bagian bangunan: jangan dibongkar
+        if(this.nodeClaimed(x,y,z,n))break;      // sedang digarap rekan lain
         found={x,y,z,item:g.item};break;
       }
       if(found){best=found;bd=dn;}
     }
     return best;
   },
-  /* blok bisa dikerjakan bila salah satu sisinya terbuka & tidak terlalu tinggi */
+  /* blok bisa dikerjakan bila salah satu sisinya terbuka & tidak terlalu tinggi.
+     CATATAN: keenam sisi diperiksa. Dulu sisi −X terlewat, sehingga blok yang
+     hanya menganga ke arah itu dianggap mustahil dijangkau dan rekan memilih
+     node lain yang lebih jauh. */
   reachable(x,y,z,n){
     if(y>Math.floor(n.pos.y)+3)return false;
     const air=b=>b===B.AIR||b===B.WATER||b===B.LEAF;
-    return air(World.getBlock(x,y+1,z))||air(World.getBlock(x+1,y,z))||
+    return air(World.getBlock(x,y+1,z))||
+           air(World.getBlock(x+1,y,z))||air(World.getBlock(x-1,y,z))||
            air(World.getBlock(x,y,z+1))||air(World.getBlock(x,y,z-1));
   },
   /* ---------- mencari makanan (beri & jamur) di sekitar pemain ---------- 
-     Tanaman disimpan per-chunk sebagai daftar {x,y,z,t} dengan koordinat lokal;
-     t=4 beri, t=5 jamur. Rekan memanennya untuk menambah bekal makanan. */
+     Tanaman disimpan per-chunk sebagai daftar {x,y,z,t} dengan koordinat lokal.
+     t=7 SEMAK BERI (model voxel; dulu t=4 billboard), t=5 jamur. Rekan
+     memanennya untuk menambah bekal makanan. */
   findFood(n){
     const R=CFG.NPC.GATHER_R;
     let best=null,bd=1e9;
@@ -1311,36 +1985,117 @@ const NPCS={
       const c=World.chunks.get(cx+','+cz);
       if(!c||!c.plants)continue;
       for(const p of c.plants){
-        if(p.t!==4&&p.t!==5)continue;                 // hanya beri & jamur
+        /* t=4 tetap diterima demi chunk lama yang dibuat sebelum semak voxel */
+        const berry=(p.t===7||p.t===4);
+        if(!berry&&p.t!==5)continue;                  // hanya beri & jamur
         const wx=cx*16+p.x+0.5,wz=cz*16+p.z+0.5;
         if(Math.hypot(wx-Player.pos.x,wz-Player.pos.z)>R)continue;
         const dn=Math.hypot(wx-n.pos.x,wz-n.pos.z);
         if(dn<bd){bd=dn;best={x:wx,y:p.y,z:wz,cx,cz,p,
-          item:p.t===4?'berry':'mush',cnt:p.t===4?2:1};}
+          item:berry?'berry':'mush',cnt:berry?2:1};}
       }
     }
     return best;
   },
-  /* apakah rekan perlu menimbun makanan? (bekal menipis) */
+  /* ---------- apakah rekan perlu menimbun makanan? (bekal menipis) ---------- */
   needsFood(n){
     let stock=0;
     for(const s of n.bag)if(s&&ITEMS[s.id].food)stock+=s.n;
     return stock<3;
+  },
+  /* =========================================================================
+     BERBURU HEWAN untuk BEKAL (sapi & kelinci)
+     -------------------------------------------------------------------------
+     Selain memetik semak beri & jamur, rekan yang diperintah "cari resource"
+     kini ikut memburu hewan jinak terdekat — sapi (daging + kulit) dan kelinci
+     (daging). Keduanya tidak menyerang balik, jadi ini murni pengumpulan bekal.
+
+     `n.prey` menandai hewan yang sedang diburu. Monsters.hurt punya penjaga
+     "NPC tidak boleh melukai hewan ternak" supaya penjaga desa tidak
+     menyembelih sapi sembarangan; penjaga itu kini memberi pengecualian khusus
+     untuk hewan yang memang sedang diburu (lihat monsters.js).
+     ========================================================================= */
+  PREY:{cow:1,rabbit:1},
+  findPrey(n){
+    if(typeof Monsters==='undefined'||!Monsters.list)return null;
+    const R=CFG.NPC.GATHER_R;
+    let best=null,bd=1e9;
+    for(const m of Monsters.list){
+      if(m.dead||m.pet||m.catchActive)continue;
+      if(!this.PREY[m.type])continue;
+      /* tetap di sekitar pemain supaya rekan tidak berkeliaran jauh */
+      if(Math.hypot(m.pos.x-Player.pos.x,m.pos.z-Player.pos.z)>R)continue;
+      const d=Math.hypot(m.pos.x-n.pos.x,m.pos.z-n.pos.z);
+      if(d<bd){bd=d;best=m;}
+    }
+    return best;
+  },
+  aiHunt(n,dt,prey){
+    n.prey=prey;
+    const to=new THREE.Vector3().subVectors(prey.pos,n.pos).setY(0);
+    const d=to.length();
+    const ang=this.steer(n,Math.atan2(to.x,to.z));
+    n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*7);
+    const reach=this.npcReach(n);
+    if(d>reach*0.85){
+      const sp=n.speed*(n.inWater?0.5:1);
+      n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(7*dt,0,1));
+      n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(7*dt,0,1));
+      return;
+    }
+    n.vel.x*=Math.exp(-7*dt);n.vel.z*=Math.exp(-7*dt);
+    n.working=true;                       // memburu = bekerja (anti checkStuck)
+    if(n.atkCd>0)return;
+    n.atkCd=CFG.NPC.ATK_CD;n.swing=0.25;
+    const dir=to.clone().normalize().setY(0.25);
+    const wasDead=prey.dead;
+    Monsters.hurt(prey,this.npcDmg(n),dir,3,n);
+    FX.debris(prey.pos.clone().add(new THREE.Vector3(0,1,0)),0xffe08a,4,2);
+    Sfx.at(prey.pos,'hit');
+    if(!wasDead&&prey.dead){
+      /* hasil buruan langsung masuk tas rekan supaya tidak berserakan */
+      const loot=prey.type==='cow'?[['meat',2],['leather',1]]:[['meat',1]];
+      for(const [id,cnt] of loot)this.bagAdd(n,id,cnt);
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),
+        `${ITEMS.meat.e}+${prey.type==='cow'?2:1}`,'#ffc98a');
+      this.gainXp(n,4);
+      n.prey=null;
+      UI.renderNpcPanel();
+    }
   },
   aiGather(n,dt){
     if(this.bagFull(n)){
       UI.toast(`Tas ${n.name} penuh — ambil isinya dulu`);
       this.setOrder(n,'follow');return;
     }
-    /* prioritaskan mencari makanan bila bekalnya hampir habis */
+    /* buruan yang sudah mati / hilang dilepas */
+    if(n.prey&&(n.prey.dead||Monsters.list.indexOf(n.prey)<0))n.prey=null;
+    /* PRIORITAS BEKAL: selama makanan menipis, rekan mencari makanan dulu —
+       semak beri / jamur, lalu berburu sapi & kelinci terdekat. Blok tambang
+       baru dikerjakan setelah bekalnya cukup. */
     if(!n.mineAt&&this.needsFood(n)){
+      if(n.prey&&!n.prey.dead){this.aiHunt(n,dt,n.prey);return;}
       const food=this.findFood(n);
       if(food){this.aiForage(n,dt,food);return;}
+      const prey=this.findPrey(n);
+      if(prey){this.aiHunt(n,dt,prey);return;}
     }
-    /* target hilang / sudah ditambang orang lain → cari lagi */
+    /* target hilang / sudah ditambang orang lain → cari lagi.
+       Sekaligus penjaga: bila node sudah TIDAK terjangkau (mis. tertimbun blok
+       lain), lepaskan supaya rekan tidak berdiri mengayun tanpa hasil. */
     if(n.mineAt){
       const b=World.getBlock(n.mineAt.x,n.mineAt.y,n.mineAt.z);
       if(!NPC_GATHER.some(e=>e.block===b))n.mineAt=null;
+      /* penjaga tambahan: blok yang ternyata bagian bangunan dilepas, mis.
+         rumah baru dipasang pemain tepat di atas node yang sedang digarap */
+      else if(this.isStructureBlock(n.mineAt.x,n.mineAt.y,n.mineAt.z)){
+        FX.clearBlockShake(n.mineAt.x,n.mineAt.y,n.mineAt.z);
+        n.mineAt=null;n.mineT=0;
+      }
+      else if(!this.reachable(n.mineAt.x,n.mineAt.y,n.mineAt.z,n)){
+        FX.clearBlockShake(n.mineAt.x,n.mineAt.y,n.mineAt.z);
+        n.mineAt=null;n.mineT=0;
+      }
     }
     if(!n.mineAt){
       n.mineAt=this.findNode(n);n.mineT=0;
@@ -1351,14 +2106,31 @@ const NPCS={
     const d=to.length();
     const ang=this.steer(n,Math.atan2(to.x,to.z));
     n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*6);
-    if(d>1.6){
+    /* Jangkauan tambang lebih longgar daripada jarak berhenti (1.6 vs 2.4):
+       tanpa histeresis ini, dorongan separate() sedikit saja membuat NPC
+       melewati batas, `n.mineT=0` dijalankan, dan progresnya hilang terus —
+       salah satu penyebab blok tak pernah hancur. Sekarang NPC berhenti pada
+       1.6 tapi progres tetap jalan sampai 2.4. */
+    const REACH=2.4;
+    if(d>REACH){
       const sp=n.speed*(n.inWater?0.5:1)*0.9;
       n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
       n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
       n.mineT=0;
       return;
     }
-    n.vel.x*=0.7;n.vel.z*=0.7;
+    if(d>1.6){
+      /* masih dalam jangkauan tapi belum ideal: terus merapat TANPA membuang
+         progres yang sudah terkumpul */
+      const sp=n.speed*(n.inWater?0.5:1)*0.9;
+      n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
+      n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
+    }else{
+      n.vel.x*=0.7;n.vel.z*=0.7;
+    }
+    /* menandai "sedang bekerja" agar checkStuck tidak salah menilai NPC yang
+       berdiri diam menambang sebagai macet (lihat catatan di checkStuck). */
+    n.working=true;
     n.swing=Math.max(n.swing,0.2);                  // animasi mengayun alat
     /* skill Tangan Tambang mempercepat penambangan 2× */
     const rate=n.role.skill.id==='digger'?2:1;
@@ -1380,9 +2152,18 @@ const NPCS={
     if(n.mineT<CFG.NPC.MINE_TIME)return;
     n.mineT=0;n.minePulse=0;
     FX.clearBlockShake(t.x,t.y,t.z);
+    const mined=World.getBlock(t.x,t.y,t.z);
     World.setBlock(t.x,t.y,t.z,B.AIR);
     FX.debris(new THREE.Vector3(t.x+0.5,t.y+0.5,t.z+0.5),
-      BLOCK_INFO[World.getBlock(t.x,t.y,t.z)]?0x9aa0a8:0x9aa0a8,5,2);
+      (BLOCK_INFO[mined]||{}).color||0x9aa0a8,5,2);
+    /* POHON TUMBANG: menebang batang paling bawah membuat sisa batang di
+       atasnya runtuh berurutan, sama seperti saat PEMAIN menebangnya
+       (World.fellTree). Dulu rekan hanya melenyapkan satu blok kayu, jadi
+       pohon tetap menggantung di udara dan rekan harus memanjat blok demi
+       blok — pohon pun tidak pernah benar-benar tumbang. */
+    if(mined===B.WOOD&&World.fellTree)World.fellTree(t.x,t.y,t.z);
+    /* daun yang kehilangan batang penopang ikut membusuk */
+    if(mined===B.WOOD&&World.leafDecay)World.leafDecay(t.x,t.y,t.z);
     let cnt=1;
     if(n.role.skill.id==='digger'&&Math.random()<0.35)cnt++;
     this.bagAdd(n,t.item,cnt);
@@ -1406,6 +2187,7 @@ const NPCS={
       return;
     }
     n.vel.x*=0.7;n.vel.z*=0.7;
+    n.working=true;            // memanen juga "bekerja" (lihat checkStuck)
     n.swing=Math.max(n.swing,0.2);
     n.forageT=(n.forageT||0)+dt;
     if(n.forageT<0.9)return;
@@ -1449,11 +2231,24 @@ const NPCS={
   },
 
   physics(n,dt){
+    n._stepCd=Math.max(0,(n._stepCd||0)-dt);
     n.inWater=World.inWaterAt(n.pos.x,n.pos.y+0.3,n.pos.z);
     n.vel.y-=CFG.GRAV*(n.inWater?0.3:1)*dt;
     if(n.inWater){
       if(n.pos.y<CFG.WATER_Y-0.5)n.vel.y+=18*dt;
       n.vel.y=clamp(n.vel.y,-3,3.5);
+    }
+    /* ---------- NAIK SATU BLOK (proaktif, SEBELUM uji tabrakan) ----------
+       Dijalankan lebih dulu supaya arah lompatan masih arah gerak asli: uji
+       tabrakan di bawah menolak langkah ke pijakan yang lebih tinggi lalu
+       memutar arah, jadi cek yang dijalankan sesudahnya akan meleset.
+       Ini juga yang membuat NPC bisa keluar dari air ke tepi daratan setinggi
+       1 blok — di air `onGround` selalu false sehingga jalur onBump lama tidak
+       pernah aktif. */
+    const hspd0=Math.hypot(n.vel.x,n.vel.z);
+    if(hspd0>0.5){
+      const wa=Math.atan2(n.vel.x,n.vel.z);
+      this.tryStepUp(n,n.pos.x+Math.sin(wa)*0.8,n.pos.z+Math.cos(wa)*0.8);
     }
     /* patokan tinggi SEBELUM gravitasi (lihat BUGFIX di Player.update) */
     const px0=n.pos.x,pz0=n.pos.z,py0=n.pos.y;
@@ -1488,6 +2283,7 @@ const NPCS={
       const wh=FX.waveHeightAt(n.pos.x,n.pos.z);
       if(wh>0.03&&n.pos.y<g+wh){n.pos.y=g+wh;if(n.vel.y<0)n.vel.y=0;n.onGround=true;}
     }
+    /* CATATAN: cek "naik satu blok" sudah dijalankan di AWAL physics(). */
     n.vel.x*=Math.exp(-2*dt);n.vel.z*=Math.exp(-2*dt);
     this.separate(n,dt);                          // badan tidak saling menembus
     this.unroof(n);                               // anti-nyangkut di atap/tembok rumah

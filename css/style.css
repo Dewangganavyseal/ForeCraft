@@ -1,5 +1,19 @@
+@font-face{
+  font-family:'Press Start 2P';
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+  src:url('PressStart2P.ttf') format('truetype');
+}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,sans-serif;color:#e8e6d8;user-select:none}
+/* PERF: saat resolusi dinamis aktif (GPU kewalahan), blur HUD dimatikan —
+   itu efek kompositor termahal. Murni kosmetik, gameplay tak tersentuh. */
+body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+/* FPS meter (PC, toggle F3) */
+#fps-hud{display:none;position:fixed;left:8px;bottom:8px;z-index:99;font-family:'Press Start 2P',monospace;
+  font-size:10px;color:#8fe07a;background:rgba(0,0,0,.55);border:1px solid rgba(143,224,122,.35);
+  padding:5px 8px;border-radius:6px;pointer-events:none}
 #game{position:fixed;inset:0}
 #game canvas{display:block}
 .hidden{display:none!important}
@@ -47,6 +61,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Se
   height:100%;z-index:2;pointer-events:none}
 #compass:before{left:0;background:linear-gradient(90deg,rgba(10,14,10,.9),transparent)}
 #compass:after{right:0;background:linear-gradient(270deg,rgba(10,14,10,.9),transparent)}
+/* ------ KETERANGAN ARAH LOG PASS (di atas frame kompas) ------
+   Satu baris sangat kecil: nama tanda, jarak, dan panah tren.
+   ⯆ hijau = jarak mengecil (arah benar) · ⯅ merah = menjauh · 📍 = sudah sampai.
+   Ini yang membuat penanda arah bisa dipakai bernavigasi, bukan hanya menebak. */
+#compass-info{font-size:9px;font-weight:700;line-height:12px;margin-bottom:1px;
+  color:#ffd0cc;text-shadow:0 1px 2px #000;white-space:nowrap;
+  max-width:168px;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#compass-info.near{color:#8fe07a}
+#compass-info.far{color:#ff8a80}
+#compass-info.here{color:#ffe08a}
+/* ------ PENANDA LOG PASS: garis merah arah tanda lokasi ------
+   #compass punya overflow:hidden, jadi penanda otomatis terpotong di tepi
+   jendela kompas. z-index di atas gradien tepi supaya tetap terlihat.
+   Tidak ada label di dalam frame: overflow:hidden akan memotongnya, jadi
+   seluruh keterangan (nama/jarak/tren) ditaruh di #compass-info di atas frame. */
+#compass-target{position:absolute;top:0;height:100%;z-index:3;
+  transform:translateX(-50%);pointer-events:none}
+#compass-target .ct-line{position:absolute;left:50%;top:0;width:2px;height:100%;
+  margin-left:-1px;background:#ff3b30;
+  box-shadow:0 0 5px rgba(255,59,48,.95),0 0 2px #000}
+#compass-target.edge .ct-line{opacity:.5;width:3px}
+/* pemain sudah menghadap tepat ke tanda: garis jadi hijau = "jalan lurus" */
+#compass-target.aim .ct-line{background:#8fe07a;
+  box-shadow:0 0 7px rgba(143,224,122,.95),0 0 2px #000}
 
 #combo{position:absolute;top:26%;left:50%;transform:translateX(-50%);font-family:'Press Start 2P',monospace;font-size:22px;color:#ffd24d;text-shadow:0 0 12px rgba(255,170,0,.8),0 2px 0 #000;opacity:0;transition:opacity .2s}
 #combo.pop{animation:cpop .18s}
@@ -59,7 +97,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Se
 .hslot .key{position:absolute;top:1px;left:4px;font-size:8px;opacity:.55}
 
 #toast{position:fixed;top:132px;left:14px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;pointer-events:none;z-index:12}
-.toast-item{background:rgba(8,12,8,.82);border:1px solid rgba(255,255,255,.18);padding:4px 12px;border-radius:12px;font-size:12px;backdrop-filter:blur(4px);animation:tin 2.4s forwards}
+.toast-item{display:inline-flex;align-items:center;gap:6px;background:rgba(8,12,8,.82);border:1px solid rgba(255,255,255,.18);padding:4px 12px;border-radius:12px;font-size:12px;backdrop-filter:blur(4px);animation:tin 2.4s forwards}
+.toast-item .iico{width:18px;height:18px;flex:0 0 auto}
 @keyframes tin{0%{opacity:0;transform:translateX(-10px)}15%,80%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
 #hint{position:absolute;bottom:14px;left:12px;font-size:10px;opacity:.5;max-width:300px;line-height:1.5}
 
@@ -79,10 +118,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Se
 /* ikon yang mengikuti kursor / jari; pointer-events off agar slot di bawahnya terdeteksi */
 .drag-ghost{position:fixed;z-index:60;pointer-events:none;transform:translate(-50%,-50%);
   font-size:30px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+/* ghost yang mengangkat item bergambar (PNG kustom) — ukuran pas satu ikon */
+.drag-ghost img.iico{width:44px;height:44px}
 /* cegah scroll & seleksi teks saat menarik item di layar sentuh */
 #panel-bag .grid{touch-action:pan-y}
 #panel-bag.drag-lock, #panel-bag.drag-lock *{touch-action:none !important}
 .slot.press{border-color:#ffd24d;box-shadow:0 0 10px rgba(255,210,77,.35)}
+
+/* tooltip nama item saat tap biasa di layar sentuh (mobile tak punya hover) */
+.slot-tip{position:fixed;z-index:61;pointer-events:none;
+  background:rgba(18,16,22,.94);border:1px solid #5a4a6a;border-radius:8px;
+  padding:5px 10px;font-size:13px;color:#efe8ff;white-space:nowrap;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);animation:tipIn .12s ease-out}
+.slot-tip b{color:#ffd76b}
+.slot-tip i{color:#8fe07a;font-style:normal;margin-left:4px}
+@keyframes tipIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
 
 /* panel tas mobile lebih ringkas; PC memakai ukuran asli */
 body.touch #panel-bag .grid{grid-template-columns:repeat(auto-fill,40px);gap:4px}
@@ -128,12 +179,39 @@ body.touch #panel-bag .tip{font-size:10px}
    karena #hud secara umum tidak menerima klik. */
 #team{position:absolute;top:78px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:13;pointer-events:auto}
 .tmate{position:relative;width:52px;padding:4px 2px 6px;background:rgba(10,14,10,.6);border:1px solid rgba(255,255,255,.16);border-radius:9px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;backdrop-filter:blur(4px)}
+/* AREA SENTUH ikon rekan diperlebar sedikit melampaui kotaknya (tak terlihat).
+   Besarnya sengaja lebih kecil dari jarak antar ikon (gap) supaya area sentuh
+   dua ikon bertetangga tidak saling menimpa. Pseudo-element ikut menjadi
+   sasaran hit-test dan event-nya tetap dialamatkan ke .tmate. */
+.tmate::before{content:'';position:absolute;inset:-4px;border-radius:12px}
 .tmate:hover{border-color:#9fd77f}
 .tmate.busy{border-color:#ffd24d}
-.tmate .tface{font-size:20px;line-height:1}
+.tmate .tface{font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center}
+.tface .tico{width:28px;height:28px;object-fit:contain;vertical-align:middle;display:inline-block}
+.pc-face .tico{width:34px;height:34px;object-fit:contain;vertical-align:middle;display:inline-block}
+.npc-face .tico{width:46px;height:46px;object-fit:contain;vertical-align:middle;display:inline-block}
+.pc-ico .tico{width:38px;height:38px;object-fit:contain;vertical-align:middle;display:inline-block}
+.prof-ico{width:20px;height:20px;object-fit:contain;vertical-align:middle;display:inline-block;margin-right:5px}
+.eff-ico{width:18px;height:18px;object-fit:contain;vertical-align:middle;display:inline-block;margin-right:4px}
+.sk-ico{width:30px;height:30px;object-fit:contain;display:block;margin:0 auto 2px}
+.branch-ico{width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:5px}
+.q-ico{width:20px;height:20px;object-fit:contain;vertical-align:middle;margin-right:3px}
+.menu-ico{width:22px;height:22px;object-fit:contain;vertical-align:middle}
+.t-ico .sk-ico{margin:0 auto}
+.cs-ic .iico{width:20px;height:20px;object-fit:contain;vertical-align:middle}
+.cs-ic .cs-ico{width:18px;height:18px;object-fit:contain;vertical-align:middle}
+.st-nm .sk-ico{display:inline-block;width:20px;height:20px;margin:0 4px 0 0;vertical-align:middle}
+.hud-ico{width:14px;height:14px;object-fit:contain;vertical-align:-2px;display:inline-block}
+.ph-ico{width:22px;height:22px;object-fit:contain;vertical-align:-4px;display:inline-block;margin-right:4px}
+.tab-ico{width:16px;height:16px;object-fit:contain;vertical-align:-3px;display:inline-block;margin-right:3px}
+.craft-tab{display:inline-flex;align-items:center;gap:3px}
+.panel h2{display:flex;align-items:center}
+.panel h2 .x{margin-left:auto}
 .tmate .tlv{font-size:9px;opacity:.85;font-weight:700}
 .tmate .thp{width:40px;height:4px;background:rgba(0,0,0,.55);border-radius:3px;overflow:hidden}
 .tmate .thp i{display:block;height:100%;background:linear-gradient(90deg,#ff5d5d,#ff9d6b)}
+.tmate .tst{width:40px;height:3px;background:rgba(0,0,0,.55);border-radius:2px;overflow:hidden;margin-top:1px}
+.tmate .tst i{display:block;height:100%;background:linear-gradient(90deg,#ffd24d,#ff9d47)}
 .tmate .tord{position:absolute;top:-4px;right:-4px;font-size:11px;background:rgba(8,12,8,.9);border-radius:50%;padding:1px 2px}
 .tmate .tmode{position:absolute;bottom:-4px;right:-4px;font-size:11px;background:rgba(8,12,8,.9);border-radius:50%;padding:1px 2px}
 
@@ -144,15 +222,26 @@ body.touch #panel-bag .tip{font-size:10px}
 .npc-lv{font-size:11px;color:#ffe066;font-weight:700}
 .npc-bar{position:relative;height:14px;margin-top:4px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.14);border-radius:7px;overflow:hidden}
 .npc-bar i{display:block;height:100%;background:linear-gradient(90deg,#ff5d5d,#ff9d6b)}
+.npc-bar.st i{background:linear-gradient(90deg,#ffd24d,#ff9d47)}
 .npc-bar.xp i{background:linear-gradient(90deg,#4da3ff,#9fd7ff)}
 .npc-bar span{position:absolute;inset:0;font-size:9px;line-height:14px;text-align:center;text-shadow:0 1px 2px #000}
 .npc-stats{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-top:8px;opacity:.9}
 .npc-skill{margin-top:8px;font-size:12px;line-height:1.5;background:rgba(90,140,80,.16);border-left:3px solid #9fd77f;border-radius:0 8px 8px 0;padding:6px 10px}
 .npc-gear{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.ngear{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:6px 2px;text-align:center;cursor:pointer}
+.ngear{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:6px 2px;text-align:center;cursor:pointer;transition:all .15s}
 .ngear:hover{border-color:#9fd77f}
 .ngear .ge{display:block;font-size:22px}
 .ngear .gn{display:block;font-size:9px;opacity:.6}
+.ngear.empty{background:rgba(6,8,12,.85);border:1px dashed rgba(255,255,255,.12)}
+.ngear.empty .ge{opacity:.22}
+.ngear.empty .gn{opacity:.35}
+.ngear.filled{box-shadow:inset 0 0 10px rgba(0,0,0,.6)}
+.ngear.r-common{background:rgba(184,192,204,.12);border-color:#b8c0cc}
+.ngear.r-uncommon{background:rgba(99,212,113,.15);border-color:#63d471;box-shadow:inset 0 0 10px rgba(99,212,113,.25)}
+.ngear.r-rare{background:rgba(77,163,255,.15);border-color:#4da3ff;box-shadow:inset 0 0 12px rgba(77,163,255,.32)}
+.ngear.r-epic{background:rgba(180,107,255,.16);border-color:#b46bff;box-shadow:inset 0 0 14px rgba(180,107,255,.4)}
+.ngear.r-legendary{background:rgba(255,162,39,.18);border-color:#ffa227;box-shadow:inset 0 0 16px rgba(255,162,39,.45),0 0 8px rgba(255,162,39,.35);animation:rarePulse 1.8s ease-in-out infinite}
+.coin-ico{display:inline-block;vertical-align:middle;object-fit:contain;pointer-events:none}
 .npc-cmd{display:flex;flex-wrap:wrap;gap:6px}
 .npc-cmd button{background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:12px;padding:7px 11px;border-radius:8px;cursor:pointer}
 .npc-cmd button:hover{border-color:#9fd77f}
@@ -172,8 +261,22 @@ body.touch #panel-bag .tip{font-size:10px}
 }
 
 
-#sp-info{font-size:14px;margin-bottom:12px}
+#sp-info{font-size:14px;margin-bottom:0}
 #sp-info b{color:#ffd24d;font-size:18px}
+/* ---- HEADER PANEL SKILL MENEMPEL (tetap di atas) ----
+   #sp-info dikecualikan dari wadah scroll .panel-body (bersama h2) sehingga
+   menjadi baris tetap di bawah judul panel — tidak pernah ikut ter-scroll
+   ke bawah saat menjelajah pohon skill. */
+#panel-skills>#sp-info{
+  flex:0 0 auto;
+  position:relative;top:auto;z-index:3;
+  margin:0;
+  padding:6px 22px 10px;
+  background:linear-gradient(rgba(20,28,20,.99),rgba(14,20,14,.95));
+  border-bottom:1px solid rgba(140,200,120,.25);
+}
+body.touch #panel-skills>#sp-info{padding:4px 14px 8px;font-size:12px}
+body.touch #panel-skills>#sp-info b{font-size:16px}
 /* ============ SKILL TREE (pohon akar menyambung) ============ */
 #branches{display:flex;flex-direction:column;gap:16px}
 .branch.tree{background:rgba(0,0,0,.28);border-radius:12px;padding:12px;width:100%;box-sizing:border-box}
@@ -418,7 +521,16 @@ body.touch .hslot:active{
   border-color:#ffe9a8;
 }
 
-/* Secondary buttons - right top */
+/* Secondary buttons - right top
+   PENTING: KOTAK WADAH tidak boleh menangkap sentuhan, hanya tombolnya.
+   #mobile ber-z-index 15 sementara #hud (isi ikon rekan & pelacak quest)
+   ber-z-index 10 — karena keduanya membuat stacking context terpisah, SELURUH
+   isi #mobile selalu berada di atas seluruh isi #hud, berapa pun z-index
+   dalamnya. Dulu #m-buttons memakai pointer-events:auto pada wadahnya, jadi
+   kotak grid 3 kolom × 2 baris di kanan atas menelan semua sentuhan di
+   daerahnya — termasuk sentuhan yang ditujukan ke ikon rekan (#team) yang
+   berada tepat di bawah/di belakangnya. Itulah sebabnya ikon tim hanya bisa
+   ditekan di bagian yang menyembul keluar dari kotak itu. */
 #m-buttons{
   position:fixed;
   right: 15px;
@@ -426,9 +538,10 @@ body.touch .hslot:active{
   display: flex;
   flex-direction: column;
   gap: 8px;
-  pointer-events: auto;
+  pointer-events: none;
   touch-action: none;
 }
+#m-buttons > button{pointer-events:auto}
 
 /* Main action buttons - Kluster Busur (Arc Cluster) di sudut kanan bawah */
 #m-main{
@@ -442,7 +555,10 @@ body.touch .hslot:active{
   z-index: 16;
 }
 
-/* Active skills container - tepat di atas tombol roll */
+/* Active skills container - tepat di atas tombol roll.
+   Wadahnya tembus sentuhan (lihat catatan di #m-buttons): hanya tombol
+   skill-nya yang menerima sentuhan, sehingga kolom kosong di sisi kanan tidak
+   ikut menelan ketukan yang ditujukan ke ikon rekan / HUD di belakangnya. */
 #m-active{
   position:fixed;
   right:110px;
@@ -450,9 +566,14 @@ body.touch .hslot:active{
   display:flex;
   flex-direction:column-reverse;
   gap:8px;
-  pointer-events:auto;
+  pointer-events:none;
+  /* tombol Hantam Bumi dibidik dengan menahan+menyeret jari; tanpa ini
+     browser bisa mengklaim geseran sebagai scroll/pull-to-refresh dan
+     touchmove berhenti terkirim sehingga indikator tidak mau digeser. */
+  touch-action:none;
   z-index:16;
 }
+#m-active > button{pointer-events:auto}
 #mobile .m-active-btn{
   width:48px;height:48px;border-radius:50%;
   position:relative;
@@ -461,6 +582,7 @@ body.touch .hslot:active{
   color:#fff;font-size:22px;
   backdrop-filter:blur(4px);
   box-shadow:0 4px 12px rgba(0,0,0,.4);
+  touch-action:none;
 }
 .m-active-btn span{
   position:absolute;
@@ -721,6 +843,49 @@ img.iico{
 #levelup{position:fixed;top:34%;left:50%;transform:translateX(-50%);font-family:'Press Start 2P',monospace;font-size:26px;color:#ffd24d;text-shadow:0 0 20px rgba(255,200,60,.9);opacity:0;pointer-events:none;z-index:35}
 #levelup.show{animation:lup 2s}
 @keyframes lup{0%{opacity:0;transform:translateX(-50%) scale(.5)}15%{opacity:1;transform:translateX(-50%) scale(1.15)}30%{transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+
+/* ===================================================================
+   BANNER DUNGEON — "DUNGEON LV n" besar di tengah layar
+   -------------------------------------------------------------------
+   Muncul sekali saat pemain memasuki area dungeon (Dungeon.update →
+   UI.dungeonBanner). Tembus klik (pointer-events:none) dan hilang sendiri
+   setelah ~3 detik. Warna judul menandai kesesuaian level:
+     putih-kuning = sepadan · merah = dungeon terlalu tinggi · hijau = di bawah
+   =================================================================== */
+#dgbanner{
+  position:fixed;top:26%;left:50%;transform:translateX(-50%) scale(.85);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  opacity:0;pointer-events:none;z-index:36;text-align:center;
+  padding:14px 26px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(8,10,16,.72),rgba(8,10,16,.38));
+  border:1px solid rgba(255,210,77,.35);
+  box-shadow:0 10px 40px rgba(0,0,0,.55);
+  backdrop-filter:blur(3px);
+}
+#dgbanner b{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(18px,4.6vw,34px);letter-spacing:2px;
+  color:#ffd24d;text-shadow:0 0 22px rgba(255,190,50,.9),0 3px 0 #000;
+}
+#dgbanner i{font-style:normal;font-size:clamp(11px,2.6vw,15px);color:#e8f0d8;opacity:.92}
+#dgbanner u{text-decoration:none;font-size:clamp(10px,2.3vw,13px);color:#bfe6a0;opacity:.9}
+#dgbanner.hard b{color:#ff8577;text-shadow:0 0 22px rgba(255,90,70,.9),0 3px 0 #000}
+#dgbanner.hard u{color:#ffb0a8}
+#dgbanner.easy b{color:#9fe08a;text-shadow:0 0 22px rgba(120,220,100,.85),0 3px 0 #000}
+/* DUNGEON CLEAR: hijau-emas kemenangan, bingkai lebih terang dari biasanya */
+#dgbanner.clear{border-color:rgba(150,240,150,.55)}
+#dgbanner.clear b{color:#8ff0a6;text-shadow:0 0 26px rgba(110,240,150,.95),0 3px 0 #000}
+#dgbanner.clear i{color:#dff6e2}
+#dgbanner.clear u{color:#bfe6a0}
+#dgbanner.show{animation:dgb 3.2s ease-out}
+@keyframes dgb{
+  0%{opacity:0;transform:translateX(-50%) scale(.7)}
+  10%{opacity:1;transform:translateX(-50%) scale(1.06)}
+  18%{transform:translateX(-50%) scale(1)}
+  78%{opacity:1;transform:translateX(-50%) scale(1)}
+  100%{opacity:0;transform:translateX(-50%) scale(1.02)}
+}
+
 @media(max-width:700px){.grid{grid-template-columns:repeat(7,44px)}.slot{width:44px;height:44px;font-size:20px}.hslot{width:42px;height:42px;font-size:21px}}
 
 /* ===================================================================
@@ -833,6 +998,7 @@ img.iico{
   color:#d8e8d0;font-size:11px;font-weight:700;line-height:1.25;
   cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45);backdrop-filter:blur(4px)}
 #bag-float-menu .bag-menu-btn span{display:block;font-size:20px}
+#bag-float-menu .menu-ico{width:24px;height:24px;object-fit:contain}
 #bag-float-menu .bag-menu-btn.active{border-color:#ffd24d;color:#ffd24d;
   background:rgba(45,36,12,.9)}
 @media (max-width:640px){
@@ -853,6 +1019,18 @@ img.iico{
   color:#0d160c;border-color:#a8e08c;box-shadow:0 2px 10px rgba(120,200,110,.3)}
 .craft-tab:disabled{opacity:.35;cursor:default}
 .craft-tab i{font-style:normal;opacity:.75;font-size:10px}
+
+/* ====== TAB KATEGORI KANTONG / TAS ====================================== */
+#bag-cat-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 9px}
+.bag-cat-tab{font-size:11px;font-weight:700;letter-spacing:.02em;
+  padding:5px 9px;border-radius:8px;cursor:pointer;
+  background:rgba(255,255,255,.06);color:#cfe6c0;
+  border:1px solid rgba(140,200,120,.22);transition:.15s;display:inline-flex;align-items:center;gap:3px}
+.bag-cat-tab:hover{background:rgba(140,200,120,.18);color:#eaffda}
+.bag-cat-tab.active{background:linear-gradient(180deg,#8cc878,#5f9c4c);
+  color:#0d160c;border-color:#a8e08c;box-shadow:0 2px 8px rgba(120,200,110,.3)}
+body.touch #bag-cat-tabs{gap:4px;margin:4px 0 7px}
+body.touch .bag-cat-tab{font-size:9.5px;padding:4px 7px}
 
 /* ====== tombol simpan manual ============================================
    Diletakkan sebagai anak #stats sehingga menempel persis di kanan bar HP &
@@ -1104,6 +1282,20 @@ body.touch #toast{z-index:11}
 .qcard.ok .qgoal{color:#ffd24d}
 .qrew{font-size:11px;opacity:.8;margin-top:5px;color:#ffdf9a}
 .qbtns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* ---- RARITY QUEST (4 tingkat) ----
+   Warna aksen kartu mengikuti rarity; badge kecil di bawah judul menyebut
+   namanya. Kelas r-* dipasang Quest.renderPanel dari d.rar. */
+.qmeta{margin:3px 0 2px}
+.qrar{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;
+  padding:1px 7px;border-radius:9px;border:1px solid currentColor;
+  background:rgba(255,255,255,.05)}
+.qcard.r-common  {border-left-color:#b8c0cc}
+.qcard.r-uncommon{border-left-color:#63d471}
+.qcard.r-rare    {border-left-color:#4da3ff;background:rgba(10,18,30,.55)}
+.qcard.r-epic    {border-left-color:#b46bff;background:rgba(22,12,32,.6);
+  box-shadow:inset 0 0 18px rgba(180,107,255,.12)}
+/* quest siap klaim tetap memakai aksen emas (menimpa warna rarity) */
+.qcard.ok{border-left-color:#ffd24d!important}
 /* bar progres tujuan quest, dipakai panel & pelacak HUD */
 .qbar{height:5px;border-radius:3px;overflow:hidden;
   background:rgba(255,255,255,.12)}
@@ -1120,7 +1312,7 @@ body.touch #toast{z-index:11}
    ============================================================================= */
 #questtrack{
   position:fixed;right:12px;top:50%;transform:translateY(-50%);
-  width:184px;max-height:34vh;overflow:hidden;z-index:13;
+  width:184px;z-index:13;
   pointer-events:none;cursor:default;user-select:none;
   padding:7px 9px;border-radius:10px;
   background:rgba(8,12,8,.62);border:1px solid rgba(255,255,255,.15);
@@ -1138,16 +1330,14 @@ body.touch #toast{z-index:11}
 .qt-c{display:block;font-size:10px;opacity:.7;margin:1px 0 3px}
 .qt-row.ok .qt-n,.qt-row.ok .qt-c{color:#ffd24d;opacity:1}
 
-/* mobile: pelacak dikecilkan & digeser agar tidak menabrak tombol kontrol */
+/* mobile: pelacak dikecilkan & digeser agar tidak menabrak tombol kontrol.
+   Tanpa batas tinggi — isinya paling banyak 3 baris quest (Quest.MAX). */
 body.touch #questtrack{
-  width:148px;max-height:26vh;right:var(--pad);
+  width:148px;right:var(--pad);
   top:auto;bottom:calc(var(--ctrl) + var(--hb) + 18px);transform:none;
 }
 @media (max-width:400px){
-  body.touch #questtrack{width:132px;max-height:22vh}
-}
-@media (max-height:420px){
-  body.touch #questtrack{max-height:18vh}
+  body.touch #questtrack{width:132px}
 }
 
 /* =========================================================================
@@ -1240,6 +1430,12 @@ body.touch.chat-open #toast{top:auto}
   display:inline-block}
 .shop-coin b{color:#ffd24d;font-size:17px}
 #shop-buy{display:flex;flex-direction:column;gap:6px}
+/* TOKO DUNGEON MASTER: 10 baris changer + judul + catatan bisa melewati tinggi
+   panel di layar ponsel. Daftarnya diberi tinggi maksimum & scroll sendiri,
+   sehingga judul panel dan tombol tutup tetap terlihat. */
+#shop-buy.dm-list{max-height:52vh;overflow-y:auto;padding-right:4px}
+#shop-buy.dm-list::-webkit-scrollbar{width:6px}
+#shop-buy.dm-list::-webkit-scrollbar-thumb{background:rgba(180,150,255,.45);border-radius:3px}
 .shop-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:7px 11px}
 .shop-row .s-ico{font-size:24px}
@@ -1270,6 +1466,12 @@ body.touch.chat-open #toast{top:auto}
 #modal-box input[type=number]{width:90px;background:#04140a;color:#eaffea;
   border:1px solid rgba(143,224,122,.45);border-radius:7px;padding:6px 8px;
   font-size:15px;text-align:center;outline:none;margin-bottom:12px}
+/* kotak TEKS (mis. nama tanda Log Pass) — lebih lebar & rata kiri */
+#modal-box input[type=text].m-text{width:min(240px,72vw);background:#04140a;
+  color:#eaffea;border:1px solid rgba(143,224,122,.45);border-radius:7px;
+  padding:7px 10px;font-size:14px;text-align:left;outline:none;margin-bottom:12px}
+#modal-box input[type=text].m-text:focus{border-color:#8fe07a;
+  box-shadow:0 0 0 2px rgba(143,224,122,.18)}
 #modal-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 #modal-btns button{padding:9px 20px;border-radius:8px;font-weight:700;font-size:14px;
   cursor:pointer;border:1px solid rgba(255,255,255,.25)}
@@ -1299,6 +1501,32 @@ body.touch.chat-open #toast{top:auto}
 #place-bar #pb-x:hover{background:rgba(152,56,48,.75)}
 @media(max-width:700px){#place-bar{bottom:150px;padding:8px 10px}
   #place-bar button{padding:9px 13px;font-size:13px}}
+
+/* =========================================================================
+   ATUR PINTU — bar ◀ ▶ / Terapkan / Batal
+   -------------------------------------------------------------------------
+   Memakai gaya & posisi yang sama dengan #place-bar supaya pemain langsung
+   mengenalinya. Tombol ◀ ▶ dibuat lebar minimal 44px: itu ukuran sasaran
+   sentuh minimum yang nyaman untuk jempol, dan sekaligus membuat mode ini
+   tetap terpakai penuh di mobile tanpa perlu membidik dinding.
+   ========================================================================= */
+#door-bar{position:fixed;bottom:118px;left:50%;transform:translateX(-50%);
+  display:flex;gap:8px;align-items:center;z-index:32;background:rgba(14,20,14,.88);
+  border:1px solid rgba(140,200,120,.35);border-radius:12px;padding:10px 14px;
+  backdrop-filter:blur(4px);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#door-bar button{min-width:44px;padding:9px 14px;border-radius:8px;font-weight:700;
+  font-size:14px;cursor:pointer;border:1px solid rgba(255,255,255,.25);color:#fff}
+#door-bar #db-prev,#door-bar #db-next{background:rgba(58,88,120,.65);
+  border-color:rgba(120,170,220,.5);font-size:17px;line-height:1}
+#door-bar #db-prev:hover,#door-bar #db-next:hover{background:rgba(78,114,152,.75)}
+#door-bar #db-info{min-width:46px;text-align:center;color:#cfe3c4;font-size:13px;
+  font-weight:700;font-variant-numeric:tabular-nums}
+#door-bar #db-ok{background:#3f6d3a;border-color:#6da55f}
+#door-bar #db-ok:hover{background:#4d8446}
+#door-bar #db-x{background:rgba(122,42,36,.65);border-color:rgba(222,112,100,.5)}
+#door-bar #db-x:hover{background:rgba(152,56,48,.75)}
+@media(max-width:700px){#door-bar{bottom:150px;padding:8px 10px;gap:6px}
+  #door-bar button{padding:10px 12px;font-size:13px}}
 
 /* =========================================================================
    UI POLISH — menjamin tidak ada elemen tumpang tindih (PC & mobile)
@@ -1636,8 +1864,9 @@ body.touch #m-active{
   bottom:calc(var(--bottom-ui) + var(--main-h) + 8px);
   display:flex;flex-direction:column-reverse;flex-wrap:wrap-reverse;
   gap:clamp(5px,1.2vmin,8px);align-items:center;justify-content:flex-end;
-  max-height:min(30vh,160px);z-index:21;pointer-events:auto;
+  max-height:min(30vh,160px);z-index:21;pointer-events:none;
 }
+body.touch #m-active > button{pointer-events:auto}
 body.touch #m-active .m-active-btn{
   width:clamp(38px,9vmin,50px);height:clamp(38px,9vmin,50px);
   font-size:clamp(16px,4vmin,22px);
@@ -1674,11 +1903,17 @@ body.touch #toast{
   overflow:hidden;z-index:11;
 }
 
-/* quest tracker dipindah ke KIRI agar tidak tertutup tombol menu kanan */
+/* quest tracker dipindah ke KIRI agar tidak tertutup tombol menu kanan.
+   TINGGI TIDAK DIBATASI LAGI: quest aktif maksimum 3 (Quest.MAX), jadi tinggi
+   kotaknya sudah terbatas dengan sendirinya. Dulu ada max-height 24vh/20vh/16vh
+   + overflow:hidden, sehingga di layar ponsel kecil hanya satu baris quest yang
+   terlihat dan sisanya terpotong. Kotak ini tumbuh ke ATAS (bottom-anchored)
+   dan pointer-events:none, jadi memanjang sedikit tidak menghalangi apa pun. */
 body.touch #questtrack{
   left:var(--pad);right:auto;top:auto;transform:none;
   bottom:calc(var(--bottom-ui) + var(--joy) + 18px);
-  width:min(170px,44vw);max-height:24vh;
+  width:min(170px,44vw);
+  max-height:none;overflow:visible;
   z-index:12;pointer-events:none;
 }
 
@@ -1688,7 +1923,7 @@ body.touch #actbtn:not(.world){
   bottom:calc(var(--bottom-ui) + var(--main-h) + 72px);
   z-index:27;
 }
-body.touch #place-bar{
+body.touch #place-bar,body.touch #door-bar{
   left:50%;right:auto;transform:translateX(-50%);
   bottom:calc(var(--bottom-ui) + var(--main-h) + 16px);
   z-index:31;
@@ -1703,7 +1938,6 @@ body.touch #place-bar{
     --joy: clamp(74px, 16vmin, 108px);
     --menu: clamp(32px, 6.8vmin, 40px);
   }
-  body.touch #questtrack{max-height:20vh}
 }
 
 /* layar sangat sempit */
@@ -1726,19 +1960,25 @@ body.touch #place-bar{
     --menu: clamp(28px, 6.5vmin, 36px);
   }
   body.touch #m-active{max-height:min(24vh,110px)}
-  body.touch #questtrack{max-height:16vh}
 }
 
 /* =========================================================================
    OPTIMASI MOBILE: ikon tim/hewan, panel crafting, pelacak quest
    ========================================================================= */
 
-/* ---- ikon rekan & pet: versi ringkas agar semua muat di kolom kanan ---- */
-body.touch .tmate{width:44px;padding:3px 2px 4px;gap:1px}
-body.touch .tmate .tface{font-size:16px}
-body.touch .tmate .tlv{font-size:8px}
-body.touch .tmate .thp{width:34px;height:3px}
-body.touch .tmate .tord,body.touch .tmate .tmode{font-size:9px;padding:0 2px}
+/* ---- ikon rekan & pet: TOMBOL, jadi jangan terlalu kecil ----
+   Dulu dikecilkan ke 44px dengan gap 1px; digabung dengan skala UI Studio
+   (mis. 0.65) sasaran ketuknya tinggal ~28px dan ketukan sering jatuh di sela
+   antar ikon. Sekarang ukuran dasar & jaraknya sedikit dinaikkan, ditambah
+   `overflow:visible` supaya area sentuh tambahan (.tmate::before) tidak
+   terpotong. Jumlah ikon maksimum hanya 4 (3 rekan + 1 pet), jadi kolomnya
+   tidak mungkin memanjang sampai menutupi kontrol bawah. */
+body.touch #team{gap:8px;padding:2px 4px;overflow:visible;max-height:none}
+body.touch .tmate{width:50px;padding:5px 3px 6px;gap:2px}
+body.touch .tmate .tface{font-size:18px}
+body.touch .tmate .tlv{font-size:8.5px}
+body.touch .tmate .thp{width:38px;height:4px}
+body.touch .tmate .tord,body.touch .tmate .tmode{font-size:10px;padding:0 3px}
 
 /* landscape / layar pendek: ruang vertikal sempit, jadi ikon tim disusun
    mendatar (baris) ke arah kiri alih-alih dipotong secara vertikal */
@@ -1765,12 +2005,15 @@ body.touch .recipe .chip{font-size:8px;padding:1px 4px}
 body.touch .recipe button{padding:5px 9px;font-size:11px}
 body.touch .craft-qty{width:42px;font-size:11px;padding:4px 5px}
 
-/* ---- pelacak quest: baris ringkas agar semua quest terlihat ---- */
+/* ---- pelacak quest: baris ringkas agar SEMUA quest aktif terlihat ----
+   Tanpa pemotongan tinggi: tiga baris quest (batas Quest.MAX) harus berjejer
+   rapi ke bawah bahkan di ponsel layar kecil. */
 body.touch #questtrack{padding:5px 7px}
-body.touch .qt-h{font-size:8px;margin-bottom:3px}
-body.touch .qt-row{margin-bottom:4px}
-body.touch .qt-n{font-size:9.5px;line-height:1.2}
-body.touch .qt-c{font-size:8.5px;margin:0 0 2px}
+body.touch .qt-h{font-size:8.5px;margin-bottom:3px}
+body.touch .qt-row{margin-bottom:5px}
+body.touch .qt-row:last-child{margin-bottom:0}
+body.touch .qt-n{font-size:10px;line-height:1.25}
+body.touch .qt-c{font-size:9px;margin:0 0 2px}
 body.touch .qbar{height:3px}
 
 /* =========================================================================
@@ -1779,6 +2022,18 @@ body.touch .qbar{height:3px}
 .hslot .lvl,.slot .lvl{position:absolute;top:1px;right:4px;font-size:10px;font-weight:700;
   color:#ffd24d;text-shadow:0 1px 2px rgba(0,0,0,.8);pointer-events:none}
 .slot.eq .lvl{top:auto;bottom:1px;right:4px}
+
+/* ------ LOG PASS BERTANDA: bingkai merah + titik penanda ------
+   Warnanya senada dengan garis penanda di kompas supaya pemain langsung
+   mengaitkan slot ini dengan arah yang ditunjuk. */
+.hslot.marked,.slot.marked{border-color:#ff3b30;
+  box-shadow:0 0 10px rgba(255,59,48,.45)}
+.hslot.marked:after,.slot.marked:after{content:'';position:absolute;
+  left:3px;bottom:3px;width:6px;height:6px;border-radius:50%;
+  background:#ff3b30;box-shadow:0 0 5px rgba(255,59,48,.9);pointer-events:none}
+/* slot terpilih tetap memakai sorot kuning agar "sedang dipegang" jelas */
+.hslot.marked.sel{border-color:#ffd24d;
+  box-shadow:0 0 12px rgba(255,210,77,.5),0 0 10px rgba(255,59,48,.4)}
 
 /* =========================================================================
    PANEL LANDASAN TEMPA (ANVIL)
@@ -1805,6 +2060,162 @@ body.touch .qbar{height:3px}
 .anvil-detail .ad-cost .ok{color:#8fe07a}
 .anvil-detail .ad-cost .no{color:#ff7b6b}
 .anvil-go{font-size:14px;padding:8px 18px}
+
+/* ================= PANEL PARTY (daftar rekan tim) =================
+   Grid responsif: auto-fill kartu min 190px → 1 kolom di HP kecil, banyak
+   kolom di layar lebar. Tidak ada lebar tetap yang memecah di layar sempit. */
+.party-count{font-size:13px;color:#cfe6bf;margin-bottom:10px}
+.party-count b{color:#fff}
+.party-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:10px;
+}
+.party-card{
+  background:rgba(0,0,0,.28);border:1px solid rgba(140,200,120,.28);
+  border-radius:10px;padding:10px 11px;cursor:pointer;
+  transition:transform .08s,border-color .15s,box-shadow .15s;
+}
+.party-card:hover{border-color:#9fd77f;transform:translateY(-2px);
+  box-shadow:0 6px 18px -6px rgba(120,200,110,.5)}
+.party-card:active{transform:translateY(0)}
+.party-card.pet{border-color:rgba(127,216,255,.45)}
+.party-card.pet:hover{border-color:#7fd8ff;box-shadow:0 6px 18px -6px rgba(90,190,255,.55)}
+.party-card .pc-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.party-card .pc-face{font-size:26px;line-height:1;flex:0 0 auto}
+.party-card .pc-id{display:flex;flex-direction:column;min-width:0}
+.party-card .pc-id b{font-size:13px;color:#fff;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.party-card .pc-lv{font-size:10px;color:#bfe6a0}
+.party-card .pc-role{font-size:11px;color:#9fb0c4;margin-bottom:7px}
+.party-card .pc-bar{position:relative;height:14px;border-radius:7px;
+  background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:4px}
+.party-card .pc-bar i{position:absolute;inset:0;border-radius:7px;
+  background:linear-gradient(90deg,#4fd06a,#8fe07a)}
+.party-card .pc-bar.st i{background:linear-gradient(90deg,#ffd24d,#ff9d47)}
+.party-card .pc-bar.xp i{background:linear-gradient(90deg,#4da3ff,#7fd8ff)}
+.party-card .pc-bar span{position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;font-size:9px;color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.party-card .pc-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.party-card .pc-tags span{font-size:10px;color:#dfe8d8;
+  background:rgba(255,255,255,.07);border-radius:6px;padding:2px 7px}
+@media (max-width:420px){
+  .party-grid{grid-template-columns:1fr}
+}
+
+/* =========================================================================
+   BINGKAI POTRET PEMAIN (#portrait) + PANEL KARAKTER (#panel-char)
+   -------------------------------------------------------------------------
+   #stats sekarang berbentuk BARIS: potret di kiri, kolom bar HP/ST/HU/XP di
+   kanannya. Potret adalah <button> berisi <canvas> yang dirender ulang oleh
+   js/charpanel.js (CharView) memakai model karakter yang sedang dipakai.
+   ========================================================================= */
+#stats{flex-direction:row;align-items:flex-start;gap:8px}
+#stats-bars{display:flex;flex-direction:column;gap:5px;min-width:0}
+#portrait{flex:0 0 auto;pointer-events:auto;position:relative;
+  width:62px;height:62px;padding:0;cursor:pointer;
+  border-radius:12px;overflow:hidden;
+  background:radial-gradient(circle at 50% 32%,rgba(90,120,80,.55),rgba(8,12,8,.85));
+  border:2px solid rgba(180,220,150,.42);
+  box-shadow:0 2px 10px rgba(0,0,0,.5),inset 0 0 14px rgba(0,0,0,.5);
+  transition:transform .12s,border-color .2s,box-shadow .2s}
+#portrait:hover{border-color:rgba(200,240,170,.75);
+  box-shadow:0 2px 14px rgba(0,0,0,.55),0 0 12px rgba(159,215,127,.3)}
+#portrait:active{transform:scale(.94)}
+#portrait-cv{display:block;width:100%;height:100%}
+/* label level kecil di sudut bawah potret */
+#portrait-lv{position:absolute;right:2px;bottom:1px;
+  font-family:'Press Start 2P',monospace;font-size:8px;color:#ffe08a;
+  background:rgba(0,0,0,.6);border-radius:5px;padding:2px 4px;line-height:1;
+  pointer-events:none}
+/* gear button tetap di kanan seluruh blok #stats (potret + bar) */
+
+/* ---- kilau tepi layar saat tangkisan berhasil ---- */
+#block-flash{position:fixed;inset:0;pointer-events:none;z-index:22;opacity:0;
+  background:radial-gradient(ellipse at center,transparent 52%,rgba(120,190,255,.6) 100%)}
+#block-flash.on{animation:blockFlash .34s ease-out}
+@keyframes blockFlash{0%{opacity:1}100%{opacity:0}}
+
+/* ---- PANEL KARAKTER ---- */
+#panel-char{width:min(680px,96vw)}
+#char-layout{display:flex;gap:16px;align-items:stretch}
+/* kolom kiri: daftar stat (scroll sendiri bila panjang) */
+#char-stats{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+/* kolom kanan: viewport 3D karakter, menempel di atas */
+#char-view{flex:0 0 auto;width:250px;position:relative;align-self:flex-start;
+  border-radius:12px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(46,62,44,.7),rgba(10,16,10,.9));
+  border:1px solid rgba(140,200,120,.28)}
+#char-cv{display:block;width:100%;height:340px;touch-action:none;cursor:grab}
+#char-cv:active{cursor:grabbing}
+#char-view-hint{position:absolute;left:0;right:0;bottom:0;text-align:center;
+  font-size:10px;color:#c8d8b8;background:rgba(0,0,0,.45);padding:3px 0;
+  pointer-events:none}
+/* baris stat */
+.cs-head{margin:10px 0 4px;font-size:11px;letter-spacing:1px;
+  text-transform:uppercase;color:#ffe08a;
+  border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:3px}
+.cs-head:first-child{margin-top:0}
+.cs-row{display:flex;align-items:center;gap:8px;font-size:12.5px;
+  padding:3px 6px;border-radius:6px}
+.cs-row:nth-child(odd){background:rgba(255,255,255,.035)}
+.cs-row .cs-ic{flex:0 0 auto;width:18px;text-align:center;font-size:13px}
+.cs-row .cs-lb{flex:1 1 auto;min-width:0;color:#cfdcc4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-row .cs-vl{flex:0 0 auto;color:#fff;font-weight:700;font-size:12px}
+.cs-row.good .cs-vl{color:#9fe08a}
+.cs-row.dim{opacity:.5}
+.cs-row.wrap{align-items:flex-start}
+.cs-row.wrap .cs-vl{white-space:normal;text-align:right;max-width:60%;
+  font-weight:400;font-size:11px;color:#c8d8e8}
+
+/* ---- MOBILE / LAYAR KECIL ---- */
+@media (max-width:760px){
+  /* stat & model ditumpuk: model di ATAS supaya langsung terlihat */
+  #char-layout{flex-direction:column;gap:12px}
+  #char-view{width:100%;order:-1}
+  #char-cv{height:260px}
+  .cs-row{font-size:12px;padding:4px 6px}
+}
+@media (max-width:600px){
+  #portrait{width:52px;height:52px;border-radius:10px}
+  #portrait-lv{font-size:7px;padding:1px 3px}
+  #stats{gap:6px}
+  #stats-bars{gap:4px}
+  #char-cv{height:220px}
+  .cs-head{font-size:10px}
+  .cs-row{font-size:11.5px;gap:6px}
+  .cs-row .cs-vl{font-size:11px}
+}
+@media (max-width:400px){
+  #portrait{width:46px;height:46px}
+  #stats{gap:5px}
+  #char-cv{height:190px}
+}
+/* layar pendek (landscape ponsel): potret & viewport dipendekkan */
+@media (max-height:480px){
+  #portrait{width:46px;height:46px}
+  #char-cv{height:170px}
+}
+/* sentuh: tombol potret sedikit lebih besar agar mudah diketuk */
+body.touch #portrait{width:58px;height:58px}
+@media (max-width:600px){
+  body.touch #portrait{width:50px;height:50px}
+}
+
+/* ================= PANEL ALTAR (ingredient ritual) ================= */
+.altar-ings{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.altar-ing{display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:rgba(0,0,0,.28);border:1px solid rgba(140,180,220,.25);border-radius:9px}
+.altar-ing.ok{border-color:rgba(99,212,113,.5)}
+.altar-ing.no{border-color:rgba(255,107,107,.45)}
+.altar-ing .ai-ico{font-size:22px;flex:0 0 auto}
+.altar-ing .ai-nm{flex:1 1 auto;font-size:13px;color:#e6eeff}
+.altar-ing .ai-ct{font-size:13px;font-weight:700}
+.altar-go{width:100%;font-size:13px;padding:12px;border-radius:10px}
+.altar-go:disabled{opacity:.5;cursor:not-allowed}
+
 
 
 

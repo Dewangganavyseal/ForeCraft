@@ -211,6 +211,17 @@ const Farming={
   },
   SEEDS:['seed_wheat','seed_carrot','seed_cabbage','seed_tomato','seed_watermelon'],
 
+  /* ---------- PELUANG BENIH SAMPINGAN ----------
+     SATU angka untuk SEMUA sumber benih tak-terduga, supaya benih tidak lagi
+     membanjiri tas. Dipakai di:
+       · World.harvestPlants   — memanen tanaman liar (dulu 30% rumput / 18% lain)
+       · Farming.tryUse        — mencangkul rumput/tanah (dulu 25%)
+       · Farming.harvest       — benih EKSTRA saat panen (dulu 40%)
+       · Farming.harvestByNpc  — benih ekstra panen rekan NPC (dulu 40%)
+     Panen tetap MENGEMBALIKAN 1 benih secara pasti (bukan peluang), jadi siklus
+     bertani tidak rusak: tanam 1 → panen 1, dan 10% peluang dapat lebih. */
+  SEED_CHANCE:0.10,
+
   key:(x,y,z)=>x+','+y+','+z,
 
   randomSeed(){return this.SEEDS[(Math.random()*this.SEEDS.length)|0];},
@@ -224,12 +235,14 @@ const Farming={
     const def=this.CROPS[p.type];if(!def)return;
     const green=n&&n.role&&n.role.skill&&n.role.skill.id==='green';
     const cropN=1+(Math.random()<0.5?1:0)+(green?1:0);
-    const seedN=1+(Math.random()<0.4?1:0);
+    /* 1 benih pasti kembali + 10% peluang benih ekstra (SEED_CHANCE) */
+    const seedN=1+(Math.random()<this.SEED_CHANCE?1:0);
     const pos=new THREE.Vector3(p.x+0.5,p.y+1.1,p.z+0.5);
     this.remove(p,false);
     const give=(id,cnt)=>{
       if(cnt<=0)return;
-      if(n&&typeof NPCS!=='undefined'&&NPCS.isTeam(n)&&NPCS.bagAdd&&NPCS.bagAdd(n,id,cnt))return;
+      /* hasil panen masuk ke tas NPC (baik rekan maupun petani desa untuk disimpan ke peti) */
+      if(n&&typeof NPCS!=='undefined'&&NPCS.bagAdd&&NPCS.bagAdd(n,id,cnt))return;
       if(typeof World!=='undefined')World.dropItem(pos.x,pos.y,pos.z,id,cnt);
     };
     give(def.crop,cropN);
@@ -268,7 +281,9 @@ const Farming={
     const def=this.CROPS[p.type];if(!def)return;
     const pos=new THREE.Vector3(p.x+0.5,p.y+1.2,p.z+0.5);
     FX.spawnDrop(pos,def.crop,1+(Math.random()<0.5+Prof.yieldBonus('farming')+RPG.gatherBonus(def.crop)?1:0));
-    FX.spawnDrop(pos.clone().add(new THREE.Vector3(0.2,0.1,0)),def.seed,1+(Math.random()<0.4?1:0));
+    /* 1 benih pasti kembali (siklus tanam-panen tetap utuh) + 10% ekstra */
+    FX.spawnDrop(pos.clone().add(new THREE.Vector3(0.2,0.1,0)),def.seed,
+      1+(Math.random()<this.SEED_CHANCE?1:0));
     FX.debris(pos,0x9fe88a,8,2);
     Player.addXP(2);
     Prof.gain('farming',8,1);
@@ -377,8 +392,8 @@ const Farming={
         World.setBlock(bx,by,bz,B.FARM);
         FX.debris(new THREE.Vector3(bx+0.5,by+1,bz+0.5),0x6f4a26,8,2);
         if(typeof Sfx!=='undefined'&&Sfx.chop)Sfx.chop();
-        /* kadang menemukan benih liar saat mencangkul */
-        if(Math.random()<0.25){
+        /* kadang menemukan benih liar saat mencangkul (SEED_CHANCE = 10%) */
+        if(Math.random()<this.SEED_CHANCE){
           FX.spawnDrop(new THREE.Vector3(bx+0.5,by+1.1,bz+0.5),this.randomSeed(),1);
         }
         this.save();

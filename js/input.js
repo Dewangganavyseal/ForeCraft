@@ -30,7 +30,7 @@ const Input={
            Sekarang tombolnya diteruskan ke UI.toggle: tombol panel yang
            sama menutup, tombol panel lain berpindah ke panel itu. */
         const PANEL_KEY={KeyB:'bag',KeyK:'skills',KeyC:'craft',
-                         KeyG:'npc',KeyH:'help'};
+                         KeyG:'party',KeyH:'help',KeyP:'char'};
         if(k==='Escape')UI.closeAll();
         else if(PANEL_KEY[k])UI.toggle(PANEL_KEY[k]);
         return;
@@ -40,6 +40,15 @@ const Input={
       if(typeof Furni!=='undefined'&&Furni.placing){
         if(k==='Escape'){Furni.cancelPlace();return;}
         if(k==='KeyR'){Furni.rotatePlace();return;}
+      }
+      /* ATUR PINTU: Q/E (atau ◀ ▶ di bar) melangkah antar posisi pintu yang sah,
+         Enter menerapkan, Escape membatalkan. Sengaja memakai tombol yang sama
+         fungsinya dengan tombol layar supaya perilakunya identik di PC & mobile. */
+      if(typeof Furni!=='undefined'&&Furni.doorEdit){
+        if(k==='Escape'){Furni.cancelDoorEdit();return;}
+        if(k==='KeyQ'){Furni.stepDoor(-1);return;}
+        if(k==='KeyE'){Furni.stepDoor(1);return;}
+        if(k==='Enter'){e.preventDefault();Furni.applyDoorEdit();return;}
       }
       /* ENTER: buka / fokus kotak chat di kiri bawah (di bawah bar Lv).
           Chat.open() sendiri menolak saat panel lain terbuka / pemain mati. */
@@ -58,12 +67,17 @@ const Input={
       if(k==='KeyK')UI.toggle('skills');
       if(k==='KeyC')UI.toggle('craft');
       if(k==='KeyH')UI.toggle('help');
-      /* G: tombol interaksi universal — bicara dengan penduduk, memakai
-         perabot (duduk/tidur/meja kerja), atau meletakkan perabot dari tangan.
-         Bila tidak ada apa pun untuk diinteraksi, panel kontrol rekan dibuka. */
-      if(k==='KeyG'){
+      /* P: panel Karakter (stat detail) — sama dengan mengetuk bingkai potret */
+      if(k==='KeyP')UI.toggle('char');
+      /* F: tombol interaksi universal — bicara dengan penduduk, memakai
+         perabot (duduk/tidur/meja kerja), mengisi altar, atau meletakkan
+         perabot dari tangan. (Dulu ini fungsi G.) */
+      if(k==='KeyF'){
         if(Action.current())Action.trigger();
-        else UI.toggle('npc');
+      }
+      /* G: buka panel PARTY (daftar rekan tim). */
+      if(k==='KeyG'){
+        UI.toggle('party');
       }
 
       /* makan kini lewat klik/tombol serang saat memegang makanan */
@@ -100,16 +114,22 @@ const Input={
       if(!Game.started||UI.open)return;
       /* klik saat chat terbuka = tutup chat, bukan menyerang */
       if(typeof Chat!=='undefined'&&Chat.active)return;
-      /* klik tombol HUD khusus tidak boleh memicu serangan */
+      /* klik tombol HUD khusus tidak boleh memicu serangan.
+         #modal-ov ikut dikecualikan: selama dialog konfirmasi/nama terbuka,
+         UI.open masih null sehingga klik pada dialog dulu tetap diteruskan
+         sebagai serangan (dan pada Log Pass membuat dialognya terbuka lagi
+         tepat setelah ditutup). */
       const el=e.target;
-      if(el&&el.closest&&el.closest('#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu'))return;
+      if(el&&el.closest&&el.closest('#modal-ov,#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu'))return;
       if(e.button===0){
-        /* saat mode penempatan, klik kiri memindahkan ghost ke titik klik —
+        /* saat mode penempatan / atur pintu, klik kiri menunjuk sasaran —
            tapi klik pada elemen UI (bar pasang, hotbar, panel) diabaikan */
-        if(typeof Furni!=='undefined'&&Furni.placing){
+        if(typeof Furni!=='undefined'&&(Furni.placing||Furni.doorEdit)){
           const el=e.target;
-          if(!(el&&el.closest&&el.closest('#place-bar,#mobile,.panel,#team,#hotbar,#toast,#actbtn')))
-            Furni.moveGhostTo(e.clientX,e.clientY);
+          if(!(el&&el.closest&&el.closest('#place-bar,#door-bar,#mobile,.panel,#team,#hotbar,#toast,#actbtn'))){
+            if(Furni.doorEdit)Furni.pickDoorAt(e.clientX,e.clientY);
+            else Furni.moveGhostTo(e.clientX,e.clientY);
+          }
         }
         else this.attackQ=true;
       }
@@ -254,14 +274,19 @@ const Input={
         }
       }
     },{passive:true});
-    /* MODE PENEMPATAN (mobile): satu ketukan di area dunia memindahkan ghost
-       ke titik ketuk. Ketukan di UI (place-bar/tombol/panel) diabaikan. */
+    /* MODE PENEMPATAN / ATUR PINTU (mobile): satu ketukan di area dunia
+       menunjuk sasaran. Ketukan di UI (bar/tombol/panel) diabaikan.
+       Satu ketuk dipilih (bukan seret/gestur) karena di mobile jempol menutupi
+       sasaran saat menyeret, dan gestur multi-jari bentrok dengan putar/zoom
+       kamera dua jari. */
     window.addEventListener('touchstart',e=>{
-      if(typeof Furni==='undefined'||!Furni.placing)return;
+      if(typeof Furni==='undefined')return;
+      if(!Furni.placing&&!Furni.doorEdit)return;
       const t=e.changedTouches[0];
       const el=t.target;
-      if(el&&el.closest&&el.closest('#place-bar,#mobile,.panel,#team,#hotbar,#toast'))return;
-      Furni.moveGhostTo(t.clientX,t.clientY);
+      if(el&&el.closest&&el.closest('#place-bar,#door-bar,#mobile,.panel,#team,#hotbar,#toast'))return;
+      if(Furni.doorEdit)Furni.pickDoorAt(t.clientX,t.clientY);
+      else Furni.moveGhostTo(t.clientX,t.clientY);
     },{passive:true});
     const bind=(id,fn)=>{
       const el=document.getElementById(id);
@@ -280,11 +305,12 @@ const Input={
     bind('m-bag',()=>UI.toggle('bag'));
     bind('m-craft',()=>UI.toggle('craft'));
     bind('m-skill',()=>UI.toggle('skills'));
-    /* tombol 🤝: interaksi kontekstual (bicara / perabot / meletakkan),
-       atau membuka panel rekan bila tidak ada apa pun di dekat pemain */
+    bind('m-party',()=>UI.toggle('party'));
+    /* tombol 🤝: interaksi kontekstual (bicara / perabot / mengisi altar /
+       meletakkan). Membuka panel Party dilakukan lewat tombol/ikon terpisah. */
     bind('m-talk',()=>{
       if(Action.current())Action.trigger();
-      else UI.toggle('npc');
+      else UI.toggle('party');
     });
   },
 

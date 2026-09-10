@@ -97,6 +97,10 @@ const RareNPC={
        dalam tavern sehingga pemain bisa menemuinya di sana, bukan hanya di
        jalan antar desa. */
     const toTavern=Math.random()<0.65;
+    const startBiome=start.biome!==undefined?start.biome:
+      ((typeof WGEN!=='undefined'&&WGEN.biomeAt)?WGEN.biomeAt(start.x,start.z):0);
+    const startLvl=(typeof NPCS!=='undefined'&&NPCS.rollBiomeLevel)
+      ?NPCS.rollBiomeLevel(startBiome,start.x,start.z):10;
     this.list.push({
       role,
       x:start.x+rand(-6,6),z:start.z+rand(-6,6),
@@ -105,6 +109,7 @@ const RareNPC={
       tavernVisit:toTavern,
       quest:this.QUESTS[Math.floor(Math.random()*this.QUESTS.length)],
       npc:null,gone:false,sayT:rand(4,12),
+      lvl:startLvl,
     });
   },
 
@@ -121,13 +126,21 @@ const RareNPC={
        topY mengenai GENTENG sehingga mesh muncul berdiri di atas atap. Interior
        desa selalu rata CFG.SEA, jadi pakai itu sebagai lantai spawn. */
     if(typeof WGEN!=='undefined'&&WGEN.buildingAt&&WGEN.buildingAt(w.x,w.z,0))y=CFG.SEA;
-    const lvl=6+Math.floor(Math.random()*6);           // pengembara relatif kuat
-    const n=NPCS.make(w.role,w.x,y,w.z,{x:w.dest.x,z:w.dest.z},lvl);
+    /* LEVEL NPC RARE MENGIKUTI DESA / BIOME:
+       Pengembara langka menyesuaikan level dengan biome tempat ia sedang melintas
+       atau desa tujuannya (mis. Pegunungan Lv 50-75, Redlands Lv 30-50),
+       sehingga ia tidak terbunuh oleh monster liar setempat saat berkelana. */
+    const curBiome=(typeof WGEN!=='undefined'&&WGEN.biomeAt)?WGEN.biomeAt(w.x,w.z):
+                   (w.dest&&w.dest.biome!==undefined?w.dest.biome:0);
+    const localLvl=(typeof NPCS!=='undefined'&&NPCS.rollBiomeLevel)
+      ?NPCS.rollBiomeLevel(curBiome,w.x,w.z):10;
+    w.lvl=Math.max(w.lvl||1,localLvl);
+    const n=NPCS.make(w.role,w.x,y,w.z,{x:w.dest.x,z:w.dest.z},w.lvl);
     n.wander=true;                                     // jangan dibuang update NPCS
     n.rareRef=w;
     NPCS.list.push(n);
     w.npc=n;
-    UI.toast(`${w.role.e} ${w.role.name} sedang melintas — dekati dan tekan G`);
+    UI.toast(`${w.role.e} ${w.role.name} sedang melintas — dekati dan tekan F`);
     FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.4,0)),0xbfe4ff,10,2.2);
   },
   hide(w){

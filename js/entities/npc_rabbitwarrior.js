@@ -170,14 +170,13 @@ const NPC_Rabbitwarrior={
         if(tl>=SK.dash&&rb.lastStrike<i){
           rb.lastStrike=i;
           if(n.target&&!n.target.dead){
-            const wasDead=n.target.dead;
             Monsters.hurt(n.target,npcDmgSafe(n)*0.7,
               new THREE.Vector3(0,.25,0),2,n);
             PortFX.spark(n.target.pos.x,n.target.pos.y+1,n.target.pos.z,
               6,0xf2e7d1,6);
             Sfx.at(n.target.pos,'hit');
-            if(!wasDead&&n.target.dead&&NPCS.isTeam(n))
-              NPCS.gainXp(n,CFG.NPC.XP_PER_KILL);
+            /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat
+               XP penuh. Grant ganda lama di sini dihapus. */
           }
         }
       }
@@ -185,14 +184,16 @@ const NPC_Rabbitwarrior={
     }
     if(!n.target)return false;
     const d=n.target.pos.distanceTo(n.pos);
-    /* picu RAPID CLAW */
-    if(n.rapidCd<=0&&d<3.2){
+    /* picu RAPID CLAW (butuh stamina 30) */
+    if(n.rapidCd<=0&&d<3.2&&((n.stamina||0)>=30)){
+      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
       rb.action={name:'skill',t:0,lastStrike:-1};
       rb.skillYaw=n.mesh.rotation.y;
       rb.skillPos=n.pos.clone();
       n.rapidCd=12;
       NPCS.say(n,'RAPID CLAW!',1.6);
       UI.toast(`🐰 ${n.name}: RAPID CLAW!`);
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
       return true;
     }
     /* serangan biasa: combo 1→2→3 bergilir */
@@ -203,13 +204,12 @@ const NPC_Rabbitwarrior={
       rb.action={name:seq[rb.comboIdx],t:0};
       const dir=new THREE.Vector3().subVectors(n.target.pos,n.pos)
         .setY(0.25).normalize();
-      const wasDead=n.target.dead;
       Monsters.hurt(n.target,npcDmgSafe(n)*(rb.comboIdx===2?1.3:1),dir,4,n);
       PortFX.spark(n.target.pos.x,n.target.pos.y+1,n.target.pos.z,
         4,0xf2e7d1,5);
       Sfx.at(n.target.pos,'hit');
-      if(!wasDead&&n.target.dead&&NPCS.isTeam(n))
-        NPCS.gainXp(n,CFG.NPC.XP_PER_KILL);
+      /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat XP
+         penuh. Grant ganda lama di sini dihapus. */
     }
     return false;   // gerak mendekat tetap dari aiFight
   },

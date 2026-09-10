@@ -214,12 +214,14 @@ const NPC_Stonegiant={
       return true;
     }
     if(!n.target)return false;
-    /* picu EARTHQUAKE: cooldown habis & ≥2 monster dekat */
-    if(n.quakeCd<=0&&this.countNear(n,8)>=2&&n.target.pos.distanceTo(n.pos)<10){
+    /* picu EARTHQUAKE: cooldown habis & ≥2 monster dekat & butuh stamina (40) */
+    if(n.quakeCd<=0&&this.countNear(n,8)>=2&&n.target.pos.distanceTo(n.pos)<10&&((n.stamina||0)>=40)){
+      n.stamina=(n.stamina||0)-40; n.stamRegenT=1.8;
       n.quake={t:0,hitDone:[false,false,false],target:n.target};
       n.quakeCd=14;
       UI.toast(`🗿 ${n.name} mengguncang bumi!`);
       NPCS.say(n,'HANCUR!!',2);
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-40 STAM','#ffd24d');
       return true;
     }
     return false;   // serangan biasa ditangani aiFight (dgn visual combo)
@@ -274,10 +276,9 @@ const NPC_Stonegiant={
       if(m.dead)continue;
       const dx=m.pos.x-x,dz=m.pos.z-z;
       if(dx*dx+dz*dz>r*r)continue;
-      const wasDead=m.dead;
       Monsters.hurt(m,dmg,new THREE.Vector3(dx*0.2,0.4,dz*0.2),knock,owner);
-      if(!wasDead&&m.dead&&owner&&NPCS.isTeam(owner))
-        NPCS.gainXp(owner,CFG.NPC.XP_PER_KILL);
+      /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat XP
+         penuh. Grant ganda lama di sini dihapus. */
     }
   },
 

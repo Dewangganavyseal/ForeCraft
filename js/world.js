@@ -1,7 +1,10 @@
-﻿'use strict';
+'use strict';
 /* Manajemen chunk: streaming, edit blok, reruntuhan, banjir air */
 const World={
   chunks:new Map(),dirty:new Set(),pending:[],flood:[],blockHP:new Map(),
+  /* regrow: tanah (DIRT) yang terbuka setelah blok grass hancur; setelah
+     REGROW_T detik kembali menjadi GRASS dan ditumbuhi rumput dunia kecil. */
+  regrow:[],REGROW_T:15,
   group:new THREE.Group(),lcx:1e9,zcz:1e9,loadList:[],
   idx:(x,y,z)=>x+z*16+y*256,
   key:(cx,cz)=>cx+','+cz,
@@ -57,7 +60,7 @@ const World={
   /* Tinggi lantai di kolom (x,z).
      ---------------------------------------------------------------------
      `fromY` = ketinggian kaki entitas. Bila diisi, pencarian dimulai dari
-     setinggi langkah kaki, BUKAN dari puncak dunia — blok yang berada di
+     setinggi langkah kaki, BUKAN dari puncak dunia � blok yang berada di
      atas kepala diabaikan.
 
      Tanpa batas ini, ambang atas pintu (lintel) ikut terbaca sebagai
@@ -66,9 +69,10 @@ const World={
      terasa "membuka jalan" hanya karena sisa balok kayu di atasnya memang
      dilewati daftar pengecualian di bawah. */
   /* blok yang dihitung sebagai "lantai" oleh groundAt. Udara/air/kanopi/
-     batang/atap sengaja BUKAN lantai supaya pemain bisa berjalan di bawah
-     pohon & tidak menempel ke genteng. */
-  isFloor(id){return id!==B.AIR&&id!==B.WATER&&id!==B.WOOD&&id!==B.LEAF&&id!==B.ROOF;},
+     batang sengaja BUKAN lantai supaya pemain bisa berjalan di bawah
+     pohon & tidak menempel ke kanopi. B.ROOF dan B.PLANK adalah lantai padat
+     (termasuk lantai trim kayu di arena dungeon) agar tidak tembus. */
+  isFloor(id){return id!==B.AIR&&id!==B.WATER&&id!==B.WOOD&&id!==B.LEAF;},
 
   groundAt(x,z,fromY){
     /* radius sampling disamakan dengan radius tabrakan pemain (0.28) supaya
@@ -76,6 +80,14 @@ const World={
     const r=0.26;let g=0;
     const yTop=(fromY===undefined)?CFG.WORLD_H-1
               :clamp(Math.floor(fromY+0.02),0,CFG.WORLD_H-1);
+    /* ALTAR RITUAL: strukturnya mesh, bukan blok dunia, jadi permukaannya tidak
+       terbaca oleh pemindaian blok di bawah. Tanpa ini altar hanya punya
+       tabrakan: pemain tak pernah bisa memijak atau melompat ke atasnya karena
+       lantai yang dilaporkan selalu tanah DI BAWAH altar, sehingga ia langsung
+       ditarik turun lagi. Tingkat yang JAUH di atas kepala diabaikan (mengikuti
+       aturan blok: hanya blok pada level <= yTop yang boleh jadi lantai) supaya
+       pemain yang berdiri di samping pedestal tidak ikut terangkat. */
+    const useAltar=(typeof Altar!=='undefined'&&Altar.topAt&&Altar.list&&Altar.list.length);
     for(const[ox,oz]of[[-r,-r],[r,-r],[-r,r],[r,r]]){
       // Kanopi dan batang bukan lantai. Jika ikut dihitung, pemain akan
       // tertahan saat mendekati pohon karena sisi batang terlihat seperti
@@ -88,6 +100,10 @@ const World={
            genteng saat berjalan di samping rumah */
         if(this.isFloor(id)){gy=y+1;break;}
       }
+      if(useAltar){
+        const at=Altar.topAt(x+ox,z+oz);
+        if(at>gy&&at<=yTop+1)gy=at;
+      }
       if(gy>g)g=gy;
     }
     return g;
@@ -98,7 +114,7 @@ const World={
      sebagai garansi anti-"terhisap terrain": bila kaki pemain sampai berada
      DI DALAM blok padat (terdorong ke sudut struktur, sisa posisi save lama,
      dsb.), panggil fungsi ini lalu set pos.y ke hasilnya agar pemain selalu
-     didorong keluar ke permukaan — tidak pernah terkubur. Mengembalikan y
+     didorong keluar ke permukaan � tidak pernah terkubur. Mengembalikan y
      apa adanya bila kaki tidak berada di dalam blok padat. */
   unburyY(x,z,y){
     const bx=Math.floor(x),bz=Math.floor(z);
@@ -114,7 +130,7 @@ const World={
      `feetY` pada kolom (x,z). Memindai 2 level blok (kaki & dada) di empat
      sudut tabrakan. Dipakai sebagai penjaga gerak horizontal supaya pemain
      TIDAK PERNAH dipindahkan ke posisi yang membuat badannya berada DI DALAM
-     blok lantai padat — ini penutup hulu bug "terhisap terrain" (pemain
+     blok lantai padat � ini penutup hulu bug "terhisap terrain" (pemain
      terdorong masuk ke celah blok lalu terjebak dan harus loncat untuk lepas).
      Mengembalikan false bila ada blok lantai padat di ruang tubuh. */
   headroomOK(x,z,feetY){
@@ -133,11 +149,21 @@ const World={
     // memblokir agar pemain tetap bisa berjalan di bawah kanopi.
     const samples=[[0,0],[r,0],[-r,0],[0,r],[0,-r],[r*.7,r*.7],[-r*.7,r*.7],[r*.7,-r*.7],[-r*.7,-r*.7]];
     const by=Math.floor(y+0.45),by2=Math.floor(y+1.15);
+    /* ALTAR RITUAL: struktur mesh (bukan blok dunia), jadi tabrakannya diuji
+       terpisah — tanpa ini altar bisa ditembus begitu saja. */
+    if(typeof Altar!=='undefined'&&Altar.solidAt&&
+       samples.some(([ox,oz])=>Altar.solidAt(x+ox,y+0.45,z+oz)||
+                               Altar.solidAt(x+ox,y+1.15,z+oz)))return true;
+    /* KIOS & perabot PADAT (Furni): meja counter kios Dungeon Master dsb.
+       Tanpa ini pemain menembus bangunannya begitu saja. */
+    if(typeof Furni!=='undefined'&&Furni.solidAt&&
+       samples.some(([ox,oz])=>Furni.solidAt(x+ox,y+0.45,z+oz)||
+                               Furni.solidAt(x+ox,y+1.15,z+oz)))return true;
     return samples.some(([ox,oz])=>{
       const id1=this.getBlock(Math.floor(x+ox),by,Math.floor(z+oz));
       const id2=this.getBlock(Math.floor(x+ox),by2,Math.floor(z+oz));
-      /* papan dinding rumah ikut memblokir supaya pemain masuk lewat pintu */
-      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK;
+      /* papan dinding & atap rumah ikut memblokir supaya pemain masuk lewat pintu */
+      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK||id===B.ROOF;
       return solid(id1)||solid(id2);
     });
   },
@@ -154,11 +180,11 @@ const World={
      (pemain & makhluk tetap bisa melihat lewat sela kanopi / di dalam air);
      semua blok padat lain (tanah, batu, dinding papan, atap, batang) menutupi.
      Dipakai losBlocked supaya monster & NPC TIDAK bisa melihat menembus
-     tembok — misalnya dari dalam rumah mereka tak melihat apa pun di luar.
+     tembok � misalnya dari dalam rumah mereka tak melihat apa pun di luar.
      ========================================================================= */
   blocksSight(id){return id!==B.AIR&&id!==B.WATER&&id!==B.LEAF;},
   /* true bila ada blok padat di antara titik A dan B (pandangan terhalang).
-      Marching sampel tiap 0.5 blok sepanjang garis — cukup rapat agar tidak ada
+      Marching sampel tiap 0.5 blok sepanjang garis � cukup rapat agar tidak ada
       blok tipis yang terlewat. Titik ujung (blok tempat A/B berdiri) sengaja
       tidak ikut dihitung supaya tidak salah deteksi. */
   losBlocked(ax,ay,az,bx,by,bz){
@@ -179,7 +205,9 @@ const World={
      penuh, item dibuang pemain, drop ikan, dll). Meneruskan ke sistem drop
      FX yang sudah menangani jatuh, magnet ke pemain, dan pickup.
      `opts.owner=true` memberi jeda ambil (item dari tas pemain tidak langsung
-     tersedot balik). */
+     tersedot balik).
+     `opts.lvl` / `opts.mark` membawa data per-instance (level tempa & tanda
+     lokasi Log Pass) supaya tidak hilang saat item dibuang lalu dipungut. */
   dropItem(x,y,z,id,n,opts){
     if(n<=0||!ITEMS[id])return;
     FX.spawnDrop(new THREE.Vector3(x,y,z),id,n,opts);
@@ -188,7 +216,7 @@ const World={
   /* ---------- streaming ----------
       PIPELINE ala Minecraft: pembentukan dunia dibagi dua tahap yang dianggarkan
       per frame supaya TIDAK ada frame yang membeku saat menjelajah:
-        TAHAP 1 (gen)  : isi DATA chunk (terrain + desa) — lebih murah, harus
+        TAHAP 1 (gen)  : isi DATA chunk (terrain + desa) � lebih murah, harus
                          siap dulu karena mesh butuh data chunk tetangga.
         TAHAP 2 (mesh) : bangun MESH maksimal 1 chunk/frame, hanya bila data
                          chunk itu + 4 tetangganya sudah ada (pre-gen), sehingga
@@ -199,6 +227,11 @@ const World={
   update(dt,pp){
     this.processTimers(dt);
     if(typeof Farming!=='undefined')Farming.update(dt,pp);
+    /* waktu angin tumbuhan voxel: satu uniform untuk seluruh dunia, jadi
+       semua semak/tebu/tulip bergoyang tanpa biaya per-tanaman */
+    if(Mesher.floraTime)Mesher.floraTime.value+=dt;
+    /* rumput yang terinjak pemain/mob/NPC (uniform array, biaya CPU kecil) */
+    this.updateTrample(dt,pp);
     this.updateCanopy(dt,pp);
     const pcx=Math.floor(pp.x/16),pcz=Math.floor(pp.z/16);
     if(pcx!==this.lcx||pcz!==this.zcz){
@@ -216,29 +249,39 @@ const World={
           this.disposeGroup(c);c.group=null;
         }
       }
+      /* rumput dunia hanya tampak dalam radius dekat: sembunyikan yang jauh
+         (hemat jutaan wajah di render pass tanpa membuang mesh terrain-nya) */
+      this.updateGrassVisibility(pcx,pcz);
     }
-    /* ANGGARAN WAKTU per frame (ms). Semua tahap streaming dibatasi angka ini. */
+    /* ANGGARAN WAKTU per frame (ms). Semua tahap streaming dibatasi angka ini.
+       MODE PERSIAPAN: saat menu panorama / layar loading (pemain belum mulai),
+       anggaran dinaikkan & kuota dilebarkan — dunia jadi siap jauh lebih cepat
+       tanpa pernah mengganggu gameplay, karena gameplay memang belum berjalan. */
     const t0=performance.now();
-    const BUDGET=IS_MOBILE?3:5;
+    const warm=(typeof Game!=='undefined')&&(!Game.started||Game.menuMode);
+    const BUDGET=warm?16:(IS_MOBILE?3:5);
 
     /* TAHAP 1 — generate DATA chunk yang belum ada, terdekat dulu. */
     let gens=0;
+    const genMax=warm?6:(IS_MOBILE?2:3);
     for(const e of this.loadList){
-      if(gens>=(IS_MOBILE?2:3))break;
+      if(gens>=genMax)break;
       if(performance.now()-t0>BUDGET)break;
       if(this.chunks.has(this.key(e.cx,e.cz)))continue;   // data sudah ada
       this.getChunk(e.cx,e.cz);                            // buat data (terrain+desa)
       gens++;
     }
 
-    /* TAHAP 2 — mesh MAKSIMAL 1 chunk per frame, hanya yang data + 8 tetangganya
-       sudah siap (4 sisi utk wajah perbatasan + 4 diagonal utk AO sudut). Dengan
-       begini mesh tidak memicu generasi chunk apa pun (bebas cascade).
-       Anggaran habis → berhenti, lanjut frame berikut. */
+    /* TAHAP 2 — mesh MAKSIMAL 1 chunk per frame (2 saat persiapan), hanya yang
+       data + 8 tetangganya sudah siap (4 sisi utk wajah perbatasan + 4 diagonal
+       utk AO sudut). Dengan begini mesh tidak memicu generasi chunk apa pun
+       (bebas cascade). Anggaran habis → berhenti, lanjut frame berikut. */
     if(performance.now()-t0<BUDGET){
       const R=CFG.VIEW_R;
+      let meshed=0;
       for(const e of this.loadList){
         if(e.d>R*R)break;                                  // hanya radius render
+        if(meshed>=(warm?2:1))break;
         const c=this.chunks.get(this.key(e.cx,e.cz));
         if(!c||c.group)continue;                           // belum ada data / sudah mesh
         let ready=true;
@@ -248,11 +291,11 @@ const World={
         }
         if(!ready)continue;                                // tetangga belum siap
         this.buildMesh(c);
-        break;                                             // cukup 1 mesh/frame
+        meshed++;                                          // cukup utk frame ini
       }
     }
 
-    /* remesh chunk kotor (edit blok) — anggaran kecil, maks 2 */
+    /* remesh chunk kotor (edit blok) � anggaran kecil, maks 2 */
     let rem=0;
     for(const k of this.dirty){
       if(rem>=2)break;
@@ -264,10 +307,140 @@ const World={
       this.dirty.delete(k);
     }
   },
+  /* Bangun ulang SELURUH mesh chunk yang sedang tampil. Dipakai saat preset
+     grafis berubah (Gfx.apply): subdivisi air, ambang rumput, dan radius render
+     semuanya dibaca ulang saat mesh dibangun. Data chunk (terrain) TIDAK
+     dibuang — hanya meshnya, jadi dunia & bangunan tetap sama.
+     Chunk di luar radius baru dilepas; sisanya ditandai dirty agar dibangun
+     bertahap oleh update() sesuai anggaran per frame (tidak membekukan game). */
+  rebuildAll(){
+    const pcx=this.lcx,pcz=this.zcz;
+    for(const[k,c]of this.chunks){
+      if(!c.group)continue;
+      this.disposeGroup(c);c.group=null;
+      /* hanya chunk dalam radius render baru yang perlu dibangun lagi */
+      if(Math.abs(c.cx-pcx)<=CFG.VIEW_R+1&&Math.abs(c.cz-pcz)<=CFG.VIEW_R+1)
+        this.dirty.add(k);
+    }
+    /* paksa antrean muat dihitung ulang di frame berikutnya (radius bisa
+       berubah) dengan menganggap pemain baru saja pindah chunk */
+    this.lcx=1e9;this.zcz=1e9;
+  },
+
   disposeGroup(c){
     Game.scene.remove(c.group);
     c.group.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+    c.grassMesh=null;
     c.group=null;
+  },
+  /* Sembunyikan mesh RUMPUT DUNIA milik chunk di luar CFG.GRASS_R (radius dari
+     chunk pemain). Terrain, pohon, semak, dsb tetap terlihat sampai VIEW_R;
+     hanya rumput dekoratif yang dipangkas jaraknya karena ia menyumbang jauh
+     lebih banyak wajah daripada apa pun. Dipanggil saat pemain pindah chunk &
+     setelah tiap chunk baru di-mesh. */
+  updateGrassVisibility(pcx,pcz){
+    const R=CFG.GRASS_R;
+    for(const[,c]of this.chunks){
+      if(!c.grassMesh)continue;
+      c.grassMesh.visible=(Math.abs(c.cx-pcx)<=R&&Math.abs(c.cz-pcz)<=R);
+    }
+  },
+
+  /* ---------- RUMPUT TERINJAK ----------
+     Rumput tertekuk menjauh dari apa pun yang melewatinya: pemain, monster, &
+     NPC. Tekukannya dihitung di VERTEX SHADER (lihat applyGrassShader di
+     mesher.js), jadi yang perlu dikirim per frame hanya DAFTAR PENGINJAK —
+     bukan menyentuh geometri rumput sama sekali.
+
+     Anggaran ketat supaya tetap ringan:
+       · maksimum Mesher.trampleMax (12) penginjak aktif; yang dipakai adalah
+         yang TERDEKAT ke pemain, karena hanya itu yang terlihat di layar.
+       · hanya entitas hidup yang punya mesh & berada dalam radius rumput.
+       · loop hanya menyentuh array yang sudah ada (Monsters.list, NPCS.list),
+         tanpa alokasi objek baru per frame — slot Vector4 dipakai ulang.
+
+     KEKUATAN (w) DIHALUSKAN, ASIMETRIS: naik cepat, turun lambat.
+       · entitas mulai bergerak  → w melompat ke 1 dalam ~0,1 detik (rumput
+         langsung rebah saat dilangkahi),
+       · entitas berhenti/menjauh → w turun perlahan ~1 detik (rumput berdiri
+         lagi berangsur, bukan mendadak).
+     Nilai w disimpan per entitas di `_trPrev`, jadi tidak perlu state per
+     rumput sama sekali. */
+  _trPrev:new Map(),      // id → {x,z,w} posisi & kekuatan frame lalu
+  _trBuf:[],              // {x,z,r,w,d} kandidat, dipakai ulang tiap frame
+  updateTrample(dt,pp){
+    if(!Mesher.trample||!Mesher.trampleCount)return;
+    const MAXN=Mesher.trampleMax||12;
+    const buf=this._trBuf;
+    let n=0;
+    /* Kekuatan tekukan sebuah entitas, dihaluskan dari kecepatannya.
+       `id` harus STABIL antar frame — dipakai mesh.id (unik & tetap selama
+       objek hidup) supaya mob/NPC tanpa uid tetap terlacak. */
+    const strengthOf=(id,x,z)=>{
+      let p=this._trPrev.get(id);
+      if(!p){p={x,z,w:0.35};this._trPrev.set(id,p);return p.w;}
+      /* kecepatan horizontal. Lonjakan sangat besar = teleport/spawn ulang →
+         diabaikan. Ambangnya tinggi (200 blok/s) supaya entitas yang benar-benar
+         cepat pada frame rate rendah TIDAK ikut terbuang — dulu ambang 20
+         membuat efeknya hilang justru saat bergerak kencang. */
+      let spd=0;
+      if(dt>0){
+        const d=Math.hypot(x-p.x,z-p.z)/dt;
+        if(d<200)spd=d;
+      }
+      p.x=x;p.z=z;
+      /* target: diam 0.35 → berlari (>=5 blok/s) 1.0 */
+      const tgt=0.35+Math.min(1,spd/5)*0.65;
+      /* asimetris: rebah cepat, berdiri lagi lambat */
+      const k=(tgt>p.w)?Math.min(1,dt*14):Math.min(1,dt*2.2);
+      p.w+=(tgt-p.w)*k;
+      return p.w;
+    };
+    const add=(id,x,z,r)=>{
+      const dx=x-pp.x,dz=z-pp.z;
+      const d=dx*dx+dz*dz;
+      if(d>36*36)return;                       // di luar radius rumput terlihat
+      const w=strengthOf(id,x,z);
+      if(n<buf.length){const s=buf[n];s.x=x;s.z=z;s.r=r;s.w=w;s.d=d;}
+      else buf.push({x,z,r,w,d});
+      n++;
+    };
+    /* --- pemain --- */
+    add('P',pp.x,pp.z,0.95);
+    /* --- monster & hewan --- */
+    if(typeof Monsters!=='undefined'&&Monsters.list){
+      for(const m of Monsters.list){
+        if(m.dead||!m.pos||!m.mesh)continue;
+        /* radius mengikuti ukuran tabrakan mob, sedikit dilebihkan */
+        add(m.mesh.id,m.pos.x,m.pos.z,Math.max(0.7,(m.r||0.5)*1.7));
+      }
+    }
+    /* --- NPC --- */
+    if(typeof NPCS!=='undefined'&&NPCS.list){
+      for(const q of NPCS.list){
+        if(q.dead||!q.pos||!q.mesh)continue;
+        add(q.mesh.id,q.pos.x,q.pos.z,0.9);
+      }
+    }
+    /* pilih MAXN terdekat: urutkan hanya bila kandidatnya melebihi kapasitas */
+    let use=n;
+    if(n>MAXN){
+      buf.length=n;                       // buang sisa lama agar sort benar
+      buf.sort((a,b)=>a.d-b.d);
+      use=MAXN;
+    }
+    const U=Mesher.trample.value;
+    for(let i=0;i<use;i++){
+      const s=buf[i];
+      U[i].set(s.x,s.z,s.r,s.w);
+    }
+    Mesher.trampleCount.value=use;
+    /* bersihkan cache posisi entitas yang sudah hilang (tiap ~2 detik saja) */
+    this._trGC=(this._trGC||0)+dt;
+    if(this._trGC>2){
+      this._trGC=0;
+      if(this._trPrev.size>200)this._trPrev.clear();
+    }
   },
   buildMesh(c){
     this.getChunk(c.cx-1,c.cz);this.getChunk(c.cx+1,c.cz);
@@ -282,6 +455,22 @@ const World={
     }
     if(res.plant){
       const m=new THREE.Mesh(res.plant,M.plant);m.receiveShadow=true;g.add(m);
+    }
+    /* tumbuhan voxel (semak beri, kaktus, tebu, tulip) */
+    if(res.flora){
+      const m=new THREE.Mesh(res.flora,M.flora);
+      m.castShadow=!IS_MOBILE;m.receiveShadow=true;g.add(m);
+    }
+    /* RUMPUT DUNIA (dekoratif): mesh terpisah, TIDAK pernah ikut shadow pass
+       (menggandakan biaya render), dan disembunyikan berdasarkan jarak lewat
+       World.updateGrassVisibility. Materialnya SENDIRI (MAT_WGRASS): kartu
+       3-plane bertekstur alpha dengan shader angin + efek terinjak. */
+    if(res.grass){
+      const m=new THREE.Mesh(res.grass,M.wgrass||M.flora);
+      m.castShadow=false;m.receiveShadow=false;
+      /* langsung sembunyikan bila chunk ini di luar radius rumput */
+      m.visible=(Math.abs(c.cx-this.lcx)<=CFG.GRASS_R&&Math.abs(c.cz-this.zcz)<=CFG.GRASS_R);
+      c.grassMesh=m;g.add(m);
     }
     if(res.leaf){
       const m=new THREE.Mesh(res.leaf,M.leaf);
@@ -307,13 +496,20 @@ const World={
   canopyOp:1,
   _leafCache:null,
   /* flood-fill daun terhubung dari (sx,sy,sz); mengembalikan bounding-box xz
-     [minX,minZ,maxX,maxZ]. Dibatasi radius & jumlah blok agar murah. */
+     [minX,minZ,maxX,maxZ]. Dibatasi radius & jumlah blok agar murah.
+
+     Batas RH (jangkauan vertikal) harus melebihi TINGGI KANOPI: pohon punya
+     batang 6-10 blok dengan kanopi 4 lapis (worldgen: dy -2..+1 dari puncak),
+     jadi flood-fill dari lapisan bawah kanopi perlu bisa menjangkau ke atas
+     maupun ke bawah beberapa blok. RH lama (6) sudah cukup, tetapi radius
+     mendatar R=9 dinaikkan sedikit karena kanopi bisa selebar 4 blok dari
+     batang dan dua pohon berdempet menyatu menjadi satu gugus daun. */
   floodLeafBox(sx,sy,sz){
     const key=(x,y,z)=>x+','+y+','+z;
     const visited=new Set([key(sx,sy,sz)]);
     const q=[[sx,sy,sz]];
     let minX=sx,maxX=sx,minZ=sz,maxZ=sz,count=0;
-    const MAX=700,R=9,RH=6;
+    const MAX=900,R=11,RH=8;
     const NB=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
     while(q.length&&count<MAX){
       const cur=q.shift();count++;
@@ -331,24 +527,73 @@ const World={
     }
     return[minX,minZ,maxX,maxZ];
   },
+  /* ---------- kanopi mana yang MENGHALANGI PANDANGAN ke pemain? ----------
+     Menelusuri garis dari kepala pemain menuju KAMERA dan mengembalikan blok
+     daun pertama yang ditemukan, atau null.
+
+     Kenapa perlu: kamera game ini miring dari atas, jadi daun yang menutupi
+     pemain di layar TIDAK berada tepat di atas kepalanya — ia berada di antara
+     pemain dan kamera, beberapa blok ke arah belakang-atas. Deteksi lama hanya
+     memeriksa kolom vertikal tepat di atas pemain (px,pz), sehingga selama
+     pemain belum benar-benar berada di bawah pusat kanopi (praktis: menempel di
+     batang) daun tidak pernah dibuat transparan — persis gejala yang dilaporkan.
+
+     Penelusuran memakai langkah kecil sampai sejauh jarak kamera, dibatasi
+     LOS_MAX blok supaya tetap murah (dipanggil sekali per frame). */
+  LOS_STEP:0.45,
+  LOS_MAX:26,
+  leafBlockingView(pp){
+    if(typeof Cam==='undefined'||!Cam.cam)return null;
+    const cp=Cam.cam.position;
+    /* titik acuan = kepala pemain (bukan kaki) */
+    const ox=pp.x,oy=pp.y+1.5,oz=pp.z;
+    let dx=cp.x-ox,dy=cp.y-oy,dz=cp.z-oz;
+    const len=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if(len<0.001)return null;
+    dx/=len;dy/=len;dz/=len;
+    const far=Math.min(len,this.LOS_MAX);
+    let lx=-1,ly=-1,lz=-1;
+    for(let t=0.6;t<=far;t+=this.LOS_STEP){
+      const x=Math.floor(ox+dx*t),y=Math.floor(oy+dy*t),z=Math.floor(oz+dz*t);
+      if(x===lx&&y===ly&&z===lz)continue;      // masih di blok yang sama
+      lx=x;ly=y;lz=z;
+      if(y<0||y>=CFG.WORLD_H)continue;
+      if(this.getBlock(x,y,z)===B.LEAF)return {x,y,z};
+    }
+    return null;
+  },
   updateCanopy(dt,pp){
     const px=Math.floor(pp.x),pz=Math.floor(pp.z);
-    /* cari daun tepat di atas kepala pemain */
-    const y0=Math.floor(pp.y)+2,y1=Math.min(CFG.WORLD_H,y0+8);
-    let leafY=-1;
-    for(let y=y0;y<y1;y++){if(this.getBlock(px,y,pz)===B.LEAF){leafY=y;break;}}
+    /* ---------- 1. daun tepat di atas kepala (berada DI BAWAH kanopi) ----------
+       Jangkauan pemindaian dinaikkan dari 8 → seluruh kolom sampai WORLD_H:
+       batang pohon 6-10 blok membuat kanopi berada 8-12 blok di atas kaki,
+       yaitu DI LUAR jendela lama (y0..y0+8) begitu pemain berdiri di tanah.
+       Itu sebabnya berjalan di bawah pohon tinggi tidak memicu transparansi. */
+    let leaf=null;
+    for(let y=Math.floor(pp.y)+2;y<CFG.WORLD_H;y++){
+      if(this.getBlock(px,y,pz)===B.LEAF){leaf={x:px,y,z:pz};break;}
+    }
+    /* ---------- 2. daun yang MENGHALANGI PANDANGAN kamera → pemain ----------
+       Inilah kasus "berjalan di belakang pohon": pemain tidak berada di bawah
+       kanopi, tapi kanopi menutupinya di layar. */
+    if(!leaf)leaf=this.leafBlockingView(pp);
     Mesher.getMats();
-    if(leafY<0){
+    if(!leaf){
       this._leafCache=null;
       this.canopyOp+=(1-this.canopyOp)*Math.min(1,dt*5);
       Mesher.fadeLeaf.uAmt.value=this.canopyOp;
       this.updateRoof(dt,pp);
       return;
     }
-    /* di bawah kanopi: pakai kotak cache selama pemain masih di dalamnya */
+    /* Kotak fade dicache selama titik daun pemicu masih berada di dalamnya,
+       jadi flood-fill tidak dijalankan tiap frame. Dulu cache diuji dengan
+       posisi PEMAIN — tidak cocok lagi karena pemain kini bisa berada di luar
+       kanopi (kasus 2), sehingga cache selalu miss dan flood-fill berjalan
+       setiap frame. */
     let box=this._leafCache;
-    const inCache=box&&px>=box[0]-1&&px<=box[2]+1&&pz>=box[1]-1&&pz<=box[3]+1;
-    if(!inCache){box=this.floodLeafBox(px,leafY,pz);this._leafCache=box;}
+    const inCache=box&&leaf.x>=box[0]-1&&leaf.x<=box[2]+1&&
+                       leaf.z>=box[1]-1&&leaf.z<=box[3]+1;
+    if(!inCache){box=this.floodLeafBox(leaf.x,leaf.y,leaf.z);this._leafCache=box;}
     Mesher.fadeLeaf.uMin.value.set(box[0]-0.5,box[1]-0.5);
     Mesher.fadeLeaf.uMax.value.set(box[2]+1.5,box[3]+1.5);
     this.canopyOp+=(CFG.CANOPY_FADE-this.canopyOp)*Math.min(1,dt*6);
@@ -360,14 +605,14 @@ const World={
      METODA AREA TRIGGER PER-RUMAH: setiap rumah punya area trigger sendiri,
      yaitu footprint-nya (WGEN.buildingAt). Begitu pemain terdeteksi "di dalam"
      (ada blok atap di atas kepala), kotak fade diisi footprint rumah ITU,
-     sehingga SELURUH atap rumah tersebut full transparan sekaligus — atap
+     sehingga SELURUH atap rumah tersebut full transparan sekaligus � atap
      rumah tetangga tidak ikut. Dinding tidak pernah transparan karena dinding
      bukan material atap (atap memakai mesh & material terpisah).
 
      BUGFIX: dulu pemindaian atap hanya 5 blok di atas kepala (y0..y0+5).
-     Rumah tinggi (Loteng h=7 → atap y≈11, Wisma h=6 → y≈10) atapnya berada
+     Rumah tinggi (Loteng h=7 ? atap y�11, Wisma h=6 ? y�10) atapnya berada
      di LUAR jangkauan itu, sehingga atapnya tidak pernah jadi transparan.
-     Sekarang: (1) cek footprint rumah lewat WGEN.buildingAt — bila pemain
+     Sekarang: (1) cek footprint rumah lewat WGEN.buildingAt � bila pemain
      memang berada di dalam kavling rumah, seluruh kolom di atasnya dipindai
      sampai WORLD_H; (2) fallback pemindaian kolom penuh + tetangga. */
   roofOp:1,
@@ -377,6 +622,45 @@ const World={
     for(let y=y0;y<CFG.WORLD_H;y++)
       if(this.getBlock(x,y,z)===B.ROOF)return true;
     return false;
+  },
+  /* ---------- APAKAH PEMAIN BERADA DI DALAM GUA DUNGEON? ----------
+     BUGFIX: transparansi "dalam ruangan" dulu HANYA dipicu blok B.ROOF. Kubah
+     gua dungeon dibangun dari B.STONE (lihat dungeon.js buildDungeonPart:
+     `for(let y=ceil;y<=ceil+1;y++)set(y,WALL)`), sehingga saat pemain masuk gua
+     insideHouse tetap false — kubahnya tidak pernah memudar dan karakter
+     tertutup batu dari sudut kamera mana pun.
+
+     Di sini gua dideteksi langsung: pemain berada di dalam radius sebuah dungeon
+     berjenis 'cave' DAN ada blok padat di atas kepalanya (blok padat apa pun,
+     bukan cuma ROOF, karena kubah gua memang batu).
+
+     DIMEMO PER BLOK: WGEN.nearestDungeon memeriksa 9 sel grid dan tiap sel ikut
+     memanggil nearestVillage, jadi terlalu mahal untuk dijalankan setiap frame.
+     Hasilnya cukup dihitung ulang saat pemain berpindah blok. */
+  _caveKey:null,_caveRes:null,
+  inDungeonCave(px,y0,pz){
+    const k=px+','+y0+','+pz;
+    if(this._caveKey===k)return this._caveRes;
+    this._caveKey=k;
+    this._caveRes=null;
+    if(typeof WGEN==='undefined'||!WGEN.nearestDungeon)return null;
+    const near=WGEN.nearestDungeon(px,pz);
+    if(!near||near.d.kind!=='cave')return null;
+    if(near.dist>near.d.r+1)return null;
+    /* ada langit-langit di atas kepala? */
+    let roofed=false;
+    for(let y=y0;y<CFG.WORLD_H;y++){
+      const b=this.getBlock(px,y,pz);
+      if(b!==B.AIR&&b!==B.WATER){roofed=true;break;}
+    }
+    if(!roofed)return null;
+    const d=near.d;
+    /* yTop: kubah gua JAUH lebih tinggi dari atap rumah (domeH bisa 15-17 blok
+       di atas lantai), jadi kotak oklusinya perlu setinggi dunia. Tanpa ini
+       hanya DINDING SAMPING gua yang memudar — atapnya berada di luar kotak
+       sehingga tetap padat dan menutupi karakter dari atas. */
+    this._caveRes={x:d.x-d.r,z:d.z-d.r,w:d.r*2,d:d.r*2,yTop:CFG.WORLD_H+2};
+    return this._caveRes;
   },
   updateRoof(dt,pp){
     const px=Math.floor(pp.x),pz=Math.floor(pp.z);
@@ -394,23 +678,34 @@ const World={
            this.getBlock(px+dx,y0,pz+dz)===B.AIR){inside=true;break;}
       }
     }
+    /* 4. GUA DUNGEON: kubahnya batu (bukan ROOF), jadi diperiksa terpisah.
+       Mengembalikan bentang gua sebagai kotak oklusi. */
+    const caveBB=inside?null:this.inDungeonCave(px,y0,pz);
+    if(caveBB)inside=true;
     this.insideHouse=inside;
     Mesher.getMats();
     let bb=null;
     if(inside){
-      /* area trigger = footprint rumah yang sedang dimasuki */
+      /* area trigger FADE_ROOF = footprint rumah yang sedang dimasuki.
+         GUA TIDAK memakai jalur ini: kubah gua terbuat dari B.STONE yang
+         dirender MAT_SOLID, dan MAT_SOLID dipasang applyLocalFade(...,null)
+         sehingga tidak punya uniform kotak FADE_ROOF. Memasang kotak gua ke
+         FADE_ROOF hanya akan menghilangkan lantai tepi arena (yang memakai
+         B.ROOF sebagai pelapis di dungeon Lv≥7) tanpa menyentuh kubahnya. */
       bb=b||((typeof WGEN!=='undefined'&&WGEN.buildingAt)?WGEN.buildingAt(px,pz,2):null);
-      if(bb){
+      if(!caveBB&&bb){
         const pad=2;   // tritisan atap (1 blok) + pengaman
         Mesher.fadeRoof.uMin.value.set(bb.x-pad,bb.z-pad);
         Mesher.fadeRoof.uMax.value.set(bb.x+bb.w+pad,bb.z+bb.d+pad);
-      }else{
+      }else if(!caveBB){
         /* fallback: kotak di sekitar pemain bila footprint tak ditemukan */
         Mesher.fadeRoof.uMin.value.set(px-8,pz-8);
         Mesher.fadeRoof.uMax.value.set(px+8,pz+8);
       }
-      /* footprint yang sama dipakai oklusi dinding ala Project Zomboid */
-      this._occBB=bb||{x:px-8,z:pz-8,w:16,d:16};
+      /* OKLUSI ala Project Zomboid — INILAH yang membuat kubah batu gua memudar,
+         karena shader oklusi memang terpasang di MAT_SOLID (mesher.js). Untuk
+         gua, kotaknya adalah seluruh bentang gua. */
+      this._occBB=caveBB||bb||{x:px-8,z:pz-8,w:16,d:16};
     }
     const target=inside?CFG.ROOF_FADE:1;
     this.roofOp+=(target-this.roofOp)*Math.min(1,dt*8);
@@ -436,8 +731,10 @@ const World={
        memproses fragmen di atas y ini (rel.y > 0.18) */
     U.uOP.value.set(pp.x,pp.y,pp.z);
 
-    /* arah pemain → kamera. Kamera ortografik diposisikan jauh mengikuti yaw,
-       jadi arah ini otomatis berubah saat kamera diputar. */
+    /* arah pemain → kamera. Kamera diposisikan jauh mengikuti yaw & elev, jadi
+       arah ini otomatis berubah saat kamera diputar. Sejak kamera menjadi
+       perspektif, jaraknya ikut zoom — uOL memakai jarak NYATA (dihitung di
+       sini), jadi tidak ada asumsi jarak tetap. */
     if(typeof Cam!=='undefined'&&Cam.cam){
       const cp=Cam.cam.position;
       const dx=cp.x-pp.x,dy=cp.y-pp.y,dz=cp.z-pp.z;
@@ -446,11 +743,16 @@ const World={
       U.uOL.value=l;
     }
 
-    /* bbox rumah: tetap dikirim selama fade keluar agar transisi tidak pop */
+    /* bbox rumah: tetap dikirim selama fade keluar agar transisi tidak pop.
+       `b.yTop` (dipakai gua) menaikkan tutup kotak sampai puncak dunia; tanpa
+       itu +13 blok tidak cukup untuk kubah gua yang tinggi, sehingga hanya
+       dinding sampingnya yang memudar dan atapnya tetap menutupi karakter. */
     if(this._occBB&&this.occOp<0.999){
       const b=this._occBB,pad=2;
       U.uOBMin.value.set(b.x-pad,pp.y-0.6,b.z-pad);
-      U.uOBMax.value.set(b.x+b.w+pad,pp.y+13.0,b.z+b.d+pad);
+      U.uOBMax.value.set(b.x+b.w+pad,
+        b.yTop!==undefined?b.yTop:pp.y+13.0,
+        b.z+b.d+pad);
     }else{
       U.uOBMin.value.set(1e9,1e9,1e9);
       U.uOBMax.value.set(-1e9,-1e9,-1e9);
@@ -469,14 +771,21 @@ const World={
         this.setBlock(p.x,p.y,p.z,B.AIR);
         const col=(BLOCK_INFO[id]||{}).color||0x888888;
         FX.debris(new THREE.Vector3(p.x+0.5,p.y+0.5,p.z+0.5),col,p.leaf?3:6,p.leaf?1.6:3);
-        if(id===B.LEAF&&Math.random()<0.1)FX.spawnDrop(new THREE.Vector3(p.x+0.5,p.y+0.5,p.z+0.5),'berry',1);
-        /* batang tumbang: kayu jatuh mengikuti arah tumbang */
+        /* CATATAN: daun TIDAK lagi menjatuhkan beri. Beri sekarang hanya
+           didapat dari SEMAK BERI (tanaman voxel tipe 7) yang tumbuh di hutan
+           & tanah merah � lihat World.harvestPlants & WGEN.plantAt. */
+        /* batang tumbang: kayu jatuh mengikuti arah tumbang.
+           SKILL PENEBANG (axe) ikut berlaku di sini — inilah jalur yang
+           menjatuhkan MAYORITAS kayu (seluruh batang di atas titik potong),
+           jadi tanpa ini bonusnya hampir tak terasa. */
         if(p.drop){
           const dropX=p.dx!==undefined?p.dx:p.x+0.5;
           const dropZ=p.dz!==undefined?p.dz:p.z+0.5;
           const dp=new THREE.Vector3(dropX,
             this.groundAt(dropX,dropZ,p.y+1)+0.45,dropZ);
-          FX.spawnDrop(dp,p.drop,1+(Math.random()<RPG.harvestBonus()+RPG.gatherBonus(p.drop)?1:0));
+          let tb=RPG.harvestBonus()+RPG.gatherBonus(p.drop);
+          if(p.drop==='wood'&&RPG.woodBonus)tb+=RPG.woodBonus();
+          FX.spawnDrop(dp,p.drop,1+(Math.random()<tb?1:0));
           if(ITEMS.resin&&Math.random()<0.22)FX.spawnDrop(dp,'resin',1);
           Player.addXP(1);Sfx.chop();
           if(p.last)this.leafDecay(p.x,p.y,p.z);
@@ -494,6 +803,20 @@ const World={
           Sfx.splash(false);
         }
       }
+    }
+    /* ---------- REGROW: DIRT terbuka → GRASS setelah 15 detik ----------
+       Blok DIRT yang lahir dari grass hancur perlahan ditumbuhi lagi. Syarat
+       tetap terbuka (udara di atas) & masih DIRT (tidak ditimpa/digali). Saat
+       jadi GRASS, mesh chunk ditandai dirty → mesher menumbuhkan rumput dunia
+       kecil di atasnya secara otomatis. */
+    for(let i=this.regrow.length-1;i>=0;i--){
+      const g=this.regrow[i];g.t-=dt;
+      if(g.t>0)continue;
+      this.regrow.splice(i,1);
+      if(this.getBlock(g.x,g.y,g.z)!==B.DIRT)continue;      // sudah berubah
+      if(this.getBlock(g.x,g.y+1,g.z)!==B.AIR)continue;     // tertutup blok lain
+      this.setBlock(g.x,g.y,g.z,B.GRASS);
+      FX.debris(new THREE.Vector3(g.x+0.5,g.y+1.05,g.z+0.5),0x5d9e3f,5,1.4);
     }
   },
   checkFlood(x,y,z){
@@ -545,12 +868,31 @@ const World={
   breakBlock(wx,wy,wz){
     const id=this.getBlock(wx,wy,wz);
     if(id===B.AIR||id===B.WATER)return;
+    /* ---------- GRASS BLOCK HANCUR → DIRT, lalu tumbuh lagi ----------
+       Saat blok GRASS permukaan (ada udara di atasnya) dihancurkan, ia TIDAK
+       lenyap jadi lubang: berubah jadi DIRT, dan dijadwalkan kembali menjadi
+       GRASS setelah REGROW_T detik. Begitu jadi grass lagi, mesher otomatis
+       menumbuhkan rumput dunia kecil di atasnya. */
+    if(id===B.GRASS&&this.getBlock(wx,wy+1,wz)===B.AIR){
+      this.setBlock(wx,wy,wz,B.DIRT);
+      const info0=BLOCK_INFO[B.GRASS];
+      FX.debris(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),info0.color,8,2.4);
+      if((id===B.GRASS)&&Math.random()<0.3+RPG.harvestBonus())
+        FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),'fiber',1);
+      Player.addXP(1);Prof.gainBlock(B.GRASS);
+      this.regrow.push({x:wx,y:wy,z:wz,t:this.REGROW_T});
+      if(typeof Sfx!=='undefined'&&Sfx.chop)Sfx.chop();
+      return;
+    }
     this.setBlock(wx,wy,wz,B.AIR);
     const info=BLOCK_INFO[id];
     FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),info.color,10,3.2);
     /* bonus hasil: skill Pemanen + proficiency sub-skill blok + skill GATHER per jenis drop */
     const dropId=info.drop||((id===B.GRASS||id===B.DIRT)?'fiber':null);
-    const bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
+    let bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
+    /* SKILL PENEBANG (axe): peluang kayu ekstra, di atas cabang GATHER.
+       Lihat RPG.woodBonus() — skill ini sebelumnya tidak berefek apa pun. */
+    if(id===B.WOOD&&RPG.woodBonus)bonus+=RPG.woodBonus();
     if(info.drop)FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,1+(Math.random()<bonus?1:0));
     else if((id===B.GRASS||id===B.DIRT)&&Math.random()<0.3+bonus)
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),'fiber',1);
@@ -579,7 +921,7 @@ const World={
         last:i===trunk.length-1,
       });
     });
-    UI.toast('🪓 Pohon tumbang!');
+    UI.toast('?? Pohon tumbang!');
   },
 
   leafDecay(wx,wy,wz){
@@ -595,6 +937,25 @@ const World={
       }
     }
   },
+   /* ---------- panen tanaman liar ----------
+      Tabel drop per tipe tanaman (lihat WGEN.plantAt):
+        1 rumput � 2/3 bunga � 5 jamur � 6 tumbuhan merah   ? billboard
+        7 SEMAK BERI � 8 kaktus � 9 tebu � 10 tulip          ? model voxel
+      BERI sekarang HANYA dari semak beri (tipe 7). Dulu beri dijatuhkan daun
+      pohon & "semak beri" billboard (tipe 4); keduanya sudah dilepas.
+      Tipe 4 tetap dikenali agar chunk lama (sebelum perubahan) tidak error. */
+   PLANT_DROP:{
+     1:['fiber',1,1],          // [item, jumlah dasar, peluang tambahan-acak]
+     2:['fiber',0,0.5],
+     3:['fiber',0,0.5],
+     4:['berry',2,0],          // kompatibilitas chunk lama
+     5:['mush',1,0],
+     6:['fiber',1,0],
+     7:['berry',2,0.5],        // semak beri: sumber utama beri
+     8:['fiber',1,0.5],        // kaktus: serat berdaging
+     9:['sugar_cane',2,0.5],   // tebu: batang tebu (bahan gula)
+     10:['fiber',0,0.6],       // tulip: kelopak & tangkai
+   },
   harvestPlants(pos,r){
     const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);
     const c=this.getChunk(cx,cz);
@@ -604,14 +965,19 @@ const World={
       const d=Math.hypot(wx-pos.x,wz-pos.z);
       if(d<r&&Math.abs(p.y-pos.y)<2){
         hit=true;
-        const drop=p.t===1?['fiber',1]:p.t===2?['fiber',Math.random()<0.5?1:0]:
-          p.t===3?['fiber',Math.random()<0.5?1:0]:p.t===4?['berry',2]:['mush',1];
+        const D=this.PLANT_DROP[p.t]||['mush',1,0];
+        const drop=[D[0],D[1]+(Math.random()<D[2]?1:0)];
         const extra=Math.random()<RPG.harvestBonus()+Prof.yieldBonus('harvesting')+RPG.gatherBonus(drop[0])?1:0;
         if(drop[1]+extra>0)FX.spawnDrop(new THREE.Vector3(wx,p.y+0.4,wz),drop[0],drop[1]+extra);
-        /* tanaman liar kadang menjatuhkan benih pertanian */
-        if(typeof Farming!=='undefined'&&Math.random()<0.18)
+        /* BENIH PERTANIAN dari tanaman liar: SATU peluang seragam 10% untuk
+           SEMUA jenis tumbuhan (Farming.SEED_CHANCE). Dulu rumput 30% & sisanya
+           18%, sehingga benih menumpuk terlalu cepat di tas. */
+        if(typeof Farming!=='undefined'&&Math.random()<Farming.SEED_CHANCE)
           FX.spawnDrop(new THREE.Vector3(wx,p.y+0.5,wz),Farming.randomSeed(),1);
-        FX.debris(new THREE.Vector3(wx,p.y+0.4,wz),0x5d9e3f,4,1.5);
+        /* warna serpihan mengikuti tanaman: semak beri merah, tebu kekuningan */
+        const dust=p.t===7?0xd8342c:p.t===9?0xc9c157:p.t===10?0xe23b3b:
+                   p.t===8?0x4aa04d:p.t===6?0xd23b2a:0x5d9e3f;
+        FX.debris(new THREE.Vector3(wx,p.y+0.4,wz),dust,4,1.5);
       }else keep.push(p);
     }
     if(hit){c.plants=keep;this.markDirty(cx,cz);Player.addXP(1);Prof.gain('harvesting',4,1);}

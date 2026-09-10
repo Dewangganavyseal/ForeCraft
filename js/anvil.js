@@ -143,7 +143,7 @@ const Anvil={
       const d=document.createElement('div');
       d.className='anvil-item'+(isSel?' sel':'');
       if(it.rarity&&RARITY[it.rarity])d.style.borderColor=RARITY[it.rarity].css;
-      d.innerHTML=`<span class="ai-ico">${it.e}</span>
+      d.innerHTML=`<span class="ai-ico">${(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.id):it.e}</span>
         <span class="ai-nm">${it.n}${r.lvl?` <b class="ai-lv">Lv ${r.lvl}</b>`:''}<br><i>${t.kind==='equip'?'Dipakai':t.kind==='held'?'Digenggam':(t.g===0?'Hotbar':'Tas')}</i></span>`;
       d.addEventListener('click',()=>{this.sel=t;Sfx.click&&Sfx.click();this.render();});
       list.appendChild(d);
@@ -174,11 +174,11 @@ const Anvil={
         statNext=`→ +${Math.round(base*(1+this.DEF_PER_LV*(r.lvl+1))*100)}%`;
       }
       det.innerHTML=`
-        <div class="ad-head">${it.e} <b>${it.n}</b> ${r.lvl?`<span class="ai-lv">Lv ${r.lvl}</span>`:'<i>belum ditempa</i>'}</div>
+        <div class="ad-head">${(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.id):it.e} <b>${it.n}</b> ${r.lvl?`<span class="ai-lv">Lv ${r.lvl}</span>`:'<i>belum ditempa</i>'}</div>
         <div class="ad-stat">${maxed?'⚒️ Level maksimum':statNow+' '+statNext}</div>
         ${maxed?'':`<div class="ad-cost">
           <span class="${haveC>=c.coin?'ok':'no'}">🪙 ${c.coin} (punya ${haveC})</span>
-          ${c.matId?`<span class="${haveM>=c.matN?'ok':'no'}">${ITEMS[c.matId].e} ${ITEMS[c.matId].n} ×${c.matN} (punya ${haveM})</span>`:''}
+          ${c.matId?`<span class="${haveM>=c.matN?'ok':'no'}">${(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(c.matId):ITEMS[c.matId].e} ${ITEMS[c.matId].n} ×${c.matN} (punya ${haveM})</span>`:''}
         </div>
         <button class="big anvil-go" ${ok?'':'disabled'}>⚒️ Tempa → Lv ${r.lvl+1}</button>`}
         <p class="tip">Level menambah damage senjata (+${Math.round(this.DMG_PER_LV*100)}%/Lv) atau pertahanan armor & tameng (+${Math.round(this.DEF_PER_LV*100)}%/Lv). Koin didapat dari quest, monster, dan berdagang.</p>`;

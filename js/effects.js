@@ -139,13 +139,14 @@ const FX={
   groundWave(x,y,z,opts){
     opts=opts||{};
     const mode=opts.mode||'line';
-    const color=opts.color||0xd9b23a;
-    const speed=opts.speed||7.5;          // kecepatan front gelombang (blok/detik)
-    const amp=opts.amp||0.95;             // tinggi angkatan maksimum
-    const width=opts.width||1.15;         // lebar front (sigma gaussian)
+    const speed=opts.speed||7.5;
+    const amp=opts.amp||0.95;
+    const width=opts.width||1.15;
     const maxDist=opts.radius||(mode==='radial'?3.6:4.6);
-    const dur=maxDist/speed+0.55;         // umur total gelombang
-    const field={x,z,mode,dir:opts.dir||0,speed,amp,width,maxDist,t:0,dur,meshes:[]};
+    const spread=opts.angleSpread||0;
+    const dur=maxDist/speed+0.62;
+    const field={x,z,mode,dir:opts.dir||0,speed,amp,width,maxDist,t:0,dur,meshes:[],spread,
+      smooth:!!opts.smooth};
 
     /* kumpulkan titik blok yang akan terangkat */
     const pts=[];
@@ -160,9 +161,15 @@ const FX={
     }else{
       const dx=Math.sin(field.dir),dz=Math.cos(field.dir);
       const rows=Math.ceil(maxDist/0.85);
+      /* lebar seed: dengan angleSpread baris terjauh harus selebar SPREAD
+         (bukan selebar formula lama), agar ada blok yang bisa terangkat di
+         ujung kerucut yang menyebar */
+      const seedW=(mode==='line'&&spread>0)
+        ?(r)=>Math.max(0.8+r*0.5,spread*Math.min(1,r/rows))
+        :(r)=>0.8+r*0.5;
       for(let r=1;r<=rows;r++){
-        const w=0.8+r*0.5;
-        const cols=Math.max(1,Math.round(w*2));
+        const w=seedW(r);
+        const cols=Math.max(1,Math.round(w*2/0.85));
         for(let c=0;c<cols;c++){
           const off=(c-(cols-1)/2)*0.85;
           pts.push({x:x+dx*r*0.85+dz*off, z:z+dz*r*0.85-dx*off});
@@ -197,19 +204,37 @@ const FX={
   waveHeightAt(wx,wz){
     let h=0;
     for(const f of this.waveFields){
-      let dist;
+      let dist,lat=0;
       if(f.mode==='radial'){
         dist=Math.hypot(wx-f.x,wz-f.z);
       }else{
         const dx=Math.sin(f.dir),dz=Math.cos(f.dir);
         dist=(wx-f.x)*dx+(wz-f.z)*dz;
-        const lat=Math.abs((wx-f.x)*dz-(wz-f.z)*dx);
-        if(lat>2.4)continue;
+        lat=Math.abs((wx-f.x)*dz-(wz-f.z)*dx);
+        const latL=f.spread>0?Math.max(2.4,f.spread*0.52):2.4;
+        if(lat>latL)continue;
       }
       if(dist<0||dist>f.maxDist)continue;
+      /* dengan angleSpread, lebar gaussian tumbuh linear terhadap jarak:
+         dekat sumber selebar f.width (mengerucut), di ujung jarak selebar
+         f.spread (menyebar) — lerp berbasis dist, bukan waktu, agar front
+         yang bergerak selalu punya lebar konsisten menurut posisinya */
+      let w=f.width;
+      if(f.spread>0){
+        const u=clamp(dist/Math.max(1,f.maxDist),0,1);
+        w=f.width+(f.spread-f.width)*u;
+      }
       const front=f.t*f.speed;
       const dd=dist-front;
-      h=Math.max(h,f.amp*Math.exp(-(dd*dd)/(f.width*f.width)));
+      const wLat=Math.max(0.55,w*0.60);
+      const latW=f.mode==='radial'?1:Math.exp(-(lat*lat)/(wLat*wLat));
+      let hRaw=f.amp*Math.exp(-(dd*dd)/(w*w))*latW;
+      if(f.smooth){
+        const rise=Math.min(1,Math.max(0,(w*0.65+dd)/(w*1.25)));
+        const fall=Math.min(1,Math.max(0,(w*0.55-dd)/(w*1.05)));
+        hRaw*=Math.pow(rise,0.55)*Math.pow(fall,0.85);
+      }
+      h=Math.max(h,hRaw);
     }
     return h;
   },
@@ -219,6 +244,7 @@ const FX={
     const m=new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.9,side:THREE.DoubleSide,depthWrite:false});
     const mesh=new THREE.Mesh(g,m);
     mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y+0.03,z);mesh.renderOrder=3;
+    mesh.scale.setScalar(0.01);
     this.group.add(mesh);
     this.rings.push({mesh,life,max:life,scale1});
   },
@@ -456,29 +482,44 @@ const FX={
       this.trails.push({mesh:spike,life:0.16,max:0.16,isParticle:true,v:new THREE.Vector3()});
     }
   },
-  /* gelombang kelem vertikal yang melebar */
   shockwave(x,y,z,color,scale1=3){
     const g=new THREE.RingGeometry(0.7,1,32);
     const m=new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.85,
       side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
     const mesh=new THREE.Mesh(g,m);
     mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y+0.05,z);mesh.renderOrder=4;
+    mesh.scale.setScalar(0.01);
     this.group.add(mesh);
     this.rings.push({mesh,life:0.4,max:0.4,scale1});
   },
   ripple(x,y,z,color,scale1){
     this.ring(x,y,z,color,0.5,scale1||2);
   },
+  /* Teks mengambang di dunia 3D (damage, "+XP tim", "LV 5", dsb).
+     Digambar ke CANVAS, jadi localizeDOM TIDAK bisa menjangkaunya — teksnya
+     harus diterjemahkan di sini, sama seperti UI.toast. Tanpa ini, angka XP
+     yang muncul di atas mob tetap berbahasa Indonesia walau bahasa game sudah
+     diganti. Frasa yang tidak punya terjemahan lewat apa adanya. */
   text(pos,str,color='#fff'){
-    const cv=document.createElement('canvas');cv.width=256;cv.height=64;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id'&&I18N.translateText)
+      str=I18N.translateText(String(str),I18N.lang);
+    const s=String(str);
+    const cv=document.createElement('canvas');
     const c=cv.getContext('2d');
-    c.font='bold 30px "Press Start 2P", monospace';
+    const fontStr='bold 24px "Press Start 2P", monospace';
+    c.font=fontStr;
+    const tw=c.measureText(s).width;
+    /* lebar canvas dinamis: teks panjang seperti "Boss Core" tidak pernah terpotong */
+    const w=Math.max(256,Math.ceil(tw+48));
+    const h=64;
+    cv.width=w;cv.height=h;
+    c.font=fontStr;
     c.textAlign='center';c.textBaseline='middle';
-    c.lineWidth=6;c.strokeStyle='rgba(0,0,0,0.85)';c.strokeText(str,128,32);
-    c.fillStyle=color;c.fillText(str,128,32);
+    c.lineWidth=6;c.strokeStyle='rgba(0,0,0,0.85)';c.strokeText(s,w/2,h/2);
+    c.fillStyle=color;c.fillText(s,w/2,h/2);
     const tex=new THREE.CanvasTexture(cv);
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
-    sp.scale.set(2.1,0.53,1);sp.position.copy(pos);sp.renderOrder=10;
+    sp.scale.set((w/256)*2.1,0.53,1);sp.position.copy(pos);sp.renderOrder=10;
     this.group.add(sp);
     this.texts.push({sp,life:0.95,max:0.95});
   },
@@ -502,7 +543,11 @@ const FX={
   /* ---------- DROP ITEM ----------
      Konstanta jeda ambil: item yang jatuh dari tas pemain tidak bisa langsung
      dipungut kembali. LOCAL_ID = id pemain lokal (nantinya multiplayer memakai
-     id berbeda sehingga pemain lain kena jeda lebih lama). */
+     id berbeda sehingga pemain lain kena jeda lebih lama).
+
+     opts.lvl / opts.mark = DATA PER-INSTANCE yang ikut jatuh bersama item
+     (level tempa & tanda lokasi Log Pass), lalu dipulihkan saat dipungut.
+     Tanpa ini, membuang Log Pass akan menghapus tandanya. */
   LOCAL_ID:'player',DROP_LOCK_OWNER:3,DROP_LOCK_OTHER:5,
   spawnDrop(pos,id,n,opts){
     if(n<=0)return;
@@ -523,6 +568,16 @@ const FX={
     mesh.position.copy(pos);
     this.group.add(mesh);
     const drop={mesh,id,n,t:0,vy:0,isModel};
+    if(opts.lvl)drop.lvl=opts.lvl;
+    if(opts.mark)drop.mark=opts.mark;
+    /* efek visual kelangkaan saat item langka/epik/legendaris jatuh di dunia */
+    const it=(typeof ITEMS!=='undefined')?ITEMS[id]:null;
+    const rar=(it&&it.rarity)||'common';
+    drop.rarity=rar;
+    if(rar!=='common'&&this.ring){
+      const col=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].c:0xffffff;
+      this.ring(pos.x,pos.y+0.05,pos.z,col,rar==='legendary'?1.2:rar==='epic'?0.9:0.6,rar==='legendary'?4:3);
+    }
     /* drop milik pemain (dibuang dari tas) diberi jeda ambil: 3 detik untuk
        yang membuang, 5 detik untuk pemain lain — tidak langsung tersedot balik. */
     if(opts.owner){drop.ownerId=this.LOCAL_ID;drop.lockOwner=this.DROP_LOCK_OWNER;drop.lockOther=this.DROP_LOCK_OTHER;}
@@ -587,22 +642,36 @@ const FX={
       f.t+=dt;
       const front=f.t*f.speed;
       for(const mb of f.meshes){
-        let dist;
+        let dist,lat=0;
         if(f.mode==='radial')dist=Math.hypot(mb.x-f.x,mb.z-f.z);
         else{
           const dx=Math.sin(f.dir),dz=Math.cos(f.dir);
           dist=(mb.x-f.x)*dx+(mb.z-f.z)*dz;
+          lat=Math.abs((mb.x-f.x)*dz-(mb.z-f.z)*dx);
         }
         const dd=dist-front;
-        const lift=f.amp*Math.exp(-(dd*dd)/(f.width*f.width));
-        /* puncak blok tepat di gy+lift (sama dengan physics waveHeightAt) */
+        let w=f.width;
+        if(f.spread>0){
+          const u=clamp(dist/Math.max(1,f.maxDist),0,1);
+          w=f.width+(f.spread-f.width)*u;
+        }
+        const wLat=Math.max(0.55,w*0.60);
+        const latW=f.mode==='radial'?1:Math.exp(-(lat*lat)/(wLat*wLat));
+        const liftRaw=f.amp*Math.exp(-(dd*dd)/(w*w))*latW;
+        let lift=liftRaw;
+        if(f.smooth){
+          const rise=Math.min(1,Math.max(0,(w*0.65+dd)/(w*1.25)));
+          const fall=Math.min(1,Math.max(0,(w*0.55-dd)/(w*1.05)));
+          const env=Math.pow(rise,0.55)*Math.pow(fall,0.85);
+          lift=liftRaw*env;
+        }
         mb.mesh.position.y=mb.base+lift-0.5;
-        mb.mesh.visible=lift>0.05;
+        mb.mesh.visible=lift>0.04;
       }
       if(f.t>f.dur){
         for(const mb of f.meshes){
           this.group.remove(mb.mesh);
-          mb.mesh.geometry.dispose();mb.mesh.material.dispose();
+          if(mb.mesh.geometry)mb.mesh.geometry.dispose();
         }
         this.waveFields.splice(i,1);
       }
@@ -681,10 +750,17 @@ const FX={
         d.mesh.position.x+=dx*pull;d.mesh.position.z+=dz*pull;
       }
       if(d.t>waitT&&hd<1.65&&Math.abs(Player.pos.y-d.mesh.position.y)<3.5){
-        const left=RPG.addItem(d.id,d.n);
+        /* data per-instance (level tempa & tanda Log Pass) ikut dipulihkan */
+        const left=RPG.addItem(d.id,d.n,d.lvl,d.mark);
         if(left>0){d.n=left;d.t=0;UI.toast('🎒 Tas penuh!');}
         else{
-          UI.toast(`+${d.n} ${ITEMS[d.id].e} ${ITEMS[d.id].n}`);
+          const mk=d.mark&&d.mark.name?` · 🧭 ${d.mark.name}`:'';
+          const it=ITEMS[d.id];
+          const rar=(it&&it.rarity)||'common';
+          const rarColor=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].css:'#b8c0cc';
+          const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(d.id):it.e;
+          UI.toast(`${ico} +${d.n} ${it.n}${mk}`);
+          if(this.text)this.text(Player.pos.clone().add(new THREE.Vector3(0,2.0,0)),`+${d.n} ${it.e} ${it.n}`,rarColor);
           Sfx.pickup();
           this.disposeDrop(d.mesh,d.isModel);
           this.drops.splice(i,1);

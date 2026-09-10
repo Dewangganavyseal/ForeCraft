@@ -1,11 +1,19 @@
 'use strict';
 /* Karakter: model, fisika, renang, combo 5 slash */
+/* ---------- tabel combo ----------
+   dur = jendela serangan lama (dipakai sebagai batas bawah durasi)
+   hit = titik damage cadangan bila animator belum siap (lihat comboHitTime)
+   rec = JEDA PEMULIHAN sesudah ANIMASI combo selesai.
+   Total satu serangan = max(dur, durasi animasi) + rec, dihitung oleh
+   Player.attackTotal(). Inilah yang menahan spam tombol serang: satu serangan
+   harus tuntas dulu — animasinya tidak lagi terpotong di tengah. */
 const COMBOS=[
-  {dur:0.34,hit:0.14,dmg:1.0,vert:false},
-  {dur:0.34,hit:0.14,dmg:1.0,vert:false},
-  {dur:0.38,hit:0.16,dmg:1.25,vert:true},
-  {dur:0.50,hit:0.22,dmg:1.4,vert:false},
-  {dur:0.72,hit:0.34,dmg:2.4,vert:true,knock:7},
+  {dur:0.34,hit:0.14,dmg:1.0,vert:false,rec:0.06},
+  {dur:0.34,hit:0.14,dmg:1.0,vert:false,rec:0.06},
+  {dur:0.38,hit:0.16,dmg:1.25,vert:true,rec:0.08},
+  {dur:0.50,hit:0.22,dmg:1.4,vert:false,rec:0.14},
+  /* pamungkas: jeda akhir paling panjang — animasi hantaman harus tuntas dulu */
+  {dur:0.72,hit:0.34,dmg:2.4,vert:true,knock:7,rec:0.30},
 ];
 const Player={
   pos:new THREE.Vector3(),vel:new THREE.Vector3(),
@@ -18,7 +26,16 @@ const Player={
   maxStamina(){return 100+CFG.STAM_PER_LVL*(this.level-1);},
 
   buffSpeed:0,splashT:0,rippleT:0,stamRegenT:0,hitStop:0,
-  attack:{active:false,combo:-1,t:0,hitDone:false,queued:false,sinceEnd:99},
+  /* KELAPARAN: damage kelaparan (2 HP/detik) dikumpulkan lalu dilepas sebagai
+     satu "pukulan" tiap STARVE_TICK detik supaya ada umpan balik yang terasa
+     (getar + vignette + suara + angka), bukan HP menyusut tanpa tanda. */
+  STARVE_TICK:1.0,
+  starveAcc:0,starveT:0,
+  /* attack.t berjalan sepanjang ANIMASI + pemulihan (bukan hanya jendela
+     damage), sehingga satu serangan selalu tuntas sebelum serangan berikutnya
+     boleh mulai. moveMul = pengali kecepatan gerak saat menyerang. */
+  attack:{active:false,combo:-1,t:0,hitDone:false,queued:false,sinceEnd:99,
+    moveMul:1,recover:false},
   dodge:{active:false,t:0,cd:0,dir:new THREE.Vector3()},
   skillAnim:null,                       // animasi skill aktif {id,t,max}
   mesh:null,parts:{},rollG:null,spawnP:new THREE.Vector3(),
@@ -218,7 +235,15 @@ const Player={
     /* hidung, mulut, dan dagu */
     head.add(this.pl(0.05,0.05,0.04,SKIN_D,0.155,0.2));
     head.add(this.pl(0.04,0.02,0.02,0xb98a68,0.135,0.205));
-    head.add(this.pl(0.1,0.02,0.02,0xb07a6a,0.09,0.196));
+    /* MULUT: referensinya disimpan (parts.mouth) supaya animasi bisa
+       membukanya — dipakai Teriakan Perang agar benar-benar terlihat berteriak.
+       Rongga gelap di belakang bibir membuat mulut terbuka terbaca jelas. */
+    const mouth=this.pl(0.1,0.02,0.02,0xb07a6a,0.09,0.196);
+    head.add(mouth);
+    const mouthIn=this.pl(0.085,0.02,0.015,0x3a1c1c,0.09,0.19);
+    mouthIn.visible=false;                 // baru terlihat saat mulut terbuka
+    head.add(mouthIn);
+    mouth.userData.baseY=0.09;mouth.userData.inner=mouthIn;
     head.add(this.pl(0.12,0.05,0.03,SKIN_D,0.045,0.185));
     /* bekas luka kecil di pipi (karakter detail) */
     head.add(this.pl(0.015,0.06,0.01,0xc9856a,0.14,0.19,0.12));
@@ -237,7 +262,7 @@ const Player={
     armL.add(this.armorG.shield);
 
     /* parts.sword diisi refreshWeapon() (model pedang per senjata) */
-    this.parts={...this.parts,legL,legR,armL,armR,head,torso,sword:null};
+    this.parts={...this.parts,legL,legR,armL,armR,head,torso,mouth,sword:null};
     Game.scene.add(this.mesh);
     this.refreshArmor();
   },
@@ -521,6 +546,8 @@ const Player={
   /* ---------- aksi ---------- */
   tryJump(){
     if(this.dead)return;
+    /* sedang Hantam Bumi: lompatannya digerakkan mesin fase slamQuick */
+    if(this.slamQuick)return;
     /* lompat saat menunggangi diteruskan ke mount */
     if(typeof Capture!=='undefined'&&Capture.riding){Capture.jumpQ=true;return;}
     if(this.onGround){this.vel.y=CFG.PLAYER.jump;this.onGround=false;this.airJumped=false;
@@ -578,11 +605,15 @@ const Player={
       this.pos.y=gy;this.onGround=true;this.airJumped=false;
       this.slamLeap=null;
       if(this.playSkillAnim)this.playSkillAnim('slam');   // pose hantaman saat mendarat
+      /* jalur TERARAH belum membayar apa pun (SlamAim.release memanggil
+         startSlamLeap langsung, bukan useActive), jadi di sini biaya & cooldown
+         dipungut normal — tanpa prepaid. */
       if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
     }
   },
   tryDodge(){
     if(this.dead||this.dodge.active||this.dodge.cd>0)return;
+    if(this.slamQuick)return;                    // sedang Hantam Bumi
     const cost=20*RPG.stamCostMult();
     if(this.stamina<cost){UI.toast('⚡ Stamina kurang!');Sfx.noStamina();return;}
     this.stamina-=cost;
@@ -591,11 +622,100 @@ const Player={
       :new THREE.Vector3(Math.sin(this.facing),0,Math.cos(this.facing));
     this.dodge.active=true;this.dodge.t=0;this.dodge.dir.copy(dir);
     this.dodge.cd=RPG.dodgeCD();
-    this.attack.active=false;
+    /* dodge memutus serangan: bersihkan juga buffer & pengali gerak supaya
+       kecepatan tidak tertinggal di nilai "sedang menyerang" */
+    this.attack.active=false;this.attack.queued=false;this.attack.moveMul=1;
     if(typeof Prof!=='undefined')Prof.gain('agility',5,1);
     Sfx.dash();
     if(this.inWater){FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2.6);Sfx.splash(false);}
   },
+   /* ---------- durasi serangan ----------
+      comboAnimDur : panjang ANIMASI combo ke-ci (sumber: PlayerAnimator).
+      attackTotal  : total waktu satu serangan = animasi penuh + pemulihan.
+      Keduanya ikut dipercepat skill 'Aliran Combo' (comboSpeedMult) supaya
+      animasi & logika damage tidak pernah lepas sinkron. */
+   comboSpeed(){
+     return (typeof RPG!=='undefined'&&RPG.comboSpeedMult)?RPG.comboSpeedMult():1;
+   },
+   comboAnimDur(ci){
+     const names=['combo1','combo2','combo3','combo4','combo5'];
+     const d=(this.animator&&this.animator.durations)
+       ?this.animator.durations[names[ci]]:0;
+     return d||COMBOS[ci].dur;
+   },
+   attackTotal(ci){
+     const C=COMBOS[ci],sp=this.comboSpeed();
+     /* animasi tidak boleh terpotong: jendela damage & panjang animasi
+        dibandingkan, yang terpanjang yang menentukan */
+     return (Math.max(C.dur,this.comboAnimDur(ci))+(C.rec||0.12))/sp;
+   },
+   /* Saat damage keluar (detik, sebelum diskala kecepatan combo).
+      Diambil dari FRAME IMPACT animasi (PlayerAnimator.hitPoints) supaya
+      damage jatuh tepat ketika bilah terlihat mengenai sasaran — sekaligus
+      sinkron dengan VFX combo yang juga dipicu dari frame itu. COMBOS[].hit
+      hanya dipakai bila animator belum tersedia. */
+   comboHitTime(ci){
+     const names=['combo1','combo2','combo3','combo4','combo5'];
+     const an=this.animator;
+     if(an&&an.hitPoints&&an.durations){
+       const n=names[ci];
+       const hp=an.hitPoints[n],du=an.durations[n];
+       if(hp!==undefined&&du)return hp*du;
+     }
+     return COMBOS[ci].hit;
+   },
+   /* ---------- mesin satu serangan ----------
+      Timeline satu serangan (semua diskala comboSpeed):
+        0            → mulai ayunan, pose combo diputar
+        hitT         → damage & VFX keluar (frame impact animasi)
+        animT        → ANIMASI selesai; fase pemulihan mulai (recover=true)
+        animT+rec    → serangan benar-benar berakhir
+
+      attack.active tetap true sampai akhir, jadi tryAttack() tidak bisa
+      menyalakan serangan baru = tombol tidak bisa di-spam dan animasi tidak
+      pernah terpotong. Input yang ditekan di tengah disimpan (A.queued) dan
+      dieksekusi di chainT (lihat di bawah) supaya rangkaian combo tetap
+      mengalir tanpa menghapus jedanya. */
+   updateAttack(dt){
+     const A=this.attack;
+     if(!A.active)return;
+     const C=COMBOS[A.combo];
+     const sp=this.comboSpeed();
+     const hitT=this.comboHitTime(A.combo)/sp;
+     const animT=this.comboAnimDur(A.combo)/sp;
+     const total=animT+(C.rec||0.12)/sp;
+     A.t+=dt;
+     if(!A.hitDone&&A.t>=hitT){A.hitDone=true;this.doHit(A.combo);}
+     /* gerak: paling terkunci saat ayunan, mengendur saat pemulihan supaya
+        jedanya terasa "recovery", bukan macet total */
+     A.recover=A.t>=animT;
+     A.moveMul=A.recover?0.8:0.45;
+     const end=()=>{A.active=false;A.sinceEnd=0;A.moveMul=1;A.recover=false;};
+     /* Kapan rantai combo boleh menyusul:
+          combo 1-4 : sesudah animasi selesai + sebagian pemulihan (40%) →
+                      rangkaian tetap mengalir tapi SELALU ada satu beat jeda
+                      di antara serangan, jadi menahan tombol tidak menghasilkan
+                      ayunan tanpa henti.
+          combo 5   : menunggu pemulihan PENUH. Pamungkas adalah komitmen besar,
+                      jadi jedanya paling terasa sebelum rangkaian dimulai lagi. */
+     const rec=(C.rec||0.12)/sp;
+     const chainT=(A.combo>=COMBOS.length-1)?total:(animT+rec*0.4);
+     if(A.queued&&A.t>=chainT){
+       /* input tertunda: lanjut ke combo berikutnya */
+       A.queued=false;end();
+       this.comboGap=0;this.tapGap=0;
+       this.tryAttack();
+     }else if(A.t>=total){
+       A.queued=false;end();
+       /* jeda pendek tambahan supaya klik beruntun tidak langsung menembus */
+       this.comboGap=0.06;
+     }
+   },
+   /* true selama serangan masih berjalan (ayunan atau pemulihan) — dipakai
+      sistem lain untuk tahu pemain belum boleh menyerang lagi */
+   attackBusy(){
+     return this.attack.active||(this.comboGap||0)>0;
+   },
    tryAttack(){
      if(this.dead||this.dodge.active)return;
      if(this.slamQuick)return;                    // sedang melakukan Hantam Bumi
@@ -608,15 +728,28 @@ const Player={
      /* makanan: klik/tombol serang dipakai untuk makan saat sedang memegang
         makanan (ala Minecraft), bukan memukul. */
      if(typeof RPG!=='undefined'&&RPG.tryEatSelected&&RPG.tryEatSelected())return;
-     /* IJEDA: jeda antar-combo & jeda antar-klik menahan spam agar ada ritme */
+     /* item dengan mekanik pakai (Dungeon Changer, dll.): klik = pakai item,
+        bukan menyerang. Diletakkan setelah makan supaya prioritas tetap. */
+     if(typeof RPG!=='undefined'&&RPG.useSelected&&RPG.useSelected())return;
+     /* ---------- KUNCI ANTI-SPAM ----------
+        Selama sebuah serangan masih berjalan (animasi + pemulihan), tombol
+        serang TIDAK memulai serangan baru. Tekanan disimpan sebagai buffer dan
+        baru dieksekusi tepat setelah serangan sekarang benar-benar tuntas.
+        Buffer hanya dibuka sesudah frame damage supaya menekan berkali-kali di
+        awal ayunan tidak "menumpuk" rantai combo. */
+     if(this.attack.active){
+       const A=this.attack;
+       if(A.t>=this.comboHitTime(A.combo)/this.comboSpeed())A.queued=true;
+       return;
+     }
+     /* JEDA: jeda antar-combo & jeda antar-klik menahan spam agar ada ritme */
      if(this.comboGap>0)return;
      if(this.tapGap>0)return;
      this.tapGap=0.10;
-     if(this.attack.active){this.attack.queued=true;return;}
-     if(this.stamina<3){UI.toast('⚡ Terlalu lelah!');Sfx.noStamina();return;}
-     this.stamina-=5*RPG.stamCostMult();this.stamRegenT=0.5;
+     /* memukul biasa kini TIDAK lagi menguras/membutuhkan stamina (hanya dodge & skill) */
      let next=(this.attack.sinceEnd<0.95*RPG.comboWindowMult()&&this.attack.combo<4)?this.attack.combo+1:0;
-     this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0};
+     this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0,
+       moveMul:0.45,recover:false};
       /* auto-aim ke monster terdekat; pet tidak ikut dibidik */
       let best=null,bd=4.2;
       for(const m of Monsters.list){
@@ -655,21 +788,34 @@ const Player={
    },
 
   /* =========================================================================
-     HANTAM BUMI CEPAT (Q sekali) — tiga fase mengikuti fisika nyata:
+     HANTAM BUMI CEPAT (Q sekali, tanpa ditahan) — tiga fase mengikuti fisika:
        windup : jongkok statis sesaat (animasi slam_windup, tanpa damage)
-       air    : lompatan fisika sungguhan (vel.y) — pose 'jump'
-       land   : saat kembali menyentuh tanah → BARU AoE hantaman + pose
-                slam_land. Damage tidak lagi keluar instan di awal.
+       air    : LONCAT DI TEMPAT dengan fisika sungguhan (vel.y) — pose 'jump'.
+                Gerak mendatar dimatikan supaya benar-benar naik-turun di titik
+                yang sama, bukan melompat maju.
+       land   : saat kembali menyentuh tanah → BARU AoE hantaman (gelombang
+                kejut di tanah) + pose slam_land.
+     Biaya (stamina + cooldown) sudah dibayar RPG.useActive('slam'), jadi
+     pendaratan memakai doSlamAt(...,true) agar efeknya TIDAK ditolak oleh
+     pemeriksaan cooldown skill-nya sendiri.
      ========================================================================= */
   startSlamQuick(){
     if(this.dead||this.slamQuick||this.dodge.active)return;
     if(typeof Capture!=='undefined'&&Capture.riding)return;
-    this.slamQuick={phase:'windup',t:0};
+    /* titik loncat dikunci: pendaratan (dan gelombangnya) tepat di sini */
+    this.slamQuick={phase:'windup',t:0,x:this.pos.x,z:this.pos.z,done:false};
+    /* batalkan ayunan yang sedang jalan supaya pose slam tidak berebut animator */
+    this.attack.active=false;this.attack.queued=false;this.attack.moveMul=1;
   },
   updateSlamQuick(dt){
     const q=this.slamQuick;
     if(!q)return;
     q.t+=dt;
+    /* loncat DI TEMPAT: kunci posisi mendatar sepanjang windup & melayang */
+    if(q.phase!=='land'){
+      this.vel.x=0;this.vel.z=0;
+      this.pos.x=q.x;this.pos.z=q.z;
+    }
     if(q.phase==='windup'){
       /* jongkok dulu; baru melesat ke atas setelah windup selesai */
       if(q.t>=0.16){
@@ -677,18 +823,37 @@ const Player={
         this.vel.y=Math.max(this.vel.y,6.6);
         this.onGround=false;
         if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+        /* debu lepas landas di titik loncat */
+        if(typeof FX!=='undefined'&&FX.debris)
+          FX.debris(new THREE.Vector3(q.x,this.pos.y+0.15,q.z),0xc9b48a,7,2.0);
       }
     }else if(q.phase==='air'){
-      /* di udara: tunggu mendarat (jaga-jaga bila terdorong ke air dsb.) */
-      if((this.onGround&&q.t>0.15)||q.t>2.5){
+      /* di udara: tunggu benar-benar menyentuh tanah lagi. Batas 2.5s hanya
+         jaring pengaman bila pemain terdorong ke air/celah. */
+      if((this.onGround&&q.t>0.12)||q.t>2.5){
         q.phase='land';q.t=0;
-        if(typeof RPG!=='undefined'&&RPG.doSlamAt)
-          RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
+        this._slamImpact();
       }
     }else if(q.phase==='land'){
       if(q.t>=0.5)this.slamQuick=null;   // tunggu animasi slam_land selesai
     }
   },
+  /* hantaman saat mendarat: gelombang kejut tanah + damage area.
+     Dipisah agar jalur tekan-cepat maupun jaring pengaman memakai kode sama,
+     dan dijaga flag `done` supaya tidak pernah meledak dua kali. */
+  _slamImpact(){
+    const q=this.slamQuick;
+    if(q){
+      if(q.done)return;
+      q.done=true;
+    }
+    const x=q?q.x:this.pos.x, z=q?q.z:this.pos.z;
+    const gy=(typeof World!=='undefined'&&World.groundAt)
+      ? World.groundAt(x,z,this.pos.y+2) : this.pos.y;
+    if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(x,gy,z,true);
+    if(typeof Sfx!=='undefined'&&Sfx.land)Sfx.land(1);
+  },
+
 
   /* --- animasi nyala pedang: emissive + opacity mata bilah meredup halus --- */
   updateSwordGlow(dt){
@@ -734,15 +899,26 @@ const Player={
           FX.text(m.pos.clone().add(new THREE.Vector3(0,2.4,0)),'🩸','#d64550');
         }
         break;
-      /* Pedang Badai: petir melompat ke dua musuh lain di sekitar target */
+      /* Pedang Badai: petir melompat ke dua musuh TERDEKAT di sekitar target.
+         BUGFIX: dulu mengambil dua musuh pertama dalam urutan Monsters.list
+         (tak terurut), jadi dengan 5+ mob di jangkauan petir sering melewati
+         yang paling dekat dan menyambar yang jauh — tidak cocok dengan
+         deskripsi "2 musuh terdekat". Sekarang kandidat diurutkan dulu. */
       case 'shock':{
-        let jumps=0;
+        const cand=[];
         for(const o of Monsters.list){
-          if(o===m||o.dead||o.pet||jumps>=2)continue;
-          if(o.pos.distanceTo(m.pos)>4.5)continue;
+          if(o===m||o.dead||o.pet)continue;
+          const d=o.pos.distanceTo(m.pos);
+          if(d>4.5)continue;
+          cand.push({o,d});
+        }
+        cand.sort((a,b)=>a.d-b.d);
+        let jumps=0;
+        for(const c of cand){
+          if(jumps>=2)break;
           jumps++;
-          Monsters.hurt(o,dmg*0.5,new THREE.Vector3(0,0.2,0),1.5);
-          FX.impact(o.pos.clone().add(new THREE.Vector3(0,1.1,0)),0xffe066,0.9);
+          Monsters.hurt(c.o,dmg*0.5,new THREE.Vector3(0,0.2,0),1.5);
+          FX.impact(c.o.pos.clone().add(new THREE.Vector3(0,1.1,0)),0xffe066,0.9);
         }
         if(jumps)FX.ring(m.pos.x,m.pos.y+0.05,m.pos.z,0xffe066,0.35,4.5);
         break;
@@ -762,9 +938,13 @@ const Player={
         break;
       /* Kepalan tangan: tanpa damage susulan, hanya menyentak gerak musuh
          sebentar. Ini membuat bertinju tetap berguna tapi jelas lebih lemah
-         daripada efek pedang mana pun. */
+         daripada efek pedang mana pun.
+         BUGFIX: `m.slowMul=0.75` dulu ditimpa langsung, sehingga meninju
+         monster yang sedang dibekukan Pedang Fajar Beku (0.55) justru
+         MELEMAHKAN perlambatannya. Sekarang diambil yang paling kuat. */
       case 'crush':
-        m.slowT=Math.max(m.slowT||0,0.9);m.slowMul=0.75;
+        m.slowT=Math.max(m.slowT||0,0.9);
+        m.slowMul=Math.min(m.slowMul||1,0.75);
         FX.debris(m.pos.clone().add(new THREE.Vector3(0,1.1,0)),EFFECTS.crush.c,3,1.1);
         break;
       /* Penghancur Titan: pukulan pamungkas melepas gelombang kejut area */
@@ -803,7 +983,8 @@ const Player={
       let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
       if(diff>1.35&&d>1.0)continue;
       hitAny=true;
-      Monsters.hurt(m,dmg,new THREE.Vector3(dx/d,0.3,dz/d),ci===4?(C.knock||5):3.5);
+      const kDir = d > 0.001 ? new THREE.Vector3(dx/d, 0.3, dz/d) : new THREE.Vector3(Math.sin(this.facing), 0.3, Math.cos(this.facing));
+      Monsters.hurt(m,dmg,kDir,ci===4?(C.knock||5):3.5);
       /* rekan PASIF mengunci target yang diserang pemain */
       if(typeof NPCS!=='undefined'&&NPCS.onPlayerAttack)NPCS.onPlayerAttack(m);
       if(RPG.lifesteal()>0)this.hp=Math.min(this.maxHp(),this.hp+dmg*RPG.lifesteal());
@@ -884,7 +1065,10 @@ const Player={
       const bid=World.getBlock(blkHit.x,blkHit.y,blkHit.z);
       const bdef=(typeof BLOCK_PROF!=='undefined')?BLOCK_PROF[bid]:null;
       const spd=(bdef&&typeof Prof!=='undefined')?Prof.speedBonus(bdef.sk):0;
-      World.hitBlock(blkHit.x,blkHit.y,blkHit.z,1+spd);
+      /* SKILL PENEBANG (axe): khusus blok KAYU, pukulan jauh lebih kuat.
+         Lihat RPG.chopSpeedMult() — dulu skill ini tidak berefek apa pun. */
+      const chop=(bid===B.WOOD&&RPG.chopSpeedMult)?RPG.chopSpeedMult():1;
+      World.hitBlock(blkHit.x,blkHit.y,blkHit.z,(1+spd)*chop);
     }
     /* perabot (meja/kursi/kasur/peti/perahu) juga ikut hancur bila dipukul */
     if(typeof Furni!=='undefined'&&Furni.hitNearest)
@@ -895,40 +1079,82 @@ const Player={
   },
   takeDamage(n,src){
     if(this.dead||this.dodge.active)return;
+    const raw=n;
     /* reduksi armor */
     /* Aura Guardian (skill 'aegis') menambah pertahanan pemain selama rekan
        Guardian hidup & berada dalam radius NPCS.AEGIS_R. */
     let def=RPG.defense?RPG.defense():0;
     if(typeof NPCS!=='undefined'&&NPCS.auraDef)def+=NPCS.auraDef(this.pos);
-    def=Math.min(0.8,def);
+    /* buff Aura Perisai dari Mage Support (Player.shieldT/shieldV diisi
+       NPC_Magesupport.applyShieldAura, di-tick NPCS.supportBuffs) */
+    if(this.shieldT>0)def+=this.shieldV||0;
+    def=Math.min(0.85,def);
     const blocked=n*def;
     n=Math.max(1,n-blocked);
-    this.hp-=n;FX.addShake(0.4);Sfx.hurt();
+
+    /* ---------- TANGKISAN PERISAI ----------
+       Diundi SESUDAH reduksi armor: bila berhasil, sebagian besar damage yang
+       tersisa hilang sekaligus. Tangkisan yang berhasil juga menaikkan
+       proficiency 'Penangkisan', jadi perisai menguat karena benar-benar
+       dipakai bertahan. */
+    let parried=0;
+    if(typeof RPG!=='undefined'&&RPG.rollBlock&&RPG.rollBlock()){
+      parried=n*RPG.blockPower();
+      n=Math.max(1,n-parried);
+      this.blockFxT=0.28;                 // pose menahan (animasi lengan kiri)
+      if(typeof Prof!=='undefined'&&Prof.gainParry)Prof.gainParry(raw);
+      if(typeof Sfx!=='undefined'&&Sfx.parry)Sfx.parry();
+      if(typeof FX!=='undefined'){
+        FX.text(this.pos.clone().add(new THREE.Vector3(-0.5,2.4,0)),
+          '🛡 TANGKIS -'+Math.round(parried),'#9fd7ff');
+        FX.impact(this.pos.clone().add(new THREE.Vector3(0,1.2,0)),0x9fd7ff,0.8);
+      }
+      if(typeof UI!=='undefined'&&UI.flashBlock)UI.flashBlock();
+    }
+
+    this.hp-=n;FX.addShake(parried?0.2:0.4);Sfx.hurt();
     UI.flashVignette();
     FX.text(this.pos.clone().add(new THREE.Vector3(0,2,0)),'-'+Math.round(n),'#ff6b57');
     if(blocked>=1)
       FX.text(this.pos.clone().add(new THREE.Vector3(0.5,2.4,0)),'🛡'+Math.round(blocked),'#9fd7ff');
 
-    /* efek 'thorns' dari Mahkota Duri Titan: balas damage ke penyerang terdekat */
+    /* ---------- efek 'thorns' dari Mahkota Duri Titan ----------
+       BUGFIX BESARAN: dulu memantulkan `n*th` — `n` adalah damage SESUDAH armor
+       & tangkisan. Dengan armor di batas 70%, pemain hanya memantulkan
+       0.30 × 0.30 = 9% dari serangan asli, padahal deskripsi menjanjikan 30%.
+       Sekarang dihitung dari `raw` (damage asli sebelum mitigasi), jadi 30%
+       benar-benar 30%.
+
+       BUGFIX SUMBER: bila `src` null (racun kalajengking, balok lemparan
+       kumbang) duri tidak pernah aktif. Sekarang jatuh kembali ke penyerang
+       terdekat dari POSISI PEMAIN, sehingga serangan tanpa titik asal tetap
+       dibalas. */
     const th=RPG.thornsRatio?RPG.thornsRatio():0;
-    if(th>0&&src){
-      let atk=null,bd=3.2;
+    if(th>0){
+      const from=src||this.pos;
+      const R=src?3.2:4.5;      // tanpa src, radius sedikit diperlebar
+      let atk=null,bd=R;
       for(const m of Monsters.list){
         if(m.dead||m.pet)continue;
-        const d=m.pos.distanceTo(src);
+        const d=m.pos.distanceTo(from);
         if(d<bd){bd=d;atk=m;}
       }
       if(atk){
-        Monsters.hurt(atk,n*th,new THREE.Vector3(0,0.2,0),1.5);
+        Monsters.hurt(atk,raw*th,new THREE.Vector3(0,0.2,0),1.5);
         FX.impact(atk.pos.clone().add(new THREE.Vector3(0,1.1,0)),0xff6bd6,0.9);
       }
     }
-    if(src){
+    /* Knockback dilewati bila tangkisan berhasil DAN pemain punya Benteng Tak
+       Goyah — pemain berdiri tegak menahan hantaman, tidak terpental. */
+    const noStagger=parried>0&&typeof RPG!=='undefined'&&RPG.blockNoStagger&&RPG.blockNoStagger();
+    if(src&&!noStagger){
       const diff=new THREE.Vector3().subVectors(this.pos,src).setY(0);
 
       if(diff.lengthSq()>0.0001){
         const d=diff.normalize();
-        this.vel.addScaledVector(d,6);this.vel.y=Math.max(this.vel.y,3);
+        /* tangkisan tanpa Benteng: terpental tetap ada tapi jauh lebih ringan */
+        const kb=parried>0?2.5:6;
+        this.vel.addScaledVector(d,kb);this.vel.y=Math.max(this.vel.y,parried>0?1.2:3);
       }
     }
     if(this.hp<=0){this.hp=0;this.die();}
@@ -942,19 +1168,68 @@ const Player={
         [0xeac9a6,0xc94f43,0x6b4a34,0x9aa2ac],14,3.4);
     document.getElementById('death-stats').textContent=
       `Level ${this.level} · ${this.kills} monster dikalahkan · Hari ${Weather.day}`;
-    document.getElementById('death').classList.remove('hidden');
+    const dEl=document.getElementById('death');
+    dEl.classList.remove('hidden');
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(dEl,I18N.lang);
+  },
+  /* ---------- TITIK RESPAWN ACAK ----------
+     Permintaan pemain: mati TIDAK lagi mengembalikan ke titik awal yang sama.
+     Prioritas kandidat:
+       1. Desa ACAK dalam ±8 sel grid (±768 blok) dari posisi kematian — tanah
+          diratakan, ada penjaga, dan lokasinya berbeda setiap kali mati.
+       2. Titik daratan acak 150-400 blok dari titik mati, di luar dungeon.
+       3. Fallback terakhir: spawnP lama (kasur / titik awal) bila tidak ada
+          kandidat yang valid. */
+  randomRespawnPoint(){
+    const px=this.pos.x,pz=this.pos.z;
+    const G=(typeof WGEN!=='undefined'&&WGEN.VILLAGE_GRID)||96;
+    const dungeonOK=(x,z)=>{
+      if(typeof WGEN==='undefined'||!WGEN.nearestDungeon)return true;
+      const dg=WGEN.nearestDungeon(x,z);
+      return !dg||dg.dist>dg.d.r+6;         // jangan muncul di dalam dungeon
+    };
+    /* 1) desa acak di sekitar titik mati */
+    if(typeof WGEN!=='undefined'&&WGEN.villageInCell&&typeof World!=='undefined'){
+      const gx=Math.floor(px/G),gz=Math.floor(pz/G),vs=[];
+      for(let dz=-8;dz<=8;dz++)for(let dx=-8;dx<=8;dx++){
+        try{const v=WGEN.villageInCell(gx+dx,gz+dz);if(v)vs.push(v);}catch(e){}
+      }
+      while(vs.length){
+        const i=(Math.random()*vs.length)|0,v=vs[i];
+        const y=World.topY(Math.floor(v.x),Math.floor(v.z));
+        if(y>CFG.SEA&&dungeonOK(v.x,v.z))
+          return {x:v.x+0.5,y:Math.max(CFG.SEA,y)+0.1,z:v.z+0.5};
+        vs.splice(i,1);                     // kandidat gagal → coba desa lain
+      }
+    }
+    /* 2) titik daratan acak di sekitar titik mati */
+    for(let i=0;i<28;i++){
+      const a=Math.random()*Math.PI*2,d=rand(150,400);
+      const x=px+Math.sin(a)*d,z=pz+Math.cos(a)*d;
+      const y=World.topY(Math.floor(x),Math.floor(z));
+      if(y<=CFG.SEA)continue;               // jangan muncul di laut
+      if(!dungeonOK(x,z))continue;
+      return {x:x+0.5,y:Math.max(CFG.SEA,y)+0.1,z:z+0.5};
+    }
+    return null;
   },
   respawn(){
     this.dead=false;this.hp=this.maxHp()*0.7;this.hunger=60;this.stamina=this.maxStamina();
-    this.pos.copy(this.spawnP);this.vel.set(0,0,0);
+    /* titik bangkit DIACAK (desa acak / daratan acak) — bukan lagi titik awal */
+    const p=this.randomRespawnPoint();
+    if(p){this.pos.set(p.x,p.y,p.z);if(UI.toast)UI.toast('🎲 Kau terbangun di tempat yang belum kau kenal...');}
+    else this.pos.copy(this.spawnP);
+    this.vel.set(0,0,0);
     document.getElementById('death').classList.add('hidden');
   },
   addXP(n){
     this.xp+=n;
-    let need=Math.round(70*Math.pow(this.level,1.4));
-    while(this.xp>=need){
+    /* Cap MAX_LEVEL (200) di sini: satu-satunya tempat level pemain naik.
+       Kurva XP mengambil CFG.playerXpNeed supaya semua sistem sepakat. */
+    let need=CFG.playerXpNeed(this.level);
+    while(this.xp>=need&&this.level<CFG.MAX_LEVEL){
       this.xp-=need;this.level++;RPG.sp++;
-      need=Math.round(70*Math.pow(this.level,1.4));
+      need=CFG.playerXpNeed(this.level);
       UI.levelUpBanner();Sfx.levelup();
       FX.ring(this.pos.x,this.pos.y+0.1,this.pos.z,0xffd24d,1.0,4);
       /* naik level: kapasitas bertambah dan langsung diisi sebagian */
@@ -966,6 +1241,17 @@ const Player={
   /* ---------- update ---------- */
   update(dt){
     if(this.dead)return;
+    /* Timer pose menahan tameng (diisi takeDamage saat tangkisan berhasil).
+       Ditempatkan PALING ATAS supaya tetap menyusut di semua jalur — termasuk
+       saat menunggangi mob atau lompatan Hantam Bumi, yang keluar dari update()
+       lebih awal. Kalau tidak, pose menahan bisa terkunci selamanya.
+
+       CATATAN BUG: timer ini dulu diturunkan di dalam comboHitTime(), fungsi
+       yang TIDAK menerima `dt`. Dalam mode strict barisnya melempar
+       ReferenceError, dan karena tryAttack() memanggil comboHitTime() DI LUAR
+       try/catch loop game, satu serangan sesudah tangkisan berhasil langsung
+       membekukan seluruh game. */
+    this.blockFxT=Math.max(0,(this.blockFxT||0)-dt);
     /* HANTAM BUMI cepat: mesin fase jongkok → lompat (fisika) → hantam saat
        mendarat. Dipanggil paling awal agar damage tepat di frame mendarat. */
     if(this.slamQuick)this.updateSlamQuick(dt);
@@ -1026,8 +1312,11 @@ const Player={
     let spd=CFG.PLAYER.speed*RPG.speedMult()*(sprint?CFG.PLAYER.sprint/CFG.PLAYER.speed:1);
     if(this.inWater)spd*=RPG.skillVal('swim')>0?0.9:0.55;
     if(this.buffSpeed>0)spd*=1.18;
-    if(A.active)spd*=0.45;
+    if(A.active)spd*=(A.moveMul!==undefined?A.moveMul:0.45);
     if(D.active)spd=0;
+    /* HANTAM BUMI cepat: loncat DI TEMPAT — input gerak diabaikan sampai
+       mendarat, jadi pemain tidak bisa "menggeser" titik hantamannya */
+    if(this.slamQuick&&this.slamQuick.phase!=='land')spd=0;
     const acc=this.onGround?30:9;
     if(sailing){
       this.vel.set(0,0,0);
@@ -1044,8 +1333,36 @@ const Player={
     else this.stamina=Math.min(this.maxStamina(),this.stamina+(moving?9:14)*dt);
     this.stamina=clamp(this.stamina,0,this.maxStamina());
     this.hunger=clamp(this.hunger,0,100);
-    if(this.hunger<=0)this.hp-=2*dt;
-    else if(this.hunger>85&&this.hp<this.maxHp())this.hp=Math.min(this.maxHp(),this.hp+1.3*dt);
+    /* ---------- KELAPARAN: HP TERKIKIS DENGAN UMPAN BALIK ----------
+       Dulu `this.hp-=2*dt` berjalan diam-diam: tidak ada getar, suara, angka
+       damage, maupun vignette — pemain baru sadar setelah bar HP hampir habis.
+       Sekarang kerusakan kelaparan dikumpulkan lalu dilepas sebagai "pukulan"
+       tiap STARVE_TICK detik, memakai umpan balik yang sama dengan terkena
+       serangan (getar kamera + vignette + suara + angka merah).
+
+       Sengaja TIDAK memanggil takeDamage(): fungsi itu memotong damage dengan
+       armor, mengundi tangkisan perisai, memicu efek 'thorns', dan memberi
+       knockback — semuanya tidak masuk akal untuk rasa lapar. Yang diambil
+       hanyalah bagian umpan baliknya. */
+    if(this.hunger<=0){
+      const dmg=2*dt;
+      this.hp-=dmg;
+      this.starveAcc=(this.starveAcc||0)+dmg;
+      this.starveT=(this.starveT||0)-dt;
+      if(this.starveT<=0&&this.hp>0){
+        this.starveT=this.STARVE_TICK;
+        const shown=Math.max(1,Math.round(this.starveAcc));
+        this.starveAcc=0;
+        FX.addShake(0.3);
+        if(typeof Sfx!=='undefined'&&Sfx.hurt)Sfx.hurt();
+        if(typeof UI!=='undefined'&&UI.flashVignette)UI.flashVignette();
+        FX.text(this.pos.clone().add(new THREE.Vector3(0,2,0)),
+          `🍖 -${shown}`,'#ffa84d');
+      }
+    }else{
+      this.starveAcc=0;this.starveT=0;
+      if(this.hunger>85&&this.hp<this.maxHp())this.hp=Math.min(this.maxHp(),this.hp+1.3*dt);
+    }
     /* efek 'regen' dari Zirah Nadi Kristal: pemulihan pasif terus-menerus */
     const rg=RPG.regenPerSec?RPG.regenPerSec():0;
     if(rg>0&&this.hp>0&&this.hp<this.maxHp())
@@ -1182,16 +1499,10 @@ const Player={
     }
 
     /* --- combo attack --- */
-    if(A.active){
-      const C=COMBOS[A.combo];
-      const dur=C.dur/RPG.comboSpeedMult();
-      A.t+=dt;
-      if(!A.hitDone&&A.t>=C.hit){A.hitDone=true;this.doHit(A.combo);}
-      if(A.queued&&A.t>dur*0.55){A.queued=false;this.attack.active=false;this.comboGap=0.12;this.tryAttack();}
-      else if(A.t>=dur){A.active=false;A.sinceEnd=0;this.comboGap=0.28;}
-    }
-    /* hadap */
-    if(!A.active){
+    this.updateAttack(dt);
+    /* hadap: arah terkunci selama AYUNAN, tapi sudah boleh berputar lagi saat
+       fase pemulihan supaya jedanya tidak terasa seperti karakter macet */
+    if(!A.active||A.recover){
       if(moving)this.facing=angLerp(this.facing,Math.atan2(mv.x,mv.z),clamp(12*dt,0,1));
     }
     this.animate(dt,moving,hspd,sprint);
@@ -1213,13 +1524,34 @@ const Player={
   skillAnimName(id){
     const map={
       whirl:'skill_whirlwind', // serangan putar area
-      roar :'roar',            // Teriakan Perang: auman berdiri (animasi sendiri)
-      herb :'skill_heal'       // minum ramuan / penyembuhan
+      roar :'roar',            // Teriakan Perang: teriakan berdiri (animasi sendiri)
+      herb :'skill_heal',      // minum ramuan / penyembuhan
+      /* Hantam Bumi terarah: pose hantam saat mendarat. Dulu tidak dipetakan
+         sehingga jatuh ke default 'skill_heal' (pose minum ramuan) — salah
+         total untuk hantaman tanah. */
+      slam :'slam_land'
     };
     return map[id]||'skill_heal';
   },
 
   animate(dt,moving,hspd,sprint){
+    /* ---------- LEPAS OFFSET POSE MENAHAN TAMENG ----------
+       Offset yaw torso dari frame sebelumnya dikembalikan PALING AWAL: sebelum
+       animator diinisialisasi, sebelum animator menulis pose apa pun, dan
+       sebelum SEMUA `return` awal di bawah (animator belum ada / slamQuick /
+       menunggangi / combo). Dengan begitu offset tidak pernah menumpuk, di
+       jalur mana pun.
+
+       BUGFIX "badan berputar-putar saat berlari": dulu offsetnya ditambahkan
+       (`torso.rotation.y+=0.22*k`) tanpa pernah dilepas. Klip animator TIDAK
+       semuanya menulis ulang torso.rotation.y setiap frame — animSprint &
+       animJump hanya menyetel rotation.x — sehingga selama pose menahan aktif
+       di klip itu yaw torso bertambah 0.22 rad TIAP FRAME (~2 putaran per detik
+       di 60fps) dan badan pemain terlihat berputar-putar. */
+    if(this._blockTorsoOff&&this.parts.torso)
+      this.parts.torso.rotation.y-=this._blockTorsoOff;
+    this._blockTorsoOff=0;
+
     /* inisialisasi animator sekali (lazy) supaya aman dipanggil di mana pun */
     if(!this.animator){
       if(typeof PlayerAnimator==='undefined')return;
@@ -1282,10 +1614,26 @@ const Player={
       return;
     }
 
-    /* one-shot (dodge/skill/combo) prioritas tertinggi; dipicu sekali per aktivasi */
+    /* BERLAYAR: pemain DUDUK di geladak perahu, memakai pose yang sama dengan
+       menunggangi pet (ride_idle / ride_move). Dulu tidak ada cabang ini,
+       sehingga pemain memakai pose idle/berdiri — terlihat seperti berdiri
+       kaku di atas papan perahu, bukan duduk mengayuh. */
+    if(typeof Furni!=='undefined'&&Furni.riding){
+      const name=(Furni.boatSpd>0.6)?'ride_move':'ride_idle';
+      if(an.currentAnim!==name)an.setAnimation(name);
+      comboTick();
+      this.extraYaw=0;this.moveLean=0;
+      return;
+    }
+
+    /* one-shot (dodge/skill/combo) prioritas tertinggi; dipicu sekali per aktivasi.
+       Pose combo hanya "memegang" animator selama ANIMASINYA belum selesai;
+       sesudah itu (fase pemulihan) animasi kembali ke idle/walk supaya jeda
+       akhir serangan terlihat sebagai gerak menahan diri, bukan pose beku. */
     const dodgeKey=this.dodge.active?'dodge':null;
     const skillKey=(this.skillAnim&&this.skillAnim.t>0)?('s'+this.skillAnim.id):null;
-    const atkKey=this.attack.active?('c'+this.attack.combo):null;
+    const atkPlaying=this.attack.active&&!this.attack.recover;
+    const atkKey=atkPlaying?('c'+this.attack.combo):null;
     const actionKey=dodgeKey||skillKey||atkKey||null;
 
     const oneShotPlaying=(an.durations[an.currentAnim]||0)>0&&!an.finished;
@@ -1295,7 +1643,10 @@ const Player={
         const name=dodgeKey?'dash'
           :skillKey?this.skillAnimName(this.skillAnim.id)
           :'combo'+(this.attack.combo+1);
-        an.setAnimation(name);
+        /* animasi combo diputar dengan KECEPATAN yang sama dengan logika
+           serangan (skill 'Aliran Combo'), supaya pose selesai tepat saat
+           fase pemulihan dimulai — bukan tertinggal di belakang. */
+        an.setAnimation(name,atkKey?this.comboSpeed():1.0);
         /* beri tahu ComboSystem bahwa animasi combo dimulai dari driver game
            (untuk trail pedang + state VFX), tanpa mengubah chaining damage */
         if(this.comboSys&&/^combo[1-5]$/.test(name))this.comboSys.externalStart(name);
@@ -1331,15 +1682,41 @@ const Player={
       if(an.currentAnim!==name)an.setAnimation(name);
     }
     comboTick();
+    /* ---------- POSE MENAHAN TAMENG ----------
+       Sesaat setelah tangkisan berhasil, lengan kiri (yang memegang tameng)
+       diangkat menutupi badan, dan badan sedikit memutar. Ditumpangkan SETELAH
+       animator berjalan supaya tidak perlu klip animasi baru.
+
+       Offset yaw torso dicatat di `_blockTorsoOff` dan DILEPAS di awal animate()
+       frame berikutnya, jadi hasilnya selalu `pose_klip + offset` — tidak
+       pernah akumulatif (lihat catatan bug di awal fungsi ini). */
+    if(this.blockFxT>0&&this.parts.armL){
+      const k=Math.min(1,this.blockFxT/0.28);
+      this.parts.armL.rotation.x=-1.15*k;
+      this.parts.armL.rotation.z=0.55*k;
+      if(this.parts.torso){
+        this._blockTorsoOff=0.22*k;
+        this.parts.torso.rotation.y+=this._blockTorsoOff;
+      }
+    }
     /* spin combo/skill kini diputar animator lewat body, jadi yaw mesh bersih */
     this.extraYaw=0;this.moveLean=0;
   },
   /* ---------- animasi skill aktif ----------
       Dipanggil RPG.useActive saat skill berhasil dipakai; memutar pose singkat
-      yang khas per skill (slam/whirl/roar/herb). */
+      yang khas per skill (whirl/roar/herb), dan pose pendaratan untuk slam
+      terarah. Hantam Bumi tekan-cepat TIDAK lewat sini: fase animasinya
+      digerakkan mesin slamQuick.
+      Durasi disamakan dengan panjang animasinya di PlayerAnimator supaya pose
+      tidak terpotong di tengah gerakan (mis. teriakan terputus sebelum mulut
+      menutup kembali). */
   playSkillAnim(id){
-    /* slam tidak lewat sini: fase animasinya digerakkan slamQuick */
-    const dur={whirl:0.55,roar:0.90,herb:0.6}[id]||0.5;
+    const FALLBACK={whirl:0.55,roar:0.90,herb:0.6,slam:0.50};
+    let dur=FALLBACK[id]||0.5;
+    if(this.animator&&this.animator.durations){
+      const d=this.animator.durations[this.skillAnimName(id)];
+      if(d)dur=d;
+    }
     this.skillAnim={id,t:dur,max:dur};
   },
 };
@@ -1357,6 +1734,22 @@ const Player={
 const SlamAim={
   HOLD:0.28,      // detik tahan sebelum masuk mode bidik
   MAX_R:7,        // radius bidik maksimum dari pemain
+  DEAD:10,        // px seretan yang diabaikan (anggap tekan di tempat)
+  /* ---------- SENSITIVITAS SERETAN (mobile) ----------
+     Panjang seretan yang setara radius bidik penuh (MAX_R) TIDAK tetap lagi:
+     dihitung per-seretan dari sisa ruang layar ke arah jari (lihat dragSpan).
+     Tombol skill menempel di tepi kanan layar, jadi seretan ke kanan hanya
+     punya belasan piksel sebelum mentok — dengan nilai tetap 90px seperti dulu,
+     lingkaran target praktis tidak bisa diarahkan ke kanan sama sekali.
+
+     Sekarang: span = ruang tersisa × ROOM_FRAC, dijepit antara DRAG_MIN dan
+     DRAG_MAX. Arah yang sempit (mentok tepi) jadi jauh lebih sensitif — geseran
+     ±28px sudah mencapai radius penuh — sementara arah yang lapang tetap punya
+     kendali halus. */
+  DRAG_MIN:28,    // px seretan minimum untuk mencapai MAX_R (arah paling sempit)
+  DRAG_MAX:56,    // px seretan maksimum untuk mencapai MAX_R (arah paling lapang)
+  ROOM_FRAC:0.6,  // porsi ruang tersisa yang dipakai sebagai rentang seret
+  EDGE_PAD:8,     // px sisi layar yang dianggap tidak terjangkau jari
   state:'idle',   // idle | pending | aiming
   t:0,
   aim:{x:0,z:0},
@@ -1365,19 +1758,38 @@ const SlamAim={
 
   active(){return this.state!=='idle';},
 
-  press(){
+  /* origin = titik awal sentuhan {x,y} untuk mode seret (mobile). Bila null
+     (PC) bidikan memakai posisi kursor. */
+  press(origin){
     if(this.state!=='idle')return;
     if(typeof RPG==='undefined'||RPG.skillVal('slam')<=0||Player.dead)return;
     if(RPG.activeCD.slam>0){UI.toast(`⏳ ${Math.ceil(RPG.activeCD.slam)}s lagi`);return;}
     this.state='pending';this.t=0;
-    this.dragStart=null;this.dragCur=null;
+    /* Titik awal seretan HARUS diset di sini, bukan sebelum press(): dulu
+       press() selalu menimpanya dengan null sehingga dragStart tetap kosong,
+       cabang seret di updateAim() tidak pernah menang, dan indikator diam di
+       tempat (bug "lingkaran target tidak bisa digeser" di mobile). */
+    this.dragStart=origin?{x:origin.x,y:origin.y}:null;
+    this.dragCur=origin?{x:origin.x,y:origin.y}:null;
+  },
+
+  /* posisi jari terkini selama menahan tombol skill (mobile) */
+  drag(x,y){
+    if(this.state==='idle')return;
+    if(!this.dragStart)this.dragStart={x,y};
+    this.dragCur={x,y};
   },
 
   /* dipanggil loop game tiap frame */
   update(dt){
     if(this.state==='idle')return;
     this.t+=dt;
-    if(this.state==='pending'&&this.t>=this.HOLD){
+    /* Masuk mode bidik setelah ditahan HOLD detik ATAU begitu jari digeser
+       melewati dead-zone — mana yang lebih dulu. Tanpa syarat kedua, menggeser
+       jari dengan cepat tidak memunculkan indikator sampai 0.28s berlalu. */
+    const dragged=this.dragStart&&this.dragCur&&
+      Math.hypot(this.dragCur.x-this.dragStart.x,this.dragCur.y-this.dragStart.y)>this.DEAD;
+    if(this.state==='pending'&&(this.t>=this.HOLD||dragged)){
       this.state='aiming';
       this.updateAim();
       this.showIndicator();
@@ -1393,6 +1805,7 @@ const SlamAim={
     const wasAiming=this.state==='aiming';
     this.hideIndicator();
     this.state='idle';
+    this.dragStart=null;this.dragCur=null;
     if(Player.dead)return;
     if(!wasAiming){
       /* tekan cepat: hantam di tempat (loncat kecil) */
@@ -1403,6 +1816,38 @@ const SlamAim={
     const dx=this.aim.x-Player.pos.x,dz=this.aim.z-Player.pos.z;
     if(Math.hypot(dx,dz)<1.2){RPG.useActive('slam');return;}
     Player.startSlamLeap(this.aim.x,this.aim.z);
+  },
+
+  /* batalkan bidikan tanpa mengeksekusi apa pun (mis. jari keluar / panel buka) */
+  cancel(){
+    if(this.state==='idle')return;
+    this.hideIndicator();
+    this.state='idle';
+    this.dragStart=null;this.dragCur=null;
+  },
+
+  /* ---------- RENTANG SERET EFEKTIF ke arah (ux,uy) layar ----------
+     Menghitung berapa piksel ruang yang MASIH ADA dari titik awal seretan
+     sampai tepi layar pada arah itu, lalu memetakannya menjadi panjang seretan
+     yang setara radius bidik penuh. Karena tombol skill ada di tepi kanan,
+     arah kanan hanya punya sedikit ruang → rentangnya kecil → sensitif. */
+  dragSpan(ux,uy){
+    const s=this.dragStart;
+    if(!s)return this.DRAG_MAX;
+    const W=window.innerWidth,H=window.innerHeight,pad=this.EDGE_PAD;
+    let room=Infinity;
+    if(ux>0.001)room=Math.min(room,(W-pad-s.x)/ux);
+    else if(ux<-0.001)room=Math.min(room,(s.x-pad)/-ux);
+    if(uy>0.001)room=Math.min(room,(H-pad-s.y)/uy);
+    else if(uy<-0.001)room=Math.min(room,(s.y-pad)/-uy);
+    if(!isFinite(room))room=this.DRAG_MAX;
+    room=Math.max(0,room);
+    /* Batas bawah ikut menyusut bila ruangnya lebih sempit dari DRAG_MIN —
+       kalau tidak, arah yang benar-benar mentok (mis. hanya 20px tersisa)
+       tidak akan pernah mencapai MAX_R karena jari tak bisa menyeret sejauh
+       rentang minimumnya. */
+    const lo=Math.min(this.DRAG_MIN,Math.max(this.DEAD+4,room*0.85));
+    return clamp(room*this.ROOM_FRAC,lo,this.DRAG_MAX);
   },
 
   /* hitung titik bidik dari kursor (PC) atau seretan jempol (mobile) */
@@ -1417,12 +1862,17 @@ const SlamAim={
       const dx=this.dragCur.x-this.dragStart.x;
       const dy=this.dragCur.y-this.dragStart.y;
       const d=Math.hypot(dx,dy);
-      if(d<8){this.aim.x=Player.pos.x;this.aim.z=Player.pos.z;return;}
+      if(d<this.DEAD){this.aim.x=Player.pos.x;this.aim.z=Player.pos.z;return;}
       const ix=dx/d, iz=-dy/d;              // layar -> input (y layar ke bawah)
       const yaw=Cam.yaw;
       const wx=-Math.sin(yaw)*iz+Math.cos(yaw)*ix;
       const wz=-Math.cos(yaw)*iz-Math.sin(yaw)*ix;
-      const dist=clamp(d/16,0,1)*this.MAX_R; // skala seretan -> jarak dunia
+      /* Jarak dipetakan dari panjang seretan SESUDAH dead-zone. Rentangnya
+         mengikuti ruang layar yang tersisa ke arah jari (lihat dragSpan), jadi
+         menggeser ke arah tepi yang mentok tetap bisa mencapai radius penuh
+         dengan geseran pendek. */
+      const span=Math.max(1,this.dragSpan(dx/d,dy/d)-this.DEAD);
+      const dist=clamp((d-this.DEAD)/span,0,1)*this.MAX_R;
       this.aim.x=Player.pos.x+wx*dist;
       this.aim.z=Player.pos.z+wz*dist;
     }else if(typeof Input!=='undefined'&&Input.mouseX!==undefined){

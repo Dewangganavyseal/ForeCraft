@@ -262,13 +262,12 @@ const PortFX={
       const blk=World.getBlock(Math.floor(p.g.position.x),
         Math.floor(p.g.position.y),Math.floor(p.g.position.z));
       if(hit){
-        const wasDead=hit.dead;
         Monsters.hurt(hit,p.dmg,p.dir.clone().setY(.2),3,p.owner);
         this.spark(p.g.position.x,p.g.position.y,p.g.position.z,8,0x9fe8ff,5);
         FX.ring(p.g.position.x,p.g.position.y,p.g.position.z,0x59c8ff,.3,1.6);
         Sfx.at(p.g.position,'hit');
-        if(!wasDead&&hit.dead&&p.owner&&NPCS.isTeam(p.owner))
-          NPCS.gainXp(p.owner,CFG.NPC.XP_PER_KILL);
+        /* XP kill diberikan Monsters.shareKillXp() (dari Monsters.kill): semua
+           rekan tim + pet dapat XP penuh. Grant ganda lama dihapus. */
         p.active=false;p.g.visible=false;
       }else if(blk&&blk!==B.AIR&&blk!==B.WATER){
         this.spark(p.g.position.x,p.g.position.y,p.g.position.z,5,0x9fe8ff,3);
@@ -381,6 +380,168 @@ const PortChest={
     if(!IS_MOBILE){
       glow=new THREE.PointLight(0xffd76a,0,4,2);
       glow.position.set(0,.35,0);g.add(glow);
+    }
+    g.userData.lid=lidPivot;
+    g.userData.port={glow,gemMats,gems};
+    return g;
+  },
+};
+
+/* ===========================================================================
+   1b. PORTGOLDCHEST — PETI EMAS PENJAGA AGUNG (hadiah boss dungeon)
+   ---------------------------------------------------------------------------
+   Peti mewah khusus hadiah boss, dibangun dengan gaya voxel yang sama seperti
+   PortChest supaya menyatu dengan estetika game, tetapi jelas berbeda kelas:
+
+     · badan LEBIH LEBAR & LEBIH TINGGI (16×16 voxel, dinding 10 tinggi)
+     · seluruh badan berlapis EMAS dengan dua pita nila gelap sebagai kontras,
+       plus urat emas terang di setiap sambungan papan
+     · empat PILAR SUDUT bertakhta permata di puncaknya
+     · tutup BERUNDAK TIGA TINGKAT (bukan datar) bermahkota lima gerigi emas
+     · gembok besar bermata rubi di sisi depan
+     · di dalamnya tumpukan batangan emas berlapis + permata warna-warni yang
+       berdenyut cahayanya saat tutup terbuka
+
+   Sama seperti PortChest, model mengekspos:
+     userData.lid  = Group engsel tutup (dianimasikan Furni.update)
+     userData.port = {glow, gemMats, gems} untuk denyut cahaya harta
+   =========================================================================== */
+const PortGoldChest={
+  OPEN_ANGLE:-1.92,
+  build(){
+    const S=0.055;                       // sama dgn PortChest agar seukuran blok
+    const tint=(hex,d)=>{const c=new THREE.Color(hex);
+      c.offsetHSL(0,0,rand(-.025,.025)+(d||0));return c;};
+    /* palet: emas berlapis + nila gelap sebagai pita kontras */
+    const GOLD=0xf0c53c, GOLD_HI=0xffe98a, GOLD_DK=0xa87c12,
+          IND=0x2c2350, IND_DK=0x1a1433,
+          INNER=0x3a2c10, INNER_FLOOR=0x4a3a14,
+          RUBY=0xff3b6b, EMER=0x35e06e, SAPH=0x4da3ff;
+    /* badan 16×16 voxel (PortChest 14×14) → peti terasa lebih berbobot */
+    const X0=-8,X1=7,Z0=-8,Z1=7;
+    const WALL_TOP=10;                   // dinding badan setinggi 10 voxel
+
+    const geo=new THREE.BoxGeometry(S,S,S);
+    const mat=new THREE.MeshLambertMaterial();
+    const build=items=>{
+      const mesh=new THREE.InstancedMesh(geo,mat,items.length);
+      const M=new THREE.Matrix4(),C=new THREE.Color();
+      items.forEach((v,i)=>{
+        M.makeTranslation((v.x+.5)*S,(v.y+.5)*S,(v.z+.5)*S);
+        mesh.setMatrixAt(i,M);C.copy(v.c);mesh.setColorAt(i,C);
+      });
+      mesh.castShadow=!IS_MOBILE;
+      return mesh;
+    };
+
+    const g=new THREE.Group();
+
+    /* ---------------- BADAN ---------------- */
+    const body=[];
+    /* dasar penuh */
+    for(let x=X0;x<=X1;x++)for(let z=Z0;z<=Z1;z++)
+      body.push({x,y:0,z,c:tint(GOLD_DK,-.04)});
+    /* dinding: emas dengan DUA pita nila melingkar (y 3 & 7) dan urat emas
+       terang di sambungan papan tiap 3 voxel */
+    for(let y=1;y<=WALL_TOP;y++){
+      const belt=(y===3||y===7);
+      const seam=(y%3===0);
+      for(let x=X0;x<=X1;x++)for(let z=Z0;z<=Z1;z++){
+        if(!(x===X0||x===X1||z===Z0||z===Z1))continue;
+        const corner=(x===X0||x===X1)&&(z===Z0||z===Z1);
+        let col;
+        if(corner)col=tint(GOLD_HI,.02);            // sudut selalu emas terang
+        else if(belt)col=tint(IND,-.02);
+        else col=tint(GOLD,seam?.05:0);
+        body.push({x,y,z,c:col});
+      }
+    }
+    /* dinding dalam gelap + lantai dalam */
+    for(let y=1;y<=WALL_TOP-1;y++)
+      for(let x=X0+1;x<=X1-1;x++)for(let z=Z0+1;z<=Z1-1;z++)
+        if(x===X0+1||x===X1-1||z===Z0+1||z===Z1-1)body.push({x,y,z,c:tint(INNER)});
+    for(let x=X0+2;x<=X1-2;x++)for(let z=Z0+2;z<=Z1-2;z++)
+      body.push({x,y:1,z,c:tint(INNER_FLOOR)});
+
+    /* PILAR SUDUT: empat tiang emas menjulang 2 voxel di atas dinding,
+       masing-masing bertakhta permata di puncaknya */
+    const gemTop=[RUBY,EMER,SAPH,EMER];
+    let gi=0;
+    for(const cx of[X0,X1])for(const cz of[Z0,Z1]){
+      for(let y=WALL_TOP+1;y<=WALL_TOP+2;y++)
+        body.push({x:cx,y,z:cz,c:tint(GOLD_HI,.03)});
+      body.push({x:cx,y:WALL_TOP+3,z:cz,c:new THREE.Color(gemTop[gi++%4])});
+    }
+
+    /* GEMBOK besar di sisi depan (z=Z1) bermata rubi */
+    for(let y=4;y<=7;y++)for(let x=-2;x<=1;x++){
+      const border=(y===4||y===7||x===-2||x===1);
+      body.push({x,y,z:Z1,c:tint(border?GOLD_DK:GOLD_HI,border?-.03:.04)});
+    }
+    body.push({x:-1,y:6,z:Z1+1,c:new THREE.Color(RUBY)});
+    body.push({x:0, y:6,z:Z1+1,c:new THREE.Color(RUBY)});
+    g.add(build(body));
+
+    /* ---------------- TUTUP BERUNDAK ----------------
+       Engsel di tepi atas belakang (z=Z0) seperti PortChest, tapi bentuknya
+       tiga undakan yang menyempit ke tengah + gerigi mahkota di depan. */
+    const lidPivot=new THREE.Group();
+    lidPivot.position.set(0,(WALL_TOP+1)*S,Z0*S);
+    const lid=[];
+    const lp=(x,y,z,c)=>lid.push({x,y:y-(WALL_TOP+1),z:z-Z0,c});
+
+    /* undakan 1: pelat penuh sebagai dasar tutup */
+    for(let x=X0;x<=X1;x++)for(let z=Z0;z<=Z1;z++){
+      const edge=(x===X0||x===X1||z===Z0||z===Z1);
+      lp(x,WALL_TOP+1,z,tint(edge?GOLD_HI:GOLD,edge?.03:0));
+    }
+    /* undakan 2: menyempit 1 voxel di keempat sisi, dengan pita nila */
+    for(let x=X0+1;x<=X1-1;x++)for(let z=Z0+1;z<=Z1-1;z++){
+      const edge=(x===X0+1||x===X1-1||z===Z0+1||z===Z1-1);
+      lp(x,WALL_TOP+2,z,tint(edge?IND_DK:GOLD,edge?-.02:.02));
+    }
+    /* undakan 3: puncak emas terang */
+    for(let x=X0+2;x<=X1-2;x++)for(let z=Z0+2;z<=Z1-2;z++)
+      lp(x,WALL_TOP+3,z,tint(GOLD_HI,.04));
+    /* GERIGI MAHKOTA: lima taji menghadap depan di puncak tutup */
+    for(const cx of[-5,-2,0,2,4]){
+      lp(cx,WALL_TOP+4,Z1-2,tint(GOLD_HI,.06));
+      if(cx===0)lp(cx,WALL_TOP+5,Z1-2,new THREE.Color(RUBY));   // taji tengah tertinggi
+    }
+    /* bingkai gembok pada tutup (menyambung dgn gembok badan) */
+    for(let x=-2;x<=1;x++)lp(x,WALL_TOP+1,Z1,tint(GOLD_DK,-.02));
+    const lidMesh=build(lid);
+    lidPivot.add(lidMesh);g.add(lidPivot);
+
+    /* ---------------- HARTA DI DALAM ----------------
+       Batangan emas bertumpuk + permata warna-warni. Materialnya emissive
+       supaya Furni.update bisa menguatkan kilaunya saat tutup terbuka. */
+    const gemMats=[];
+    const gems=new THREE.Group();
+    const addGlow=(x,y,z,color,sx,sy,sz)=>{
+      const m=new THREE.MeshStandardMaterial({color,emissive:color,
+        emissiveIntensity:.15,roughness:.28,metalness:.35});
+      const ms=new THREE.Mesh(new THREE.BoxGeometry(sx||.12,sy||.09,sz||.12),m);
+      ms.position.set(x*S,y*S,z*S);gems.add(ms);gemMats.push(m);
+    };
+    /* tumpukan batangan emas (dua lapis, lapis atas lebih sedikit) */
+    for(const[bx,bz]of[[-3,-3],[-1,-3],[1,-3],[-3,-1],[-1,-1],[1,-1],[3,-1]])
+      addGlow(bx,2.6,bz,0xffcf3f,.145,.085,.1);
+    for(const[bx,bz]of[[-2,-2],[0,-2],[2,-2]])
+      addGlow(bx,3.5,bz,0xffe07a,.145,.085,.1);
+    /* permata: rubi, zamrud, safir */
+    addGlow(-3.5,2.7,2.5,RUBY,.11,.11,.11);
+    addGlow(-1,2.7,3,EMER,.1,.1,.1);
+    addGlow(1.5,2.7,2.5,SAPH,.115,.115,.115);
+    addGlow(3.5,2.7,1.5,EMER,.095,.095,.095);
+    addGlow(0,4.3,-2,RUBY,.09,.09,.09);
+    g.add(gems);
+
+    /* cahaya dalam peti (hanya PC; mobile terlalu mahal) */
+    let glow=null;
+    if(!IS_MOBILE){
+      glow=new THREE.PointLight(0xffdf8a,0,5.5,2);
+      glow.position.set(0,.42,0);g.add(glow);
     }
     g.userData.lid=lidPivot;
     g.userData.port={glow,gemMats,gems};
@@ -808,7 +969,7 @@ const SkillsPort={
      npc_stonegiant.js, npc_rabbitwarrior.js). SkillsPort hanya meneruskan
      panggilan dari npc.js (aiFight / onMeleeHit) dan PortFX (shard/meteor).
      --------------------------------------------------------------------- */
-  poseKinds:{elf:1,giant:1,rabbit:1,goblin:1,lion:1},
+  poseKinds:{elf:1,giant:1,rabbit:1,goblin:1,lion:1,magesupport:1,royalguard:1},
   _ent(n){
     const kind=n.parts.rare&&n.parts.rare.kind;
     if(kind==='elf')return window.NPC_Elfmage;
@@ -816,6 +977,8 @@ const SkillsPort={
     if(kind==='rabbit')return window.NPC_Rabbitwarrior;
     if(kind==='goblin')return window.NPC_Goblin;
     if(kind==='lion')return window.NPC_Lionknight;
+    if(kind==='magesupport')return window.NPC_Magesupport;
+    if(kind==='royalguard')return window.NPC_Royalguard;
     return null;
   },
   combat(n,dt){const e=this._ent(n);return e&&e.combat?e.combat(n,dt):false;},

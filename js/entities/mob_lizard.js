@@ -362,7 +362,8 @@ const Mob_Lizard={
     this._acid=[];this._acidMeshes=[];
     const scene=(typeof Game!=='undefined'&&Game.scene)?Game.scene:null;
     for(let i=0;i<this.ACID_MAX;i++){
-      this._acid.push({life:0,dmg:6,pos:new THREE.Vector3(),vel:new THREE.Vector3(),hit:false});
+      this._acid.push({life:0,dmg:6,pos:new THREE.Vector3(),vel:new THREE.Vector3(),
+        hit:false,src:null});
       const mm=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.34),
         new THREE.MeshBasicMaterial({color:0x74ef3a,transparent:true,opacity:0.95,
           blending:THREE.AdditiveBlending,depthWrite:false}));
@@ -371,22 +372,33 @@ const Mob_Lizard={
       this._acidMeshes.push(mm);
     }
   },
-  /* semburkan proyektil asam dari mulut lizard ke arah pemain */
+  /* semburkan proyektil asam dari mulut lizard ke arah SASARANNYA.
+     Sasaran diambil dari m.acidTarget (diisi Monsters.mobAttack) sehingga
+     lizard tetap menyemburkan asam saat lawannya rekan NPC / pet, dan lizard
+     peliharaan menyemburkannya ke monster musuh — dulu arahnya selalu dipaku
+     ke pemain sehingga jurus ini tidak pernah berguna di luar duel dengan
+     pemain. */
   acidBurst(m){
     this.acidInit();
     const mouth=new THREE.Vector3();
     if(m.parts&&m.parts.mouth)m.parts.mouth.getWorldPosition(mouth);
     else mouth.copy(m.pos).add(new THREE.Vector3(0,1.5,0));
-    /* arah ke pemain (dengan sedikit sebaran) */
-    const toP=new THREE.Vector3().subVectors(Player.pos,m.pos);
-    toP.normalize();
+    /* arah ke sasaran (dengan sedikit sebaran) */
+    let tgt=(m.acidTarget&&!m.acidTarget.dead)?m.acidTarget:null;
+    if(!tgt&&typeof Monsters!=='undefined'&&Monsters.battleTarget)
+      tgt=Monsters.battleTarget(m,12);
+    if(!tgt&&!m.pet&&typeof Player!=='undefined'&&!Player.dead)tgt=Player;
+    if(!tgt)return;
+    const toT=new THREE.Vector3().subVectors(tgt.pos,m.pos);
+    toT.normalize();
     let spawned=0;
     for(let i=0;i<this.ACID_MAX&&spawned<8;i++){
       const a=this._acid[i];
       if(a.life>0)continue;
       a.life=1.4;a.hit=false;a.dmg=Math.max(3,Math.round(m.dmg*0.5));
+      a.src=m;
       a.pos.copy(mouth);
-      const dir=toP.clone();
+      const dir=toT.clone();
       dir.x+=(Math.random()-0.5)*0.3;
       dir.y+=(Math.random()-0.5)*0.2+0.15;
       dir.z+=(Math.random()-0.5)*0.3;
@@ -405,12 +417,15 @@ const Mob_Lizard={
         a.life-=dt;
         a.vel.y-=14*dt;
         a.pos.addScaledVector(a.vel,dt);
-        /* kena pemain? */
-        if(!a.hit&&!Player.dead&&a.pos.distanceTo(Player.pos.clone().add(new THREE.Vector3(0,0.9,0)))<1.0){
-          a.hit=true;a.life=0;
-          Player.takeDamage(a.dmg,null);
-          FX.debris(Player.pos.clone().add(new THREE.Vector3(0,1,0)),0x74ef3a,6,2.2);
-          FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.2,0)),'☠ asam','#7be05a');
+        /* kena siapa? pihak lawan ditentukan Monsters.projTarget: asam lizard
+           liar melukai pemain/NPC/pet, asam lizard peliharaan melukai monster */
+        if(!a.hit&&typeof Monsters!=='undefined'&&Monsters.projTarget){
+          const v=Monsters.projTarget(a.src,a.pos.x,a.pos.y,a.pos.z,1.0);
+          if(v&&Monsters.hitTarget(a.src,v,a.dmg,1.6,a.pos.x,a.pos.z,0)){
+            a.hit=true;a.life=0;
+            FX.debris(v.pos.clone().add(new THREE.Vector3(0,1,0)),0x74ef3a,6,2.2);
+            FX.text(v.pos.clone().add(new THREE.Vector3(0,2.2,0)),'☠ asam','#7be05a');
+          }
         }
         if(a.pos.y<0.15)a.life=0;
         if(a.life>0){

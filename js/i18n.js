@@ -28,12 +28,17 @@ const I18N_ITEMS={
   bread:{en:'Bread',zh:'面包',ja:'パン'},
   salad:{en:'Fruit Salad',zh:'水果沙拉',ja:'フルーツサラダ'},
   pie:{en:'Berry Pie',zh:'浆果派',ja:'ベリーパイ'},
+  sugar_cane:{en:'Sugar Cane',zh:'甘蔗',ja:'サトウキビ'},
+  sugar:{en:'Sugar',zh:'糖',ja:'砂糖'},
+  cake:{en:'Cake',zh:'蛋糕',ja:'ケーキ'},
   bandage:{en:'Bandage',zh:'绷带',ja:'包帯'},
+  potion_stam:{en:'Stamina Potion',zh:'耐力药水',ja:'スタミナポーション'},
   fish:{en:'Fresh Fish',zh:'新鲜鱼',ja:'新鮮な魚'},
   cfish:{en:'Grilled Fish',zh:'烤鱼',ja:'焼き魚'},
   resin:{en:'Tree Resin',zh:'树脂',ja:'樹脂'},
   leather:{en:'Leather',zh:'皮革',ja:'革'},
   hoe:{en:'Hoe',zh:'锄头',ja:'クワ'},
+  log_pass:{en:'Log Pass',zh:'定位牌',ja:'ログパス'},
   rope:{en:'Rope',zh:'绳子',ja:'ロープ'},
   saddle:{en:'Saddle',zh:'鞍',ja:'サドル'},
   pet_charm:{en:'Tamer Charm',zh:'驯兽护符',ja:'テイマーの護符'},
@@ -56,7 +61,14 @@ const I18N_ITEMS={
   gold_ingot:{en:'Gold Ingot',zh:'金锭',ja:'金インゴット'},
   pelt:{en:'Wolf Pelt',zh:'狼毛皮',ja:'狼の毛皮'},
   venom:{en:'Scorpion Venom',zh:'蝎毒',ja:'サソリの毒'},
+  centipede_shell:{en:'Centipede Shell',zh:'蜈蚣壳',ja:'ムカデの殻'},
+  insect_leg:{en:'Insect Leg',zh:'昆虫腿',ja:'虫の脚'},
+  hard_shell:{en:'Hard Shell',zh:'坚硬甲壳',ja:'硬い甲殻'},
+  green_blood:{en:'Green Blood',zh:'绿色血液',ja:'緑の血'},
+  toxic_venom:{en:'Toxic Venom',zh:'剧毒毒液',ja:'猛毒'},
   boss_core:{en:'Boss Core',zh:'首领核心',ja:'ボスコア'},
+  soul_shard:{en:'Soul Shard',zh:'灵魂碎片',ja:'魂の破片'},
+  dungeon_changer:{en:'Dungeon Changer',zh:'地牢变换器',ja:'ダンジョンチェンジャー'},
   helm_gold:{en:'Gold Helm',zh:'黄金头盔',ja:'黄金の兜'},
   plate_gold:{en:'Gold Armor',zh:'黄金铠甲',ja:'黄金の鎧'},
   greaves_gold:{en:'Gold Greaves',zh:'黄金护腿',ja:'黄金のグリーヴ'},
@@ -87,7 +99,21 @@ const I18N_ITEMS={
   shield_storm:{en:'Storm Shield',zh:'风暴之盾',ja:'嵐の盾'},
   shield_frost:{en:'Frost Dawn Shield',zh:'霜晓之盾',ja:'氷暁の盾'},
   shield_dark:{en:'Shadow Shield',zh:'暗影之盾',ja:'影の盾'},
+  helm_carapace:{en:'Centipede Carapace Helm',zh:'蜈蚣甲盔',ja:'ムカデ甲の兜'},
+  plate_carapace:{en:'Centipede Carapace Armor',zh:'蜈蚣甲铠',ja:'ムカデ甲の鎧'},
+  shield_carapace:{en:'Centipede Carapace Shield',zh:'蜈蚣甲盾',ja:'ムカデ甲の盾'},
   bag:{en:'Large Leather Bag',zh:'大皮背包',ja:'大きな革のバッグ'},
+  /* ---- perabot yang bisa dibuat & diletakkan (ITEMS f_*) ---- */
+  f_table:{en:'Wooden Table',zh:'木桌',ja:'木のテーブル'},
+  f_chair:{en:'Wooden Chair',zh:'木椅',ja:'木の椅子'},
+  f_bed:{en:'Bed',zh:'床',ja:'ベッド'},
+  f_chest:{en:'Storage Chest',zh:'储物箱',ja:'収納チェスト'},
+  f_boat:{en:'Wooden Boat',zh:'木船',ja:'木のボート'},
+  f_board:{en:'Quest Board',zh:'任务板',ja:'クエスト掲示板'},
+  f_workbench:{en:'Workbench',zh:'工作台',ja:'作業台'},
+  f_anvil:{en:'Anvil',zh:'铁砧',ja:'金床'},
+  f_stove:{en:'Cooking Stove',zh:'炉灶',ja:'かまど'},
+  f_campfire:{en:'Campfire',zh:'营火',ja:'焚き火'},
   f_house:{en:'Wooden House',zh:'木屋',ja:'木の家'},
 };
 
@@ -103,6 +129,14 @@ const I18N_MOBS={
   lizard:{en:'Swamp Lizard',zh:'沼泽蜥蜴',ja:'沼のトカゲ'},
   cow:{en:'Cow',zh:'牛',ja:'牛'},
   horse:{en:'Horse',zh:'马',ja:'馬'},
+  kelabang:{en:'Giant Centipede',zh:'巨型蜈蚣',ja:'大ムカデ'},
+  /* potongan ruas kelabang yang terlepas saat induknya mati */
+  kelabang_part:{en:'Centipede Segment',zh:'蜈蚣体节',ja:'ムカデの体節'},
+  kumbang:{en:'Horned Beetle',zh:'独角甲虫',ja:'カブトムシ'},
+  yeti:{en:'Yeti',zh:'雪人',ja:'イエティ'},
+  semut:{en:'Giant Ant',zh:'巨蚁',ja:'大アリ'},
+  /* penjaga hantu bersabit khas reruntuhan/dungeon */
+  reaper:{en:'Reaper',zh:'死神',ja:'リーパー'},
 };
 
 /* --------------------------------------------------------------- BIOME NAMES */
@@ -113,6 +147,7 @@ const I18N_BIOMES={
   'Pegunungan':{en:'Mountains',zh:'山脉',ja:'山岳'},
   'Laut':{en:'Ocean',zh:'海洋',ja:'海'},
   'Pantai':{en:'Beach',zh:'海滩',ja:'浜辺'},
+  'Tanah Merah':{en:'Redlands',zh:'赤红之地',ja:'赤土の地'},
 };
 
 /* -------------------------------------------------------------------- RARITY */
@@ -162,6 +197,7 @@ const I18N_SUBSKILLS={
   mining:{en:'Mining',zh:'采矿',ja:'採掘'},
   harvesting:{en:'Harvesting',zh:'采集',ja:'採取'},
   combat:{en:'Combat',zh:'战斗',ja:'戦闘'},
+  blocking:{en:'Blocking',zh:'格挡',ja:'受け'},
   crafting:{en:'Crafting',zh:'制作',ja:'クラフト'},
   cooking:{en:'Cooking',zh:'烹饪',ja:'料理'},
   farming:{en:'Farming',zh:'农耕',ja:'農業'},

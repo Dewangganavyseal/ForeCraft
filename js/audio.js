@@ -98,6 +98,21 @@ const Sfx={
   /* raungan singa: dengung rendah berlapis + desau napas kuat */
   roar(){this.noiseBurst(0.55,0.45,240);this.tone(90,0.65,'sawtooth',0.30,-45);
     this.tone(58,0.75,'square',0.20,-18);this.tone(140,0.3,'sawtooth',0.12,-60);},
+  /* TERIAKAN PERANG (manusia berteriak): pekik yang naik lalu turun.
+     Beda dari roar() milik monster — pitch jauh lebih tinggi, ada formant vokal
+     ("aaa") dari dua nada berdekatan, dan desau napas di awal. */
+  shout(){
+    if(!this.ok)return;
+    this.noiseBurst(0.12,0.30,1800);                 // napas awal
+    this.tone(300,0.10,'sawtooth',0.30,260);         // pekik naik cepat
+    setTimeout(()=>{
+      this.tone(560,0.42,'sawtooth',0.32,-300);      // puncak lalu turun
+      this.tone(700,0.36,'square',0.14,-320);        // formant vokal
+      this.tone(180,0.45,'triangle',0.20,-70);       // dada / tubuh suara
+      this.noiseBurst(0.34,0.22,1100);               // serak
+    },90);
+    setTimeout(()=>this.tone(220,0.26,'sawtooth',0.16,-120),420);   // ekor habis napas
+  },
   /* gelombang tanah: gemuruh rendah + desakan tanah saat blok terangkat.
      Pitch & intensitas diacak/diskalakan agar terasa dinamis & satisfying. */
   wave(power=1){

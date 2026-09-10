@@ -61,6 +61,12 @@ const I18N={
     if(typeof RECIPES!=='undefined')
       for(const r of RECIPES)d.recipes[r.out]=r.name;
 
+    /* quest: nama & deskripsi 57 quest */
+    if(typeof Quest!=='undefined'&&Array.isArray(Quest.DEFS)){
+      d.quests={};
+      for(const q of Quest.DEFS)d.quests[q.id]=[q.name,q.desc];
+    }
+
     this._origData=d;
   },
 
@@ -164,6 +170,16 @@ const I18N={
     if(typeof RPG!=='undefined'&&Array.isArray(RPG.mobSlots)&&typeof MOB_NAME!=='undefined'){
       for(const p of RPG.mobSlots){
         if(p&&p.type&&MOB_NAME[p.type])p.name=MOB_NAME[p.type];
+      }
+    }
+
+    /* quest: nama & deskripsi mengikuti bahasa aktif */
+    if(typeof Quest!=='undefined'&&Array.isArray(Quest.DEFS)&&typeof I18N_QUESTS!=='undefined'){
+      for(const q of Quest.DEFS){
+        const o=O.quests?O.quests[q.id]:null;
+        if(!o)continue;
+        q.name=id?o[0]:(this.pick(I18N_QUESTS[q.id],lang,0)||o[0]);
+        q.desc=id?o[1]:(this.pick(I18N_QUESTS[q.id],lang,1)||o[1]);
       }
     }
   },
@@ -315,12 +331,15 @@ const I18N={
     this.patchData(lang);
     this.startObserver();
     this.localizeDOM(lang);
+    if(typeof Quest!=='undefined'&&Quest.refresh)Quest.refresh();
+    if(typeof UI!=='undefined'&&UI.open==='char'&&typeof CharView!=='undefined')CharView.renderStats();
   },
 
   /* dipanggil setelah UI menggambar ulang secara manual */
   refresh(){
     if(this.lang==='id')return;
     this.localizeDOM(this.lang);
+    if(typeof Quest!=='undefined'&&Quest.refresh)Quest.refresh();
   },
 };
 window.I18N=I18N;

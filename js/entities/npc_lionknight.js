@@ -189,14 +189,15 @@ const NPC_Lionknight={
       return true;
     }
     if(!n.target||n.target.dead)return false;
-    /* picu: cooldown siap & singa sedang dikerubuti (sesuai peran taunt) */
-    if(lk.roarCd<=0&&this.countNear(n,this.LK.range)>=2){
+    /* picu: cooldown siap & singa sedang dikerubuti & butuh stamina (35) */
+    if(lk.roarCd<=0&&this.countNear(n,this.LK.range)>=2&&((n.stamina||0)>=35)){
+      n.stamina=(n.stamina||0)-35; n.stamRegenT=1.8;
       n.roar={t:0,w1:false,w2:false};
       lk.roarCd=this.LK.cd;
       NPCS.say(n,'AUMAN SINGA!',1.8);
       UI.toast(`🦁 ${n.name}: AUMAN SINGA!`);
-      /* percikan ancang-ancang: aura emas berkumpul */
       FX.ring(n.pos.x,n.pos.y+0.15,n.pos.z,0xffd24d,0.5,1.6);
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-35 STAM','#ffd24d');
       PortFX.spark(n.pos.x,n.pos.y+1.2,n.pos.z,6,0xfff0a8,3);
       return true;
     }
@@ -210,12 +211,11 @@ const NPC_Lionknight={
       if(m.dead)continue;
       const dx=m.pos.x-n.pos.x,dz=m.pos.z-n.pos.z;
       if(dx*dx+dz*dz>r*r)continue;
-      const wasDead=m.dead;
       const d=Math.hypot(dx,dz)||0.001;
       /* arah dorongan = menjauhi singa, sedikit terangkat */
       Monsters.hurt(m,dmg,new THREE.Vector3(dx/d,0.3,dz/d),knock,n);
-      if(!wasDead&&m.dead&&NPCS.isTeam(n))
-        NPCS.gainXp(n,CFG.NPC.XP_PER_KILL);
+      /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat XP
+         penuh. Grant ganda lama di sini dihapus. */
     }
   },
 

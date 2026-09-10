@@ -161,10 +161,18 @@ const NPC_Elfmage={
     }
     if(!tgt)return false;
     const d=tgt.pos.distanceTo(n.pos);
-    /* pilih skill: meteor bila gerombolan, es bila target tunggal dekat */
+    /* pilih skill: meteor bila gerombolan, es bila target tunggal dekat (masing-masing butuh stamina) */
     const near=this.countNear(n,6);
-    if(n.elfMetCd<=0&&near>=2&&d<11){this.startElfCast(n,'meteor',tgt);return true;}
-    if(n.elfIceCd<=0&&d<10){this.startElfCast(n,'ice',tgt);return true;}
+    if(n.elfMetCd<=0&&near>=2&&d<11&&((n.stamina||0)>=45)){
+      n.stamina=(n.stamina||0)-45; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-45 STAM','#ffd24d');
+      this.startElfCast(n,'meteor',tgt);return true;
+    }
+    if(n.elfIceCd<=0&&d<10&&((n.stamina||0)>=30)){
+      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
+      this.startElfCast(n,'ice',tgt);return true;
+    }
     /* serangan dasar = proyektil aura (jaga jarak seperti prototipe cast) */
     const to=new THREE.Vector3().subVectors(tgt.pos,n.pos).setY(0);
     const ang=Math.atan2(to.x,to.z);
@@ -221,10 +229,9 @@ const NPC_Elfmage={
       if(m.dead)continue;
       const dx=m.pos.x-x,dz=m.pos.z-z;
       if(dx*dx+dz*dz>r*r)continue;
-      const wasDead=m.dead;
       Monsters.hurt(m,dmg,new THREE.Vector3(dx*0.2,0.4,dz*0.2),knock,owner);
-      if(!wasDead&&m.dead&&owner&&NPCS.isTeam(owner))
-        NPCS.gainXp(owner,CFG.NPC.XP_PER_KILL);
+      /* XP kill diurus Monsters.shareKillXp() — seluruh tim + pet dapat XP
+         penuh. Grant ganda lama di sini dihapus. */
     }
   },
 

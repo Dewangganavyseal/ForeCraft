@@ -26,6 +26,10 @@ const SUBSKILLS={
   mining:    {name:'Penambangan', icon:'⛏️', branch:'gathering', base:50, exp:1.35, max:50},
   harvesting:{name:'Pemanenan',   icon:'🌿', branch:'gathering', base:35, exp:1.30, max:50},
   combat:    {name:'Pertarungan', icon:'⚔️', branch:'combat',    base:60, exp:1.35, max:50},
+  /* Penangkisan: naik setiap kali tameng benar-benar berhasil menahan
+     serangan (lihat Player.takeDamage → Prof.gainParry). Levelnya menambah
+     peluang & kekuatan tangkisan, jadi perisai makin andal karena DIPAKAI. */
+  blocking:  {name:'Penangkisan',  icon:'🛡️', branch:'combat',    base:55, exp:1.32, max:50},
   crafting:  {name:'Kriya',       icon:'🔨', branch:'crafting',  base:80, exp:1.40, max:50},
   cooking:   {name:'Memasak',     icon:'🍳', branch:'survival',  base:45, exp:1.30, max:50},
   farming:   {name:'Pertanian',   icon:'🌾', branch:'survival',  base:55, exp:1.35, max:50},
@@ -140,6 +144,22 @@ const Prof={
      +0.3% crit per level (cap +50% damage, +15% crit). */
   combatDmg(){ return Math.min(0.5,(this.level('combat')-1)*0.01); },
   combatCrit(){ return Math.min(0.15,(this.level('combat')-1)*0.003); },
+
+  /* ---------- efek proficiency penangkisan ----------
+     +0.5% peluang block per level (cap +20%) dan +0.6% kekuatan block per
+     level (cap +25%). Karena XP-nya hanya didapat dari tangkisan yang BERHASIL,
+     satu-satunya cara menaikkannya adalah benar-benar bertahan di pertarungan. */
+  blockChance(){ return Math.min(0.20,(this.level('blocking')-1)*0.005); },
+  blockPower(){ return Math.min(0.25,(this.level('blocking')-1)*0.006); },
+  /* XP saat sebuah tangkisan berhasil. `actionLevel` diambil dari damage
+     serangan yang ditahan supaya menahan pukulan besar lebih berharga
+     (graying: menahan slime terus-terusan cepat kehilangan nilai).
+     CATATAN NAMA: gainBlock() sudah dipakai untuk memecah BLOK dunia, jadi
+     penangkisan memakai nama gainParry() agar tidak bertabrakan. */
+  gainParry(rawDmg){
+    const lvl=clamp(Math.round((rawDmg||0)/3),1,40);
+    this.gain('blocking',6,lvl);
+  },
 
   /* ---------- save / load ----------
      Murni data sehingga nanti bisa divalidasi di server (multiplayer). */

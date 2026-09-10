@@ -165,6 +165,38 @@ const Settings={
       }
     });
 
+    /* ===== GRAFIS (Low / Medium / High / Ultra) =====
+       Mengubah preset langsung menerapkan pixel ratio, bayangan, radius render,
+       kepadatan rumput, subdivisi air, & jumlah hujan — lalu membangun ulang
+       mesh dunia secara bertahap (tidak membekukan game). Hanya anti-aliasing
+       yang butuh buka ulang game karena hanya bisa diset saat renderer dibuat. */
+    if(typeof Gfx!=='undefined'){
+      const gfx=document.createElement('div');
+      gfx.className='set-sec';
+      gfx.innerHTML=`
+        <div class="set-h">🖥️ ${L('settings_gfx')}</div>
+        <p class="tip" style="margin-top:0">${L('settings_gfx_tip')}</p>`;
+      const grow=document.createElement('div');
+      grow.className='set-lang-row';
+      for(const lv of Gfx.levels()){
+        const b=document.createElement('button');
+        b.className='set-lang'+(Gfx.level===lv?' active':'');
+        b.textContent=L('gfx_'+lv);
+        b.addEventListener('click',()=>{
+          const wasAA=Gfx.preset().antialias;
+          Gfx.apply(lv,true);            // true = bangun ulang mesh dunia
+          this.render();                 // segarkan tombol aktif
+          if(typeof UI!=='undefined'&&UI.toast){
+            UI.toast('🖥️ '+L('settings_gfx_set',{name:L('gfx_'+lv)}));
+            if(wasAA!==Gfx.preset().antialias)UI.toast(L('settings_gfx_reload'));
+          }
+        });
+        grow.appendChild(b);
+      }
+      gfx.appendChild(grow);
+      el.appendChild(gfx);
+    }
+
     /* ===== BAHASA ===== */
     const lng=document.createElement('div');
     lng.className='set-sec';

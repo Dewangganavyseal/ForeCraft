@@ -182,6 +182,52 @@ const HeldModels={
       this.box(g,0.05,0.46,0.05,0x8a5f35,0,-0.05,0);
       this.box(g,0.16,0.10,0.04,0x9aa2ac,0,0.20,0.04,0.5,0,0);
     },
+    /* item 3D khusus untuk drop & held */
+    boss_core(g){
+      this.box(g,0.22,0.22,0.22,0x9b51e0,0,0,0);
+      this.box(g,0.16,0.16,0.16,0xd070ff,0,0,0);
+      this.box(g,0.08,0.08,0.08,0xffffff,0,0,0);
+    },
+    crystal(g){
+      this.box(g,0.12,0.28,0.12,0x4dd0e1,0,0,0,0.2,0.3,0.4);
+      this.box(g,0.08,0.24,0.08,0xe0f7fa,0,0,0,-0.2,-0.1,-0.3);
+    },
+    dungeon_changer(g){
+      this.box(g,0.06,0.38,0.06,0xd4af37,0,-0.05,0);
+      this.box(g,0.18,0.18,0.06,0x9b51e0,0,0.18,0);
+      this.box(g,0.08,0.08,0.08,0xffd700,0,0.18,0);
+      this.box(g,0.10,0.06,0.06,0xd4af37,0.08,-0.16,0);
+    },
+    potion_stam(g){
+      this.box(g,0.16,0.20,0.16,0xf1c40f,0,-0.04,0);
+      this.box(g,0.08,0.08,0.08,0x8b5a2b,0,0.10,0);
+    },
+    cake(g){
+      this.box(g,0.26,0.14,0.26,0xf5eedc,0,-0.02,0);
+      this.box(g,0.28,0.05,0.28,0xe74c3c,0,0.06,0);
+      this.box(g,0.06,0.06,0.06,0xffffff,0,0.10,0);
+    },
+    soul_shard(g){
+      this.box(g,0.14,0.24,0.14,0x7b1fa2,0,0,0,0.15,0.25,0);
+      this.box(g,0.08,0.18,0.08,0xe1bee7,0,0,0,-0.15,0.1,0.2);
+    },
+    pet_charm(g){
+      this.box(g,0.18,0.18,0.06,0x1e88e5,0,0,0);
+      this.box(g,0.10,0.10,0.08,0xffd54f,0,0,0);
+    },
+    sugar_cane(g){
+      this.box(g,0.06,0.42,0.06,0x66bb6a,0,0,0);
+      this.box(g,0.08,0.03,0.08,0x81c784,0,0.05,0);
+      this.box(g,0.08,0.03,0.08,0x81c784,0,-0.10,0);
+    },
+    log_pass(g){
+      this.box(g,0.20,0.06,0.20,0x8d6e63,0,0,0);
+      this.box(g,0.14,0.08,0.14,0xffeb3b,0,0.01,0);
+    },
+    centipede_shell(g){
+      this.box(g,0.26,0.06,0.22,0x8e24aa,0,0,0,0.2,0,0);
+      this.box(g,0.22,0.06,0.18,0xab47bc,0,0.04,0);
+    },
   },
 };
 

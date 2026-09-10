@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>🌲 Forest Survival 3D</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,26 +17,36 @@
 <div id="hud">
   <div id="stats">
     <!-- Tombol ⚙️ Pengaturan: satu pintu untuk Musik, SFX, Custom UI & Simpan -->
-    <button id="btn-gear" class="mini-btn" title="Pengaturan">⚙️</button>
-    <div class="bar hp"><span class="ico">❤️</span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
-    <div class="bar st"><span class="ico">⚡</span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
-    <div class="bar hu"><span class="ico">🍖</span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
-    <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">⭐ Lv 1</span></div>
+    <button id="btn-gear" class="mini-btn btn-img" title="Pengaturan"></button>
+    <!-- BINGKAI POTRET PEMAIN: render setengah badan dari model karakter yang
+         sedang dipakai (termasuk armor/tameng). Diketuk → panel Karakter. -->
+    <button id="portrait" type="button" title="Karakter — lihat stat lengkap">
+      <canvas id="portrait-cv" width="128" height="128"></canvas>
+      <span id="portrait-lv">1</span>
+    </button>
+    <div id="stats-bars">
+      <div class="bar hp"><span class="ico"><img class="hud-ico" src="buttons/ui_hp.png" alt="" onerror="this.outerHTML='❤️'"></span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
+      <div class="bar st"><span class="ico"><img class="hud-ico" src="buttons/ui_stam.png" alt="" onerror="this.outerHTML='⚡'"></span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
+      <div class="bar hu"><span class="ico"><img class="hud-ico" src="buttons/ui_hunger.png" alt="" onerror="this.outerHTML='🍖'"></span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
+      <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">⭐ Lv 1</span></div>
+    </div>
   </div>
   <!-- ============ CHAT: buka dengan ENTER, persis di bawah bar Lv ============ -->
   <div id="chat">
     <div id="chat-log"></div>
-    <div id="chat-row"><span class="cico">💬</span>
+    <div id="chat-row"><span class="cico"><img class="hud-ico" src="buttons/chat.png" alt="" onerror="this.outerHTML='💬'"></span>
       <input id="chat-input" type="text" maxlength="80" autocomplete="off"
         placeholder="Ketik pesan...">
-      <button id="chat-send" title="Kirim">➤</button>
+      <button id="chat-send" class="btn-img" title="Kirim"></button>
     </div>
   </div>
   <div id="topright">
+    <!-- keterangan kecil arah Log Pass; tampil hanya saat memegang Log Pass bertanda -->
+    <div id="compass-info" style="display:none"></div>
     <div id="compass"><div id="compass-strip"></div><div id="compass-mark">▼</div></div>
     <div id="clock">☀️ 12:00</div>
     <div id="daynum">Hari 1</div>
-    <div id="coinbox" title="Koin — tukarkan di pedagang desa">🪙 <b id="coin-num">0</b></div>
+    <div id="coinbox" title="Koin — tukarkan di pedagang desa"><img class="hud-ico" src="buttons/ui_coin.png" alt="" onerror="this.outerHTML='🪙'"> <b id="coin-num">0</b></div>
   </div>
   <div id="combo"></div>
   <div id="hotbar"></div>
@@ -46,21 +54,22 @@
   <div id="team"></div>
   <div id="toast"></div>
 <div id="skillbar"></div>
-<div id="hint">WASD gerak · SHIFT lari · SHIFT×2 dodge · KLIK serang/makan · SPACE lompat · Q/E/R/T skill · B tas · K skill · C crafting · G rekan · ←→ kamera · H bantu</div>
+<div id="hint">WASD gerak · SHIFT lari · SHIFT×2 dodge · KLIK serang/makan · SPACE lompat · Q/E/R/T skill · B tas · K skill · C crafting · G rekan · P karakter · ←→ kamera · H bantu</div>
 </div>
 
 <!-- ================= PANEL TAS ================= -->
 <div class="panel" id="panel-bag">
-  <h2>🎒 Tas <button class="x" data-close="bag">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"> Tas <button class="x" data-close="bag">✕</button></h2>
 
   <div id="bag-layout">
     <div id="bag-pages">
       <div id="bag-page-bag" class="bag-page">
-        <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span></div>
+        <div class="sub">Perlengkapan · Pertahanan <span id="def-num">0%</span> · Damage <span id="dmg-num">0</span> · Block <span id="blk-num">0%</span></div>
         <div class="grid equip" id="equip-grid"></div>
         <div class="sub">Hotbar (1–7)</div>
         <div class="grid" id="bag-hotbar"></div>
         <div class="sub">Kantong</div>
+        <div id="bag-cat-tabs" class="bag-cat-tabs"></div>
         <div class="grid" id="bag-grid"></div>
         <p class="tip">Klik item lalu klik slot lain untuk memindahkan. Tekan <b>F</b> untuk makan item hotbar terpilih.</p>
       </div>
@@ -76,13 +85,13 @@
 
 <!-- tombol melayang Bag / Pet di sisi kiri panel tas -->
 <div id="bag-float-menu">
-  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span>🎒</span>Bag</button>
-  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span>🐾</span>Pet</button>
+  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span><img class="menu-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"></span>Bag</button>
+  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span><img class="menu-ico" src="buttons/pet_slime.png" alt="" onerror="this.outerHTML='🐾'"></span>Pet</button>
 </div>
 
 <!-- ================= PANEL SKILL ================= -->
 <div class="panel" id="panel-skills">
-  <h2>🌟 Skill Tree <button class="x" data-close="skills">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/skills.png" alt="" onerror="this.outerHTML='🌟'"> Skill Tree <button class="x" data-close="skills">✕</button></h2>
   <div id="sp-info">Skill Points: <b id="sp-num">0</b></div>
   <!-- Pohon skill digambar dinamis oleh UI.renderSkills(): node per skill
        yang saling terhubung garis akar sesuai prasyarat (req). -->
@@ -97,16 +106,16 @@
 
 <!-- ================= PANEL CRAFTING ================= -->
 <div class="panel" id="panel-craft">
-  <h2>🔨 Crafting <button class="x" data-close="craft">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/craft.png" alt="" onerror="this.outerHTML='🔨'"> Crafting <button class="x" data-close="craft">✕</button></h2>
   <div id="craft-tabs"></div>
   <div id="recipes"></div>
 </div>
 
 <!-- ================= PANEL PETI PENYIMPANAN ================= -->
 <div class="panel" id="panel-chest">
-  <h2>🧰 Peti Penyimpanan <button class="x" data-close="chest">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/f_chest.png" alt="" onerror="this.outerHTML='🧰'"> Peti Penyimpanan <button class="x" data-close="chest">✕</button></h2>
   <div class="sub">Isi Peti <span id="chest-num">0/0</span>
-    <button id="chest-all" class="mini">⬇️ Titip Semua Resource</button></div>
+    <button id="chest-all" class="mini btn-img-mini" title="Titip Semua Resource">Titip Semua Resource</button></div>
   <div class="grid" id="chest-grid"></div>
   <div class="sub">Tasmu — klik untuk menitipkan</div>
   <div class="grid" id="chest-bag"></div>
@@ -116,15 +125,24 @@
 <!-- ================= PANEL REKAN ================= -->
 
 <div class="panel" id="panel-npc">
-  <h2>🤝 Rekan Tim <button class="x" data-close="npc">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_team.png" alt="" onerror="this.outerHTML='🤝'"> Rekan Tim <button class="x" data-close="npc">✕</button></h2>
   <div id="npc-body"></div>
+</div>
+
+<!-- ================= PANEL PARTY (daftar rekan tim) =================
+     Dibuka dengan tombol G. Menampilkan seluruh rekan + pet; klik satu rekan
+     untuk membuka panel kontrol detailnya. -->
+<div class="panel hidden" id="panel-party">
+  <h2><img class="ph-ico" src="buttons/ui_party.png" alt="" onerror="this.outerHTML='👥'"> Party <button class="x" data-close="party">✕</button></h2>
+  <div class="sub">Anggota tim & peliharaanmu — ketuk untuk mengatur.</div>
+  <div id="party-body"></div>
 </div>
 
 <!-- ================= PANEL PEDAGANG / TOKO =================
      Beli item dengan koin, atau jual item dari tas untuk dapat koin. -->
 <div class="panel hidden" id="panel-shop">
-  <h2>🏪 Pedagang Desa <button class="x" data-close="shop">✕</button></h2>
-  <div class="shop-coin">🪙 Koinmu: <b id="shop-coin">0</b></div>
+  <h2><img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML='🏪'"> Pedagang Desa <button class="x" data-close="shop">✕</button></h2>
+  <div class="shop-coin"><img class="hud-ico" src="buttons/ui_coin.png" alt="" onerror="this.outerHTML='🪙'"> Koinmu: <b id="shop-coin">0</b></div>
   <div class="sub">Beli</div>
   <div id="shop-buy"></div>
   <div class="sub">Jual (klik item di tasmu)</div>
@@ -136,30 +154,41 @@
      Enchant equipment: menaikkan level pedang/armor/tameng dengan koin
      dan bahan yang relevan. Dibuka lewat interaksi furnitur Landasan Tempa. -->
 <div class="panel hidden" id="panel-anvil">
-  <h2>⚒️ Landasan Tempa <button class="x" data-close="anvil">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/f_anvil.png" alt="" onerror="this.outerHTML='⚒️'"> Landasan Tempa <button class="x" data-close="anvil">✕</button></h2>
   <div class="sub">Tempa equipment untuk menaikkan Levelnya — bayar dengan 🪙 koin dan bahan yang relevan dengan equipment-nya.</div>
   <div id="anvil-body"></div>
+</div>
+
+<!-- ================= ALTAR RITUAL =================
+     Isi ingredient lalu mulai ritual untuk memanggil boss. Dibuka lewat
+     interaksi bagian tengah altar di dunia. -->
+<div class="panel hidden" id="panel-altar">
+  <h2><img class="ph-ico" src="buttons/ui_altar.png" alt="" onerror="this.outerHTML='🔮'"> Altar Ritual <button class="x" data-close="altar">✕</button></h2>
+  <div class="sub">Isi seluruh ingredient untuk memulai ritual pemanggilan boss.</div>
+  <div id="altar-body"></div>
 </div>
 
 <!-- ================= TERMINAL (RAHASIA) =================
      Konsol dev tersembunyi: hanya bisa dibuka lewat kode khusus yang
      diketik di chat. Dipakai untuk men-spawn apa pun yang ada di game. -->
 <div class="panel hidden" id="panel-term">
-  <h2>🖥️ TERMINAL <button class="x" data-close="term">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='🖥️'"> TERMINAL <button class="x" data-close="term">✕</button></h2>
   <div id="term-body"></div>
 </div>
 
 <!-- ================= PANEL HELP ================= -->
 <div class="panel" id="panel-help">
-  <h2>ℹ️ Bantuan <button class="x" data-close="help">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_scroll.png" alt="" onerror="this.outerHTML='ℹ️'"> Bantuan <button class="x" data-close="help">✕</button></h2>
   <table class="help-t">
     <tr><td>WASD / Panah</td><td>Gerak (panah ←→ juga putar kamera)</td></tr>
     <tr><td>SHIFT</td><td>Lari &nbsp;·&nbsp; tekan 2× = roll/dodge</td></tr>
     <tr><td>Klik Kiri</td><td>Serang pedang (rantai sampai 5 combo)</td></tr>
     <tr><td>SPACE</td><td>Lompat / berenang naik</td></tr>
     <tr><td>B / K / C / H</td><td>Tas / Skill / Crafting / Bantuan</td></tr>
+    <tr><td>P</td><td>Panel Karakter — stat lengkap (atau ketuk potret di kiri atas)</td></tr>
     <tr><td>Klik saat memegang makanan</td><td>Makan item hotbar terpilih</td></tr>
-    <tr><td>G</td><td>Ajak bicara penduduk desa (rekrut) / buka panel rekan</td></tr>
+    <tr><td>F</td><td>Interaksi: bicara/rekrut penduduk, pakai perabot, isi altar</td></tr>
+    <tr><td>G</td><td>Buka panel Party (daftar rekan tim)</td></tr>
     <tr><td>1–7</td><td>Pilih slot hotbar</td></tr>
     <tr><td>Q / E / R / T</td><td>Pakai skill aktif slot 1–4 (lihat bar skill)</td></tr>
     <tr><td>← → / Scroll</td><td>Putar / zoom kamera (mobile: geser/cubit 2 jari)</td></tr>
@@ -168,11 +197,25 @@
   <p class="tip">⚠️ Hati-hati dengan Golem Hutan raksasa — hantamannya <b>menghancurkan tanah</b>! Lubang dekat air akan perlahan tergenang. Tebang pohon (pukul batang) untuk kayu, panen semak beri, dan masak daging agar hunger pulih.</p>
 </div>
 
+<!-- ================= PANEL KARAKTER =================
+     Dibuka dari bingkai potret di kiri atas. Kiri = daftar stat detail,
+     kanan = render full-body karakter beserta equipment yang dipakai. -->
+<div class="panel hidden" id="panel-char">
+  <h2><img class="ph-ico" src="buttons/ui_char.png" alt="" onerror="this.outerHTML='🧍'"> Karakter <button class="x" data-close="char">✕</button></h2>
+  <div id="char-layout">
+    <div id="char-stats"></div>
+    <div id="char-view">
+      <canvas id="char-cv" width="320" height="440"></canvas>
+      <div id="char-view-hint">Geser untuk memutar</div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= PANEL SETTINGS (GEAR BUTTON) =================
      Berisi pengaturan musik, custom UI, save manual, & pilihan bahasa.
      Dibuka dari tombol gear di sisi HP bar. -->
 <div class="panel hidden" id="panel-settings">
-  <h2 id="settings-title">⚙️ Pengaturan <button class="x" data-close="settings">✕</button></h2>
+  <h2 id="settings-title"><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='⚙️'"> Pengaturan <button class="x" data-close="settings">✕</button></h2>
   <div id="settings-content"></div>
   <p class="tip" id="settings-tip">Setelan tersimpan otomatis.</p>
 </div>
@@ -181,11 +224,12 @@
 <div id="mobile">
   <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
   <div id="m-buttons">
-    <button id="m-bag" class="m-s">🎒</button>
-    <button id="m-craft" class="m-s">🔨</button>
-    <button id="m-skill" class="m-s">🌟</button>
-    <button id="m-chat" class="m-s" title="Chat">💬</button>
-    <button id="m-talk" class="m-s" title="Ajak bicara / rekrut">🤝</button>
+    <button id="m-bag" class="m-s btn-img" title="Tas"></button>
+    <button id="m-craft" class="m-s btn-img" title="Crafting"></button>
+    <button id="m-skill" class="m-s btn-img" title="Skill"></button>
+    <button id="m-party" class="m-s btn-img" title="Party"></button>
+    <button id="m-chat" class="m-s btn-img" title="Chat"></button>
+    <button id="m-talk" class="m-s btn-img" title="Ajak bicara / rekrut"></button>
   </div>
   <div id="m-main">
     <button id="m-roll" class="m-m btn-img" title="Dash"></button>
@@ -208,7 +252,7 @@
 
 <div id="levelup">LEVEL UP!</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/three.min.js"></script>
 <script src="js/config.js"></script>
 <!-- I18N: data terjemahan + engine pelokalan data game & DOM -->
 <script src="js/i18n.js"></script>
@@ -263,6 +307,13 @@
 <script src="js/entities/mob_lizard.js"></script>
 <script src="js/entities/mob_cow.js"></script>
 <script src="js/entities/mob_horse.js"></script>
+<script src="js/entities/mob_kelabang.js"></script>
+<script src="js/entities/mob_kumbang.js"></script>
+<script src="js/entities/mob_yeti.js"></script>
+<script src="js/entities/mob_semut.js"></script>
+<!-- REAPER: penjaga khusus dungeon (hantu hitam bersabit). Menggantikan
+     wujud "Wraith" lama yang hanya skin menempel pada mob biasa. -->
+<script src="js/entities/mob_reaper.js"></script>
 <!-- NPC desa -->
 <script src="js/entities/npc_guard.js"></script>
 <script src="js/entities/npc_hunter.js"></script>
@@ -272,15 +323,20 @@
 <script src="js/entities/npc_warrior.js"></script>
 <script src="js/entities/npc_guardian.js"></script>
 <script src="js/entities/npc_merchant.js"></script>
+<!-- Dungeon Master: penjual Dungeon Changer (NEW MODEL/Dungeon Master.html) -->
+<script src="js/entities/npc_dungeonmaster.js"></script>
 <!-- NPC langka -->
 <script src="js/entities/npc_lionknight.js"></script>
 <script src="js/entities/npc_elfmage.js"></script>
 <script src="js/entities/npc_stonegiant.js"></script>
 <script src="js/entities/npc_rabbitwarrior.js"></script>
 <script src="js/entities/npc_goblin.js"></script>
+<script src="js/entities/npc_magesupport.js"></script>
+<script src="js/entities/npc_royalguard.js"></script>
 
 <!-- Environment 3D Models -->
 <script src="js/environment/env_trees.js"></script>
+<script src="js/environment/env_plants.js"></script>
 <script src="js/environment/env_campfire.js"></script>
 <script src="js/environment/env_structures.js"></script>
 <script src="js/environment/env_chest.js"></script>
@@ -299,16 +355,27 @@
 <script src="js/camera.js"></script>
 <script src="js/rpg.js"></script>
 <script src="js/ui.js"></script>
+<!-- Bingkai potret HUD + panel Karakter (stat detail & model full body).
+     Butuh Player/RPG/UI, dan dipanggil UI.updateHUD tiap frame. -->
+<script src="js/charpanel.js"></script>
 <!-- Model voxel stasiun kerja (port NEW MODEL/Workstation.html): anvil,
      meja kerja, tungku, api unggun. Dimuat sebelum furni.js yang memakainya. -->
 <script src="js/furni_workstation.js"></script>
 <script src="js/furni.js"></script>
 <!-- Landasan Tempa: panel enchant equipment (butuh UI/RPG/ITEMS di atas). -->
 <script src="js/anvil.js"></script>
+<!-- Altar Ritual: struktur pemanggil boss (butuh Furni/Monsters/RPG/UI di atas). -->
+<script src="js/altar.js"></script>
+<!-- Log Pass: penanda lokasi. Harus SETELAH player.js & ui.js karena modul ini
+     membungkus Player.tryAttack & Player.updateHeld saat dimuat. -->
+<script src="js/logpass.js"></script>
 <!-- Quest wajib setelah furni/ui/rpg/monsters: modul ini membungkus fungsi
      mereka (Monsters.kill, RPG.craft, UI.toggle) saat dimuat. -->
 <script src="js/quest.js"></script>
-
+  <!-- Toko Dungeon Master: menambahkan Furni.DEFS.dmshop, menempatkan kios per
+       desa, dan menambatkan NPC Dungeon Master ke lapaknya. Wajib SETELAH
+       furni.js (memakai Furni.DEFS/Furni.M) dan npc.js (membungkus NPCS.make). -->
+  <script src="js/dmshop.js"></script>
   <script src="js/dungeon.js"></script>
   <script src="js/save.js"></script>
   <script src="js/ui_layout.js"></script>

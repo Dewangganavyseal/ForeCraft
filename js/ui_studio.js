@@ -31,6 +31,7 @@ const UIStudio={
       ['m-bag','Tombol Bag'],
       ['m-craft','Tombol Crafting'],
       ['m-skill','Tombol Skill'],
+      ['m-party','Tombol Party'],
       ['m-chat','Tombol Chat'],
       ['m-talk','Tombol Bicara'],
       ['m-roll','Tombol Roll'],

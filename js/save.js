@@ -23,6 +23,7 @@ const SaveGame={
     if(typeof RPG==='undefined')return;
     RPG.save();
     if(typeof Furni!=='undefined'&&Furni.save)Furni.save();
+    if(typeof Altar!=='undefined'&&Altar.save)Altar.save();
     if(this.btn){
       this.btn.classList.add('ok');
       setTimeout(()=>this.btn.classList.remove('ok'),700);
@@ -51,6 +52,7 @@ if(typeof NPCS!=='undefined'){
            agar save lama & tampilan tetap kompatibel */
         roleId:n.role.id,
         role:n.role.name,name:n.name,level:n.level,xp:n.xp,hp:n.hp,
+        stamina:Math.round(n.stamina||n.maxStamina||100),
         state:n.state,order:n.order,aggr:n.aggr!==false,
         bag:n.bag,gear:n.gear,
         pos:[n.pos.x,n.pos.y,n.pos.z],
@@ -94,16 +96,27 @@ if(typeof NPCS!=='undefined'){
       };
       n.maxhp=this.npcMaxHp(n);
       n.hp=clamp(d.hp||n.maxhp,1,n.maxhp);
+      n.maxStamina=this.npcMaxStamina(n);
+      n.stamina=clamp(d.stamina!==undefined?d.stamina:n.maxStamina,0,n.maxStamina);
       this.list.push(n);
+      /* ROYAL GUARD: bangun ulang model senjata & perisai dari gear tersimpan
+         (setelah load, tangannya kosong tanpa ini) */
+      if(role.id==='royalguard'&&
+         typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
+        NPC_Royalguard.refreshGear(n);
       /* WAJIB: tanpa ini rekan berjalan mengikuti pemain tetapi tidak
          terdaftar di tim, sehingga ikonnya hilang dari HUD dan panel G
          tampak kosong seolah rekannya tidak ada. */
       if(!this.teamFull())this.team.push(n);
       else{n.state='patrol';n.home={x:n.pos.x,z:n.pos.z};
-        n.demand=this.rollDemand(role);}
+        n.demand=this.rollDemand(role,d.lvl||1);}
     }
     if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.renderNpcPanel)UI.renderNpcPanel();
     UI.toast(`🤝 ${arr.length} rekan bergabung kembali`);
   };
+
+  /* stok Dungeon Master per desa disimpan di localStorage terpisah (pola
+     Dungeon.load) — dimuat sekali saat berkas ini dijalankan */
+  if(NPCS.loadDshop)NPCS.loadDshop();
 }

@@ -232,6 +232,11 @@ const ShieldModels={
     shield_wood:'buildWood',shield_iron:'buildIron',shield_flame:'buildFlame',
     shield_frost:'buildIce',shield_venom:'buildPoison',
     shield_storm:'buildLightning',shield_dark:'buildDark',
+    /* Tameng Karapas Kelabang: dulu tidak ada di peta ini sehingga buildFor
+       mengembalikan null — pemain yang memakainya tampak TANPA tameng, dan
+       Royal Guard yang diberi item ini juga bergenggam kosong. Fallback ke
+       builder besi dengan rona karapas diterapkan lewat warna di bawah. */
+    shield_carapace:'buildIron',
   },
 
   /* bangun tameng untuk item id; diskalakan ke TARGET_H agar cocok

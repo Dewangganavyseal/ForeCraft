@@ -12,9 +12,12 @@ const Weather={
 
   init(scene){
     this.sun=new THREE.DirectionalLight(0xfff2d8,1.1);
-    this.sun.castShadow=!IS_MOBILE;
-    if(!IS_MOBILE){
-      this.sun.shadow.mapSize.set(2048,2048);
+    /* bayangan & resolusinya diatur preset grafis (lihat Gfx.apply) */
+    const gp=(typeof Gfx!=='undefined'&&Gfx.preset)?Gfx.preset():null;
+    const useShadow=gp?gp.shadow:!IS_MOBILE;
+    this.sun.castShadow=useShadow;
+    if(useShadow){
+      this.sun.shadow.mapSize.set(gp?gp.shadowSize:1024,gp?gp.shadowSize:1024);
       const sc=this.sun.shadow.camera;
       sc.left=-34;sc.right=34;sc.top=34;sc.bottom=-34;sc.near=1;sc.far=180;
       this.sun.shadow.bias=-0.0006;
@@ -41,7 +44,21 @@ const Weather={
     this.fireflies=new THREE.Points(fg,new THREE.PointsMaterial({color:0xd8ff9a,size:0.14,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
     scene.add(this.fireflies);
     /* hujan */
-    const N=IS_MOBILE?350:700;this.rainN=N;
+    const N=(typeof Gfx!=='undefined'&&Gfx.preset)?Gfx.preset().rainN:(IS_MOBILE?350:700);
+    this.buildRain(scene,N);
+  },
+
+  /* ---------- geometri hujan ----------
+     Dipisah supaya jumlah garis hujan bisa diganti saat preset grafis berubah
+     (lihat Gfx.apply → setRainCount). Geometri & data lama dibuang dulu agar
+     tidak menumpuk. */
+  buildRain(scene,N){
+    if(this.rainLines){
+      scene.remove(this.rainLines);
+      if(this.rainLines.geometry)this.rainLines.geometry.dispose();
+    }
+    this.rainN=N;
+    this.rainData=[];
     const rg=new THREE.BufferGeometry(),rp=new Float32Array(N*6);
     for(let i=0;i<N;i++){
       this.rainData.push({x:rand(-28,28),y:rand(0,24),z:rand(-28,28),v:rand(18,25)});
@@ -51,6 +68,12 @@ const Weather={
       new THREE.LineBasicMaterial({color:0xaac6dd,transparent:true,opacity:0,depthWrite:false}));
     this.rainLines.frustumCulled=false;this.rainLines.renderOrder=5;
     scene.add(this.rainLines);
+  },
+  /* ganti jumlah garis hujan mengikuti preset grafis */
+  setRainCount(N){
+    if(!this.rainLines||this.rainN===N)return;
+    if(typeof Game==='undefined'||!Game.scene)return;
+    this.buildRain(Game.scene,N);
   },
 
   update(dt){
@@ -94,16 +117,19 @@ const Weather={
     Game.scene.background=this.tmp.clone();
     Game.scene.fog.color.copy(this.tmp);
     /* ---------- KABUT ----------
-       BUGFIX: dulu near/far dipatok pada angka absolut (30 dan 90) padahal
-       kameranya ORTOGRAFIK dan duduk sejauh Cam.DIST (80) dari pemain. Jadi
-       kedalaman pemain selalu ~80 — nyaris menyentuh far — sehingga layar
-       selalu tertutup kabut, dan makin parah saat zoom in karena far ikut
-       mengecil bersama Cam.zoom. Sekarang jarak kabut diukur RELATIF terhadap
-       posisi pemain dan diskalakan mengikuti zoom, sehingga area di sekitar
-       pemain selalu bersih dan kabut hanya menipiskan kejauhan. */
-    const z=Cam.zoom;
-    Game.scene.fog.near=Cam.DIST-z*0.2-this.rain*3;
-    Game.scene.fog.far =Cam.DIST+z*1.6+8-this.rain*4;
+       Jarak kabut diukur RELATIF terhadap posisi kamera, bukan angka absolut:
+       kamera duduk sejauh Cam.DIST dari pemain, jadi kedalaman pemain di
+       clip-space selalu ≈DIST. Kalau near/far dipatok konstan (dulu 30/90),
+       layar bisa selalu tertutup kabut.
+
+       Sejak kamera menjadi PERSPEKTIF, Cam.DIST tidak lagi konstan — ia
+       mengecil saat zoom in dan membesar saat zoom out (DIST = zoom/tan(fov/2)).
+       Karena itu lebar pita kabut ikut diskalakan terhadap DIST, bukan terhadap
+       zoom seperti dulu: dengan begitu proporsi "area bersih di sekitar pemain"
+       tetap sama di semua tingkat zoom. */
+    const D=Cam.DIST;
+    Game.scene.fog.near=D*0.92-this.rain*3;
+    Game.scene.fog.far =D*1.55+8-this.rain*4;
 
     /* lampu */
     let inten=(0.15+dayF*1.05)*(1-this.rain*0.22)+this.flash*1.5;

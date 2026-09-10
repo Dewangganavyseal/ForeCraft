@@ -5,14 +5,75 @@ const Game={
   started:false,loadingDone:false,menuMode:false,
   camTarget:new THREE.Vector3(),menuCenter:new THREE.Vector3(),
 
+  /* ---------- PERF: FPS meter + RESOLUSI DINAMIS (PC saja) ---------- */
+  perf:{scale:1,ema:60,acc:0,cool:0,hudOn:false,showT:0},
+  initPerf(){
+    if(typeof document==='undefined'||!document.body)return;
+    let hud=document.getElementById('fps-hud');
+    if(!hud){
+      hud=document.createElement('div');
+      hud.id='fps-hud';
+      document.body.appendChild(hud);
+    }
+    window.addEventListener('keydown',e=>{
+      if(e.code==='F3'){
+        e.preventDefault();
+        this.perf.hudOn=!this.perf.hudOn;
+        hud.style.display=this.perf.hudOn?'block':'none';
+      }
+    });
+  },
+  applyPerfRatio(){
+    if(typeof IS_MOBILE!=='undefined'&&IS_MOBILE)return;
+    if(!this.renderer)return;
+    const gp=(typeof Gfx!=='undefined'&&Gfx.preset)?Gfx.preset():null;
+    const base=gp?gp.pixelRatio:2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,base*this.perf.scale));
+  },
+  perfTick(dt){
+    if(typeof IS_MOBILE!=='undefined'&&IS_MOBILE)return;
+    const P=this.perf;if(!P)return;
+    P.ema+=((1/Math.max(dt,1e-4))-P.ema)*0.05;
+    P.acc+=dt;P.cool=Math.max(0,P.cool-dt);
+    if(P.acc>=1){
+      P.acc=0;
+      if(P.cool<=0){
+        if(P.ema<42&&P.scale>0.7){
+          P.scale=Math.max(0.7,P.scale-0.1);
+          this.applyPerfRatio();
+          if(document.body)document.body.classList.add('perf-hud');
+          P.cool=3;P.showT=2.5;
+        }else if(P.ema>57&&P.scale<1){
+          P.scale=Math.min(1,P.scale+0.05);
+          this.applyPerfRatio();
+          if(P.scale>=1&&document.body)document.body.classList.remove('perf-hud');
+          P.cool=5;P.showT=2.5;
+        }
+      }
+      if(P.hudOn||P.showT>0){
+        if(P.showT>0)P.showT-=1;
+        const el=document.getElementById('fps-hud');
+        if(el){
+          el.style.display='block';
+          el.textContent=Math.round(P.ema)+' FPS · Res '+Math.round(P.scale*100)+'%';
+        }
+      }
+    }
+  },
+
   init(){
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(0x8fb8de);
     this.scene.fog=new THREE.Fog(0x8fb8de,34,90);
-    this.renderer=new THREE.WebGLRenderer({antialias:true});
+    /* preset grafis aktif (Low/Medium/High/Ultra) — lihat GFX_PRESETS di
+       config.js. antialias hanya bisa diset saat renderer dibuat, jadi
+       mengubahnya butuh reload; sisanya bisa diganti saat main. */
+    const gp=(typeof Gfx!=='undefined'&&Gfx.preset)?Gfx.preset():null;
+    this.renderer=new THREE.WebGLRenderer({antialias:gp?gp.antialias:true});
     this.renderer.setSize(window.innerWidth,window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,IS_MOBILE?1.6:2));
-    this.renderer.shadowMap.enabled=!IS_MOBILE;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,
+      gp?gp.pixelRatio:(IS_MOBILE?1.6:2)));
+    this.renderer.shadowMap.enabled=gp?gp.shadow:!IS_MOBILE;
     this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.renderer.outputEncoding=THREE.sRGBEncoding;
     document.getElementById('game').appendChild(this.renderer.domElement);
@@ -26,6 +87,7 @@ const Game={
     Weather.init(this.scene);
     FX.init(this.scene);
     Furni.init(this.scene);
+    if(typeof Altar!=='undefined')Altar.init(this.scene);
     Dungeon.init();
     SaveGame.init();
     Music.initUI();
@@ -34,6 +96,7 @@ const Game={
     Cam.init();
     Input.init();
     UI.init();
+    if(typeof CharView!=='undefined')CharView.init();
     this.scene.add(World.group);
 
     /* main menu baru + background panorama */
@@ -41,6 +104,7 @@ const Game={
     this.startMenuBackground();
 
     this.clock=new THREE.Clock();
+    this.initPerf();
     this.loop=this.loop.bind(this);
     requestAnimationFrame(this.loop);
   },
@@ -51,6 +115,9 @@ const Game={
       if(c.group)World.disposeGroup(c);
     }
     World.chunks.clear();
+    if(typeof World!=='undefined'){
+      World.lcx=1e9;World.zcz=1e9;World.loadList=[];
+    }
   },
 
   findSpawn(){
@@ -105,17 +172,22 @@ const Game={
     if(typeof Music!=='undefined'&&Music.playMenu)Music.playMenu();
   },
 
-  /* kumpulkan beberapa posisi desa untuk tur panorama (cari yang ada desanya) */
+  /* kumpulkan beberapa posisi desa untuk tur panorama (cari yang ada desanya).
+     Sejak desa jauh lebih langka (peluang 20% per wilayah biome + jeda minimal
+     satu wilayah), sapuan ±3 sel hampir selalu hanya menemukan desa spawn.
+     Radius diperlebar ke ±14 sel & jumlah percobaan dinaikkan supaya panorama
+     tetap berpindah antar desa yang berbeda. */
   buildVillageTour(){
     const tour=[],seen={};
-    for(let i=0;i<60&&tour.length<6;i++){
-      const gx=Math.floor(Math.random()*7)-3;
-      const gz=Math.floor(Math.random()*7)-3;
+    const R=14;
+    for(let i=0;i<400&&tour.length<6;i++){
+      const gx=Math.floor(Math.random()*(R*2+1))-R;
+      const gz=Math.floor(Math.random()*(R*2+1))-R;
       const key=gx+','+gz;
       if(seen[key])continue;
+      seen[key]=true;
       const v=(typeof WGEN.villageInCell==='function')?WGEN.villageInCell(gx,gz):null;
       if(!v)continue;
-      seen[key]=true;
       tour.push({x:v.x+0.5,y:CFG.SEA+1.4,z:v.z+0.5});
     }
     if(!tour.length){                       // fallback bila tak ada desa
@@ -207,6 +279,7 @@ const Game={
     document.getElementById('start').classList.add('hidden');
     document.getElementById('loading').style.display='flex';
     this.loadingDone=false;
+    this._loadingStartT=(typeof performance!=='undefined')?performance.now():Date.now();
 
     if(save){
       this.seed=save.seed;
@@ -260,6 +333,14 @@ const Game={
       for(let dx=-CFG.VIEW_R;dx<=CFG.VIEW_R;dx++)
         World.getChunk(pcx+dx,pcz+dz);
 
+    /* RUMAH MODULAR pemain: tulis ulang bloknya SETELAH chunk dunia dibersihkan
+       & di-regenerate di atas. Furni.load() memang sudah menulis blok rumah saat
+       halaman dibuka, tapi clearWorldMeshes() di awal begin() membuang seluruh
+       data chunk itu — tanpa restore ini, rumah yang dibangun hilang setelah
+       keluar-masuk game (record-nya tetap ada, jadi bloknya seolah "hantu":
+       tak terlihat & tak bisa disentuh sampai pintu dipindah). */
+    if(typeof Furni!=='undefined'&&Furni.restoreHouses)Furni.restoreHouses();
+
     UI.renderHotbar();
     RPG.renderCoin();
 
@@ -291,6 +372,7 @@ const Game={
   loop(){
     requestAnimationFrame(this.loop);
     const dt=clamp(this.clock.getDelta(),0,0.05);
+    this.perfTick(dt);
 
     /* main menu panorama */
     if(this.menuMode){
@@ -302,19 +384,37 @@ const Game={
     if(!this.started){this.renderer.render(this.scene,Cam.cam);return;}
 
     /* konsumsi input sekali; Chat.active = pemain sedang mengetik di chat,
-       semua aksi karakter ditahan dulu */
+       semua aksi karakter ditahan dulu. modalOpen = dialog kecil (buang item,
+       nama Log Pass) sedang tampil — aksi karakter juga ditahan supaya klik &
+       tombol di dialog tidak bocor ke gameplay.
+
+       PENTING: flag input DIRESET LEBIH DULU, lalu handler dijalankan DI DALAM
+       try/catch bersama seluruh update. Dulu urutannya kebalikan (handler di
+       luar try, reset sesudahnya), sehingga satu exception di tryAttack membuat
+       `attackQ` tetap true → frame berikutnya melempar lagi → update & render
+       tidak pernah jalan = GAME BEKU TOTAL, bukan sekadar satu frame gagal.
+       Dengan urutan ini, error terburuk hanya membatalkan satu aksi. */
     const chatActive=(typeof Chat!=='undefined')&&Chat.active;
     const studioActive=(typeof UIStudio!=='undefined')&&UIStudio.active;
-    if(!UI.open&&!chatActive&&!studioActive&&!Player.dead){
-      if(Input.jumpQ)Player.tryJump();
-      if(Input.attackQ&&!(typeof Furni!=='undefined'&&Furni.placing))Player.tryAttack();
-      if(Input.dodgeQ&&!Furni.placing)Player.tryDodge();
-    }
+    const modalActive=(typeof UI!=='undefined')&&UI.modalOpen&&UI.modalOpen();
+    const canAct=!UI.open&&!chatActive&&!studioActive&&!modalActive&&!Player.dead;
+    const qJump=Input.jumpQ,qAtk=Input.attackQ,qDodge=Input.dodgeQ;
     Input.jumpQ=false;Input.attackQ=false;Input.dodgeQ=false;
 
     try{
+      if(canAct){
+        if(qJump)Player.tryJump();
+        if(qAtk&&!(typeof Furni!=='undefined'&&Furni.placing))Player.tryAttack();
+        if(qDodge&&!Furni.placing)Player.tryDodge();
+      }
       RPG.updateActive(dt);
-      if(typeof SlamAim!=='undefined')SlamAim.update(dt);
+      /* Bidikan Hantam Bumi dibatalkan bila pemain tidak boleh beraksi (panel
+         terbuka / chat / mati), supaya lingkaran target tidak tertinggal di
+         layar saat sentuhan tidak pernah dilepas. */
+      if(typeof SlamAim!=='undefined'){
+        if(canAct)SlamAim.update(dt);
+        else SlamAim.cancel();
+      }
       Player.update(dt);
       Monsters.update(dt);
       NPCS.update(dt);
@@ -322,6 +422,7 @@ const Game={
       if(typeof FishSys!=='undefined')FishSys.update(dt);
       if(typeof PortFX!=='undefined')PortFX.update(dt);
       Furni.update(dt);
+      if(typeof Altar!=='undefined')Altar.update(dt);
       Dungeon.update(dt);
       if(UI.hudExtra)UI.hudExtra(dt);
       World.update(dt,Player.pos);
@@ -329,27 +430,47 @@ const Game={
       Weather.update(dt);
       if(typeof HPBars!=='undefined')HPBars.update(dt);
       if(typeof Capture!=='undefined')Capture.update(dt);
-      this.camTarget.set(Player.pos.x,Player.pos.y+1.3,Player.pos.z);
-      Cam.update(dt,this.camTarget);
-      /* screen-shake dari ComboVFX dipasang SETELAH Cam.update supaya tidak
-         tertimpa reposisi kamera (lihat player_combo_vfx.updateShake). */
-      if(Player.comboVfx)Player.comboVfx.updateShake(dt);
-      UI.updateHUD();
     }catch(err){
+      /* Error dicatat SEKALI ke toast (agar tidak membanjiri layar), tapi
+         SELALU ke console — tanpa ini, bug yang muncul berulang tiap frame
+         diam-diam tersembunyi setelah toast pertama. */
+      console.error('[Game loop error]',err);
       if(!this._errShown){this._errShown=true;
-        console.error('[Game loop error]',err);
         if(typeof UI!=='undefined'&&UI.toast)UI.toast('⚠️ Error: '+(err&&err.message||err));
       }
+    }finally{
+      /* KAMERA & HUD WAJIB SELALU BERJALAN:
+         Ditempatkan di finally agar bila terjadi error sekecil apa pun di entitas/efek,
+         kamera DIJAMIN tetap mengikuti pergerakan karakter dan tidak pernah membeku. */
+      try{
+        if(typeof Cam!=='undefined'&&Cam.cam&&typeof Player!=='undefined'&&Player.pos){
+          this.camTarget.set(Player.pos.x,Player.pos.y+1.3,Player.pos.z);
+          Cam.update(dt,this.camTarget);
+        }
+        if(Player.comboVfx)Player.comboVfx.updateShake(dt);
+        if(typeof UI!=='undefined'&&UI.updateHUD)UI.updateHUD();
+      }catch(camErr){console.error('[Cam/HUD error]',camErr);}
     }
 
-    if(!this.loadingDone&&World.loadList.length){
-      const c=World.getChunk(World.loadList[0].cx,World.loadList[0].cz);
-      if(c.group){this.loadingDone=true;
-        document.getElementById('loading').style.display='none';
-        UI.toast('🌲 Selamat datang di hutan! Waspadai malam...');
+    if(!this.loadingDone){
+      const now=(typeof performance!=='undefined')?performance.now():Date.now();
+      const elapsed=now-(this._loadingStartT||0);
+      let ready=false;
+      if(typeof World!=='undefined'&&World.loadList&&World.loadList.length){
+        const c=World.chunks.get(World.key(World.loadList[0].cx,World.loadList[0].cz));
+        if(c&&c.group)ready=true;
+      }
+      /* Selesai bila chunk pertama pemain sudah ter-mesh, atau batas aman 3.5 detik
+         agar pemain tidak pernah terjebak selamanya di layar loading */
+      if(ready||elapsed>3500){
+        this.loadingDone=true;
+        const lEl=document.getElementById('loading');
+        if(lEl)lEl.style.display='none';
+        if(typeof UI!=='undefined'&&UI.toast)UI.toast('🌲 Selamat datang di hutan! Waspadai malam...');
       }
     }
     this.renderer.render(this.scene,Cam.cam);
+    this.perfTick(dt);
   },
 };
 
@@ -403,6 +524,7 @@ const MainMenu={
           <button id="mm-music" class="big mm-music">🎵 Musik</button>
         </div>
       </div>`;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('#mm-load').addEventListener('click',()=>this.showLoad());
     this.el.querySelector('#mm-new').addEventListener('click',()=>this.showNew());
     this.el.querySelector('#mm-music').addEventListener('click',()=>this.showMusic());
@@ -420,6 +542,7 @@ const MainMenu={
         </div>
         <button class="big mm-back">← Kembali</button>
       </div>`;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
     const tg=this.el.querySelector('#mm-mus-tg');
     const vol=this.el.querySelector('#mm-mus-vol');
@@ -442,6 +565,7 @@ const MainMenu={
         <div class="slot-list">${slots}</div>
         <button class="big mm-back">← Kembali</button>
       </div>`;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
     this.el.querySelectorAll('.slot-btn').forEach(b=>{
       b.addEventListener('click',()=>{
@@ -461,6 +585,7 @@ const MainMenu={
         <div class="slot-list">${slots}</div>
         <button class="big mm-back">← Kembali</button>
       </div>`;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
     this.el.querySelectorAll('.slot-btn').forEach(b=>{
       b.addEventListener('click',()=>{
@@ -501,6 +626,7 @@ const MainMenu={
         </div>
       </div>`;
     this.el.appendChild(ov);
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(ov,I18N.lang);
     ov.querySelector('.mm-no').addEventListener('click',()=>ov.remove());
     ov.querySelector('.mm-yes').addEventListener('click',()=>{ov.remove();onOk();});
   },
@@ -531,14 +657,15 @@ const Tutorial={
         <ul>
           <li>🕹️ Bergerak: WASD / joystick (mobile).</li>
           <li>⚔️ Klik / tombol serang: menyerang, makan saat memegang makanan, mencangkul, menanam, memanen.</li>
-          <li>🎒 B: tas · K: skill · C: crafting.</li>
+          <li>🎒 B: tas · K: skill · C: crafting · G: party.</li>
           <li>🌾 Cangkul rumput menjadi ladang, lalu tanam benih.</li>
-          <li>🧑 Dekati penduduk lalu tekan G / tombol 🤝 untuk bicara atau rekrut.</li>
+          <li>🧑 Dekati penduduk lalu tekan F / tombol 🤝 untuk bicara atau rekrut.</li>
           <li>🌙 Malam berbahaya — siapkan makanan dan senjata.</li>
         </ul>
         <button id="tutorial-ok">✔ Mengerti</button>
       </div>`;
     document.body.appendChild(ov);
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(ov,I18N.lang);
     ov.querySelector('#tutorial-ok').addEventListener('click',()=>{
       this.markDone();
       ov.remove();
