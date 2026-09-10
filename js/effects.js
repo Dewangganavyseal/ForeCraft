@@ -211,7 +211,7 @@ const FX={
         const dx=Math.sin(f.dir),dz=Math.cos(f.dir);
         dist=(wx-f.x)*dx+(wz-f.z)*dz;
         lat=Math.abs((wx-f.x)*dz-(wz-f.z)*dx);
-        const latL=f.spread>0?Math.max(2.4,f.spread*0.52):2.4;
+        const latL=f.spread>0?Math.max(2.4,f.spread*0.85):2.4;
         if(lat>latL)continue;
       }
       if(dist<0||dist>f.maxDist)continue;

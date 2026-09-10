@@ -13,6 +13,7 @@ opencode-config.bat
 *.bat
 
 # ============ Backup & Checkpoints ============
+save_*.json
 js/backup/
 CHECKPOINT_*/
 *(backup)*

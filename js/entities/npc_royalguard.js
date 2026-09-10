@@ -50,18 +50,13 @@ const NPC_RoyalGuard={
     bashDmgMul:1.6,       // damage bash terhadap npcDmgSafe
     bashWind:0.34,        // animasi ancang-ancang (detik) â€” file asli
     bashHit:0.16,         // jendela impact
-    /* ---- shockwave (efek mengerucut → menyebar) ----
-       KALIBRASI ke HANTAM BUMI pemain (amp 0.95 + shockwave + shake 0.7):
-       dulu amp 0.55 terasa datar. Sekarang DUA front dikeluarkan: front
-       sempit cepat yang MENGANGKAT tanah tinggi, lalu front lebar lambat
-       yang bergolak menyusul — tanah terasa hidup dua lapis. */
-     waveNarrow:1.0,
-     waveSpread:5,
-     waveSpeed:7.2,
-     waveAmp:0.88,
-     waveSpeed2:5.0,
-     waveAmp2:0.42,
-     waveWidth2:2.6,
+    /* ---- shockwave tanah terangkat (kalibrasi hantam bumi player & giant slam) ----
+       Dibuat lurus menyebar ke depan: satu gelombang tanah bertenaga penuh (amp 0.95),
+       menjalar cepat dan mengangkat blok tanah secara nyata & rapi */
+    waveSpeed:8.2,
+    waveAmp:0.95,         // persis hantam bumi player & giant slam (0.95)
+    waveWidth:1.15,       // lebar awal front (mengerucut di dekat perisai)
+    waveSpread:4.8,       // menyebar ke depan hingga 4.8 blok
     /* ---- PROVOKE ---- */
     provDur1:7, provDur100:10,
     provCd1:15, provCd100:12,
@@ -448,14 +443,6 @@ const NPC_RoyalGuard={
       if(P.shieldPlate&&P.shieldPlate.material&&P.shieldPlate.material.emissive)
         P.shieldPlate.material.emissiveIntensity=0;
     }
-    /* efek cone bash menyebar-mengerucut */
-    if(st.cone){
-      st.cone.material.opacity*=Math.exp(-5.5*dt);
-      st.coneFlash*=Math.exp(-5*dt);
-      const sc=1+(1-st.coneFlash)*0.45;
-      st.cone.scale.set(sc,sc,sc);
-      if(st.cone.material.opacity<0.02){st.cone.visible=false;}
-    }
   },
 
   /* pose ayunan pedang biasa (dipakai saat swing dari aiFight) */
@@ -501,45 +488,28 @@ const NPC_RoyalGuard={
     P.shX=shX;P.shY=shY;      // deviasi orientasi perisai (file asli)
   },
 
-    /* ---------- POSE PROVOKE (angkat pedang â†’ kuda-kuda bertahan) ---------- */
+    /* ---------- POSE PROVOKE (teriak penantang singkat 0.45 dtk) ---------- */
   _poseProvoke(n,P,A,t){
-    const st=n.rgSt;
-    const b=Math.sin(t*7);
-    let shX=0.06,shY=-0.2;
-    if(t<0.5){
-      const u=t/0.5;
-      P.aRx=-0.14-u*2.3;P.aRz=-0.22+u*0.28;P.fRx=-0.62+u*0.5;
-      P.aLx=-0.42-u*0.22;P.aLy=0.3-u*0.36;P.fLx=-1.15+u*0.28;
-      P.lean=-u*0.2;P.rootY=u*0.1;
-      P.headX=-u*0.24;
-      P.legLz=u*0.16;P.legRz=-u*0.16;
-      P.legLx=-u*0.1;P.legRx=-u*0.1;
-      shY=-0.2+u*0.2;          // perisai dibuka ke depan
-    }else{
-      /* pose bertahan selama sisa durasi provoke */
-      P.aRx=-2.4+Math.sin(t*2)*0.06;P.aRz=0.06;P.fRx=-0.14;
-      P.aLx=-0.66+b*0.02;P.aLy=-0.06;P.aLz=0.18;P.fLx=-0.88+b*0.02;
-      P.lean=-0.16;P.rootY=0.1+b*0.012;
-      P.headX=-0.2;
-      P.twist=Math.sin(t*1.6)*0.05;
-      P.legLz=0.16;P.legRz=-0.16;
-      P.legLx=-0.1;P.legRx=-0.1;
-      shX=-0.04;shY=0;         // perisai menutup dada, tegak lurus hadap
-      if(st&&st.provT<=0)n.rgAct=null;    // selesai → kembali normal
+    const u=clamp(t/0.45,0,1);
+    P.aRx=-0.14-u*2.3;P.aRz=-0.22+u*0.28;P.fRx=-0.62+u*0.5;
+    P.aLx=-0.42-u*0.22;P.aLy=0.3-u*0.36;P.fLx=-1.15+u*0.28;
+    P.lean=-u*0.2;P.rootY=u*0.1;
+    P.headX=-u*0.24;
+    P.legLz=u*0.16;P.legRz=-u*0.16;
+    P.legLx=-u*0.1;P.legRx=-u*0.1;
+    P.shX=0.06;P.shY=-0.2+u*0.2;          // perisai dibuka ke depan saat teriak
+    if(t>=0.45){
+      n.rgAct=null;                       // selesai teriak: guard langsung bebas menyerang & bergerak
     }
-    P.shX=shX;P.shY=shY;
   },
 
   /* =====================================================================
-     SHIELD BASH â€” eksekusi
+     SHIELD BASH — eksekusi
      ---------------------------------------------------------------------
-     Kerucut depan ~70Â°, jangkauan 8 blok. Mob kena: knockback + STUN.
-     Stun diimplementasi lewat m.stunT (field baru di Monsters) â€” selama
-     stunT>0 mob membeku (lihat patch Monsters.update).
-     Shockwave tanah memakai FX.groundWave mode 'line': front gelombang
-     MULAI mengerucut selebar 1 blok lalu MENYEBAR hingga 5 blok secara
-     halus (kurva gaussian lebar front naik dengan jarak â€” lihat
-     FX.groundWave angleSpread).
+     Kerucut depan ~70°, jangkauan 8 blok. Mob kena: knockback + STUN.
+     Gelombang tanah terangkat dibuat persis hantam bumi player & giant slam:
+     satu gelombang bertenaga penuh (amp 0.95), menjalar lurus menyebar ke
+     depan mengikuti arah perisai tanpa tumpang-tindih glitch.
      ===================================================================== */
   _doBash(n){
     const RG=this.RG,st=n.rgSt||(n.rgSt={});
@@ -547,44 +517,34 @@ const NPC_RoyalGuard={
     const Lv=typeof Player!=='undefined'?Player.level:1;
     const stun=lerp(RG.bashStun1,RG.bashStun100,clamp((Lv-1)/99,0,1));
     const knock=lerp(RG.bashKnock1,RG.bashKnock100,clamp((Lv-1)/99,0,1));
-    /* VFX: ring + flash + percikan di titik benturan */
-    const ix=n.pos.x+fx*1.6,iz=n.pos.z+fz*1.6,iy=n.pos.y+1.1;
-    FX.ring(ix,iy-0.9,iz,0xff9a4d,0.5,7);
-    FX.impact(new THREE.Vector3(ix,iy,iz),0xffc39a,1.6);
-    PortFX.spark(ix,iy,iz,14,0xffb066,11);
-    FX.addShake(0.7);                    // kalibrasi Hantam Bumi pemain (0.7)
-    /* CONE + SHOCKWAVE VERTIKAL di titik benturan (dulu hanya ring datar) */
-    FX.shockwave(ix,iy-0.85,iz,0xffd24d,5);
-    /* cone glow (RingGeometry kerucut menghadap depan) */
-    if(!st.cone){
-      st.cone=new THREE.Mesh(new THREE.RingGeometry(0.5,3.4,26,1,-0.7,1.4),
-        new THREE.MeshBasicMaterial({color:0xff9a4d,transparent:true,opacity:0,
-          side:THREE.DoubleSide,depthWrite:false}));
-      st.cone.rotation.x=-RPI/2;
-      (typeof Game!=='undefined'&&Game.scene)?Game.scene.add(st.cone):null;
-    }
-    st.cone.visible=true;
-    st.cone.position.set(n.pos.x,n.pos.y+0.07,n.pos.z);
-    st.cone.rotation.z=-n.mesh.rotation.y;
-    st.cone.material.opacity=0.55;
-    st.coneFlash=1;
-    /* SHOCKWAVE TANAH DUA LAPIS (kalibrasi leap/Hantam Bumi pemain):
-       1. Front utama: mengerucut 1 blok, menyebar 5 blok, angkat TINGGI
-          (amp 1.0; dulu 0.55 sehingga terasa datar).
-       2. Front kedua: lebih lambat & lebar konstanta - tanah bergolak
-          menyusul di belakang front utama, memberi rasa dua lapis. */
+
+    /* Titik benturan perisai di depan guard */
+    const ix=n.pos.x+fx*1.4,iz=n.pos.z+fz*1.4,iy=n.pos.y+0.2;
+
+    /* VFX benturan tanah persis hantam bumi player & giant slam */
+    FX.ring(ix,iy+0.05,iz,0xff9a4d,0.6,6);
+    FX.ring(ix,iy+0.05,iz,0xffffff,0.35,3.5);
+    FX.shockwave(ix,iy,iz,0xffd24d,5);
+    FX.debris(new THREE.Vector3(ix,iy+0.3,iz),0x8a6b4a,18,4.5);
+    PortFX.spark(ix,iy+0.5,iz,14,0xffd9a0,9);
+    FX.addShake(0.65);
+    Sfx.at(n.pos,'smash');
+
+    /* GELOMBANG TANAH TERANGKAT:
+       Lurus menyebar ke depan, bertenaga penuh (amp 0.95) & mulus menjalar */
     if(typeof FX!=='undefined'&&FX.groundWave){
-      FX.groundWave(ix,iy-0.9,iz,{mode:'line',dir:n.mesh.rotation.y,
-        speed:RG.waveSpeed,amp:RG.waveAmp,
-        radius:RG.waveSpread,width:RG.waveNarrow,angleSpread:RG.waveSpread,
-        smooth:true});
-      FX.groundWave(ix,iy-0.9,iz,{mode:'line',dir:n.mesh.rotation.y,
-        speed:RG.waveSpeed2,amp:RG.waveAmp2,radius:RG.waveSpread,
-        width:RG.waveWidth2,smooth:true});
-      /* tanah & debu meledak di titik benturan - memberi rasa hentakan */
-      FX.debris(new THREE.Vector3(ix,iy-0.8,iz),0x8a6b4a,24,5.2);
-      FX.debris(new THREE.Vector3(ix+fx*2,iy-0.8,iz+fz*2),0x9e8a5a,12,3.6);
+      FX.groundWave(ix,iy,iz,{
+        mode:'line',
+        dir:n.mesh.rotation.y,
+        speed:RG.waveSpeed,
+        amp:RG.waveAmp,
+        radius:RG.bashRange,
+        width:RG.waveWidth,
+        angleSpread:RG.waveSpread,
+        smooth:false
+      });
     }
+
     /* damage + stun semua mob di kerucut */
     const dmg=npcDmgSafe(n)*RG.bashDmgMul;
     let hit=0;
@@ -596,9 +556,8 @@ const NPC_RoyalGuard={
       const dot=(dx*fx+dz*fz)/(d||0.001);
       if(dot<RG.bashDot)continue;
       hit++;
-      m.stunT=stun;                       // MONSTERS STUN (patch monsters.js)
+      m.stunT=stun;                       // MONSTERS STUN
       m.vx=m.vx||0;m.vz=m.vz||0;
-      /* knockback: Monsters.physics membaca m.vel, bukan vx/vz */
       const kx=d>0.001?(dx/d):fx, kz=d>0.001?(dz/d):fz;
       m.vel.x+=kx*knock;m.vel.z+=kz*knock;
       Monsters.hurt(m,dmg,new THREE.Vector3(kx,0.2,kz),knock*0.5,n);
@@ -611,18 +570,11 @@ const NPC_RoyalGuard={
 
   /* =====================================================================
       PROVOKE
-      ---------------------------------------------------------------------
-      Perilaku (permintaan pemain):
-        - mob TIDAK tersedot ke arah guard — dulu ada "tarikan pelan" yang
-          menyeret mob; itu dihapus total.
-        - mob yang terkena PINDAH SASARAN ke guard dan MENYERANGNYA:
-          m.provokedBy=guard dipasang, dan Monsters.pickFoe menghormatinya
-          (target terkunci — pukulan pemain tidak menggeser sasaran).
-        - lock lepas saat durasi habis ATAU guard tewas.
       ===================================================================== */
   _endProvoke(n){
     const st=n.rgSt||(n.rgSt={});
     st.provT=0;
+    n.provDr=0;
     for(const m of Monsters.list)if(m.provokedBy===n)m.provokedBy=null;
   },
   _doProvoke(n){
@@ -632,6 +584,7 @@ const NPC_RoyalGuard={
     st.provT=lerp(RG.provDur1,RG.provDur100,k);
     st.provDur=st.provT;
     st.provCd=lerp(RG.provCd1,RG.provCd100,k);
+    n.provDr=RG.provDr;                        // 70% damage reduction aktif
     FX.ring(n.pos.x,n.pos.y+0.07,n.pos.z,0xffd23d,0.8,14);
     FX.impact(n.pos.clone().add(new THREE.Vector3(0,1.4,0)),0xffe066,1.8);
     FX.addShake(0.2);
@@ -645,8 +598,6 @@ const NPC_RoyalGuard={
       taunt++;
       m.provokedBy=n;                          // KUNCI TARGET (dicek pickFoe)
       if(m.foe)m.foe=n;                        // balik arah seketika frame ini
-      /* threat besar agar setelah lock lepas mob masih menganggap guard
-         lawan utamanya untuk sementara */
       if(typeof Monsters.addThreat==='function')Monsters.addThreat(m,n,25,99);
     }
     if(taunt)FX.text(n.pos.clone().add(new THREE.Vector3(0,2.3,0)),
@@ -654,7 +605,7 @@ const NPC_RoyalGuard={
   },
 
   /* =====================================================================
-     COMBAT â€” dipanggil SkillsPort.combat dari NPCS.aiFight
+     COMBAT — dipanggil SkillsPort.combat dari NPCS.aiFight
      ===================================================================== */
   combat(n,dt){
     const st=n.rgSt||(n.rgSt={});
@@ -662,16 +613,18 @@ const NPC_RoyalGuard={
     /* cooldown turun selalu */
     st.bashCd=Math.max(0,(st.bashCd||0)-dt);
     st.provCd=Math.max(0,(st.provCd||0)-dt);
-    /* ---------- sedang memainkan aksi ----------
-       (timeline A.t ditambahkan di animate(); di sini hanya logika eksekusi) */
+    /* ---------- sedang memainkan aksi ---------- */
     const A=n.rgAct;
     if(A){
       if(A.type==='provoke'){
-        /* durasi berjalan; unlock ditangani tick() — di sini tidak ada
-           tarikan lagi (provoke memindah target, bukan menyedot mob) */
-        if(st.provT<=0)n.rgAct=null;
+        if(A.t>=0.45){
+          n.rgAct=null;                        // selesai animasi teriak: guard langsung aktif bertarung!
+        }else{
+          return true;                         // jeda sekejap hanya saat animasi teriak
+        }
+      }else{
+        return true;                           // bash sedang berjalan
       }
-      return true;    // aiFight bawaan dilewati selama aksi berjalan
     }
     /* ---------- picu skill ---------- */
     if(!n.target||n.target.dead)return false;
@@ -714,13 +667,14 @@ const NPC_RoyalGuard={
     const st=n.rgSt;if(!st)return;
     st.bashCd=Math.max(0,(st.bashCd||0)-dt);
     st.provCd=Math.max(0,(st.provCd||0)-dt);
+    if(n.dead){
+      if(st.provT>0)this._endProvoke(n);
+      return;
+    }
     if(st.provT>0){
       st.provT-=dt;
-      /* durasi habis: lepas KUNCI TARGET semua mob yang diprovokasi.
-         (Mob di luar jangkauan / guard tewas: lock lewat sendiri lewat
-         Monsters.pickFoe yang mengecek provokedBy.dead.) */
+      /* durasi habis: lepas KUNCI TARGET semua mob yang diprovokasi */
       if(st.provT<=0)this._endProvoke(n);
-      if(n.rgAct&&n.rgAct.type==='provoke'&&st.provT<=0)n.rgAct=null;
     }
   },
 };

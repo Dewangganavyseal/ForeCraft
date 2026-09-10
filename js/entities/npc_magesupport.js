@@ -710,29 +710,23 @@ const NPC_Magesupport={
     c.sfx=(c.sfx||0)+1;
     if(c.sfx%SUP.starSfxEvery===1&&typeof Sfx!=='undefined')
       Sfx.at(new THREE.Vector3(x,gy,z),'hit');
-    /* ---- DoT persen MAX HP ke monster dalam radius ----
-       di-tick NPCS.supportBuffs → Monsters.hurt per detik supaya threat/aggro
-       tetap konsisten (sumber = mage ini). Dua penyesuaian balance:
-       1) sisa DoT lama DITUMPUK (bukan ditimpa) supaya monster yang tersentuh
-          beberapa bola tidak kehilangan kikisan yang belum terbayar;
-       2) bagian bola yang jatuh di tanah kosong DISIMPAN di c.pool lalu
-          ditambahkan ke bola berikutnya. Pola sebaran prototipe lebar (sampai
-          ~3 blok dari pusat), jadi tanpa ini sebagian besar bola akan luput
-          dari target dan total kikisan satu hujan jauh di bawah lvStarPct. */
+    /* ---- DAMAGE HUJAN CAHAYA: 50% dari total damage Mage Support per bola cahaya ---- */
     if(typeof Monsters==='undefined')return;
-    const r=SUP.starR,dur=c.dotDur;
-    const share=c.pctPer+(c.pool||0);
-    let hit=false;
+    const r=SUP.starR;
+    const totalDmg=(typeof NPCS!=='undefined'&&NPCS.npcDmg)?NPCS.npcDmg(n):n.baseDmg;
+    const beamDmg=Math.max(1,Math.round(totalDmg*0.50));
     for(const m of Monsters.list){
-      if(m.dead)continue;
+      if(m.dead||m.pet||m.catchActive)continue;
       const dx=m.pos.x-x,dz=m.pos.z-z;
-      if(dx*dx+dz*dz>r*r)continue;
-      hit=true;
-      const prev=m.starDot;
-      const rem=(prev&&prev.left>0?prev.rate*prev.left:0)+m.maxhp*share;
-      m.starDot={rate:rem/dur,left:dur,src:n,acc:(prev&&prev.acc)||0};
+      const distSq=dx*dx+dz*dz;
+      if(distSq>r*r)continue;
+      const d=Math.sqrt(distSq)||0.001;
+      const kx=(dx/d)*0.35,kz=(dz/d)*0.35;
+      Monsters.hurt(m,beamDmg,new THREE.Vector3(kx,0.25,kz),1.5,n);
+      FX.text(m.pos.clone().add(new THREE.Vector3(0,1.7,0)),String(beamDmg),'#ffe4a0');
+      if(typeof PortFX!=='undefined'&&PortFX.spark)
+        PortFX.spark(m.pos.x,m.pos.y+0.8,m.pos.z,4,0xfff8dc,4);
     }
-    c.pool=hit?0:share;
   },
   /* cincin & cahaya area di tanah selama hujan berlangsung (areaRing+areaGlow) */
   spawnStarArea(x,gy,z,dur){
