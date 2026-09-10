@@ -574,13 +574,14 @@ const Player={
   startSlamLeap(tx,tz){
     const dx=tx-this.pos.x,dz=tz-this.pos.z;
     const dist=Math.hypot(dx,dz);
+    const targetGy=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(tx,tz,CFG.WORLD_H-1)||World.groundAt(tx,tz)||this.pos.y):this.pos.y;
     this.slamLeap={sx:this.pos.x,sy:this.pos.y,sz:this.pos.z,tx,tz,t:0,
+      targetGy,
       dur:clamp(dist/13,0.32,0.62),arc:clamp(1.8+dist*0.22,2,3.4)};
     if(dist>0.01)this.facing=Math.atan2(dx,dz);
     this.vel.set(0,0,0);
     this.onGround=false;
-    /* efek lepas landas: debu + suara lompat. Pose hantam baru diputar saat
-       mendarat (bukan di sini) supaya selama terbang terlihat melompat. */
+    /* efek lepas landas: debu + suara lompat */
     FX.debris(new THREE.Vector3(this.pos.x,this.pos.y+0.2,this.pos.z),0xc9b48a,9,2.6);
     Sfx.jump();
   },
@@ -590,25 +591,20 @@ const Player={
     const p=clamp(L.t/L.dur,0,1);
     this.pos.x=lerp(L.sx,L.tx,p);
     this.pos.z=lerp(L.sz,L.tz,p);
-    const gy=World.groundAt(this.pos.x,this.pos.z,L.sy+3);
-    this.pos.y=lerp(L.sy,gy,p)+Math.sin(p*Math.PI)*L.arc;
+    const targetY=(L.targetGy!==undefined)?L.targetGy:World.groundAt(L.tx,L.tz,CFG.WORLD_H-1);
+    const gy=World.groundAt(this.pos.x,this.pos.z,Math.max(L.sy+6,targetY+4))||targetY;
+    this.pos.y=lerp(L.sy,targetY,p)+Math.sin(p*Math.PI)*L.arc;
     this.vel.set(0,0,0);
-    /* anggap melayang supaya animate() memakai pose 'jump' (terlihat melompat,
-       bukan diam meluncur) */
     this.onGround=false;this.inWater=false;
     this.animate(dt,false,0,false);
-    /* SINKRONISASI MESH: biasanya dilakukan di akhir update() yang dilewati
-       selama lompatan. Tanpa ini model tidak mengikuti busur dan hanya
-       "pindah tempat" di akhir. */
     if(this.mesh){this.mesh.position.copy(this.pos);this.mesh.rotation.y=this.facing;}
     if(p>=1){
       this.pos.y=gy;this.onGround=true;this.airJumped=false;
       this.slamLeap=null;
       if(this.playSkillAnim)this.playSkillAnim('slam');   // pose hantaman saat mendarat
-      /* jalur TERARAH belum membayar apa pun (SlamAim.release memanggil
-         startSlamLeap langsung, bukan useActive), jadi di sini biaya & cooldown
-         dipungut normal — tanpa prepaid. */
-      if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z);
+      /* Jalur TERARAH: biaya & cooldown sudah dibayar saat tombol dilepas,
+         panggil doSlamAt dengan prepaid=true agar efek & damage selalu keluar */
+      if(typeof RPG!=='undefined'&&RPG.doSlamAt)RPG.doSlamAt(this.pos.x,this.pos.y,this.pos.z,true);
     }
   },
   tryDodge(){
@@ -1333,34 +1329,21 @@ const Player={
     else this.stamina=Math.min(this.maxStamina(),this.stamina+(moving?9:14)*dt);
     this.stamina=clamp(this.stamina,0,this.maxStamina());
     this.hunger=clamp(this.hunger,0,100);
-    /* ---------- KELAPARAN: HP TERKIKIS DENGAN UMPAN BALIK ----------
-       Dulu `this.hp-=2*dt` berjalan diam-diam: tidak ada getar, suara, angka
-       damage, maupun vignette — pemain baru sadar setelah bar HP hampir habis.
-       Sekarang kerusakan kelaparan dikumpulkan lalu dilepas sebagai "pukulan"
-       tiap STARVE_TICK detik, memakai umpan balik yang sama dengan terkena
-       serangan (getar kamera + vignette + suara + angka merah).
-
-       Sengaja TIDAK memanggil takeDamage(): fungsi itu memotong damage dengan
-       armor, mengundi tangkisan perisai, memicu efek 'thorns', dan memberi
-       knockback — semuanya tidak masuk akal untuk rasa lapar. Yang diambil
-       hanyalah bagian umpan baliknya. */
+    /* ---------- KELAPARAN: HP BERKURANG 5% PER TICK DAMAGE ---------- */
     if(this.hunger<=0){
-      const dmg=2*dt;
-      this.hp-=dmg;
-      this.starveAcc=(this.starveAcc||0)+dmg;
       this.starveT=(this.starveT||0)-dt;
       if(this.starveT<=0&&this.hp>0){
-        this.starveT=this.STARVE_TICK;
-        const shown=Math.max(1,Math.round(this.starveAcc));
-        this.starveAcc=0;
-        FX.addShake(0.3);
+        this.starveT=this.STARVE_TICK||1.5;
+        const dmg=Math.max(1,Math.round(this.maxHp()*0.05)); // 5% dari Max HP per damage tick
+        this.hp-=dmg;
+        FX.addShake(0.35);
         if(typeof Sfx!=='undefined'&&Sfx.hurt)Sfx.hurt();
         if(typeof UI!=='undefined'&&UI.flashVignette)UI.flashVignette();
         FX.text(this.pos.clone().add(new THREE.Vector3(0,2,0)),
-          `🍖 -${shown}`,'#ffa84d');
+          `-${dmg}`,'#ffa84d','ui_hunger');
       }
     }else{
-      this.starveAcc=0;this.starveT=0;
+      this.starveT=0;
       if(this.hunger>85&&this.hp<this.maxHp())this.hp=Math.min(this.maxHp(),this.hp+1.3*dt);
     }
     /* efek 'regen' dari Zirah Nadi Kristal: pemulihan pasif terus-menerus */
@@ -1732,9 +1715,9 @@ const Player={
             Legends), lepas untuk mengeksekusi.
    ===================================================================== */
 const SlamAim={
-  HOLD:0.28,      // detik tahan sebelum masuk mode bidik
+  HOLD:0.06,      // detik tahan sebelum masuk mode bidik (langsung responsif tanpa delay)
   MAX_R:7,        // radius bidik maksimum dari pemain
-  DEAD:10,        // px seretan yang diabaikan (anggap tekan di tempat)
+  DEAD:4,         // px seretan yang diabaikan (anggap tekan di tempat)
   /* ---------- SENSITIVITAS SERETAN (mobile) ----------
      Panjang seretan yang setara radius bidik penuh (MAX_R) TIDAK tetap lagi:
      dihitung per-seretan dari sisa ruang layar ke arah jari (lihat dragSpan).
@@ -1764,13 +1747,13 @@ const SlamAim={
     if(this.state!=='idle')return;
     if(typeof RPG==='undefined'||RPG.skillVal('slam')<=0||Player.dead)return;
     if(RPG.activeCD.slam>0){UI.toast(`⏳ ${Math.ceil(RPG.activeCD.slam)}s lagi`);return;}
+    const need=Math.max(1,Math.round(25*RPG.stamCostMult()));
+    if(Player.stamina<need){UI.toast('⚡ Stamina kurang!');Sfx.noStamina();return;}
     this.state='pending';this.t=0;
-    /* Titik awal seretan HARUS diset di sini, bukan sebelum press(): dulu
-       press() selalu menimpanya dengan null sehingga dragStart tetap kosong,
-       cabang seret di updateAim() tidak pernah menang, dan indikator diam di
-       tempat (bug "lingkaran target tidak bisa digeser" di mobile). */
     this.dragStart=origin?{x:origin.x,y:origin.y}:null;
     this.dragCur=origin?{x:origin.x,y:origin.y}:null;
+    /* Langsung siapkan titik bidik dan tampilkan indikator agar terasa instan */
+    this.updateAim();
   },
 
   /* posisi jari terkini selama menahan tombol skill (mobile) */
@@ -1815,6 +1798,12 @@ const SlamAim={
     /* terarah: loncat ke titik bidik lalu hantam saat mendarat */
     const dx=this.aim.x-Player.pos.x,dz=this.aim.z-Player.pos.z;
     if(Math.hypot(dx,dz)<1.2){RPG.useActive('slam');return;}
+    /* Bayar stamina & pasang cooldown SEBELUM terbang agar eksekusi di pendaratan 100% terjamin */
+    const need=Math.max(1,Math.round(25*RPG.stamCostMult()));
+    if(Player.stamina<need){UI.toast('⚡ Stamina kurang!');Sfx.noStamina();return;}
+    Player.stamina-=need;
+    RPG.activeCD.slam=RPG.activeCDMax('slam');
+    UI.renderActiveSkills();
     Player.startSlamLeap(this.aim.x,this.aim.z);
   },
 
@@ -1909,7 +1898,7 @@ const SlamAim={
   hideIndicator(){ if(this.indicator)this.indicator.visible=false; },
   moveIndicator(){
     if(!this.indicator)return;
-    const gy=World.groundAt(this.aim.x,this.aim.z,Player.pos.y+3);
+    const gy=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(this.aim.x,this.aim.z,CFG.WORLD_H-1)||Player.pos.y):Player.pos.y;
     this.indicator.position.set(this.aim.x,gy+0.08,this.aim.z);
   },
 };

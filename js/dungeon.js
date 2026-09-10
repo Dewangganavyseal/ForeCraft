@@ -829,7 +829,9 @@ const Dungeon={
     const got=[];
     const add=(id,n)=>{
       if(!ITEMS[id]||n<=0)return;
-      RPG.addItem(id,n);got.push(`${ITEMS[id].e} ${ITEMS[id].n} ×${n}`);
+      RPG.addItem(id,n);
+      const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):ITEMS[id].e;
+      got.push(`${ico} ${ITEMS[id].n} ×${n}`);
     };
     /* --- 1. bahan pasti: tabel harta level itu, porsi besar --- */
     const table=this.lootTableFor(lvl);
@@ -861,14 +863,18 @@ const Dungeon={
     UI.toast(`👑 PETI PENJAGA AGUNG (Lv ${lvl}): ${got.join(', ')||'kosong'}`);
     if(gear){
       const R=RARITY[gear.rar]||RARITY.common;
-      UI.toast(`${R.e} ${ITEMS[gear.id].e} ${ITEMS[gear.id].n} — ${R.n}!`);
+      const gIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(gear.id):ITEMS[gear.id].e;
+      UI.toast(`${R.e} ${gIco} ${ITEMS[gear.id].n} — ${R.n}!`);
       /* legendaris = rarity tertinggi (2% di level 10): rayakan lebih meriah */
       if(gear.rar==='legendary'){
         FX.ring(f.x,f.y+0.1,f.z,R.c,1.8,8);
         FX.debris(new THREE.Vector3(f.x,f.y+1.3,f.z),R.c,36,5);
       }
     }
-    if(rareGot)UI.toast(`✨ Temuan langka: ${ITEMS[rareGot].e} ${ITEMS[rareGot].n}!`);
+    if(rareGot){
+      const rIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(rareGot):ITEMS[rareGot].e;
+      UI.toast(`✨ Temuan langka: ${rIco} ${ITEMS[rareGot].n}!`);
+    }
     UI.renderAll();
   },
 
@@ -1030,7 +1036,8 @@ const Dungeon={
       const n=Math.max(1,Math.round(
         (e[1]+Math.floor(Math.random()*(e[2]-e[1]+1)))*mul));
       RPG.addItem(e[0],n);
-      got.push(`${ITEMS[e[0]].e} ${ITEMS[e[0]].n} ×${n}`);
+      const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(e[0]):ITEMS[e[0]].e;
+      got.push(`${ico} ${ITEMS[e[0]].n} ×${n}`);
     }
     /* animasi tutup terbuka + kilau (lid voxel ditangani Furni.update) */
     f.lidOpen=true;
@@ -1363,7 +1370,9 @@ const Dungeon={
     const got=[];
     const add=(id,n)=>{
       if(!ITEMS[id]||n<=0)return;
-      RPG.addItem(id,n);got.push(`${ITEMS[id].e} ${ITEMS[id].n} ×${n}`);
+      RPG.addItem(id,n);
+      const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):ITEMS[id].e;
+      got.push(`${ico} ${ITEMS[id].n} ×${n}`);
     };
     /* hadiah pasti: satu tumpuk penuh tiap bahan dari tabel harta level itu */
     for(const e of this.lootTableFor(lvl))add(e[0],Math.round(e[2]*(0.6+lvl*0.2)));

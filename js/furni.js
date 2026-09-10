@@ -118,17 +118,23 @@ const Furni={
     /* Meja Kerja: stasiun crafting pengganti meja biasa */
     workbench:{n:'Meja Kerja',e:'🔨',item:'f_workbench',r:2.0,label:'🔨 Meja Kerja',
       build(){return WSModels.make('bench',0.32);},
-      use(){UI.toast('🔨 Meja kerja — panel crafting terbuka');Sfx.open();
+      use(){
+        const benchIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_workbench)?`<img class="iico" src="${UI.ITEM_IMG.f_workbench}"> `:'';
+        UI.toast(benchIco+'Meja kerja — panel crafting terbuka');Sfx.open();
         if(UI.open!=='craft')UI.toggle('craft');}},
     /* Landasan Tempa: enchant/naikkan level equipment (panel anvil) */
     anvil:{n:'Landasan Tempa',e:'⚒️',item:'f_anvil',r:1.9,label:'⚒️ Tempa Equipment',
       build(){return WSModels.make('anvil',0.24);},
-      use(){UI.toast('⚒️ Landasan tempa — pilih equipment yang akan ditempa');Sfx.open();
+      use(){
+        const anvilIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_anvil)?`<img class="iico" src="${UI.ITEM_IMG.f_anvil}"> `:'';
+        UI.toast(anvilIco+'Landasan tempa — pilih equipment yang akan ditempa');Sfx.open();
         if(UI.open!=='anvil')UI.toggle('anvil');}},
     /* Tungku: stasiun memasak (panel crafting langsung ke tab Makanan) */
     stove:{n:'Tungku Masak',e:'🍲',item:'f_stove',r:2.1,label:'🍲 Masak di Tungku',
       build(){return WSModels.make('stove',0.27);},
-      use(){UI.toast('🍲 Tungku menyala — waktunya memasak');Sfx.open();
+      use(){
+        const stoveIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_stove)?`<img class="iico" src="${UI.ITEM_IMG.f_stove}"> `:'';
+        UI.toast(stoveIco+'Tungku menyala — waktunya memasak');Sfx.open();
         UI.craftTab='food';
         if(UI.open!=='craft')UI.toggle('craft');}},
     /* Api Unggun: tempat beristirahat — pulihkan HP & stamina (cooldown) */

@@ -189,33 +189,38 @@ const Mesher=(()=>{
   let grassTex=null;
   function makeGrassTex(){
     const N=(typeof window!=='undefined'&&window.Env_Plants&&Env_Plants.worldGrassTexCount)
-            ?Env_Plants.worldGrassTexCount():4;
+            ?Env_Plants.worldGrassTexCount():8;
     const TS=16;
     const cv=document.createElement('canvas');cv.width=TS*N;cv.height=TS;
     const c=cv.getContext('2d');c.clearRect(0,0,cv.width,TS);
     let sd=1337;const rr=()=>{sd^=sd<<13;sd^=sd>>>17;sd^=sd<<5;return(sd>>>0)/4294967296;};
     for(let t=0;t<N;t++){
       const ox=t*TS;
-      /* 6-8 helai per kartu: cukup padat supaya satu kartu sudah terbaca
-         sebagai rumpun, tapi tidak menjadi bidang penuh (harus tetap ada
-         sela transparan agar terlihat seperti helai). */
-      const blades=6+((rr()*3)|0);
+      /* 8 varian pola bilah yang bervariasi secara organik:
+         dari rumpun liar rapat, helai ramping tinggi, hingga bilah rimbun */
+      const blades=5+((rr()*5)|0);
       for(let b=0;b<blades;b++){
         let x=1+((rr()*(TS-2))|0);
-        const h=Math.round(TS*(0.5+rr()*0.5));
-        const lean=rr()<0.5?-1:1;
-        const wide=rr()<0.3;                     // sebagian helai 2px (lebih tebal)
+        const h=Math.round(TS*(0.45+rr()*0.55));
+        const lean=rr()<0.4?-1:(rr()<0.8?1:0);
+        const wide=rr()<0.35;                     // sebagian helai 2px (lebih tebal)
         for(let k=0;k<h;k++){
-          const p=k/(h-1);
-          /* melengkung mulai separuh ke atas → helai tidak lurus kaku */
-          if(p>0.45&&rr()<0.34)x+=lean;
+          const p=k/(h-1||1);
+          /* melengkung secara bertahap ke atas → helai organik */
+          if(p>0.35&&rr()<0.38)x+=lean;
           if(x<0||x>=TS)break;
-          /* ujung helai lebih terang; sedikit acak supaya tidak rata */
-          const lum=Math.round((0.78+p*0.22+rr()*0.06)*255);
-          const a=p>0.88?0.85:1;                 // ujung agak menipis
+          /* gradasi pencahayaan vertikal: pangkal helai sedikit lebih gelap (0.68),
+             batang tengah (0.85-0.95), ujung helai terang (1.0) dengan sedikit jitter */
+          const baseLum=0.68+p*0.30+(rr()-0.5)*0.08;
+          const lum=Math.round(clamp(baseLum,0.5,1.0)*255);
+          const a=p>0.9?0.82:1.0;                 // ujung agak menipis
           c.fillStyle='rgba('+lum+','+lum+','+lum+','+a+')';
           c.fillRect(ox+x,TS-1-k,1,1);
-          if(wide&&p<0.7&&x+1<TS)c.fillRect(ox+x+1,TS-1-k,1,1);
+          if(wide&&p<0.65&&x+1<TS){
+            const sideLum=Math.round(lum*0.9);
+            c.fillStyle='rgba('+sideLum+','+sideLum+','+sideLum+','+a+')';
+            c.fillRect(ox+x+1,TS-1-k,1,1);
+          }
         }
       }
     }
@@ -1002,10 +1007,9 @@ const Mesher=(()=>{
   /* batas pengali untuk bilah rumput & tumbuhan (bukan blok): mencegah warna
      gosong / menyilaukan setelah dikali variasi petak */
   const tclamp=v=>v<0.62?0.62:(v>1.32?1.32:v);
-  /* pengali warna BILAH RUMPUT DUNIA. Mengikuti TINGKAT blok di bawahnya:
-     rumpun tingkat rendah (baru tumbuh di pinggir) lebih kekuningan, pusat
-     rumpun paling hijau pekat — jadi gradasi tanah & rumputnya sejalan.
-     `shd` ≥ 0 (tepi air) membuat bilah ikut kecokelatan seperti rumput rawa. */
+  /* pengali warna BILAH RUMPUT DUNIA. Mengikuti TINGKAT blok di bawahnya
+     ditambah VARIASI ALAMI per-blok berbasis koordinat dunia (wx, wz) agar
+     padang rumput tampak hidup dan tidak seragam satu sama lain. */
   const TMG=[1,1,1];
   const WG_TIER=[
     [1.22,1.06,0.78],   // tingkat 0/1: kekuningan (rumput pinggir rumpun)
@@ -1013,14 +1017,33 @@ const Mesher=(()=>{
     [1.00,1.00,1.00],   // tingkat 2: warna palet asli env_plants
     [0.90,1.02,0.92],   // tingkat 3: hijau paling pekat
   ];
-  function grassTint(tier,shd,tA,tB,red){
+  function grassTint(tier,shd,tA,tB,red,wx=0,wz=0){
     const T=WG_TIER[tier<0?0:(tier>3?3:tier)];
-    const a=(tA-0.5)*0.12, b=(tB-0.5)*0.10;
-    let r=T[0]*(1+a+b), g=T[1]*(1+a), bl=T[2]*(1+a-b);
-    if(red){r*=1.06;g*=0.96;bl*=0.96;}
-    /* CATATAN: bilah rumput dunia TIDAK ikut dicokelatkan di tepi air. Yang
-       berubah jadi cokelat gelap hanyalah BLOK-nya (lihat SH_TOP di blockTint);
-       rumput yang tumbuh di atasnya tetap hijau normal, sesuai permintaan. */
+    const a=(tA-0.5)*0.16, b=(tB-0.5)*0.14;
+
+    /* Variasi natural per-blok berbasis koordinat dunia (wx, wz).
+       Amplitudo KUAT supaya dua petak rumput yang BERSEBELAHAN terlihat
+       jelas beda warnanya (hangat kuning <-> hijau segar <-> gelap), tidak
+       lagi seragam seperti karpet. */
+    let varR=0, varG=0, varB=0;
+    if(typeof WGEN!=='undefined'&&WGEN.hash){
+      const h1=(WGEN.hash(wx,wz,137)-0.5)*2;   // -1..1 (tone hangat golden vs segar)
+      const h2=(WGEN.hash(wx,wz,251)-0.5)*2;   // -1..1 (kecerahan sinar matahari)
+      const h3=(WGEN.hash(wx,wz,389)-0.5)*2;   // -1..1 (saturasi klorofil)
+
+      varR = h1 * 0.34 + h2 * 0.22;
+      varG = h2 * 0.28 + h3 * 0.20;
+      varB = -h1 * 0.28 + h2 * 0.16;
+    }
+
+    let r=T[0]*(1+a+b + varR);
+    let g=T[1]*(1+a + varG);
+    let bl=T[2]*(1+a-b + varB);
+    if(red){
+      r*=1.06*(1+varR*0.6);
+      g*=0.96*(1+varG*0.6);
+      bl*=0.96*(1+varB*0.6);
+    }
     TMG[0]=tclamp(r);TMG[1]=tclamp(g);TMG[2]=tclamp(bl);
   }
   /* pengali warna TUMBUHAN (semak/tebu/bunga/kaktus & rumput billboard).
@@ -1439,16 +1462,18 @@ const Mesher=(()=>{
               const jz=(WGEN.hash(wx,wz,92)-0.5)*0.26;
               const ox=wx+0.5+jx,oy=y+1+rz,oz=wz+0.5+jz;
               const nn=M.pos.length/3;
-              /* kartu ikut TINGKAT gradasi tanah di bawahnya: rumpun tingkat
-                 rendah kekuningan, pusat rumpun hijau pekat. */
-              grassTint(cTier[ci],shd,cTA[ci],cTB[ci],red);
+              /* kartu ikut TINGKAT gradasi tanah di bawahnya & variasi per-blok alami */
+              grassTint(cTier[ci],shd,cTA[ci],cTB[ci],red,wx,wz);
               for(let i2=0;i2<nn;i2++){
                 GP.push(M.pos[i2*3]+ox,M.pos[i2*3+1]+oy,M.pos[i2*3+2]+oz);
                 GN.push(M.nor[i2*3],M.nor[i2*3+1],M.nor[i2*3+2]);
                 GU.push(M.uv[i2*2],M.uv[i2*2+1]);
-                GC.push(Math.min(1,M.col[i2*3]*TMG[0]),
-                        Math.min(1,M.col[i2*3+1]*TMG[1]),
-                        Math.min(1,M.col[i2*3+2]*TMG[2]));
+                /* Variasi mikro per-plane (kartu) supaya helai antar-kartu
+                   dalam satu rumpun juga tidak identik */
+                const pJit=(WGEN.hash(wx*3+((i2/4)|0)*17,wz*3+((i2/4)|0)*7,99)-0.5)*0.22;
+                GC.push(Math.min(1,Math.max(0,M.col[i2*3]*TMG[0]+pJit)),
+                        Math.min(1,Math.max(0,M.col[i2*3+1]*TMG[1]+pJit*0.9)),
+                        Math.min(1,Math.max(0,M.col[i2*3+2]*TMG[2]+pJit*0.6)));
                 GA.push(M.amp[i2]);
               }
               for(let q=0;q<M.count;q++){const a=gvi+q*4;GI.push(a,a+1,a+2,a,a+2,a+3);}

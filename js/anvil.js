@@ -88,11 +88,16 @@ const Anvil={
     const sel=this.sel;
     const r=this.resolve(sel);
     if(!r){UI.toast('Pilih equipment dulu');return;}
-    if(r.lvl>=this.MAX_LV){UI.toast('⚒️ Sudah level maksimum!');return;}
+    const anvilIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_anvil)?`<img class="iico" src="${UI.ITEM_IMG.f_anvil}"> `:'';
+    if(r.lvl>=this.MAX_LV){UI.toast(`${anvilIco}Sudah level maksimum!`);return;}
     const c=this.cost(r.id,r.lvl);
-    if(RPG.coin<c.coin){UI.toast(`🪙 Koin kurang — butuh ${c.coin}`);return;}
+    if(RPG.coin<c.coin){
+      const coinIco=(typeof UI!=='undefined'&&UI.coinIcoHtml)?UI.coinIcoHtml(16):'🪙';
+      UI.toast(`${coinIco} Koin kurang — butuh ${c.coin}`);return;
+    }
     if(c.matId&&RPG.countItem(c.matId)<c.matN){
-      UI.toast(`${ITEMS[c.matId].e} ${ITEMS[c.matId].n} kurang — butuh ${c.matN}`);return;
+      const matIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(c.matId):(ITEMS[c.matId]?ITEMS[c.matId].e:'');
+      UI.toast(`${matIco} ${ITEMS[c.matId].n} kurang — butuh ${c.matN}`);return;
     }
     RPG.spendCoin(c.coin);
     if(c.matId)RPG.removeItems({[c.matId]:c.matN});
@@ -111,7 +116,10 @@ const Anvil={
     Sfx.craft();
     Player.addXP(4);
     if(typeof Prof!=='undefined')Prof.gain('crafting',20,2);
-    UI.toast(`⚒️ ${ITEMS[r.id].e} ${ITEMS[r.id].n} → Level ${r.lvl+1}!`);
+    const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.id):(ITEMS[r.id]?ITEMS[r.id].e:'');
+    UI.toast(`${anvilIco}${itemIco} ${ITEMS[r.id].n} → Level ${r.lvl+1}!`);
+    if(typeof FX!=='undefined'&&FX.text)
+      FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.2,0)),`Lv ${r.lvl+1} ${ITEMS[r.id].n}`,'#ffd870',r.id);
     UI.renderAll();
     this.render();
   },

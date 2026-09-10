@@ -702,6 +702,8 @@ const Monsters={
     const px=(hx===undefined)?m.pos.x:hx;
     const pz=(hz===undefined)?m.pos.z:hz;
     if(Math.hypot(tgt.pos.x-px,tgt.pos.z-pz)>radius+((tgt!==Player&&tgt.r)?tgt.r:0))return false;
+    /* Mob peliharaan (pet) tidak boleh melukai pemain maupun rekan tim */
+    if(m&&m.pet&&(tgt===Player||(tgt&&(tgt.pet||tgt.role))))return false;
     if(tgt===Player){
       if(Player.dead)return false;
       Player.takeDamage(dmg,m.pos);
@@ -1189,23 +1191,34 @@ const Monsters={
           FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x9fe8ff,1,0.8);
       }
       /* ---------- STUN (SHIELD BASH Royal Guard) ----------
-         m.stunT>0: mob membeku total — AI & angkatancang-ancang ditunda,
-         kecepatan horizontal dibuang, tubuh terguncang (goyang-goyang lewat
-         rotasi mesh). Indikatornya teks "STUN" + bintang saat kena. */
+         m.stunT>0: mob membeku total (freeze tanpa animasi & TANPA efek bergetar).
+         Fisika & gravitasi TETAP dijalankan agar mob yang sedang melompat /
+         di udara tetap jatuh ke tanah dan tidak melayang.
+         Emissive di-reset agar warna flash putih/merah dari hit terakhir
+         tidak menempel permanen selama membeku (dulu mob jadi PUTIH). */
       if(m.stunT>0){
         m.stunT-=dt;
         if(m.stunT<=0)m.stunT=0;
         else{
-          m.vel.x*=0.7;m.vel.z*=0.7;                 // momentum dibendung
-          if(m.mesh)m.mesh.rotation.z=Math.sin(performance.now()*0.022)*0.09;
-          if(m.windup>0)m.windup=0;                  // serangan yang dibatalkan
+          m.vel.x*=0.5;m.vel.z*=0.5;                 // momentum horizontal dibendung
+          if(m.windup>0)m.windup=0;                  // batalkan ancang-ancang
           if(Math.random()<dt*3)
             FX.text(m.pos.clone().add(new THREE.Vector3(0,1.9,0)),'💫','#ffe066');
-          m.mesh.position.copy(m.pos);
-          this.animate(m,dt);
+          /* Fisika tetap berjalan agar gravitasi menarik mob jatuh ke tanah */
+          this.physics(m,dt);
+          if(m.mesh){
+            m.mesh.position.copy(m.pos);
+            m.mesh.rotation.z=0;                     // Tidak ada efek bergetar, diam mematung total
+            /* reset emissive: flash hit (putih/merah) tidak boleh menempel */
+            m.mesh.traverse(o=>{
+              if(o.material&&o.material.emissive&&o.material.emissive.getHex()!==0x000000)
+                o.material.emissive.setHex(0x000000);
+            });
+          }
+          /* Animasi dibekukan total (tidak memanggil animate) */
           continue;                                   // lewati seluruh AI
         }
-      }else if(m.mesh)m.mesh.rotation.z*=0.85;       // pulih dari guncangan
+      }else if(m.mesh)m.mesh.rotation.z*=0.85;
       if(m.dead)continue;
 
       /* efek racun kalajengking: damage susulan tiap 1 detik.
@@ -1492,11 +1505,12 @@ const Monsters={
          memicu saling dorong fisika & glitch geleng kepala */
       const mReach=(m.type==='dragon'?3.4:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
       if(dp>mReach*0.85){
+        const moveAng=((m.detourT||0)>0&&m.altDir!==undefined)?m.altDir:angP;
         if(m.type==='slime'){
-          this.slimeHop(m,dt,angP,sp*2.1,0.75,1.25);
+          this.slimeHop(m,dt,moveAng,sp*2.1,0.75,1.25);
         }else{
-          m.vel.x=lerp(m.vel.x,Math.sin(angP)*sp,clamp(6*dt,0,1));
-          m.vel.z=lerp(m.vel.z,Math.cos(angP)*sp,clamp(6*dt,0,1));
+          m.vel.x=lerp(m.vel.x,Math.sin(moveAng)*sp,clamp(6*dt,0,1));
+          m.vel.z=lerp(m.vel.z,Math.cos(moveAng)*sp,clamp(6*dt,0,1));
         }
       }else{
         const damp=Math.exp(-8*dt);
@@ -2214,7 +2228,8 @@ const Monsters={
     const R=(typeof Mob_Reaper!=='undefined')?Mob_Reaper:null;
     m.rActT+=dt;
     const tA=m.rActT,name=m.rAct;
-    const tgt=(m.rTarget&&!m.rTarget.dead)?m.rTarget:(tgtIn||this.aimTarget(m));
+    const validTgtIn=(tgtIn&&!tgtIn.dead&&(!m.pet||(tgtIn!==Player&&!tgtIn.pet&&!tgtIn.role)))?tgtIn:null;
+    const tgt=(m.rTarget&&!m.rTarget.dead)?m.rTarget:(validTgtIn||(m.pet?null:this.aimTarget(m)));
     const HIT=(R&&R.HIT)||{a1:0.29,a2:0.25,a3a:0.31,a3b:0.59,s0:0.54,s1:0.71,s2:0.88};
 
     if(name==='a1'){
@@ -2561,9 +2576,10 @@ const Monsters={
     const hold=m.type==='golem'?3.0:m.type==='dragon'?3.4:
                m.type==='lizard'?2.4:1.6;
     if(d>hold*0.85){
-      m.vel.x=lerp(m.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
-      m.vel.z=lerp(m.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
-      if(m.type==='slime')this.slimeHop(m,dt,ang,sp*2.1,0.75,1.25);
+      const moveAng=((m.detourT||0)>0&&m.altDir!==undefined)?m.altDir:ang;
+      m.vel.x=lerp(m.vel.x,Math.sin(moveAng)*sp,clamp(6*dt,0,1));
+      m.vel.z=lerp(m.vel.z,Math.cos(moveAng)*sp,clamp(6*dt,0,1));
+      if(m.type==='slime')this.slimeHop(m,dt,moveAng,sp*2.1,0.75,1.25);
     }else{
       const damp=Math.exp(-8*dt);
       m.vel.x*=damp;m.vel.z*=damp;
@@ -2864,12 +2880,39 @@ const Monsters={
   },
 
   /* ---------- apakah langkah ke (x,z) bisa dilewati? ----------
-     Dipakai bersama oleh fisika dan penghindar rintangan. Batas pencarian
-     lantai = setinggi kepala agar ambang atas pintu tidak dianggap lantai. */
+     Dipakai bersama oleh fisika dan penghindar rintangan. */
   canStand(m,x,z){
+    const hy=m.pos.y+1.8;
+    const gy=World.groundAt(x,z,hy);
+    /* 1. Halangan 2+ blok ke ATAS dicegah jika tidak sedang melompat.
+       Jika sedang melompat (misal pet loncat 2 blok), diperbolehkan sampai 2.5 blok. */
+    const isJumping = (m.vel && m.vel.y > 1.5);
+    const maxUp = isJumping ? 2.5 : 1.25;
+    if(gy > m.pos.y + maxUp) return false;
 
-    return World.groundAt(x,z,m.pos.y+1.8)<=m.pos.y+1.02&&
-           !World.blockedAt(x,m.pos.y,z);
+    /* Cek blok penghalang fisik di tubuh */
+    if(World.blockedAt(x,m.pos.y+0.2,z,m.r||0.4)){
+      if(World.blockedAt(x,m.pos.y+1.1,z,m.r||0.4)) return false;
+      if(gy > m.pos.y + maxUp) return false;
+    }
+
+    /* Target musuh / pemain yang sedang dikejar */
+    const target = m.foe || (m.pet ? null : ((typeof Player!=='undefined'&&!Player.dead)?Player:null));
+
+    /* 2. AIR: jika titik depan ada air dan mob saat ini di daratan (bukan ikan & tidak sedang ditunggangi),
+       repath / hindari air KECUALI targetnya memang ada di dalam air */
+    const beingRidden = (typeof Capture!=='undefined')&&Capture.riding&&(Capture.pet===m);
+    if(!beingRidden){
+      const inWater = (typeof World.inWaterAt==='function') && World.inWaterAt(x,gy+0.2,z);
+      if(inWater && !m.inWater && m.type!=='fish'){
+        const targetInWater = target && (target.inWater || (target.pos && target.pos.y <= CFG.WATER_Y + 0.3));
+        if(!targetInWater) return false;
+      }
+    }
+
+    /* 3. TURUN: TIDAK ADA BATASAN TURUN.
+       Menuruni 2 blok, undakan, tebing, atau jurang bebas dilewati (kalau jatuh ya terjatuh). */
+    return true;
   },
 
   /* ---------- REPATH: cari arah bebas terdekat ----------
@@ -2888,7 +2931,7 @@ const Monsters={
        Sisi yang dicoba lebih dulu dikunci per monster (m.side) supaya
        monster tidak bergetar bolak-balik di depan rintangan yang sama. */
     if(m.side===undefined)m.side=Math.random()<0.5?1:-1;
-    for(const off of[0.45,0.9,1.35,1.8,2.3]){
+    for(const off of[0.45,0.9,1.35,1.8,2.3,2.8]){
       for(const s of[m.side,-m.side]){
         const a=want+off*s;
         if(test(a)){m.side=s;return a;}
@@ -2912,7 +2955,7 @@ const Monsters={
     if((m._stepCd||0)>0)return false;
     if(!m.onGround&&!m.inWater)return false;
     const spd=Math.hypot(m.vel.x,m.vel.z);
-    if(spd<0.5)return false;
+    if(spd<0.15)return false;
     const want=Math.atan2(m.vel.x,m.vel.z);
     const tx=m.pos.x+Math.sin(want)*0.8,tz=m.pos.z+Math.cos(want)*0.8;
     const step=World.groundAt(tx,tz,m.pos.y+1.8);
@@ -2929,6 +2972,7 @@ const Monsters={
 
   physics(m,dt){
     m._stepCd=Math.max(0,(m._stepCd||0)-dt);
+    m.detourT=Math.max(0,(m.detourT||0)-dt);
     m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
     m.vel.y-=CFG.GRAV*(m.inWater?0.3:1)*dt;
     if(m.inWater){
@@ -2944,18 +2988,17 @@ const Monsters={
        tertutup, kecepatan diputar ke arah bebas terdekat sehingga monster
        menyusuri tembok/pohon, bukan menempel lalu bergetar di sana. */
     const spd=Math.hypot(m.vel.x,m.vel.z);
-    if(!stepped&&spd>0.25){
+    if(!stepped&&spd>0.2){
       const want=Math.atan2(m.vel.x,m.vel.z);
       /* jarak lihat ke depan mengikuti kecepatan: makin cepat, makin awal
          belokannya supaya tidak terlambat menghindar */
-      const look=clamp(spd*0.32,0.55,1.4);
+      const look=clamp(spd*0.35,0.6,1.4);
       if(!this.canStand(m,m.pos.x+Math.sin(want)*look,
                           m.pos.z+Math.cos(want)*look)){
         const alt=this.freeDir(m,want,look);
         if(alt!==null){
           m.vel.x=Math.sin(alt)*spd;m.vel.z=Math.cos(alt)*spd;
-          /* arah jelajah & hadap ikut diperbarui agar animasinya konsisten */
-          if(m.state!=='chase')m.dir=alt;
+          m.dir=alt;m.altDir=alt;m.detourT=0.7;
           m.mesh.rotation.y=angLerp(m.mesh.rotation.y,alt,clamp(dt*7,0,1));
         }else if(m.state!=='chase'){
           /* benar-benar terkurung: pilih arah acak baru & jeda sejenak */
@@ -2967,10 +3010,18 @@ const Monsters={
     const nx=m.pos.x+m.vel.x*dt;
     /* monster juga berhenti di blok padat, tidak menembus tembok/pohon */
     if(this.canStand(m,nx,m.pos.z))m.pos.x=nx;
-    else{m.vel.x=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;}
+    else{
+      if(!this.tryStepUp(m,dt)){
+        m.vel.x=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;
+      }
+    }
     const nz=m.pos.z+m.vel.z*dt;
     if(this.canStand(m,m.pos.x,nz))m.pos.z=nz;
-    else{m.vel.z=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;}
+    else{
+      if(!this.tryStepUp(m,dt)){
+        m.vel.z=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;
+      }
+    }
     m.pos.y+=m.vel.y*dt;
     /* BUGFIX tersedot ke dalam terrain: batalkan gerak bila tanah di posisi
        baru terlalu tinggi, dan selalu dorong mob ke permukaan bila terbenam.
@@ -2979,7 +3030,9 @@ const Monsters={
        pernah tersisa DI DALAM blok padat. */
     const mrefY=Math.max(py0,m.pos.y)+1.8;
     let g=World.groundAt(m.pos.x,m.pos.z,mrefY);
-    if(g>py0+1.05){
+    const isJumping=(m.vel&&m.vel.y>1.5);
+    const maxG=isJumping?(m.pos.y+1.5):(py0+1.05);
+    if(g>maxG){
       m.pos.x=px0;m.pos.z=pz0;m.vel.x=0;m.vel.z=0;
       g=World.groundAt(px0,pz0,mrefY);
     }

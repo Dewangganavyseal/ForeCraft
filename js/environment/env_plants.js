@@ -380,17 +380,14 @@ const Env_Plants=(()=>{
     return (cl((hex>>16)&255)<<16)|(cl((hex>>8)&255)<<8)|cl(hex&255);
   }
 
-  /* jumlah TILE varian tekstur rumput (dibuat di mesher, strip 4×1) */
-  const WG_TEX_N=4;
+  /* jumlah TILE varian tekstur rumput (dibuat di mesher, strip 8×1) */
+  const WG_TEX_N=8;
   /* Jumlah VARIAN TATA LETAK kartu per tingkat tinggi.
      Sebelumnya satu tingkat tinggi = SATU geometri kartu yang dipakai ulang di
      semua blok, sehingga hamparan rumput terlihat seperti klon: tinggi tiap
      plane, lebarnya, dan pilihan tile teksturnya persis sama di mana-mana.
-     Dengan beberapa varian, dua blok bertingkat sama tetap berbeda bentuk.
-     Biayanya kecil: satu varian = 3 quad, cache 6 tingkat × 4 varian × 2 warna
-     = 48 entri mungil. Blok memilih varian secara deterministik dari koordinat
-     (lihat mesher), jadi chunk yang dibangun ulang selalu sama. */
-  const WG_VAR_N=4;
+     Dengan 6 varian, dua blok bertingkat sama tetap berbeda bentuk. */
+  const WG_VAR_N=6;
   /* Lebar kartu sedikit >1 blok supaya rumput antar-blok saling menyambung dan
      tidak terlihat sebagai petak-petak terpisah. */
   const WG_W=1.06;
@@ -452,8 +449,8 @@ const Env_Plants=(()=>{
       const mir=hash(seed+p*3,p+2,8)<0.5;
       const u0=(mir?(ti+1):ti)/WG_TEX_N, u1=(mir?ti:(ti+1))/WG_TEX_N;
       /* gradasi warna: pangkal gelap → ujung terang, plus variasi per kartu */
-      const cv=(hash(seed,p,7)-0.5)*2;
-      const cBot=tintHex(grad[1],cv), cTop=tintHex(grad[grad.length-1],cv);
+      const cv=(hash(seed,p,7)-0.5)*2.4;
+      const cBot=tintHex(grad[1],cv*0.8), cTop=tintHex(grad[grad.length-1],cv);
       /* 4 sudut: 0,1 pangkal (kiri,kanan) — 2,3 ujung (kanan,kiri) */
       const P=[
         [jx-ux*hw,0 ,jz-uz*hw, u0,0, cBot],

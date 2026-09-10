@@ -547,7 +547,10 @@ Mob_Reaper.spawnSpirit=function(m,i,tgt){
   const s=this._spirits.find(x=>!x.active);
   if(!s)return;
   s.active=true;s.t=0;s.struck=false;s.off=i*2.1;
-  s.mob=m;s.tgt=tgt||null;
+  s.mob=m;
+  /* Jika reaper adalah pet, arwah TIDAK BOLEH menargetkan pemain atau rekan */
+  if(m&&m.pet&&(tgt===Player||(tgt&&(tgt.pet||tgt.role))))tgt=null;
+  s.tgt=tgt||null;
   s.dmg=Math.max(3,Math.round(m.dmg*0.55));
   /* titik dada reaper */
   const chestY=m.pos.y+2.0;
@@ -556,10 +559,10 @@ Mob_Reaper.spawnSpirit=function(m,i,tgt){
      ketiganya datang dari arah berbeda (SPIR_ANG seperti file asli) */
   const yaw=m.mesh?m.mesh.rotation.y:0;
   const ang=yaw+this.SPIR_ANG[i%3];
-  if(tgt&&tgt.pos){
+  if(tgt&&tgt.pos&&!tgt.dead){
     s.target.set(tgt.pos.x,tgt.pos.y+0.9,tgt.pos.z);
   }else{
-    s.target.set(m.pos.x+Math.sin(ang)*4.8,m.pos.y+1.2,m.pos.z+Math.cos(ang)*4.8);
+    s.target.set(m.pos.x+Math.sin(ang)*6.5,m.pos.y+1.2,m.pos.z+Math.cos(ang)*6.5);
   }
   s.orbit.copy(s.chest);s.prev.copy(s.chest);
   s.g.visible=true;s.g.scale.setScalar(0.01);
@@ -574,6 +577,8 @@ Mob_Reaper.spawnSpirit=function(m,i,tgt){
 Mob_Reaper.spiritStrike=function(s){
   if(s.struck)return;
   s.struck=true;
+  /* Jika reaper adalah pet, pastikan tidak melukai pemain atau tim */
+  if(s.mob&&s.mob.pet&&(s.tgt===Player||(s.tgt&&(s.tgt.pet||s.tgt.role))))s.tgt=null;
   if(typeof Monsters!=='undefined'&&Monsters.hitTarget)
     Monsters.hitTarget(s.mob,s.tgt,s.dmg,2.2,s.target.x,s.target.z,4);
   if(typeof FX!=='undefined'){
@@ -617,9 +622,25 @@ Mob_Reaper.updateSpirits=function(dt){
       /* meluncur ke sasaran dengan lintasan melengkung */
       const u=(t-E)/D,e=ss(u);
       /* sasaran diperbarui pelan (mengejar, tapi masih bisa dihindari) */
+      if(s.mob&&s.mob.pet&&(s.tgt===Player||(s.tgt&&(s.tgt.pet||s.tgt.role))))s.tgt=null;
       if(s.tgt&&s.tgt.pos&&!s.tgt.dead){
         s.target.lerp(new THREE.Vector3(s.tgt.pos.x,s.tgt.pos.y+0.9,s.tgt.pos.z),
                       Math.min(1,dt*2.2));
+      }else if(s.mob&&s.mob.pet){
+        /* Target musuh sudah mati/hilang: cari musuh lain terdekat agar tidak meluncur ke arah pemain */
+        if(typeof Monsters!=='undefined'){
+          let nearFoe=null,minD=14;
+          for(const o of Monsters.list){
+            if(o===s.mob||o.dead||o.pet||o.catchActive)continue;
+            if(typeof Monsters.isAnimal==='function'&&Monsters.isAnimal(o))continue;
+            const d=o.pos.distanceTo(s.target);
+            if(d<minD){minD=d;nearFoe=o;}
+          }
+          if(nearFoe){
+            s.tgt=nearFoe;
+            s.target.lerp(new THREE.Vector3(nearFoe.pos.x,nearFoe.pos.y+0.9,nearFoe.pos.z),Math.min(1,dt*2.2));
+          }
+        }
       }
       p.lerpVectors(s.orbit,s.target,e);
       const dx=s.target.x-s.orbit.x,dz=s.target.z-s.orbit.z;

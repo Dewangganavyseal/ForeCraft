@@ -183,7 +183,8 @@ const FX={
        tinggi physics waveHeightAt). Warna & tekstur mengikuti blok aslinya. */
     const mat=this.waveMat();
     for(const p of pts){
-      const gy=World.groundAt(p.x,p.z,y+2);
+      const gy=(typeof World!=='undefined'&&World.groundAt)
+        ?(World.groundAt(p.x,p.z,Math.max(y+6,CFG.WORLD_H-1))||World.groundAt(p.x,p.z)||y):y;
       const blk=World.getBlock(Math.floor(p.x),Math.floor(gy)-1,Math.floor(p.z));
       const geo=this.waveBlockGeo(blk);
       const mesh=new THREE.Mesh(geo,mat);
@@ -495,29 +496,149 @@ const FX={
   ripple(x,y,z,color,scale1){
     this.ring(x,y,z,color,0.5,scale1||2);
   },
-  /* Teks mengambang di dunia 3D (damage, "+XP tim", "LV 5", dsb).
-     Digambar ke CANVAS, jadi localizeDOM TIDAK bisa menjangkaunya — teksnya
-     harus diterjemahkan di sini, sama seperti UI.toast. Tanpa ini, angka XP
-     yang muncul di atas mob tetap berbahasa Indonesia walau bahasa game sudah
-     diganti. Frasa yang tidak punya terjemahan lewat apa adanya. */
-  text(pos,str,color='#fff'){
+  /* Ambil objek Image untuk custom icon di canvas, dengan caching.
+     crossOrigin='anonymous' WAJIB: tanpa itu, menggambar PNG dari file:// ke
+     canvas membuat canvas TAINTED, dan unggahan CanvasTexture ke GPU akan
+     melempar SecurityError → sprite dirender sebagai KOTAK HITAM.
+     Dengan crossOrigin, file:// gagal load secara halus (onerror) → fallback
+     teks-only; di http(s)/capacitor same-origin tetap berhasil dimuat.
+     Tambahan: PROBE TAINT di canvas scratch memastikan image yang berpotensi
+     men-taint tidak pernah menyentuh canvas texture utama. */
+  getIconImg(url, onReady){
+    if(!this._iconCache)this._iconCache={};
+    let entry=this._iconCache[url];
+    if(!entry){
+      const img=new Image();
+      if('crossOrigin' in img)img.crossOrigin='anonymous';
+      entry={img,loaded:false,failed:false,safe:undefined,cbs:[]};
+      img.onload=()=>{
+        entry.loaded=true;
+        if(entry.safe===undefined){
+          try{
+            const sc=document.createElement('canvas');sc.width=4;sc.height=4;
+            const s2=sc.getContext('2d');
+            s2.drawImage(img,0,0,4,4);
+            s2.getImageData(0,0,1,1);
+            entry.safe=true;
+          }catch(e){entry.safe=false;}
+        }
+        if(entry.cbs){
+          entry.cbs.forEach(cb=>{try{cb(entry.safe?img:null);}catch(e){}});
+          entry.cbs=null;
+        }
+      };
+      img.onerror=()=>{entry.failed=true;};
+      img.src=url;
+      this._iconCache[url]=entry;
+    }
+    if(entry.failed)return null;
+    if(entry.safe===false)return null;                       // image berbahaya (taint) → jangan dipakai
+    if(entry.loaded&&entry.safe===true)return entry.img;
+    if(entry.loaded||(entry.img.complete&&entry.img.naturalWidth>0)){
+      /* complete tapi probe belum jalan (onload belum fire) → perlakukan
+         sebagai belum siap supaya teks-only digambar dulu (aman) */
+      if(onReady){
+        if(!entry.cbs)entry.cbs=[];
+        entry.cbs.push(onReady);
+      }
+      return null;
+    }
+    if(onReady){
+      if(!entry.cbs)entry.cbs=[];
+      entry.cbs.push(onReady);
+    }
+    return null;
+  },
+
+  /* Teks mengembang di dunia 3D (damage, "+XP tim", "LV 5", dsb).
+     Digambar ke CANVAS, mendukung teks + CUSTOM ICON PNG (bukan emoji).
+     Icon (argumen ke-4) bisa berupa item ID ('wood'), icon ID ('ui_coin'),
+     atau URL gambar. Hanya koin yang di-strips otomatis dari teks — emoji
+     efek lain (🔥 ☠ 💥 dst) TETAP dirender sebagai teks agar tidak pernah
+     mengosongkan tulisan. */
+  text(pos,str,color='#fff',icon=null){
     if(typeof I18N!=='undefined'&&I18N.lang!=='id'&&I18N.translateText)
       str=I18N.translateText(String(str),I18N.lang);
-    const s=String(str);
+    let s=String(str);
+
+    /* Resolusi Custom Icon:
+       1) argumen `icon` eksplisit (dipakai pickup/craft/quest — teksnya memang
+          ditulis tanpa emoji), 2) koin 🪙 di-strips otomatis dari teks. */
+    let iconUrl=null;
+    if(icon){
+      if(typeof icon==='object'&&icon.id)icon=icon.id;
+      if(typeof icon==='string'){
+        if(icon==='coin'||icon==='ui_coin'||icon==='🪙')iconUrl='buttons/ui_coin.png';
+        else if(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG[icon])iconUrl=UI.ITEM_IMG[icon];
+        else if(icon.indexOf('buttons/')===0)iconUrl=icon;
+      }
+    }
+    if(!iconUrl&&s.indexOf('🪙')>=0){
+      iconUrl='buttons/ui_coin.png';
+      const stripped=s.replace(/🪙/g,'').replace(/\s+/g,' ').trim();
+      if(stripped)s=stripped;              // jangan pernah kosongkan teks
+    }
+
     const cv=document.createElement('canvas');
     const c=cv.getContext('2d');
     const fontStr='bold 24px "Press Start 2P", monospace';
     c.font=fontStr;
     const tw=c.measureText(s).width;
-    /* lebar canvas dinamis: teks panjang seperti "Boss Core" tidak pernah terpotong */
-    const w=Math.max(256,Math.ceil(tw+48));
+    const iconSize=36, gap=10;
+    const hasIcon=!!iconUrl;
+    const totalW=hasIcon?(iconSize+gap+tw):tw;
+    const w=Math.max(256,Math.ceil(totalW+48));
     const h=64;
     cv.width=w;cv.height=h;
-    c.font=fontStr;
-    c.textAlign='center';c.textBaseline='middle';
-    c.lineWidth=6;c.strokeStyle='rgba(0,0,0,0.85)';c.strokeText(s,w/2,h/2);
-    c.fillStyle=color;c.fillText(s,w/2,h/2);
+
     const tex=new THREE.CanvasTexture(cv);
+
+    const renderCanvas=(loadedImg)=>{
+      c.setTransform(1,0,0,1,0,0);
+      c.clearRect(0,0,w,h);
+      c.font=fontStr;
+      c.textBaseline='middle';
+      c.lineWidth=6;
+      c.strokeStyle='rgba(0,0,0,0.85)';
+      c.fillStyle=color;
+      let drewIcon=false;
+      if(hasIcon&&loadedImg&&loadedImg.naturalWidth>0){
+        /* icon di kiri + teks rata kiri */
+        const startX=Math.max(6,(w-totalW)/2);
+        const iconY=(h-iconSize)/2;
+        try{
+          c.globalAlpha=1;
+          c.drawImage(loadedImg,startX,iconY,iconSize,iconSize);
+          drewIcon=true;
+        }catch(e){drewIcon=false;}
+        if(drewIcon){
+          const textX=startX+iconSize+gap;
+          c.textAlign='left';
+          c.strokeText(s,textX,h/2);
+          c.fillText(s,textX,h/2);
+        }
+      }
+      if(!drewIcon){
+        /* fallback aman: teks selalu tampil (tenge) walau icon belum termuat */
+        c.textAlign='center';
+        c.strokeText(s,w/2,h/2);
+        c.fillText(s,w/2,h/2);
+      }
+      /* pastikan texture di-upload ulang ke GPU setiap kali canvas digambar */
+      tex.needsUpdate=true;
+    };
+
+    /* gambar teksnya DULU (sinkron) supaya sprite tidak pernah kosong */
+    if(iconUrl){
+      const img=this.getIconImg(iconUrl,(readyImg)=>{
+        /* icon baru selesai dimuat → gambar ulang dengan icon */
+        renderCanvas(readyImg);
+      });
+      renderCanvas(img);
+    }else{
+      renderCanvas(null);
+    }
+
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
     sp.scale.set((w/256)*2.1,0.53,1);sp.position.copy(pos);sp.renderOrder=10;
     this.group.add(sp);
@@ -760,7 +881,7 @@ const FX={
           const rarColor=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].css:'#b8c0cc';
           const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(d.id):it.e;
           UI.toast(`${ico} +${d.n} ${it.n}${mk}`);
-          if(this.text)this.text(Player.pos.clone().add(new THREE.Vector3(0,2.0,0)),`+${d.n} ${it.e} ${it.n}`,rarColor);
+          if(this.text)this.text(Player.pos.clone().add(new THREE.Vector3(0,2.0,0)),`+${d.n} ${it.n}`,rarColor,d.id);
           Sfx.pickup();
           this.disposeDrop(d.mesh,d.isModel);
           this.drops.splice(i,1);

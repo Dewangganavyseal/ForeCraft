@@ -595,7 +595,8 @@ const NPCS={
   takeFromBag(n,i){
     const s=n.bag[i];if(!s)return;
     RPG.addItem(s.id,s.n);
-    UI.toast(`Mengambil ${ITEMS[s.id].e} ${ITEMS[s.id].n} ×${s.n}`);
+    const sIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(s.id):ITEMS[s.id].e;
+    UI.toast(`Mengambil ${sIco} ${ITEMS[s.id].n} ×${s.n}`);
     n.bag[i]=null;
     UI.renderNpcPanel();UI.renderAll();
   },
@@ -1254,16 +1255,14 @@ const NPCS={
   BODY_R:0.42,
   /* Satu titik jalan dianggap boleh dilalui bila badan NPC (radius BODY_R)
      tidak menembus blok padat, atau bila halangannya hanya setinggi satu blok
-     (masih bisa dilompati) dan di depannya bukan jurang. */
+     (masih bisa dilompati) dan di depannya bukan jurang atau air yang tak diinginkan. */
   stepFree(n,x,z){
     const hy=n.pos.y+1.8;
     const gy=World.groundAt(x,z,hy);
-    /* HALANGAN TINGGI 2+ BLOK (tebing, dinding batu/tanah/kayu):
-       NPC tidak bisa melompati rintangan lebih dari 1.25 blok di atas kaki.
-       Bila tanah di depan > 1.25 blok, anggap BUNTU agar steer() mencari jalan lain. */
+    /* 1. HALANGAN TINGGI 2+ BLOK (tebing, dinding batu/tanah/kayu):
+       Bila tanah di depan > 1.25 blok, anggap BUNTU agar steer() repath mencari jalan memutar. */
     if(gy > n.pos.y + 1.25) return false;
-    /* JURANG DALAM: jangan terjun bebas ke jurang > 3.5 blok */
-    if(gy < n.pos.y - 3.5) return false;
+
     /* CEK BLOK RINTANGAN (batang pohon, perabot, tembok bangunan) */
     if(World.blockedAt(x,n.pos.y,z,this.BODY_R)){
       /* jika rintangan ada di ketinggian kepala/dada (2 blok), pasti buntu */
@@ -1271,6 +1270,19 @@ const NPCS={
       /* jika rintangan 1 blok tapi tanahnya terlalu tinggi */
       if(gy > n.pos.y + 1.25) return false;
     }
+
+    /* Target NPC (musuh, atau Player bila anggota tim) */
+    const target=(n.target&&!n.target.dead)?n.target:(this.isTeam(n)?Player:null);
+
+    /* 2. AIR: bila titik tujuan adalah air dan NPC saat ini di darat,
+       repath/hindari air KECUALI targetnya memang ada di dalam air */
+    const inWater=(typeof World.inWaterAt==='function')&&World.inWaterAt(x,gy+0.2,z);
+    if(inWater&&!n.inWater){
+      const targetInWater=target&&(target.inWater||(target.pos&&target.pos.y<=CFG.WATER_Y+0.3));
+      if(!targetInWater) return false;
+    }
+
+    /* 3. TURUN: tidak ada batasan turun (bisa menuruni 2 blok / lereng bebas) */
     /* CEK HEADROOM: pastikan ada ruang berdiri setinggi tubuh di atas tanah baru */
     if(World.headroomOK && !World.headroomOK(x,z,gy)) return false;
     return true;
@@ -1426,10 +1438,9 @@ const NPCS={
   onBump(n,tx,tz){
     /* rintangan setinggi 1 blok (pagar, batu kecil, undakan) cukup dilompati */
     if(this.tryStepUp(n,tx,tz))return;
-    /* Tembok sungguhan: sisi belokan yang sedang dipakai jelas salah, jadi
-       langsung dibalik dan dikunci sebentar supaya NPC menyusuri dinding
-       ke arah baru, bukan menempel terus di titik tabrakan. */
+    /* Rintangan 2+ blok / dinding: belok dan repath memutari dinding */
     n.turnSide=-(n.turnSide||1);n.detourT=1.8;
+    n.dir+=Math.PI*0.5*n.turnSide;
   },
   /* =========================================================================
      LOMPAT SATU BLOK (NPC)
@@ -1815,7 +1826,7 @@ const NPCS={
             }
             if(stored>0){
               if(typeof FX!=='undefined'&&FX.text)
-                FX.text(new THREE.Vector3(chest.x,chest.y+1.2,chest.z),`📦 +${stored} Panen disimpan!`,'#63d471');
+                FX.text(new THREE.Vector3(chest.x,chest.y+1.2,chest.z),`+${stored} Panen disimpan!`,'#63d471','f_chest');
               if(typeof Sfx!=='undefined'&&Sfx.craft)Sfx.craft();
             }
             return;
@@ -2204,7 +2215,7 @@ const NPCS={
     this.bagAdd(n,f.item,got);
     FX.debris(new THREE.Vector3(f.x,f.y+0.4,f.z),0x5d9e3f,4,1.5);
     FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),
-      `${ITEMS[f.item].e}+${got}`,'#c9f07a');
+      `+${got}`,'#c9f07a',f.item);
     Sfx.pickup();
     this.gainXp(n,2);
     UI.renderNpcPanel();
@@ -2246,22 +2257,21 @@ const NPCS={
        1 blok — di air `onGround` selalu false sehingga jalur onBump lama tidak
        pernah aktif. */
     const hspd0=Math.hypot(n.vel.x,n.vel.z);
-    if(hspd0>0.5){
+    if(hspd0>0.15){
       const wa=Math.atan2(n.vel.x,n.vel.z);
       this.tryStepUp(n,n.pos.x+Math.sin(wa)*0.8,n.pos.z+Math.cos(wa)*0.8);
     }
     /* patokan tinggi SEBELUM gravitasi (lihat BUGFIX di Player.update) */
     const px0=n.pos.x,pz0=n.pos.z,py0=n.pos.y;
     const nx=n.pos.x+n.vel.x*dt;
-    /* langkah sumbu X ditolak bila ada blok padat di depan badan, sama
-       seperti aturan tabrakan pemain, supaya NPC tidak menembus objek */
-    if(World.groundAt(nx,n.pos.z,py0+1.8)<=py0+1.02&&
-       !World.blockedAt(nx,n.pos.y,n.pos.z))n.pos.x=nx;
-    else{n.vel.x=0;n.dir+=Math.PI*0.5;this.onBump(n,nx,n.pos.z);}
+    /* Langkah sumbu X: 1 blok (<= py0+1.25) boleh dilewati; 2+ blok / tembok dihadang & onBump */
+    if(World.groundAt(nx,n.pos.z,py0+1.8)<=py0+1.25&&
+       !World.blockedAt(nx,n.pos.y+0.2,n.pos.z,this.BODY_R))n.pos.x=nx;
+    else{n.vel.x=0;this.onBump(n,nx,n.pos.z);}
     const nz=n.pos.z+n.vel.z*dt;
-    if(World.groundAt(n.pos.x,nz,py0+1.8)<=py0+1.02&&
-       !World.blockedAt(n.pos.x,n.pos.y,nz))n.pos.z=nz;
-    else{n.vel.z=0;n.dir+=Math.PI*0.5;this.onBump(n,n.pos.x,nz);}
+    if(World.groundAt(n.pos.x,nz,py0+1.8)<=py0+1.25&&
+       !World.blockedAt(n.pos.x,n.pos.y+0.2,nz,this.BODY_R))n.pos.z=nz;
+    else{n.vel.z=0;this.onBump(n,n.pos.x,nz);}
     n.pos.y+=n.vel.y*dt;
     /* BUGFIX tersedot ke dalam terrain: bila tanah di posisi baru terlalu
        tinggi, gerak horizontal dibatalkan; dan NPC selalu didorong ke

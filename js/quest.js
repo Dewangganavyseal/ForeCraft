@@ -428,7 +428,10 @@ const Quest={
       /* jumlah item hadiah dikalikan rarity & level (lihat rewardCount) */
       const n=this.rewardCount(d,d.reward[rid]);
       const left=RPG.addItem(rid,n);
-      if(left<n)got.push(`${ITEMS[rid].e} ${ITEMS[rid].n} ×${n-left}`);
+      if(left<n){
+        const rIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(rid):ITEMS[rid].e;
+        got.push(`${rIco} ${ITEMS[rid].n} ×${n-left}`);
+      }
       /* tas penuh → sisanya dijatuhkan di kaki pemain agar tidak hilang */
       if(left>0&&typeof FX!=='undefined')
         FX.spawnDrop(Player.pos.clone().add(new THREE.Vector3(0,0.6,0)),rid,left);
@@ -441,10 +444,11 @@ const Quest={
     this.active.splice(this.active.indexOf(a),1);
     Sfx.craft();
     const R=this.rarOf(d);
-    UI.toast(`🏅 ${R.e} ${d.name} selesai! +${xp} XP · +${coin} 🪙${got.length?' · '+got.join(', '):''}`);
+    const cIco=(typeof UI!=='undefined'&&UI.coinIcoHtml)?UI.coinIcoHtml(14):'🪙';
+    UI.toast(`🏅 ${R.e} ${d.name} selesai! +${xp} XP · +${coin} ${cIco}${got.length?' · '+got.join(', '):''}`);
     if(typeof FX!=='undefined')
       FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.4,0)),
-        `+${xp} XP +${coin}🪙`,R.css);
+        `+${xp} XP +${coin} koin`,R.css,'ui_coin');
     this.save();this.refresh();
     RPG.save();UI.renderBag&&UI.renderBag();UI.renderHotbar();
   },

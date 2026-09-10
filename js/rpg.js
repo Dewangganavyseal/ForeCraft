@@ -112,9 +112,10 @@ const RPG={
     if(n<=0)return;
     this.coin+=n;
     if(!silent){
-      UI.toast(`🪙 +${n} koin`);
-      if(typeof FX!=='undefined')
-        FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.6,0)),`+${n} 🪙`,'#ffd24d');
+      const coinIco=(typeof UI!=='undefined'&&UI.coinIcoHtml)?UI.coinIcoHtml(18):'🪙';
+      UI.toast(`${coinIco} +${n} koin`);
+      if(typeof FX!=='undefined'&&FX.text)
+        FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.6,0)),`+${n} koin`,'#ffd24d','ui_coin');
       Sfx.pickup();
     }
     this.renderCoin&&this.renderCoin();
@@ -280,6 +281,8 @@ const RPG={
      oleh tekan-cepat (hantam di tempat) maupun slam terarah (hantam di titik
      pendaratan sesudah loncat). doSlamDipakai oleh SlamAim saat mendarat. */
   _slamAoE(x,y,z){
+    const actualY=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(x,z,CFG.WORLD_H-1)||y):y;
+    y=actualY;
     const C=new THREE.Vector3(x,y,z);
     /* damage Hantam Bumi kini ditautkan ke weaponDmg() (skala level, pedang,
        tempaan & skill pasif) — dulu angka datar 24 sehingga di level tinggi
@@ -647,7 +650,8 @@ const RPG={
     /* memakai tameng: sekalian tampilkan peluang menangkisnya */
     const blk=(slot==='shield'&&this.blockChance)
       ? ` · 🛡 Block ${Math.round(this.blockChance()*100)}%` : '';
-    UI.toast(`${it.e} ${it.n}${lvl?' Lv '+lvl:''} dipakai · Pertahanan ${Math.round(this.defense()*100)}%${blk}${fx}`);
+    const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):it.e;
+    UI.toast(`${itemIco} ${it.n}${lvl?' Lv '+lvl:''} dipakai · Pertahanan ${Math.round(this.defense()*100)}%${blk}${fx}`);
     Player.refreshArmor();
     UI.renderAll();
   },
@@ -661,7 +665,10 @@ const RPG={
       /* inventory penuh → jatuhkan ke tanah (jeda ambil agar tak langsung balik) */
       World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,id,1,{owner:true});
       UI.toast('🎒 Tas penuh, item dijatuhkan');
-    }else UI.toast(`${ITEMS[id].e} dilepas`);
+    }else{
+      const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):(ITEMS[id]?ITEMS[id].e:'');
+      UI.toast(`${itemIco} dilepas`);
+    }
     if(slot==='weapon')Player.refreshWeapon();
     else Player.refreshArmor();
     UI.renderAll();
@@ -742,8 +749,10 @@ const RPG={
     if(!this.isLearned(r)){UI.toast('🔒 Belum terbuka — butuh '+this.recipeReqText(r));return 0;}
     const st=this.stationReq(r);
     if(st&&!this.hasStation(st)){
-      if(st==='stove')UI.toast('🍲 Memasak makanan harus menggunakan kompor/tungku masak!');
-      else UI.toast('🔨 Butuh Meja Kerja (Crafting Table) untuk peralatan ini!');
+      const stoveIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_stove)?`<img class="iico" src="${UI.ITEM_IMG.f_stove}"> `:'';
+      const benchIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_workbench)?`<img class="iico" src="${UI.ITEM_IMG.f_workbench}"> `:'';
+      if(st==='stove')UI.toast(`${stoveIco}Memasak makanan harus menggunakan kompor/tungku masak!`);
+      else UI.toast(`${benchIco}Butuh Meja Kerja (Crafting Table) untuk peralatan ini!`);
       return 0;
     }
     count=Math.max(1,Math.floor(count)||1);
@@ -761,17 +770,24 @@ const RPG={
       }
       made++;
     }
+    const craftIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.craft)?`<img class="iico" src="${UI.ITEM_IMG.craft}"> `:'';
     if(made>0){
       Sfx.craft();
-      UI.toast(`🔨 Membuat ${ITEMS[r.out].e} ${ITEMS[r.out].n} ×${made}`+
+      const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.out):(ITEMS[r.out]?ITEMS[r.out].e:'');
+      UI.toast(`${craftIco}${itemIco} Membuat ${ITEMS[r.out].n} ×${made}`+
         (dropped?` (${dropped} jatuh, tas penuh)`:''));
+      if(typeof FX!=='undefined'&&FX.text){
+        const rar=(ITEMS[r.out]&&ITEMS[r.out].rarity)||'common';
+        const rarColor=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].css:'#8fe07a';
+        FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.2,0)),`+${made} ${ITEMS[r.out].n}`,rarColor,r.out);
+      }
       Player.addXP(3*made);
       /* proficiency kriya; resep makanan sekaligus menaikkan memasak */
       const al=r.skill?10:1;                 // resep lanjutan berharga lebih lama
       Prof.gain('crafting',12*made,al);
       if(ITEMS[r.out]&&ITEMS[r.out].food)Prof.gain('cooking',15*made,al);
     }else{
-      UI.toast('🔨 Bahan tidak cukup');
+      UI.toast(`${craftIco}Bahan tidak cukup`);
     }
     UI.renderCraft();UI.renderBag();UI.renderHotbar();
     return made;
@@ -841,11 +857,12 @@ const RPG={
     s.n--;if(s.n<=0)this.hotbar[this.sel]=null;
     Sfx.eat();
     /* umpan balik jelas: hijau bila menyembuhkan, merah bila item memang
-       merugikan (daging mentah), sehingga pemain tahu efek aslinya */
+       merugikan (daging mentah), dengan icon custom */
+    const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(s.id):it.e;
     FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.2,0)),
-      delta!==0?`${it.e}${delta>0?'+':''}${delta} HP`:it.e,
-      delta<0?'#ff8f7a':'#8fe07a');
-    if(delta<0)UI.toast(`${it.e} ${it.n} mentah — HP ${delta}! Panggang dulu di api unggun.`);
+      delta!==0?`${delta>0?'+':''}${delta} HP`:`${it.n}`,
+      delta<0?'#ff8f7a':'#8fe07a',s.id);
+    if(delta<0)UI.toast(`${itemIco} ${it.n} mentah — HP ${delta}! Panggang dulu di api unggun.`);
     UI.renderHotbar();
     return true;
   },

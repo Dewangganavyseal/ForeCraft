@@ -692,9 +692,8 @@ const Capture={
        pernah maju sehingga pet hanya mematung setelah serangan pertama. */
     {
       const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget;
-      const live=(foe&&!foe.dead)?foe:target;
-      const ref=live||Player;
-      const ang=Math.atan2(ref.pos.x-m.pos.x,ref.pos.z-m.pos.z);
+      const live=(foe&&!foe.dead)?foe:(target&&!target.dead?target:null);
+      const ang=live?Math.atan2(live.pos.x-m.pos.x,live.pos.z-m.pos.z):(m.mesh?m.mesh.rotation.y:0);
       const d=live?live.pos.distanceTo(m.pos):dp;
       if(m.kumAtk&&typeof Monsters.kumbangAtk==='function'){
         Monsters.kumbangAtk(m,dt,d,ang);return;
@@ -979,15 +978,16 @@ const Capture={
     const pet=RPG.mobSlots[i];
     if(!pet)return;
     const food=this.petFood(pet.type);
+    const fIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(food):ITEMS[food].e;
     if(RPG.countItem(food)<1){
-      UI.toast(`${ITEMS[food].e} ${pet.name} butuh ${ITEMS[food].n}!`);
+      UI.toast(`${fIco} ${pet.name} butuh ${ITEMS[food].n}!`);
       return;
     }
     RPG.removeItems({[food]:1});
     const heal=Math.round(pet.maxhp*0.3);
     pet.hp=clamp((pet.hp||1)+heal,1,pet.maxhp);
     if(this.pet&&this.deployedSlot===i)this.pet.hp=pet.hp;
-    UI.toast(`${ITEMS[food].e} ${pet.name} makan! +${heal} HP`);
+    UI.toast(`${fIco} ${pet.name} makan! +${heal} HP`);
     if(typeof Sfx!=='undefined'&&Sfx.eat)Sfx.eat();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
   },
@@ -1076,7 +1076,8 @@ const Capture={
     }
     const cost=this.levelCost(pet);
     if(RPG.countItem(cost.food)<cost.n){
-      UI.toast(`${ITEMS[cost.food].e} Butuh ${cost.n} ${ITEMS[cost.food].n} untuk naik level.`);
+      const cIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(cost.food):ITEMS[cost.food].e;
+      UI.toast(`${cIco} Butuh ${cost.n} ${ITEMS[cost.food].n} untuk naik level.`);
       return;
     }
 

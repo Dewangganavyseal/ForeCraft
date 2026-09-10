@@ -253,7 +253,7 @@ const UI={
         const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
         const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
         World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,inst);
-        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take}`);
+        this.toast(`🗑️ Membuang ${this.itemIcon(it.id)} ${it.n} ×${take}`);
         Sfx.click();
         this.renderBag();this.renderHotbar();
       }
@@ -276,7 +276,7 @@ const UI={
         cur.n-=take;
         if(cur.n<=0)n.bag[i]=null;
         World.dropItem(n.pos.x,n.pos.y+0.6,n.pos.z,s.id,take,{owner:true});
-        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari ${n.name}`);
+        this.toast(`🗑️ Membuang ${this.itemIcon(it.id)} ${it.n} ×${take} dari ${n.name}`);
         Sfx.click();
         this.renderNpcPanel();
       }
@@ -1063,7 +1063,7 @@ const UI={
         if(n.role&&n.role.id==='royalguard'&&
            typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
           NPC_Royalguard.refreshGear(n);
-        this.toast(`${ITEMS[id].e} ${ITEMS[id].n} diambil kembali`);
+        this.toast(`${this.itemIcon(id)} ${ITEMS[id].n} diambil kembali`);
         this.renderNpcPanel();this.renderAll();
       }));
   },
@@ -1248,7 +1248,7 @@ const UI={
       this.toast('🎒 Tas penuh — item dijatuhkan, koin kembali');
     }else{
       g.n--;
-      this.toast(`🏪 Membeli ${ITEMS[g.id].e} ${ITEMS[g.id].n} (−${g.price} 🪙)`);
+      this.toast(`🏪 Membeli ${this.itemIcon(g.id)} ${ITEMS[g.id].n} (−${g.price} ${this.coinIcoHtml(12)})`);
     }
     Sfx.craft();
     this.renderShop();this.renderAll();RPG.save();
@@ -1280,7 +1280,7 @@ const UI={
     const price=sellPrice(s.id),total=price*qty;
     if(qty>=s.n)arr[idx]=null;else s.n-=qty;
     RPG.addCoin(total,true);
-    this.toast(`💰 Menjual ${ITEMS[s.id].e} ${ITEMS[s.id].n} ×${qty} → +${total} 🪙`);
+    this.toast(`💰 Menjual ${this.itemIcon(s.id)} ${ITEMS[s.id].n} ×${qty} → +${total} ${this.coinIcoHtml(12)}`);
     Sfx.pickup();
     this.renderShop();this.renderAll();RPG.save();
   },
@@ -2133,7 +2133,7 @@ const UI={
         if(cur.n<=0)f.inv[i]=null;
         World.dropItem(Player.pos.x,Player.pos.y+0.6,Player.pos.z,s.id,take,{owner:true});
         Furni.save();
-        this.toast(`🗑️ Membuang ${it.e} ${it.n} ×${take} dari peti`);
+        this.toast(`🗑️ Membuang ${this.itemIcon(it.id)} ${it.n} ×${take} dari peti`);
         Sfx.click();
         this.renderChest();
       }
