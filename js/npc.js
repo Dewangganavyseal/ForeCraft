@@ -2167,6 +2167,9 @@ const NPCS={
     World.setBlock(t.x,t.y,t.z,B.AIR);
     FX.debris(new THREE.Vector3(t.x+0.5,t.y+0.5,t.z+0.5),
       (BLOCK_INFO[mined]||{}).color||0x9aa0a8,5,2);
+    /* ore yang dihancurkan rekan ikut berhamburan pecahan bongkahannya */
+    if(typeof ORE_INFO!=='undefined'&&ORE_INFO[mined]&&typeof OreFX!=='undefined')
+      OreFX.burst(t.x+0.5,t.y,t.z+0.5,mined,5,1.1);
     /* POHON TUMBANG: menebang batang paling bawah membuat sisa batang di
        atasnya runtuh berurutan, sama seperti saat PEMAIN menebangnya
        (World.fellTree). Dulu rekan hanya melenyapkan satu blok kayu, jadi

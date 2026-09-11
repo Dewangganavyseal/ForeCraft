@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.6',
+  VERSION:'0.2.7',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -264,7 +264,12 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
   /* FARM: tanah ladang hasil cangkul; bisa ditanami */
   FARM:14,
   /* RED_SOIL: tanah merah biome langka REDLANDS (habitat Kelabang Raksasa) */
-  RED_SOIL:15};
+  RED_SOIL:15,
+  /* ---------- JENIS ORE BARU (port dari NEW MODEL/ore.html) ----------
+     COAL umum, COPPER tier pemula, STEEL (baja), TUNGSTEN & TUNGSTENSTEEL
+     tier puncak. Tiap ore punya syarat level Penambangan & peluang gagal
+     per pukulan — lihat ORE_INFO di bawah. */
+  ORE_COAL:16,ORE_COPPER:17,ORE_STEEL:18,ORE_TUNGSTEN:19,ORE_TUNGSTENSTEEL:20};
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
@@ -273,18 +278,50 @@ const BLOCK_INFO={
   [B.LEAF] :{name:'Daun',  hp:0.6,drop:null,color:0x3f7d2f},
   [B.SAND] :{name:'Pasir', hp:1.6,drop:'sand',color:0xe3d29a},
   [B.SNOW] :{name:'Salju', hp:1.4,drop:null,color:0xe8f2fa},
-  /* bijih: makin langka makin keras ditambang */
-  [B.ORE_IRON]   :{name:'Bijih Besi',   hp:9.0, drop:'iron_ore',   color:0xb08a6a},
-  [B.ORE_GOLD]   :{name:'Bijih Emas',   hp:12.0,drop:'gold_ore',   color:0xd9b23a},
-  [B.ORE_CRYSTAL]:{name:'Kristal Beku', hp:16.0,drop:'crystal',    color:0x7fd8ff},
+  /* bijih: makin langka makin keras ditambang. HP dikalibrasi ulang karena
+     roll GAGAL per pukulan (ORE_INFO) sudah menambah resistensi — tanpa ini
+     ore tier atas butuh 25-30 ayunan dan terasa menghukum. */
+  [B.ORE_IRON]   :{name:'Bijih Besi',   hp:8.0, drop:'iron_ore',   color:0xb08a6a},
+  [B.ORE_GOLD]   :{name:'Bijih Emas',   hp:10.0,drop:'gold_ore',   color:0xd9b23a},
+  [B.ORE_CRYSTAL]:{name:'Kristal Beku', hp:10.0,drop:'crystal',    color:0x7fd8ff},
+  /* ---------- bijih baru (palet & karakter dari ore.html) ---------- */
+  [B.ORE_COAL]        :{name:'Bijih Batu Bara',   hp:6.0, drop:'coal',             color:0x3a3f46},
+  [B.ORE_COPPER]      :{name:'Bijih Tembaga',     hp:6.5, drop:'copper_ore',       color:0xc8703a},
+  [B.ORE_STEEL]       :{name:'Bijih Baja',        hp:10.0,drop:'steel_ore',        color:0x98a4ae},
+  [B.ORE_TUNGSTEN]    :{name:'Bijih Tungsten',    hp:11.0,drop:'tungsten_ore',     color:0x8b9a7e},
+  [B.ORE_TUNGSTENSTEEL]:{name:'Bijih Baja Tungsten',hp:12.0,drop:'tungstensteel_ore',color:0x8fa2b5},
   [B.PLANK]:{name:'Papan', hp:3.4,drop:'wood',color:0xb98a55},
   [B.ROOF] :{name:'Atap',  hp:3.4,drop:'wood',color:0x9c5a3c},
   [B.FARM] :{name:'Ladang',hp:2.0,drop:null,color:0x6f4a26},
   /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
   [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
 };
-/* blok bijih → dipakai worldgen & UI penambangan */
-const ORE_BLOCKS=[B.ORE_IRON,B.ORE_GOLD,B.ORE_CRYSTAL];
+/* blok bijih → dipakai worldgen & UI penambangan.
+   BATU (B.STONE) BUKAN ore: permukaan batu Pegunungan harus tetap polos —
+   hanya blok ORE_* yang mendapat bongkahan, gate level & roll gagal. */
+const ORE_BLOCKS=[B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
+  B.ORE_GOLD,B.ORE_TUNGSTEN,B.ORE_CRYSTAL,B.ORE_TUNGSTENSTEEL];
+
+/* ================= SISTEM PENAMBANGAN ORE (port NEW MODEL/ore.html) =========
+   `req`    = level Penambangan (Prof 'mining') MINIMUM untuk bisa menambang.
+              Level kurang → blok menolak dipukul (tidak ada damage).
+   `chance` = peluang SUKSES per pukulan pada level minimum (dari tabel
+              prototipe ore.html). Setiap level Penambangan DI ATAS req
+              menambah peluang +1.5% (maks 98%) — semakin terampil, peluang
+              gagal makin kecil.
+   Jumlah ayunan sampai hancur juga menurun seiring level: HP efektif blok
+   dikalikan (1 - (lvl-req)*3%), dibatasi minimum 45% — lihat World.hitBlock.
+   ========================================================================= */
+const ORE_INFO={
+  [B.ORE_COAL]         :{req:4, chance:0.85},
+  [B.ORE_COPPER]       :{req:7, chance:0.75},
+  [B.ORE_IRON]         :{req:12,chance:0.65},
+  [B.ORE_STEEL]        :{req:18,chance:0.58},
+  [B.ORE_GOLD]         :{req:22,chance:0.50},
+  [B.ORE_TUNGSTEN]     :{req:26,chance:0.44},
+  [B.ORE_CRYSTAL]      :{req:32,chance:0.50},
+  [B.ORE_TUNGSTENSTEEL]:{req:38,chance:0.38},
+};
 
 /* ================= biome ================= */
 /* 3 biome dipilih dari noise suhu; memengaruhi warna kabut, blok
@@ -600,6 +637,11 @@ const ITEMS={
   iron_ore:{n:'Bijih Besi',e:'🔘',rarity:'common'},
   gold_ore:{n:'Bijih Emas',e:'🔶',rarity:'uncommon'},
   crystal:{n:'Kristal Beku',e:'💎',rarity:'rare'},
+  /* ---------- bijih baru (port ore.html; icon custom menyusul) ---------- */
+  copper_ore:{n:'Bijih Tembaga',e:'🥉',rarity:'common'},
+  steel_ore:{n:'Bijih Baja',e:'⚙️',rarity:'uncommon'},
+  tungsten_ore:{n:'Bijih Tungsten',e:'⚫',rarity:'rare'},
+  tungstensteel_ore:{n:'Bijih Baja Tungsten',e:'🔷',rarity:'rare'},
   iron_ingot:{n:'Batang Besi',e:'🔩',rarity:'common'},
   gold_ingot:{n:'Batang Emas',e:'🥇',rarity:'uncommon'},
   /* drop mob baru */
@@ -771,6 +813,7 @@ const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mus
   cap_leather:0x8a5f35,vest_leather:0x8a5f35,boots_leather:0x5d3f20,
   helm_iron:0x9aa2ac,plate_iron:0x9aa2ac,greaves_iron:0x6d747d,
   sand:0xdcc78d,iron_ore:0xb08a6a,gold_ore:0xd9b23a,crystal:0x7fd8ff,
+  copper_ore:0xc8703a,steel_ore:0x98a4ae,tungsten_ore:0x8b9a7e,tungstensteel_ore:0x8fa2b5,
   iron_ingot:0xd2d9e2,gold_ingot:0xffe07a,pelt:0x9a8b7a,venom:0x9ad84f,
   centipede_shell:0x9e3b2c,
   insect_leg:0x7a4f24,hard_shell:0x9e3b2c,green_blood:0x6fe05c,toxic_venom:0x8dff3a,
@@ -1181,6 +1224,7 @@ const SHOP_VALUE={
   pie:11,bandage:7,potion_stam:8,fish:4,cfish:6,resin:3,leather:5,sand:1,coal:3,
   sugar_cane:2,sugar:5,cake:14,
   iron_ore:5,gold_ore:8,crystal:12,iron_ingot:9,gold_ingot:15,pelt:4,venom:7,
+  copper_ore:4,steel_ore:11,tungsten_ore:15,tungstensteel_ore:22,
   centipede_shell:14,
   insect_leg:35,hard_shell:40,green_blood:45,toxic_venom:50,
   boss_core:40,
@@ -1265,9 +1309,14 @@ const npcXpNeed=lvl=>Math.round(45*Math.pow(lvl,1.35));
 const NPC_GATHER=[
   {block:B.WOOD, item:'wood'},
   {block:B.STONE,item:'stone'},
+  {block:B.ORE_COAL,item:'coal'},
+  {block:B.ORE_COPPER,item:'copper_ore'},
   {block:B.ORE_IRON,item:'iron_ore'},
+  {block:B.ORE_STEEL,item:'steel_ore'},
   {block:B.ORE_GOLD,item:'gold_ore'},
+  {block:B.ORE_TUNGSTEN,item:'tungsten_ore'},
   {block:B.ORE_CRYSTAL,item:'crystal'},
+  {block:B.ORE_TUNGSTENSTEEL,item:'tungstensteel_ore'},
 ];
 
 

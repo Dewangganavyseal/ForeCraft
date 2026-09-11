@@ -889,6 +889,8 @@ const FX={
       }
     }
     this.shake=Math.max(0,this.shake-dt*2.2);
+    /* pecahan bongkahan ore (port fisika ore.html): jatuh-memantul-menggelinding */
+    if(typeof OreFX!=='undefined'&&OreFX.update)OreFX.update(dt);
   },
 
   /* --- HIGH-END GLSL VFX EXTENSION (LinearAbilityCasting Integration) --- */

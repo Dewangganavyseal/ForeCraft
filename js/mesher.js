@@ -11,7 +11,7 @@ const Mesher=(()=>{
 
   /* ---------- atlas 8 kolom x 4 baris tile @16px ----------
      Baris ke-3 & ke-4 dipakai blok biome baru (pasir, salju) dan bijih. */
-  const ATLAS_COLS=8,ATLAS_ROWS=4;
+  const ATLAS_COLS=8,ATLAS_ROWS=8;
   function makeAtlas(){
     const W=ATLAS_COLS*16,H=ATLAS_ROWS*16;
     const cv=document.createElement('canvas');cv.width=W;cv.height=H;
@@ -149,6 +149,29 @@ const Mesher=(()=>{
       [[4,4],[9,6],[6,10],[11,10]].forEach(p=>{
         px(p[0],p[1],'#d6f4ff');px(p[0],p[1]+1,'#7fd8ff');px(p[0]+1,p[1]+1,'#4fb0e0');
         px(p[0]+1,p[1],'#a8e8ff');px(p[0],p[1]+2,'#3f8fbf');});});
+    /* ---------- TILE ORE BARU (palet dari NEW MODEL/ore.html) ----------
+       Pola sama dengan tile ore lama: batu dasar + urat/nugget ore menonjol
+       2-3 px dengan glint terang di sudutnya. */
+    T(7,()=>{noiseFill('#6d747c',['#646b73','#787f87'],60);                     // batu bara
+      [[3,4],[9,3],[5,10],[11,9],[7,7],[12,12]].forEach(p=>{
+        px(p[0],p[1],'#101216');px(p[0]+1,p[1],'#1d2025');px(p[0],p[1]+1,'#2b2f35');
+        px(p[0]+1,p[1]+1,'#3a3f46');px(p[0]+2,p[1],'#707a85');});});
+    T(30,()=>{noiseFill('#8d8676',['#948d7c','#857e6e'],60);                    // tembaga
+      [[3,4],[4,5],[9,3],[10,4],[5,10],[6,11],[11,9],[12,10]].forEach(p=>{
+        px(p[0],p[1],'#a4562a');px(p[0]+1,p[1],'#c8703a');px(p[0],p[1]+1,'#e89a58');
+        px(p[0]+1,p[1]+1,'#ffd9a8');});});
+    T(31,()=>{noiseFill('#9ba7b1',['#a6b2bc','#929ea8'],60);                    // baja
+      [[4,3],[10,5],[6,10],[11,11],[3,8]].forEach(p=>{
+        px(p[0],p[1],'#6f7a85');px(p[0]+1,p[1],'#98a4ae');px(p[0],p[1]+1,'#dfe7ec');
+        px(p[0]+1,p[1]+1,'#ffffff');});});
+    T(32,()=>{noiseFill('#4a4f52',['#42474a','#54595c'],60);                    // tungsten
+      [[4,4],[9,6],[6,10],[11,10],[8,3]].forEach(p=>{
+        px(p[0],p[1],'#5c6650');px(p[0]+1,p[1],'#8b9a7e');px(p[0],p[1]+1,'#a9b89a');
+        px(p[0]+1,p[1]+1,'#e4eeda');});});
+    T(33,()=>{noiseFill('#41505f',['#3a4855','#4a5968'],60);                    // baja tungsten
+      [[3,5],[10,4],[5,10],[11,11],[8,8]].forEach(p=>{
+        px(p[0],p[1],'#5e6c7c');px(p[0]+1,p[1],'#8fa2b5');px(p[0],p[1]+1,'#c4d6e4');
+        px(p[0]+1,p[1]+1,'#ffffff');});});
     T(21,()=>{for(let y=0;y<16;y++){const col=(y%5===0)?'#8a6236':(y%2?'#b98a55':'#c49560');
         for(let x=0;x<16;x++)px(x,y,col);}
       for(let k=0;k<18;k++)px((rr()*16)|0,(rr()*16)|0,'#a37a48');});             // papan
@@ -586,6 +609,32 @@ const Mesher=(()=>{
   const AO_F=[0.55,0.75,0.88,1.0];
   const solidQ=id=>id!==B.AIR&&id!==B.WATER;
 
+  /* =======================================================================
+     PALET BONGKAHAN ORE — port 1:1 dari NEW MODEL/ore.html
+     -----------------------------------------------------------------------
+     `base` = warna batu bongkahan, `ore` = gradasi urat yang mengalir di
+     permukaan, `glint` = kilau nugget. Tiap blok bijih yang punya sisi
+     terbuka (udara/air) ditumbuhi KLUSTER BONGKAH bertingkat di atasnya dan
+     bongkah setengah-tertanam di sisi terbukanya — persis gaya prototipe
+     "kluster bongkah chamfer + urat ore mengalir + nugget menonjol".
+     ======================================================================= */
+  const h2c=h=>[parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/255,parseInt(h.slice(5,7),16)/255];
+  const ORE_PAL={
+    [B.ORE_COAL]:         {base:['#6d747c','#646b73','#787f87'],ore:['#101216','#1d2025','#3a3f46'],glint:'#707a85'},
+    [B.ORE_COPPER]:       {base:['#8d8676','#948d7c','#857e6e'],ore:['#a4562a','#c8703a','#e89a58'],glint:'#ffd9a8'},
+    [B.ORE_IRON]:         {base:['#8f7a68','#96816e','#877260'],ore:['#8a5a3c','#b3836a','#d9b092'],glint:'#f4e0c6'},
+    [B.ORE_STEEL]:        {base:['#9ba7b1','#a6b2bc','#929ea8'],ore:['#6f7a85','#98a4ae','#dfe7ec'],glint:'#ffffff'},
+    [B.ORE_GOLD]:         {base:['#7b8188','#737980','#858b92'],ore:['#c98a1e','#f6c445','#ffde74'],glint:'#fff6c4'},
+    [B.ORE_TUNGSTEN]:     {base:['#4a4f52','#42474a','#54595c'],ore:['#5c6650','#8b9a7e','#c2cfb4'],glint:'#e4eeda'},
+    [B.ORE_CRYSTAL]:      {base:['#a9c6d4','#9fc0cf','#b6d2de'],ore:['#2fb3cf','#5fd0e8','#bdf1f9'],glint:'#ffffff'},
+    [B.ORE_TUNGSTENSTEEL]:{base:['#41505f','#3a4855','#4a5968'],ore:['#5e6c7c','#8fa2b5','#dfe9f2'],glint:'#ffffff'},
+  };
+  /* pra-konversi hex → [r,g,b] 0..1 sekali saja */
+  for(const k in ORE_PAL){
+    const p=ORE_PAL[k];
+    p.b=p.base.map(h2c); p.o=p.ore.map(h2c); p.g=h2c(p.glint);
+  }
+
   /* PENGAKSES BLOK cepat. Default = World.getBlock, tapi build() mengganti
       `getB` dengan pembaca array lokal (chunk + 8 tetangga) sehingga ribuan
       panggilan getBlock saat face-visibility & AO tidak lagi membayar biaya
@@ -625,6 +674,11 @@ const Mesher=(()=>{
     if(id===B.ORE_IRON)return[18,18,18];
     if(id===B.ORE_GOLD)return[19,19,19];
     if(id===B.ORE_CRYSTAL)return[20,20,20];
+    if(id===B.ORE_COAL)return[7,7,7];
+    if(id===B.ORE_COPPER)return[30,30,30];
+    if(id===B.ORE_STEEL)return[31,31,31];
+    if(id===B.ORE_TUNGSTEN)return[32,32,32];
+    if(id===B.ORE_TUNGSTENSTEEL)return[33,33,33];
     if(id===B.PLANK)return[21,21,21];
     /* ladang: atas tanah bajakan, samping/bawah tanah biasa */
     if(id===B.FARM)return[22,2,2];
@@ -1336,6 +1390,84 @@ const Mesher=(()=>{
         else{I.push(vi,vi+1,vi+2,vi+2,vi+1,vi+3);vi+=4;}
       }
 
+      /* ===================================================================
+         BONGKAHAN ORE MENONJOL (port visual NEW MODEL/ore.html)
+         -------------------------------------------------------------------
+         Blok bijih dengan sisi terbuka ditumbuhi kluster bongkahan:
+           · ATAS (bila udara) : dua bongkah bertingkat (besar → kecil) yang
+             tampak seperti bongkah chamfer bertumpuk ala prototipe;
+           · SISI TERBUKA      : satu-dua bongkah setengah-tertanam yang
+             menonjol keluar dari wajah blok.
+         Warna tiap bongkah = batu dasar palet, dengan WAJAH URAT acak
+         deterministik (hash) yang diwarnai gradasi ore + glint — meniru
+         "urat mengalir di permukaan & nugget menonjol". Semuanya masuk
+         buffer chunk standar (murah, tanpa draw call tambahan) dan hilang
+         otomatis saat blok dihancurkan (chunk rebuild).
+         =================================================================== */
+      const pal=ORE_PAL[id];
+      if(pal){
+        /* helper lokal: kubus bongkahan 6 wajah → buffer chunk utama */
+        const pushBoulder=(bx,by,bz,sx,sy,sz,tile,seed)=>{
+          const [u0,u1,v0,v1]=tileUV(tile);
+          const wFace=WGEN.hash(seed,seed*3+1,211);
+          const veinIdx=(wFace*3)|0;
+          const veinC=pal.o[veinIdx], baseC=pal.b[(wFace*7|0)%3];
+          const glow=WGEN.hash(seed+5,seed*2,213);
+          for(let f=0;f<6;f++){
+            const d=FACES[f].dir;
+            /* warna wajah: urat pada 1-2 wajah terpilih + wajah atas ber-glint */
+            let c=d[1]===1?(glow<0.55?pal.g:baseC):baseC;
+            if(d[1]===0&&(f===((wFace*6)|0)%6||f===((wFace*6|0)+3)%6))c=veinC;
+            const shade=d[1]===1?1.0:d[1]===-1?0.5:(d[0]!==0?0.72:0.85);
+            const jt=0.95+0.1*WGEN.hash(seed+f,seed*4,215);
+            const r=shade*jt*c[0],g=shade*jt*c[1],b=shade*jt*c[2];
+            const na=d[0]!==0?0:d[1]!==0?1:2;
+            const t=[0,1,2].filter(a=>a!==na);
+            for(let i=0;i<4;i++){
+              const cn=FACES[f].corners[i];
+              P.push(bx+cn[0]*sx,by+cn[1]*sy,bz+cn[2]*sz);
+              N.push(d[0],d[1],d[2]);
+              let uu,vv;
+              if(d[1]===0){
+                const ha=na===0?2:0;
+                uu=u0+cn[ha]*(u1-u0);vv=v0+cn[1]*(v1-v0);
+              }else{
+                uu=u0+cn[t[0]]*(u1-u0);vv=v0+cn[t[1]]*(v1-v0);
+              }
+              U.push(uu,vv);
+              CL.push(r,g,b);
+            }
+            I.push(vi,vi+1,vi+2,vi+2,vi+1,vi+3);vi+=4;
+          }
+        };
+        const tile=tiles[0];
+        /* --- kluster di ATAS blok (bongkah bertingkat ala prototipe) --- */
+        if(getB(wx,y+1,wz)===B.AIR){
+          const j1x=(WGEN.hash(wx,wz,221)-0.5)*0.24, j1z=(WGEN.hash(wx,wz,223)-0.5)*0.24;
+          const j2x=(WGEN.hash(wx,wz,227)-0.5)*0.34, j2z=(WGEN.hash(wx,wz,229)-0.5)*0.34;
+          const s1=0.58+WGEN.hash(wx,wz,231)*0.14;
+          pushBoulder(wx+0.5+j1x-s1/2,y+1,wz+0.5+j1z-s1/2,s1,0.30,s1,tile,wx*7+wz*3+y);
+          const s2=s1*0.62;
+          pushBoulder(wx+0.5+j2x-s2/2,y+1.30,wz+0.5+j2z-s2/2,s2,0.20,s2,tile,wx*5+wz*9+y*2);
+        }
+        /* --- bongkah setengah-tertanam di sisi terbuka --- */
+        const maxSide=IS_MOBILE?1:2;
+        let sideDone=0;
+        for(let f=0;f<6&&sideDone<maxSide;f++){
+          const d=FACES[f].dir;
+          if(d[1]!==0)continue;
+          const nb=getB(wx+d[0],y,wz+d[2]);
+          if(nb!==B.AIR&&nb!==B.WATER)continue;
+          sideDone++;
+          const hw=WGEN.hash(wx*3+f,wz*5+y,233);
+          const size=0.36+hw*0.20;                     // 0.36..0.56
+          const vo=(WGEN.hash(wx+f*11,wz-f,235)-0.5)*0.26;
+          const px2=wx+0.5+d[0]*(0.5-0.07), py2=y+0.5+vo, pz2=wz+0.5+d[2]*(0.5-0.07);
+          const sx=d[0]!==0?0.30:size, sy=size*0.8, sz=d[2]!==0?0.30:size;
+          pushBoulder(px2-sx/2,py2-sy/2,pz2-sz/2,sx,sy,sz,tile,wx*11+wz*13+f*7+y);
+        }
+      }
+
       /* CATATAN: tidak ada wajah "undakan" penambal di sini. Tinggi sudut kisi
          (rzCorner) dibagi bersama antar blok bertetangga, jadi permukaannya
          sudah rapat tanpa tambalan apa pun. */
@@ -1612,6 +1744,9 @@ const Mesher=(()=>{
     trample:TRAMPLE,trampleCount:TRAMPLE_N,trampleMax:MAX_TRAMPLE,
     /* dipakai FX.groundWave agar blok gelombang memakai material/tekstur asli */
     atlas(){if(!atlasTex)makeAtlas();return atlasTex;},
-    tilesFor,tileUV};
+    tilesFor,tileUV,
+    /* palet bongkahan ore ([r,g,b] 0..1) untuk OreFX (pecahan menggelinding) */
+    orePalette(id){return ORE_PAL[id]||null;}
+  };
 
 })();

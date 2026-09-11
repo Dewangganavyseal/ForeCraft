@@ -118,6 +118,8 @@ const Game={
     if(typeof World!=='undefined'){
       World.lcx=1e9;World.zcz=1e9;World.loadList=[];
     }
+    /* pecahan bongkahan ore jangan tertinggal di scene antar dunia */
+    if(typeof OreFX!=='undefined'&&OreFX.clear)OreFX.clear();
   },
 
   findSpawn(){

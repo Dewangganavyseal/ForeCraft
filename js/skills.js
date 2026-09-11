@@ -47,9 +47,14 @@ BLOCK_PROF[B.WOOD]        ={sk:'logging',    xp:5,  lvl:1};
 BLOCK_PROF[B.PLANK]       ={sk:'logging',    xp:3,  lvl:1};
 BLOCK_PROF[B.ROOF]        ={sk:'logging',    xp:3,  lvl:1};
 BLOCK_PROF[B.STONE]       ={sk:'mining',     xp:8,  lvl:1};
+BLOCK_PROF[B.ORE_COAL]    ={sk:'mining',     xp:10, lvl:4};
+BLOCK_PROF[B.ORE_COPPER]  ={sk:'mining',     xp:12, lvl:7};
 BLOCK_PROF[B.ORE_IRON]    ={sk:'mining',     xp:15, lvl:12};
+BLOCK_PROF[B.ORE_STEEL]   ={sk:'mining',     xp:24, lvl:18};
 BLOCK_PROF[B.ORE_GOLD]    ={sk:'mining',     xp:22, lvl:22};
+BLOCK_PROF[B.ORE_TUNGSTEN]={sk:'mining',     xp:26, lvl:26};
 BLOCK_PROF[B.ORE_CRYSTAL] ={sk:'mining',     xp:30, lvl:32};
+BLOCK_PROF[B.ORE_TUNGSTENSTEEL]={sk:'mining',xp:34, lvl:38};
 BLOCK_PROF[B.LEAF]        ={sk:'harvesting', xp:2,  lvl:1};
 
 /* =========================================================================

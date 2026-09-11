@@ -1021,6 +1021,8 @@ const Player={
     /* prioritas: makin kecil makin diutamakan pada jarak yang sama */
     const PRIO={
       [B.ORE_CRYSTAL]:-0.85,[B.ORE_GOLD]:-0.85,[B.ORE_IRON]:-0.85,
+      [B.ORE_COAL]:-0.85,[B.ORE_COPPER]:-0.85,[B.ORE_STEEL]:-0.85,
+      [B.ORE_TUNGSTEN]:-0.85,[B.ORE_TUNGSTENSTEEL]:-0.85,
       [B.WOOD]:-0.25,[B.STONE]:0,[B.PLANK]:0,[B.ROOF]:0,
       [B.SAND]:0.25,[B.SNOW]:0.25,[B.GRASS]:0.45,[B.DIRT]:0.45,
     };

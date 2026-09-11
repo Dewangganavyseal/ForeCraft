@@ -842,20 +842,92 @@ const World={
       }
     }
   },
+  /* ---------- FX GAGAL TAMBANG (port doFail dari NEW MODEL/ore.html) ----------
+     Percikan merah-oranye + getar blok kuat + teks GAGAL. Pukulan yang gagal
+     TIDAK memberikan damage apa pun ke ore (sia-sia), persis prototipe. */
+  oreFailFx(wx,wy,wz,id){
+    const c=new THREE.Vector3(wx+0.5,wy+0.7,wz+0.5);
+    const info=BLOCK_INFO[id]||{};
+    /* percikan merah panas + serpihan gelap ore — kombinasi doFail prototipe */
+    FX.debris(c,0xff2d20,5,3.4);
+    FX.debris(c,0xff6b1a,4,2.9);
+    FX.debris(c,0xffc21a,3,2.4);
+    FX.debris(c,info.color||0x3a3f46,4,2.2);
+    if(typeof PortFX!=='undefined'&&PortFX.spark)PortFX.spark(c.x,c.y,c.z,10,0xff5a2e,8);
+    FX.blockShake(wx,wy,wz,info.color||0x8a8f98,2.2);
+    FX.addShake(0.16);
+    FX.text(c.clone().add(new THREE.Vector3(0,0.9,0)),'GAGAL!','#ff5a3a');
+    Sfx.rock();
+  },
   hitBlock(wx,wy,wz,dmg){
     if(wy<=0)return false;
     const id=this.getBlock(wx,wy,wz);
     if(id===B.AIR||id===B.WATER)return false;
+    /* ================= SISTEM PENAMBANGAN ORE (port NEW MODEL/ore.html) =====
+       1. GATE LEVEL  : Penambangan di bawah syarat → blok menolak dipukul.
+       2. PELUANG     : tiap pukulan diundi; makin tinggi level di atas syarat,
+                        peluang sukses naik (+1.5%/level, maks 98%) sehingga
+                        peluang GAGAL makin kecil.
+       3. HP EFEKTIF  : jumlah ayunan sampai hancur menurun +3%/level di atas
+                        syarat (minimum 45% HP dasar) — penambang berpengalaman
+                        menghancurkan ore dengan lebih sedikit ayunan.
+       4. TAHAPAN     : HP menyusut 66% → pecahan tahap-1, 33% → tahap-2,
+                        hancur → burst penuh. Tiga animasi pecahan bongkahan.
+       ===================================================================== */
+    const oreDef=(typeof ORE_INFO!=='undefined')?ORE_INFO[id]:null;
+    if(oreDef){
+      const mLv=(typeof Prof!=='undefined')?Prof.level('mining'):1;
+      if(mLv<oreDef.req){
+        /* anti-spam toast: cukup sekali per 0.9 detik per pukulan beruntun */
+        const now=(typeof performance!=='undefined')?performance.now():Date.now();
+        if(!this._oreDenyT||now-this._oreDenyT>900){
+          this._oreDenyT=now;
+          UI.toast(`⛏️ ${BLOCK_INFO[id].name}: butuh Penambangan Lv ${oreDef.req}!`);
+          Sfx.noStamina();
+          FX.text(new THREE.Vector3(wx+0.5,wy+1.4,wz+0.5),
+            `🔒 Lv ${oreDef.req}`,'#ff9d8a');
+        }
+        return false;
+      }
+      const eff=Math.min(0.98,oreDef.chance+(mLv-oreDef.req)*0.015);
+      if(Math.random()>eff){
+        this.oreFailFx(wx,wy,wz,id);
+        return false;
+      }
+    }
     const k=`${wx},${wy},${wz}`;
-    let hp=this.blockHP.has(k)?this.blockHP.get(k):BLOCK_INFO[id].hp;
+    /* HP efektif ore menurun sesuai kelebihan level Penambangan */
+    let maxHp=BLOCK_INFO[id].hp||1;
+    if(oreDef){
+      const mLv=(typeof Prof!=='undefined')?Prof.level('mining'):1;
+      maxHp*=clamp(1-(mLv-oreDef.req)*0.03,0.45,1);
+    }
+    let hp=this.blockHP.has(k)?this.blockHP.get(k):maxHp;
     hp-=dmg;
     FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),BLOCK_INFO[id].color,2,1.5);
     /* getaran pada blok yang dipukul: makin sedikit HP tersisa, makin kuat
        getarannya sehingga pemain punya umpan balik "hampir hancur" */
-    const maxHp=BLOCK_INFO[id].hp||1;
     FX.blockShake(wx,wy,wz,BLOCK_INFO[id].color,
       1+0.8*(1-clamp(hp/maxHp,0,1)));
-    if(id===B.STONE)Sfx.rock();else Sfx.chop();
+    if(id===B.STONE||oreDef)Sfx.rock();else Sfx.chop();
+    /* ---------- TAHAPAN PECAHAN BONGKAHAN (3 animasi) ----------
+       66% → tahap 1 (bongkahan luar rontok), 33% → tahap 2 (retak berat),
+       0   → hancur total (di breakBlock). Pecahan MENGELINDING ke tanah. */
+    if(oreDef){
+      if(!this.oreStg)this.oreStg={};
+      let st=this.oreStg[k];
+      if(!st)st=this.oreStg[k]={stage:0};
+      const frac=hp/maxHp;
+      if(st.stage<1&&frac<=0.66&&hp>0){
+        st.stage=1;
+        OreFX.burst(wx+0.5,wy,wz+0.5,id,4,1.0);
+        FX.addShake(0.12);
+      }else if(st.stage<2&&frac<=0.33&&hp>0){
+        st.stage=2;
+        OreFX.burst(wx+0.5,wy,wz+0.5,id,5,1.2);
+        FX.addShake(0.18);
+      }
+    }
     if(hp<=0){
       this.blockHP.delete(k);
       FX.clearBlockShake(wx,wy,wz);
@@ -887,6 +959,14 @@ const World={
     this.setBlock(wx,wy,wz,B.AIR);
     const info=BLOCK_INFO[id];
     FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),info.color,10,3.2);
+    /* ---------- ORE HANCUR: burst penuh pecahan bongkahan ----------
+       Tahap ke-3 dari tiga animasi pecahan (66% → 33% → hancur). Pecahan
+       jatuh, memantul, lalu MENGELINDING di tanah sebelum memudar. */
+    const isOre=(typeof ORE_INFO!=='undefined')&&!!ORE_INFO[id];
+    if(isOre&&typeof OreFX!=='undefined'){
+      OreFX.burst(wx+0.5,wy,wz+0.5,id,10,1.5);
+      if(this.oreStg)delete this.oreStg[`${wx},${wy},${wz}`];
+    }
     /* bonus hasil: skill Pemanen + proficiency sub-skill blok + skill GATHER per jenis drop */
     const dropId=info.drop||((id===B.GRASS||id===B.DIRT)?'fiber':null);
     let bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
