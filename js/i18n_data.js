@@ -536,6 +536,7 @@ const I18N_SLOTS={
    agar frasa panjang tidak terpotong oleh frasa pendek. */
 const I18N_PHRASE={
   /* HUD & umum */
+  'Bongkahan Batu':['Stone Boulder','石块矿','岩の鉱塊'],
   'Pengaturan':['Settings','设置','設定'],
   'Hari':['Day','天','日目'],
   'Koin':['Coins','金币','コイン'],

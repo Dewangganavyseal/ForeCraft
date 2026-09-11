@@ -520,16 +520,12 @@ const WGEN={
     return 0;
   },
   /* ---------- bongkahan batu / bijih ----------
-     Tersebar sebagai penanda arah & sumber tambang permukaan.
-     `rockAt` hanya menentukan ADA/TIDAK dan tinggi dasarnya; BENTUKNYA
-     ditentukan rockKind + rockH di bawah. */
+     DINONAKTIFKAN: bongkahan batu polos bawaan (rockAt) dihapus total sesuai
+     permintaan desain — satu-satunya sumber tambang permukaan kini adalah
+     NODE ORE otentik dari Ore.html (lihat oreNodeAt). rockAt mengembalikan 0
+     sehingga tidak ada lagi gundukan batu B.STONE yang tersebar di dunia. */
   rockAt(wx,wz,h){
-    if(h<CFG.SEA)return 0;
-    if(this.biomeAt(wx,wz)===BIOME.OCEAN)return 0;
-    if(Math.abs(wx)<3&&Math.abs(wz)<3)return 0;
-    const r=this.hash(wx,wz,6);
-    if(r>0.004)return 0;
-    return 2+(this.hash(wx,wz,7)<0.5?0:1);       // tinggi dasar 2-3
+    return 0;
   },
 
   /* =========================================================================
@@ -585,9 +581,10 @@ const WGEN={
      tanaman di kolom tetangga tetap ditanam lalu tertanam di dalam batu.
      Radius pindai 2 = rockR maksimum. */
   plantBlockedByRock(wx,wz){
-    /* kolom bagian NODE ORE permukaan juga menolak tanaman (alas node
-       menutup permukaan kolom tetangga pusat node) */
-    if(this.oreNodeAt(wx,wz))return true;
+    /* kolom bagian NODE ORE permukaan juga menolak tanaman */
+    for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
+      if(this.oreNodeAt(wx+dx,wz+dz))return true;
+    }
     for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       if(dx===0&&dz===0)continue;                  // kolom sendiri diurus caller
       const ox=wx+dx,oz=wz+dz;
@@ -607,34 +604,67 @@ const WGEN={
      campuran di bongkahan batu. oreFor tetap dipakai pickOre. */
   oreFor(wx,wz){return BIOME_INFO[this.biomeAt(wx,wz)].ore;},
   /* ---------- DISTRIBUSI JENIS ORE (port NEW MODEL/ore.html) ----------
-     Tiap NODE memilih JENIS ore secara deterministik dari seed:
-       · 30%  batu bara  — umum di semua biome (progres awal lancar)
-       · 42%  ore UTAMA biome (iron hutan / gold gurun / crystal tundra-gunung)
-       · 28%  ore sekunder khas biome (copper, steel/baja, tungsten,
-              tungstensteel) — ore tier tinggi makin didominasi biome ekstrem.
-     Semua jenis ore punya syarat level Penambangan (lihat ORE_INFO di
-     config.js), jadi ore tier atas tetap jarang ditemui sebelum layak. */
+     Sesuai aturan:
+     - 1 buah ore di permukaan per node
+     - Ore batu (B.ORE_STONE) mudah ditemukan di biome level rendah bersama batu bara & tembaga
+     - Ore rarity tinggi (Kristal, Tungsten, Tungstensteel, Emas) mudah ditemukan di biome Gunung
+     - Biome menengah (Gurun, Tundra, Redlands) memiliki sebaran sesuai tiernya */
   pickOre(wx,wz,y,bi){
-    const h=this.hash(wx,wz+y*97,55);
-    if(h<0.30)return B.ORE_COAL;
     const bio=(bi===undefined)?this.biomeAt(wx,wz):bi;
-    const main=(BIOME_INFO[bio]||BIOME_INFO[BIOME.FOREST]).ore;
-    if(h<0.72)return main;
-    const SEC={
-      [BIOME.FOREST]  :[B.ORE_COPPER,B.ORE_IRON,B.ORE_COPPER],
-      [BIOME.DESERT]  :[B.ORE_COPPER,B.ORE_STEEL,B.ORE_GOLD],
-      [BIOME.TUNDRA]  :[B.ORE_IRON,B.ORE_STEEL,B.ORE_CRYSTAL],
-      [BIOME.MOUNTAIN]:[B.ORE_STEEL,B.ORE_TUNGSTEN,B.ORE_TUNGSTENSTEEL],
-      [BIOME.REDLANDS]:[B.ORE_COPPER,B.ORE_TUNGSTEN,B.ORE_IRON],
-      [BIOME.BEACH]   :[B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON],
-      [BIOME.OCEAN]   :[B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON],
-    }[bio]||[B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL];
-    const idx=Math.floor(((h-0.72)/0.28)*SEC.length)%SEC.length;
-    return SEC[idx];
+    const h=this.hash(wx,wz+y*97,55);
+
+    /* MOUNTAIN (Pegunungan, Lv 50-75): Rarity TINGGI sangat mudah ditemukan! */
+    if(bio===BIOME.MOUNTAIN){
+      if(h<0.30)return B.ORE_CRYSTAL;          // 30% Kristal Beku (Diamond)
+      if(h<0.60)return B.ORE_TUNGSTEN;         // 30% Tungsten
+      if(h<0.84)return B.ORE_TUNGSTENSTEEL;    // 24% Baja Tungsten
+      if(h<0.94)return B.ORE_GOLD;             // 10% Emas
+      return B.ORE_STEEL;                      // 6% Baja
+    }
+
+    /* REDLANDS (Tanah Merah, Lv 30-50, Keras & Beracun): */
+    if(bio===BIOME.REDLANDS){
+      if(h<0.35)return B.ORE_TUNGSTEN;         // 35% Tungsten
+      if(h<0.60)return B.ORE_TUNGSTENSTEEL;    // 25% Baja Tungsten
+      if(h<0.80)return B.ORE_STEEL;            // 20% Baja
+      if(h<0.92)return B.ORE_COPPER;           // 12% Tembaga
+      return B.ORE_IRON;                       // 8% Besi
+    }
+
+    /* TUNDRA (Tundra Salju, Lv 1-20 / Mid): */
+    if(bio===BIOME.TUNDRA){
+      if(h<0.28)return B.ORE_CRYSTAL;          // 28% Kristal Beku
+      if(h<0.53)return B.ORE_STEEL;            // 25% Baja
+      if(h<0.75)return B.ORE_IRON;             // 22% Besi
+      if(h<0.90)return B.ORE_TUNGSTEN;         // 15% Tungsten
+      return B.ORE_STONE;                      // 10% Batu
+    }
+
+    /* DESERT (Gurun Pasir, Lv 20-30): */
+    if(bio===BIOME.DESERT){
+      if(h<0.30)return B.ORE_GOLD;             // 30% Emas
+      if(h<0.58)return B.ORE_IRON;             // 28% Besi
+      if(h<0.80)return B.ORE_COPPER;           // 22% Tembaga
+      if(h<0.92)return B.ORE_STEEL;            // 12% Baja
+      return B.ORE_STONE;                      // 8% Batu
+    }
+
+    /* FOREST (Hutan Rimba, Zona Awal, Lv 1-20): Rarity RENDAH mendominasi! */
+    if(bio===BIOME.FOREST){
+      if(h<0.38)return B.ORE_STONE;            // 38% Batu (sangat mudah terlihat!)
+      if(h<0.68)return B.ORE_COAL;             // 30% Batu Bara
+      if(h<0.86)return B.ORE_COPPER;           // 18% Tembaga
+      if(h<0.96)return B.ORE_IRON;             // 10% Besi
+      return B.ORE_GOLD;                       // 4% Emas
+    }
+
+    /* BEACH / LAINNYA: */
+    if(h<0.50)return B.ORE_STONE;              // 50% Batu
+    if(h<0.80)return B.ORE_COAL;               // 30% Batu Bara
+    return B.ORE_COPPER;                       // 20% Tembaga
   },
   oreRoll(wx,wz,y){
-    /* (tidak dipakai lagi — ore kini hanya node permukaan; fungsi disimpan
-       untuk kompatibilitas bila sistem vein ingin dihidupkan ulang) */
+    /* (tidak dipakai lagi — ore kini hanya node permukaan) */
     const v=Noise.fbm(nM,wx*0.16+7,wz*0.16-3,2)*0.5+0.5;
     const base=y<=0?0.16:0.09;
     return v>0.6&&this.hash(wx,wz+y*57,31)<base;
@@ -644,20 +674,30 @@ const WGEN={
      NODE ORE PERMUKAAN — satu bongkahan ore per area (port NEW MODEL/ore.html)
      -----------------------------------------------------------------------
      Aturan (permintaan desain):
-       · Ore TIDAK lagi tersebar sebagai urat bawah tanah — hanya muncul di
-         PERMUKAAN, kemunculannya acak & tersebar di berbagai biome daratan.
-       · SATU node per sel grid: satu jenis ore untuk SELURUH bongkahan
-         (tidak ada beberapa ore tercampur di satu tempat).
-       · Ukurannya sedikit lebih besar dari badan pemain: alas plus-shape
-         (5 blok) + 1 blok puncak, lalu kluster bongkahan mesher menaikkan
-         tinggi visualnya ±0.5 blok lagi.
-     Kolom ditanyakan per-koordinat; fungsi mengembalikan peran kolom:
-       {core:true}            → kolom PUSAT node (punya blok puncak)
-       {core:false,baseY,ore} → kolom alas milik node tetangga
-       null                   → kolom ini bukan bagian node mana pun
-     Semua nilai deterministik dari seed → chunk regen menghasilkan node sama.
+       · Ore TIDAK lagi berupa tumpukan blok kubus — melainkan 1 buah bongkahan
+         utuh dari Ore.html yang duduk tepat di permukaan tanah.
+       · SATU node per sel grid (hanya 1 koordinat tunggal).
+       · Tidak ada tumpukan blok kubus alas / core 2 lantai.
      ======================================================================= */
-  ORE_NODE_CELL:26, ORE_NODE_CHANCE:0.70,
+  ORE_NODE_CELL:26, ORE_NODE_CHANCE:0.75,
+  /* true bila area 4x4 di sekitar (wx,wz) cukup DATAR. Terrain voxel Forecraft
+     bergelombang halus ±1 blok antar kolom berdekatan, sehingga toleransi 0
+     terlalu ketat (biome gurun & hutan nyaris tak pernah lolos → ore tak pernah
+     muncul). Toleransi 1 blok membuat ~90% area tiap biome lolos sekaligus
+     tetap menjamin bongkahan menapak (perbedaan tinggi ≤1 blok masih dalam
+     jangkauan alas bongkahan yang grounded). Mengembalikan ketinggian DASAR
+     (min) area supaya node bisa diletakkan menapak titik tertinggi. */
+  ORE_FLAT_TOL:1,
+  oreFlatOK(wx,wz){
+    const h=this.height(wx,wz);
+    let mn=h,mx=h;
+    for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++){
+      const hh=this.height(wx+dx,wz+dz);
+      if(hh<mn)mn=hh; if(hh>mx)mx=hh;
+      if(mx-mn>this.ORE_FLAT_TOL)return false;
+    }
+    return true;
+  },
   oreNodeAt(wx,wz){
     const S=this.ORE_NODE_CELL;
     const cx=Math.floor(wx/S),cz=Math.floor(wz/S);
@@ -665,15 +705,13 @@ const WGEN={
     /* pusat node: jitter di dalam sel, menjauh dari tepi sel */
     const nx=cx*S+5+((this.hash(cx,cz,403)*(S-10))|0);
     const nz=cz*S+5+((this.hash(cx,cz,405)*(S-10))|0);
-    const dx=wx-nx,dz=wz-nz;
-    const core=(dx===0&&dz===0);
-    if(!core&&Math.abs(dx)+Math.abs(dz)!==1)return null;   // hanya plus-shape
+    if(wx!==nx||wz!==nz)return null;           // HANYA 1 TITIK TUNGGAL (1 buah di permukaan)!
     /* satu jenis ore untuk seluruh node — dari distribusi biome */
     const bio=this.biomeAt(nx,nz);
     if(bio===BIOME.OCEAN||bio===BIOME.BEACH)return null;
     const hP=this.height(nx,nz);
     if(hP<CFG.SEA)return null;                    // tidak di air/pantai basah
-    if(this.rockAt(nx,nz,hP)>0)return null;       // tidak menimpa bongkahan batu
+    if(!this.oreFlatOK(nx,nz))return null;        // WAJIB blok DATAR 4x4
     if(this.treeAt(nx,nz,hP))return null;         // tidak menggantungi pohon
     /* tidak menimpa desa / dungeon */
     for(const v of this.villagesNear(nx,nz))
@@ -682,7 +720,7 @@ const WGEN={
       for(const d of this.dungeonsNear(nx,nz))
         if(Math.max(Math.abs(nx-d.x),Math.abs(nz-d.z))<=d.r+3)return null;
     const ore=this.pickOre(nx,nz,1,bio);
-    return {core,baseY:hP,ore};
+    return {baseY:hP,ore};
   },
 
   /* ---------- desa ----------
@@ -946,6 +984,7 @@ function genChunk(cx,cz){
   const C=CFG.CHUNK,H=CFG.WORLD_H;
   const data=new Uint8Array(C*C*H);
   const plants=[];
+  const ores=[];
   const idx=(x,y,z)=>x+z*C+y*C*C;
   /* desa yang menyentuh chunk ini; dipakai untuk meratakan tanah & rumah */
   const villages=WGEN.villagesNear(cx*C+8,cz*C+8);
@@ -1055,31 +1094,19 @@ function genChunk(cx,cz){
       }
     }
 
-    /* ---------- NODE ORE PERMUKAAN (satu bongkahan ore per area) ----------
-       Kolom PUSAT  : blok ore alas + blok puncak (tinggi 2, plus overlay
-                      bongkahan mesher ≈ 2.5 blok — sedikit di atas pemain).
-       Kolom ALAS   : satu blok ore di ketinggian dasar node milik tetangga.
-       Semua kolom wajib kolom bebas (bukan pohon/desa/dungeon/batu) dan
-       hanya mengisi sel yang masih AIR. */
-    if(!occupied&&h>=CFG.SEA){
+    /* ---------- NODE ORE PERMUKAAN (1 buah bongkahan ore per lokasi) ----------
+       Satu node per lokasi (hanya 1 koordinat tunggal), diletakkan tepat di atas
+       permukaan tanah (y = h). Tidak ada lagi tumpukan blok kubus alas / 2 lantai. */
+    if(!occupied&&h>=CFG.SEA&&!tree&&safe){
       const node=WGEN.oreNodeAt(wx,wz);
       if(node){
-        if(node.core&&!tree&&safe){
-          tree=true;                            // blokir tanaman di kolom node
-          if(h<node.baseY+2){
-            let ii=idx(x,node.baseY,z);
-            if(data[ii]===B.AIR)data[ii]=node.ore;
-            ii=idx(x,Math.min(node.baseY+1,H-1),z);
-            if(data[ii]===B.AIR)data[ii]=node.ore;
-          }
-        }else if(!node.core&&!WGEN.treeAt(wx,wz,h)){
-          /* kolom alas: hanya bila permukaannya sejajar dasar node (±1) */
-          if(Math.abs(h-node.baseY)<=1){
-            const y=node.baseY;
-            if(y<H){
-              const ii=idx(x,y,z);
-              if(data[ii]===B.AIR)data[ii]=node.ore;
-            }
+        tree=true;                            // blokir tanaman di kolom node
+        const y=h;
+        if(y<H){
+          const ii=idx(x,y,z);
+          if(data[ii]===B.AIR){
+            data[ii]=node.ore;
+            ores.push({x,y,z,wx,wy:y,wz,ore:node.ore,seed:(wx*17+wz*31)});
           }
         }
       }
@@ -1119,7 +1146,7 @@ function genChunk(cx,cz){
   for(const p of plants){
     if(data[idx(p.x,p.y,p.z)]===B.AIR)okPlants.push(p);
   }
-  return {data,plants:okPlants};
+  return {data,plants:okPlants,ores};
 }
 
 /* ---------- lahan farming desa ----------

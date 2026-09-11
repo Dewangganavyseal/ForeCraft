@@ -14,7 +14,7 @@ const World={
     let c=this.chunks.get(k);
     if(!c){
       const g=genChunk(cx,cz);
-      c={cx,cz,data:g.data,plants:g.plants,group:null};
+      c={cx,cz,data:g.data,plants:g.plants,ores:g.ores,group:null};
       this.chunks.set(k,c);
     }
     return c;
@@ -71,8 +71,17 @@ const World={
   /* blok yang dihitung sebagai "lantai" oleh groundAt. Udara/air/kanopi/
      batang sengaja BUKAN lantai supaya pemain bisa berjalan di bawah
      pohon & tidak menempel ke kanopi. B.ROOF dan B.PLANK adalah lantai padat
-     (termasuk lantai trim kayu di arena dungeon) agar tidak tembus. */
-  isFloor(id){return id!==B.AIR&&id!==B.WATER&&id!==B.WOOD&&id!==B.LEAF;},
+     (termasuk lantai trim kayu di arena dungeon) agar tidak tembus.
+     CATATAN ORE: node ore adalah bongkahan 3D yang BERDIRI DI ATAS tanah,
+     BUKAN lantai yang bisa dipijak — maka ore sengaja dikecualikan dari
+     lantai agar pemain tidak "terangkat" menaiki model ore. Namun ore TETAP
+     PADAT untuk tabrakan horizontal (lihat blockedAt & solidBody di bawah)
+     supaya pemain tidak menembusnya. */
+  isFloor(id){return id!==B.AIR&&id!==B.WATER&&id!==B.WOOD&&id!==B.LEAF&&(typeof ORE_INFO==='undefined'||!ORE_INFO[id]);},
+  /* true bila blok ini BADAN PADAT yang menghalangi ruang tubuh pemain
+     (dipakai headroomOK & unburyY). Sama seperti isFloor, TETAPI ore ikut
+     dianggap padat agar pemain tidak bisa berdiri menembus bongkahan ore. */
+  solidBody(id){return this.isFloor(id)||(typeof ORE_INFO!=='undefined'&&!!ORE_INFO[id]);},
 
   groundAt(x,z,fromY){
     /* radius sampling disamakan dengan radius tabrakan pemain (0.28) supaya
@@ -121,8 +130,8 @@ const World={
     let yy=Math.floor(y+0.001);
     if(yy<0)yy=0;
     if(yy>=CFG.WORLD_H)return y;
-    if(!this.isFloor(this.getBlock(bx,yy,bz)))return y;   // tidak terkubur
-    while(yy<CFG.WORLD_H&&this.isFloor(this.getBlock(bx,yy,bz)))yy++;
+    if(!this.solidBody(this.getBlock(bx,yy,bz)))return y;   // tidak terkubur
+    while(yy<CFG.WORLD_H&&this.solidBody(this.getBlock(bx,yy,bz)))yy++;
     return yy;
   },
 
@@ -139,7 +148,7 @@ const World={
     for(const[ox,oz]of[[-r,-r],[r,-r],[-r,r],[r,r]]){
       const bx=Math.floor(x+ox),bz=Math.floor(z+oz);
       for(let dy=0;dy<=1;dy++){
-        if(this.isFloor(this.getBlock(bx,fy+dy,bz)))return false;
+        if(this.solidBody(this.getBlock(bx,fy+dy,bz)))return false;
       }
     }
     return true;
@@ -158,12 +167,18 @@ const World={
        Tanpa ini pemain menembus bangunannya begitu saja. */
     if(typeof Furni!=='undefined'&&Furni.solidAt&&
        samples.some(([ox,oz])=>Furni.solidAt(x+ox,y+0.45,z+oz)||
-                               Furni.solidAt(x+ox,y+1.15,z+oz)))return true;
+                                Furni.solidAt(x+ox,y+1.15,z+oz)))return true;
+    /* NODE ORE BONGKAHAN (Env_Ore): model 3D lebar ~3.5 blok, jauh melebihi
+       1 kolom blok ore di data dunia. Collision footprint-nya diuji terpisah
+       supaya pemain tidak menembus bagian bongkahan yang melebar. */
+    if(typeof Env_Ore!=='undefined'&&Env_Ore.solidAt&&
+       samples.some(([ox,oz])=>Env_Ore.solidAt(x+ox,y+0.45,z+oz)||
+                                Env_Ore.solidAt(x+ox,y+1.15,z+oz)))return true;
     return samples.some(([ox,oz])=>{
       const id1=this.getBlock(Math.floor(x+ox),by,Math.floor(z+oz));
       const id2=this.getBlock(Math.floor(x+ox),by2,Math.floor(z+oz));
-      /* papan dinding & atap rumah ikut memblokir supaya pemain masuk lewat pintu */
-      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK||id===B.ROOF;
+      /* papan dinding & atap rumah ikut memblokir supaya pemain masuk lewat pintu; ore memblokir agar tidak ditembus */
+      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK||id===B.ROOF||(typeof ORE_INFO!=='undefined'&&!!ORE_INFO[id]);
       return solid(id1)||solid(id2);
     });
   },
@@ -227,6 +242,7 @@ const World={
   update(dt,pp){
     this.processTimers(dt);
     if(typeof Farming!=='undefined')Farming.update(dt,pp);
+    if(typeof Env_Ore!=='undefined'&&Env_Ore.update)Env_Ore.update(dt);
     /* waktu angin tumbuhan voxel: satu uniform untuk seluruh dunia, jadi
        semua semak/tebu/tulip bergoyang tanpa biaya per-tanaman */
     if(Mesher.floraTime)Mesher.floraTime.value+=dt;
@@ -328,6 +344,7 @@ const World={
   },
 
   disposeGroup(c){
+    if(typeof Env_Ore!=='undefined'&&Env_Ore.disposeChunkOres)Env_Ore.disposeChunkOres(c);
     Game.scene.remove(c.group);
     c.group.traverse(o=>{if(o.geometry)o.geometry.dispose();});
     c.grassMesh=null;
@@ -482,6 +499,10 @@ const World={
     }
     if(res.water){
       const m=new THREE.Mesh(res.water,M.water);m.renderOrder=2;g.add(m);
+    }
+    /* BONGKAHAN ORE PERMUKAAN (port visual 100% dari NEW MODEL/Ore.html) */
+    if(typeof Env_Ore!=='undefined'&&Env_Ore.buildChunkOres){
+      Env_Ore.buildChunkOres(c, g);
     }
     Game.scene.add(g);c.group=g;
   },
@@ -892,6 +913,7 @@ const World={
       const eff=Math.min(0.98,oreDef.chance+(mLv-oreDef.req)*0.015);
       if(Math.random()>eff){
         this.oreFailFx(wx,wy,wz,id);
+        if(typeof Env_Ore!=='undefined'&&Env_Ore.onFail)Env_Ore.onFail(wx,wy,wz);
         return false;
       }
     }
@@ -918,15 +940,16 @@ const World={
       let st=this.oreStg[k];
       if(!st)st=this.oreStg[k]={stage:0};
       const frac=hp/maxHp;
-      if(st.stage<1&&frac<=0.66&&hp>0){
-        st.stage=1;
-        OreFX.burst(wx+0.5,wy,wz+0.5,id,4,1.0);
-        FX.addShake(0.12);
-      }else if(st.stage<2&&frac<=0.33&&hp>0){
-        st.stage=2;
-        OreFX.burst(wx+0.5,wy,wz+0.5,id,5,1.2);
-        FX.addShake(0.18);
-      }
+      let newStage=st.stage;
+      if(st.stage<1&&frac<=0.66&&hp>0)newStage=1;
+      else if(st.stage<2&&frac<=0.33&&hp>0)newStage=2;
+      st.stage=newStage;
+      if(typeof Env_Ore!=='undefined'&&Env_Ore.onHit)
+        Env_Ore.onHit(wx,wy,wz,id,hp,maxHp,newStage);
+      else if(newStage>0)
+        OreFX.burst(wx+0.5,wy,wz+0.5,id,newStage===1?4:5,1.0);
+      if(newStage===1)FX.addShake(0.12);
+      else if(newStage===2)FX.addShake(0.18);
     }
     if(hp<=0){
       this.blockHP.delete(k);
@@ -963,8 +986,9 @@ const World={
        Tahap ke-3 dari tiga animasi pecahan (66% → 33% → hancur). Pecahan
        jatuh, memantul, lalu MENGELINDING di tanah sebelum memudar. */
     const isOre=(typeof ORE_INFO!=='undefined')&&!!ORE_INFO[id];
-    if(isOre&&typeof OreFX!=='undefined'){
-      OreFX.burst(wx+0.5,wy,wz+0.5,id,10,1.5);
+    if(isOre){
+      if(typeof Env_Ore!=='undefined'&&Env_Ore.onDestroy)Env_Ore.onDestroy(wx,wy,wz,id);
+      else if(typeof OreFX!=='undefined')OreFX.burst(wx+0.5,wy,wz+0.5,id,10,1.5);
       if(this.oreStg)delete this.oreStg[`${wx},${wy},${wz}`];
     }
     /* bonus hasil: skill Pemanen + proficiency sub-skill blok + skill GATHER per jenis drop */

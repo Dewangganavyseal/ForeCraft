@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.7',
+  VERSION:'0.2.8',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -267,9 +267,10 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
   RED_SOIL:15,
   /* ---------- JENIS ORE BARU (port dari NEW MODEL/ore.html) ----------
      COAL umum, COPPER tier pemula, STEEL (baja), TUNGSTEN & TUNGSTENSTEEL
-     tier puncak. Tiap ore punya syarat level Penambangan & peluang gagal
-     per pukulan — lihat ORE_INFO di bawah. */
-  ORE_COAL:16,ORE_COPPER:17,ORE_STEEL:18,ORE_TUNGSTEN:19,ORE_TUNGSTENSTEEL:20};
+     tier puncak, serta ORE_STONE (bongkahan granit/batu). Tiap ore punya
+     syarat level Penambangan & peluang gagal per pukulan — lihat ORE_INFO di bawah. */
+  ORE_COAL:16,ORE_COPPER:17,ORE_STEEL:18,ORE_TUNGSTEN:19,ORE_TUNGSTENSTEEL:20,
+  ORE_STONE:21};
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
@@ -281,9 +282,10 @@ const BLOCK_INFO={
   /* bijih: makin langka makin keras ditambang. HP dikalibrasi ulang karena
      roll GAGAL per pukulan (ORE_INFO) sudah menambah resistensi — tanpa ini
      ore tier atas butuh 25-30 ayunan dan terasa menghukum. */
-  [B.ORE_IRON]   :{name:'Bijih Besi',   hp:8.0, drop:'iron_ore',   color:0xb08a6a},
-  [B.ORE_GOLD]   :{name:'Bijih Emas',   hp:10.0,drop:'gold_ore',   color:0xd9b23a},
-  [B.ORE_CRYSTAL]:{name:'Kristal Beku', hp:10.0,drop:'crystal',    color:0x7fd8ff},
+  [B.ORE_STONE]       :{name:'Bongkahan Batu',    hp:5.0, drop:'stone',            color:0x8f959c},
+  [B.ORE_IRON]        :{name:'Bijih Besi',        hp:8.0, drop:'iron_ore',         color:0xb08a6a},
+  [B.ORE_GOLD]        :{name:'Bijih Emas',        hp:10.0,drop:'gold_ore',         color:0xd9b23a},
+  [B.ORE_CRYSTAL]     :{name:'Kristal Beku',      hp:10.0,drop:'crystal',          color:0x7fd8ff},
   /* ---------- bijih baru (palet & karakter dari ore.html) ---------- */
   [B.ORE_COAL]        :{name:'Bijih Batu Bara',   hp:6.0, drop:'coal',             color:0x3a3f46},
   [B.ORE_COPPER]      :{name:'Bijih Tembaga',     hp:6.5, drop:'copper_ore',       color:0xc8703a},
@@ -296,10 +298,8 @@ const BLOCK_INFO={
   /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
   [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
 };
-/* blok bijih → dipakai worldgen & UI penambangan.
-   BATU (B.STONE) BUKAN ore: permukaan batu Pegunungan harus tetap polos —
-   hanya blok ORE_* yang mendapat bongkahan, gate level & roll gagal. */
-const ORE_BLOCKS=[B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
+/* blok bijih → dipakai worldgen & UI penambangan. */
+const ORE_BLOCKS=[B.ORE_STONE,B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
   B.ORE_GOLD,B.ORE_TUNGSTEN,B.ORE_CRYSTAL,B.ORE_TUNGSTENSTEEL];
 
 /* ================= SISTEM PENAMBANGAN ORE (port NEW MODEL/ore.html) =========
@@ -313,6 +313,7 @@ const ORE_BLOCKS=[B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
    dikalikan (1 - (lvl-req)*3%), dibatasi minimum 45% — lihat World.hitBlock.
    ========================================================================= */
 const ORE_INFO={
+  [B.ORE_STONE]        :{req:1, chance:0.95},
   [B.ORE_COAL]         :{req:4, chance:0.85},
   [B.ORE_COPPER]       :{req:7, chance:0.75},
   [B.ORE_IRON]         :{req:12,chance:0.65},
@@ -1309,6 +1310,7 @@ const npcXpNeed=lvl=>Math.round(45*Math.pow(lvl,1.35));
 const NPC_GATHER=[
   {block:B.WOOD, item:'wood'},
   {block:B.STONE,item:'stone'},
+  {block:B.ORE_STONE,item:'stone'},
   {block:B.ORE_COAL,item:'coal'},
   {block:B.ORE_COPPER,item:'copper_ore'},
   {block:B.ORE_IRON,item:'iron_ore'},

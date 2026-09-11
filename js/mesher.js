@@ -607,7 +607,7 @@ const Mesher=(()=>{
     {dir:[0,0, 1],corners:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]]},
   ];
   const AO_F=[0.55,0.75,0.88,1.0];
-  const solidQ=id=>id!==B.AIR&&id!==B.WATER;
+  const solidQ=id=>id!==B.AIR&&id!==B.WATER&&(typeof ORE_INFO==='undefined'||!ORE_INFO[id]);
 
   /* =======================================================================
      PALET BONGKAHAN ORE — port 1:1 dari NEW MODEL/ore.html
@@ -1320,6 +1320,8 @@ const Mesher=(()=>{
         }
         continue;
       }
+      /* Ore permukaan kini berupa model 3D bongkahan otentik dari Env_Ore (bukan kubus voxel) */
+      if(typeof ORE_INFO!=='undefined'&&ORE_INFO[id])continue;
       /* pengali warna gradasi untuk kolom ini (hitung sekali, pakai per wajah) */
       const ci=colTint(x,z,wx,wz);
       /* ---- tingkat TEKSTUR & TONJOLAN kolom ini ----
@@ -1339,7 +1341,7 @@ const Mesher=(()=>{
       /* tonjolan permukaan: hanya blok permukaan (ada udara di atasnya). `rz`
          di bawah dipakai untuk hal-hal yang butuh satu angka per blok (pangkal
          rumput, rumbai); GEOMETRI wajahnya memakai rzCorner per sudut. */
-      const isSurf=getB(wx,y+1,wz)===B.AIR;
+      const isSurf=getB(wx,y+1,wz)===B.AIR||(typeof ORE_INFO!=='undefined'&&!!ORE_INFO[getB(wx,y+1,wz)]);
       const rz=isSurf?rzCol(wx,wz):0;
       blockTint(id,tierFor(id,ci),shd,cTA[ci],cTB[ci],cBio[ci],gpos,gt);
       /* daun & atap ditulis ke buffer sendiri agar materialnya bisa di-fade */
@@ -1348,7 +1350,7 @@ const Mesher=(()=>{
       for(let f=0;f<6;f++){
         const d=FACES[f].dir;
         const nb=getB(wx+d[0],y+d[1],wz+d[2]);
-        if(nb!==B.AIR&&nb!==B.WATER)continue;
+        if(nb!==B.AIR&&nb!==B.WATER&&(typeof ORE_INFO==='undefined'||!ORE_INFO[nb]))continue;
         const tile=d[1]===1?tiles[0]:d[1]===-1?tiles[1]:tiles[2];
         const [u0,u1,v0,v1]=tileUV(tile);
         let shade=d[1]===1?1.0:d[1]===-1?0.5:(d[0]!==0?0.72:0.85);
@@ -1388,84 +1390,6 @@ const Mesher=(()=>{
         if(isLeaf){LI.push(lvi,lvi+1,lvi+2,lvi+2,lvi+1,lvi+3);lvi+=4;}
         else if(isRoof){RI.push(rvi,rvi+1,rvi+2,rvi+2,rvi+1,rvi+3);rvi+=4;}
         else{I.push(vi,vi+1,vi+2,vi+2,vi+1,vi+3);vi+=4;}
-      }
-
-      /* ===================================================================
-         BONGKAHAN ORE MENONJOL (port visual NEW MODEL/ore.html)
-         -------------------------------------------------------------------
-         Blok bijih dengan sisi terbuka ditumbuhi kluster bongkahan:
-           · ATAS (bila udara) : dua bongkah bertingkat (besar → kecil) yang
-             tampak seperti bongkah chamfer bertumpuk ala prototipe;
-           · SISI TERBUKA      : satu-dua bongkah setengah-tertanam yang
-             menonjol keluar dari wajah blok.
-         Warna tiap bongkah = batu dasar palet, dengan WAJAH URAT acak
-         deterministik (hash) yang diwarnai gradasi ore + glint — meniru
-         "urat mengalir di permukaan & nugget menonjol". Semuanya masuk
-         buffer chunk standar (murah, tanpa draw call tambahan) dan hilang
-         otomatis saat blok dihancurkan (chunk rebuild).
-         =================================================================== */
-      const pal=ORE_PAL[id];
-      if(pal){
-        /* helper lokal: kubus bongkahan 6 wajah → buffer chunk utama */
-        const pushBoulder=(bx,by,bz,sx,sy,sz,tile,seed)=>{
-          const [u0,u1,v0,v1]=tileUV(tile);
-          const wFace=WGEN.hash(seed,seed*3+1,211);
-          const veinIdx=(wFace*3)|0;
-          const veinC=pal.o[veinIdx], baseC=pal.b[(wFace*7|0)%3];
-          const glow=WGEN.hash(seed+5,seed*2,213);
-          for(let f=0;f<6;f++){
-            const d=FACES[f].dir;
-            /* warna wajah: urat pada 1-2 wajah terpilih + wajah atas ber-glint */
-            let c=d[1]===1?(glow<0.55?pal.g:baseC):baseC;
-            if(d[1]===0&&(f===((wFace*6)|0)%6||f===((wFace*6|0)+3)%6))c=veinC;
-            const shade=d[1]===1?1.0:d[1]===-1?0.5:(d[0]!==0?0.72:0.85);
-            const jt=0.95+0.1*WGEN.hash(seed+f,seed*4,215);
-            const r=shade*jt*c[0],g=shade*jt*c[1],b=shade*jt*c[2];
-            const na=d[0]!==0?0:d[1]!==0?1:2;
-            const t=[0,1,2].filter(a=>a!==na);
-            for(let i=0;i<4;i++){
-              const cn=FACES[f].corners[i];
-              P.push(bx+cn[0]*sx,by+cn[1]*sy,bz+cn[2]*sz);
-              N.push(d[0],d[1],d[2]);
-              let uu,vv;
-              if(d[1]===0){
-                const ha=na===0?2:0;
-                uu=u0+cn[ha]*(u1-u0);vv=v0+cn[1]*(v1-v0);
-              }else{
-                uu=u0+cn[t[0]]*(u1-u0);vv=v0+cn[t[1]]*(v1-v0);
-              }
-              U.push(uu,vv);
-              CL.push(r,g,b);
-            }
-            I.push(vi,vi+1,vi+2,vi+2,vi+1,vi+3);vi+=4;
-          }
-        };
-        const tile=tiles[0];
-        /* --- kluster di ATAS blok (bongkah bertingkat ala prototipe) --- */
-        if(getB(wx,y+1,wz)===B.AIR){
-          const j1x=(WGEN.hash(wx,wz,221)-0.5)*0.24, j1z=(WGEN.hash(wx,wz,223)-0.5)*0.24;
-          const j2x=(WGEN.hash(wx,wz,227)-0.5)*0.34, j2z=(WGEN.hash(wx,wz,229)-0.5)*0.34;
-          const s1=0.58+WGEN.hash(wx,wz,231)*0.14;
-          pushBoulder(wx+0.5+j1x-s1/2,y+1,wz+0.5+j1z-s1/2,s1,0.30,s1,tile,wx*7+wz*3+y);
-          const s2=s1*0.62;
-          pushBoulder(wx+0.5+j2x-s2/2,y+1.30,wz+0.5+j2z-s2/2,s2,0.20,s2,tile,wx*5+wz*9+y*2);
-        }
-        /* --- bongkah setengah-tertanam di sisi terbuka --- */
-        const maxSide=IS_MOBILE?1:2;
-        let sideDone=0;
-        for(let f=0;f<6&&sideDone<maxSide;f++){
-          const d=FACES[f].dir;
-          if(d[1]!==0)continue;
-          const nb=getB(wx+d[0],y,wz+d[2]);
-          if(nb!==B.AIR&&nb!==B.WATER)continue;
-          sideDone++;
-          const hw=WGEN.hash(wx*3+f,wz*5+y,233);
-          const size=0.36+hw*0.20;                     // 0.36..0.56
-          const vo=(WGEN.hash(wx+f*11,wz-f,235)-0.5)*0.26;
-          const px2=wx+0.5+d[0]*(0.5-0.07), py2=y+0.5+vo, pz2=wz+0.5+d[2]*(0.5-0.07);
-          const sx=d[0]!==0?0.30:size, sy=size*0.8, sz=d[2]!==0?0.30:size;
-          pushBoulder(px2-sx/2,py2-sy/2,pz2-sz/2,sx,sy,sz,tile,wx*11+wz*13+f*7+y);
-        }
       }
 
       /* CATATAN: tidak ada wajah "undakan" penambal di sini. Tinggi sudut kisi

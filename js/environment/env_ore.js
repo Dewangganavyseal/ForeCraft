@@ -1,107 +1,527 @@
 'use strict';
 /* =============================================================================
-   ENV_ORE — PECAHAN BONGKAHAN ORE (port fisika dari NEW MODEL/ore.html)
+   ENV_ORE — BONGKAHAN ORE VOXEL & FRAGMENT PHYSICS
    -----------------------------------------------------------------------------
-   Ketika blok bijih dipukul (lintas tahap) atau hancur, bongkahan kecil
-   terlepas: JATUH → MEMANTUL → MENGELINDING di tanah → berhenti → mengecil →
-   hilang. Fisikanya port langsung dari updateFrags() prototipe ore.html:
-     · gravitasi 21, bounce vertikal 0.34, gesek horizontal 0.72
-     · bongkahan MENGELINDING di tanah: rotasi sumbu tegak-lurus kecepatan
-       (rotateOnWorldAxis) dengan kecepatan putar = hs/r — tidak ada fragmen
-       yang melayang atau berhenti di udara.
-     · resting saat kecepatan < 0.12, lalu mengecil (shrink) & dibuang.
-   Geometri tiap palet ore dibangun SEKALI (bongkahan bertingkat 2 tingkat
-   dengan warna vertex di-bake) lalu dibagikan ke semua fragmennya — murah.
+   Porting 100% otentik dari "NEW MODEL/Ore.html":
+   - Kluster 5 BONGKAH chamfer/bevel bertingkat, alas datar tepat di y=0
+   - TOON OUTLINE gelap shell (inverted hull mesh)
+   - Urat ore mengalir di permukaan (random walk) dengan gradasi palet ore
+   - Nugget voxel menonjol + patch berkilau
+   - 3 Tahap keutuhan:
+       Tahap 0 (HP > 66%)  : Utuh penuh
+       Tahap 1 (HP 33-66%) : Bongkahan luar rontok (pecahan menggelinding)
+       Tahap 2 (HP 1-33%)  : Retak berat ke inti
+       Tahap 3 (HP <= 0)   : Hancur total (pecahan inti meledak + item drop)
+   - Fisika fragmen: JATUH → MEMANTUL → MENGGELINDING di tanah (rotateOnWorldAxis)
+     → berhenti → mengecil → dibuang.
+   ============================================================================= */
+
+const FACES_ORE=[
+  {d:[1,0,0], c:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]], n:[1,0,0], s:.80},
+  {d:[-1,0,0],c:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]], n:[-1,0,0], s:.58},
+  {d:[0,1,0], c:[[0,1,0],[0,1,1],[1,1,1],[1,1,0]], n:[0,1,0], s:1.0},
+  {d:[0,-1,0],c:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]], n:[0,-1,0], s:.50},
+  {d:[0,0,1], c:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]], n:[0,0,1], s:.86},
+  {d:[0,0,-1],c:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]], n:[0,0,-1], s:.64},
+];
+const DIRS_ORE=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const VOX_ORE=0.22, OW_ORE=0.17;
+
+function mulberry32_ore(a){
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+function hash3_ore(x,y,z,s){
+  let n=Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(z,1440662683)^Math.imul(s,974634);
+  n=Math.imul(n^(n>>>13),1274126177);
+  n^=n>>>16;
+  return (n>>>0)/4294967296;
+}
+
+const key3_ore=(x,y,z)=>x+','+y+','+z;
+
+function buildGeo_ore(subset,vox,map,center){
+  const pos=[],nor=[],col=[],ind=[]; let vi=0;
+  const cA=new THREE.Color(), gray=new THREE.Color(.5,.5,.52);
+  for(const i of subset){
+    const v=vox[i];
+    for(const f of FACES_ORE){
+      const j=map.get(key3_ore(v.x+f.d[0],v.y+f.d[1],v.z+f.d[2]));
+      if(j!==undefined&&subset.has(j))continue;
+      const fracture=j!==undefined&&!subset.has(j);
+      cA.copy(v.c).multiplyScalar(f.s*v.sj);
+      if(fracture)cA.lerp(gray,.3).multiplyScalar(.62);
+      for(const cc of f.c){
+        pos.push((v.x+cc[0]-center.x)*VOX_ORE,(v.y+cc[1]-center.y)*VOX_ORE,(v.z+cc[2]-center.z)*VOX_ORE);
+        nor.push(f.n[0],f.n[1],f.n[2]);
+        col.push(cA.r,cA.g,cA.b);
+      }
+      ind.push(vi,vi+1,vi+2,vi,vi+2,vi+3); vi+=4;
+    }
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  geo.setIndex(ind);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function buildShell_ore(subset,vox,map,center){
+  const pos=[],ind=[]; let vi=0;
+  for(const i of subset){
+    const v=vox[i];
+    for(const f of FACES_ORE){
+      const j=map.get(key3_ore(v.x+f.d[0],v.y+f.d[1],v.z+f.d[2]));
+      if(j!==undefined&&subset.has(j))continue;
+      for(const cc of f.c){
+        const p=[0,0,0];
+        for(let a=0;a<3;a++){
+          let t;
+          if(f.n[a]!==0)t=cc[a]+f.n[a]*OW_ORE;
+          else t=(cc[a]===0?-OW_ORE:1+OW_ORE);
+          p[a]=t;
+        }
+        pos.push((v.x+p[0]-center.x)*VOX_ORE,(v.y+p[1]-center.y)*VOX_ORE,(v.z+p[2]-center.z)*VOX_ORE);
+      }
+      ind.push(vi,vi+1,vi+2,vi,vi+2,vi+3); vi+=4;
+    }
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setIndex(ind);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function pickSet_ore(set,rnd){
+  const n=Math.floor(rnd()*set.size);
+  let it=set.values();
+  for(let i=0;i<n;i++)it.next();
+  return it.next().value;
+}
+
+/* Generator kluster 5 bongkahan chamfer dari Ore.html */
+function buildOreChunkData(oreDef,seed){
+  const rnd=mulberry32_ore(seed);
+  const map=new Map(); const boulders=[];
+  const L=[
+    {w:6,h:10,d:6,x:5,z:5},
+    {w:6,h:6,d:6,x:0,z:6},
+    {w:7,h:5,d:6,x:9,z:6},
+    {w:4,h:4,d:4,x:6,z:2},
+    {w:5,h:7,d:4,x:9,z:9},
+  ].map(b=>{
+    const j=k=>((rnd()*3)|0)-1;
+    return {w:b.w+j(),h:Math.max(3,b.h+j()),d:b.d+j(),x:b.x+j(),z:b.z+j()};
+  });
+  const baseCols=oreDef.base.map(h=>new THREE.Color(h));
+  /* ---- PASS 1: bangun sel voxel tiap bongkah ---- */
+  const built=L.map((b,bi)=>{
+    const cells=[];
+    for(let lx=0;lx<b.w;lx++)for(let ly=0;ly<b.h;ly++)for(let lz=0;lz<b.d;lz++){
+      const ex=lx===0||lx===b.w-1, ey=ly===0||ly===b.h-1, ez=lz===0||lz===b.d-1;
+      if((ex?1:0)+(ey?1:0)+(ez?1:0)>=2)continue;
+      const mx=Math.min(lx,b.w-1-lx), mz=Math.min(lz,b.d-1-lz);
+      if(ly>=b.h-2&&Math.min(mx,mz)===0)continue;
+      if(ly===b.h-1&&Math.min(mx,mz)<=1)continue;
+      cells.push({x:b.x+lx,y:ly,z:b.z+lz});
+    }
+    return {cells,bi};
+  });
+  /* ---- PASS 2: GROUNDING — tiap bongkah diturunkan agar sel terendahnya
+     tepat di y=0 SEBELUM dedup. Ini menjamin SEMUA bongkah (termasuk yang kecil
+     di tepi) menapak blok tanah. Bongkah yang kemudian tertelan penuh oleh
+     bongkah lain memang tersembunyi di dalam, tetapi pijakannya tetap benar. */
+  for(const b of built){
+    if(!b.cells.length)continue;
+    let minY=Infinity;
+    for(const c of b.cells)if(c.y<minY)minY=c.y;
+    if(minY!==0)for(const c of b.cells)c.y-=minY;
+  }
+  /* ---- PASS 3: tulis ke map dengan GROUNDING SADAR-TUMPUK ----
+     Sel ditulis berurutan; bila sebuah bongkah kehilangan SEMUA sel dasarnya
+     (y=0) karena tertimpa bongkah lain, ia akan melayang. Untuk mencegahnya,
+     kita turunkan bongkah itu selangkah demi selangkah sampai salah satu selnya
+     menyentuh y=0 DAN benar-benar tertulis di map (tak tertelan). */
+  const claimed=new Set();
+  built.forEach((b,bi)=>{
+    /* coba turunkan bongkah sampai punya pijakan nyata di y=0 */
+    for(let attempt=0;attempt<24;attempt++){
+      /* kumpulkan sel yang belum diklaim bongkah lain */
+      const free=b.cells.filter(c=>!claimed.has(key3_ore(c.x,c.y,c.z)));
+      if(!free.length)break;                       // tertelan penuh
+      let minY=Infinity;
+      for(const c of free)if(c.y<minY)minY=c.y;
+      if(minY<=0)break;                            // sudah menapak
+      for(const c of b.cells)c.y--;                // turun 1 voxel
+    }
+    const cells=[];
+    for(const c of b.cells){
+      const k=key3_ore(c.x,c.y,c.z);
+      if(claimed.has(k))continue;
+      claimed.add(k); map.set(k,0); cells.push(c);
+    }
+    boulders.push({cells,bi});
+  });
+
+  const vox=[];
+  const entries=[...map.keys()];
+  const cellByKey=new Map();
+  boulders.forEach((b,bi)=>b.cells.forEach(c=>cellByKey.set(key3_ore(c.x,c.y,c.z),bi)));
+  entries.forEach(k=>{
+    const [x,y,z]=k.split(',').map(Number);
+    const bi=cellByKey.get(k);
+    vox.push({x,y,z,bi,bi0:bi,c:null,sj:1});
+  });
+  map.clear();
+  vox.forEach((v,i)=>map.set(key3_ore(v.x,v.y,v.z),i));
+
+  const bTone=boulders.map(()=>.92+rnd()*.18);
+  vox.forEach(v=>{
+    v.c=baseCols[(v.bi0+((rnd()*baseCols.length)|0))%baseCols.length].clone()
+      .multiplyScalar(bTone[v.bi0]*(.96+rnd()*.08));
+    v.sj=.96+hash3_ore(v.x,v.y,v.z,seed^4242)*.08;
+  });
+
+  const exposedDirs=v=>DIRS_ORE.filter(d=>!map.has(key3_ore(v.x+d[0],v.y+d[1],v.z+d[2])));
+  const surfIdx=()=>vox.map((v,i)=>exposedDirs(v).length?i:-1).filter(i=>i>=0);
+
+  const S=surfIdx();
+  const oreCols=oreDef.ore.map(h=>new THREE.Color(h));
+  const glintC=new THREE.Color(oreDef.glint);
+
+  for(let k=0;k<9;k++){const v=vox[S[(rnd()*S.length)|0]];if(v)v.c.multiplyScalar(1.16);}
+  for(let k=0;k<3;k++){
+    let cv=vox[S[(rnd()*S.length)|0]];
+    const len=4+((rnd()*5)|0);
+    for(let s=0;s<len&&cv;s++){
+      cv.c.multiplyScalar(.62);
+      const nb=exposedDirs(cv).map(d=>map.get(key3_ore(cv.x+d[0],cv.y+d[1],cv.z+d[2]))).filter(j=>j!==undefined);
+      if(!nb.length)break; cv=vox[nb[(rnd()*nb.length)|0]];
+    }
+  }
+  const nVeins=4+((rnd()*3)|0);
+  for(let k=0;k<nVeins;k++){
+    let cv=vox[S[(rnd()*S.length)|0]];
+    const len=9+((rnd()*9)|0);
+    for(let s=0;s<len&&cv;s++){
+      cv.c=oreCols[s%oreCols.length].clone().multiplyScalar(.92+rnd()*.16);
+      const nb=exposedDirs(cv).map(d=>map.get(key3_ore(cv.x+d[0],cv.y+d[1],cv.z+d[2]))).filter(j=>j!==undefined);
+      if(!nb.length)break; cv=vox[nb[(rnd()*nb.length)|0]];
+    }
+  }
+  for(let k=0;k<3;k++){
+    const ci=S[(rnd()*S.length)|0]; const v=vox[ci]; if(!v)continue;
+    const ds=exposedDirs(v); if(!ds.length)continue;
+    const nrm=ds[(rnd()*ds.length)|0];
+    const t1=nrm[0]!==0?[0,1,0]:[1,0,0], t2=nrm[0]!==0?[0,0,1]:(nrm[1]!==0?[0,0,1]:[0,1,0]);
+    const paint=vv=>{if(vv)vv.c=oreCols[oreCols.length-1].clone().multiplyScalar(.95+rnd()*.1);};
+    paint(v);
+    [t1,t2].forEach(t=>{[1,-1].forEach(sg=>{
+      const j=map.get(key3_ore(v.x+t[0]*sg,v.y+t[1]*sg,v.z+t[2]*sg));
+      if(j!==undefined&&exposedDirs(vox[j]).some(d=>d[0]===nrm[0]&&d[1]===nrm[1]&&d[2]===nrm[2]))paint(vox[j]);
+    });});
+    v.c.copy(glintC);
+  }
+  for(let k=0;k<5;k++){
+    const v=vox[S[(rnd()*S.length)|0]]; if(!v)continue;
+    const ds=exposedDirs(v); if(!ds.length)continue;
+    const nrm=ds[(rnd()*ds.length)|0];
+    const nx=v.x+nrm[0],ny=v.y+nrm[1],nz=v.z+nrm[2],nk=key3_ore(nx,ny,nz);
+    if(map.has(nk))continue;
+    const bi0=v.bi0;
+    vox.push({x:nx,y:ny,z:nz,bi:bi0,bi0,c:oreCols[1].clone().multiplyScalar(.95+rnd()*.15),sj:1});
+    map.set(nk,vox.length-1);
+    if(rnd()<.6){
+      const t=nrm[1]!==0?[1,0,0]:(nrm[0]!==0?[0,1,0]:[1,0,0]);
+      const nk2=key3_ore(nx+t[0],ny+t[1],nz+t[2]);
+      if(!map.has(nk2)){vox.push({x:nx+t[0],y:ny+t[1],z:nz+t[2],bi:bi0,bi0,c:oreCols[2].clone(),sj:1});map.set(nk2,vox.length-1);}
+    }
+  }
+
+  const n=vox.length;
+  let cx=0,cz=0;vox.forEach(v=>{cx+=v.x+.5;cz+=v.z+.5;});
+  cx/=n;cz/=n;
+  const center={x:cx,y:0,z:cz};
+  vox.forEach(v=>{v.wx=(v.x+.5-cx)*VOX_ORE;v.wy=(v.y+.5)*VOX_ORE;v.wz=(v.z+.5-cz)*VOX_ORE;});
+
+  const vol=boulders.map(b=>b.cells.length);
+  const orderIdx=[...boulders.keys()].sort((a,b)=>vol[a]-vol[b]);
+  const force={}; if(orderIdx[0]!==undefined)force[orderIdx[0]]=1e6; if(orderIdx[1]!==undefined)force[orderIdx[1]]=9e5;
+  const rel=vox.map(v=>{
+    const f=force[v.bi0];
+    const base=Math.hypot(v.wx,v.wy-1.1,v.wz)+(hash3_ore(v.x,v.y,v.z,seed^777)-.5)*1.6;
+    return f?f+rnd()*10:base;
+  });
+  const items=vox.map((v,i)=>i).sort((a,b)=>rel[b]-rel[a]);
+  const layerOf=new Array(n);
+  const n0=Math.round(n*.34),n1=Math.round(n*.33);
+  items.forEach((i,idx)=>{layerOf[i]=idx<n0?0:idx<n0+n1?1:2;});
+  const layer0=[],layer1=[],layer2=[];
+  for(let i=0;i<n;i++)[layer0,layer1,layer2][layerOf[i]].push(i);
+  const allSet=new Set([...Array(n).keys()]);
+  const s1=new Set(allSet);layer0.forEach(i=>s1.delete(i));
+  const s2=new Set(s1);layer1.forEach(i=>s2.delete(i));
+
+  function mkFrag(cluster){
+    let fx=0,fy=0,fz=0;cluster.forEach(i=>{fx+=vox[i].wx;fy+=vox[i].wy;fz+=vox[i].wz;});
+    fx/=cluster.length;fy/=cluster.length;fz/=cluster.length;
+    const cSet=new Set(cluster);
+    const geo=buildGeo_ore(cSet,vox,map,center);
+    const shell=buildShell_ore(cSet,vox,map,center);
+    const g2c=new THREE.Vector3(fx,fy,fz);
+    let mr=0;cluster.forEach(i=>{mr=Math.max(mr,new THREE.Vector3(vox[i].wx,vox[i].wy,vox[i].wz).distanceTo(g2c));});
+    return {geo,shell,off:g2c,r:Math.max(VOX_ORE*.9,mr+VOX_ORE*.5)};
+  }
+
+  function makeFrags(L){
+    const out=[];const rem=new Set();
+    boulders.forEach((b,bi)=>{
+      const inL=b.cells.map(c=>map.get(key3_ore(c.x,c.y,c.z))).filter(i=>i!==undefined&&layerOf[i]===L);
+      if(inL.length&&inL.length===b.cells.length){out.push(mkFrag(inL));return;}
+      inL.forEach(i=>rem.add(i));
+    });
+    for(let i=0;i<n;i++)if(layerOf[i]===L&&!rem.has(i))rem.add(i);
+    boulders.forEach(b=>{
+      const inL=b.cells.map(c=>map.get(key3_ore(c.x,c.y,c.z))).filter(i=>i!==undefined&&layerOf[i]===L);
+      if(inL.length===b.cells.length&&inL.length)inL.forEach(i=>rem.delete(i));
+    });
+    while(rem.size){
+      const target=6+Math.floor(rnd()*9);
+      const seedI=pickSet_ore(rem,rnd);
+      const cluster=[];const q=[seedI];rem.delete(seedI);
+      while(q.length&&cluster.length+q.length<target){
+        const i=q.shift();cluster.push(i);const v=vox[i];
+        for(const d of DIRS_ORE){
+          const j=map.get(key3_ore(v.x+d[0],v.y+d[1],v.z+d[2]));
+          if(j!==undefined&&rem.has(j)&&rnd()<.92){rem.delete(j);q.push(j);}
+        }
+      }
+      while(q.length)cluster.push(q.shift());
+      out.push(mkFrag(cluster));
+    }
+    return out;
+  }
+
+  return {
+    geos:[buildGeo_ore(allSet,vox,map,center),buildGeo_ore(s1,vox,map,center),buildGeo_ore(s2,vox,map,center)],
+    shells:[buildShell_ore(allSet,vox,map,center),buildShell_ore(s1,vox,map,center),buildShell_ore(s2,vox,map,center)],
+    frags:[makeFrags(0),makeFrags(1),makeFrags(2)]
+  };
+}
+
+const Env_Ore={
+  ORES:[
+    {id:'batu',block:21,nama:'BATU',base:['#8f959c','#868c93','#99a0a7'],ore:['#6f767d','#8b9299','#b9c0c7'],glint:'#dfe4e9',chance:0.95},
+    {id:'coal',block:16,nama:'COAL',base:['#6d747c','#646b73','#787f87'],ore:['#101216','#1d2025','#3a3f46'],glint:'#707a85',chance:0.85},
+    {id:'copper',block:17,nama:'COPPER',base:['#8d8676','#948d7c','#857e6e'],ore:['#a4562a','#c8703a','#e89a58'],glint:'#ffd9a8',chance:0.75},
+    {id:'besi',block:9,nama:'BESI',base:['#8f7a68','#96816e','#877260'],ore:['#8a5a3c','#b3836a','#d9b092'],glint:'#f4e0c6',chance:0.65},
+    {id:'baja',block:18,nama:'BAJA',base:['#9ba7b1','#a6b2bc','#929ea8'],ore:['#6f7a85','#98a4ae','#dfe7ec'],glint:'#ffffff',chance:0.58},
+    {id:'gold',block:10,nama:'GOLD',base:['#7b8188','#737980','#858b92'],ore:['#c98a1e','#f6c445','#ffde74'],glint:'#fff6c4',chance:0.50},
+    {id:'diamond',block:11,nama:'DIAMOND',base:['#a9c6d4','#9fc0cf','#b6d2de'],ore:['#2fb3cf','#5fd0e8','#bdf1f9'],glint:'#ffffff',chance:0.42},
+    {id:'tungsten',block:19,nama:'TUNGSTEN',base:['#4a4f52','#42474a','#54595c'],ore:['#5c6650','#8b9a7e','#c2cfb4'],glint:'#e4eeda',chance:0.35},
+    {id:'tungstensteel',block:20,nama:'BAJA TUNGSTEN',base:['#41505f','#3a4855','#4a5968'],ore:['#5e6c7c','#8fa2b5','#dfe9f2'],glint:'#ffffff',chance:0.30}
+  ],
+
+  _oreByBlock:{},
+  _templates:{},
+  _chunkMat:null,
+  _outlineMat:null,
+  activeNodes:new Map(),
+
+  init(){
+    if(!this._chunkMat){
+      this._chunkMat=new THREE.MeshLambertMaterial({vertexColors:true});
+      this._outlineMat=new THREE.MeshBasicMaterial({color:0x262b33,side:THREE.BackSide});
+      for(const o of this.ORES){
+        this._oreByBlock[o.block]=o;
+        if(typeof B!=='undefined'&&B[o.id.toUpperCase()]!==undefined){
+          this._oreByBlock[B[o.id.toUpperCase()]]=o;
+        }
+      }
+    }
+  },
+
+  getTemplate(blockId){
+    this.init();
+    if(this._templates[blockId])return this._templates[blockId];
+    const def=this._oreByBlock[blockId]||this.ORES[0];
+    const tmpl=buildOreChunkData(def,blockId*997+13);
+    this._templates[blockId]=tmpl;
+    return tmpl;
+  },
+
+  spawnNode(c,group,wx,wy,wz,blockId,seed){
+    this.init();
+    const tmpl=this.getTemplate(blockId);
+    if(!tmpl)return;
+    const key=`${wx},${wy},${wz}`;
+    if(this.activeNodes.has(key))return;
+
+    const st=(typeof World!=='undefined'&&World.oreStg&&World.oreStg[key])?World.oreStg[key].stage:0;
+    const stage=Math.min(2,Math.max(0,st||0));
+
+    const nodeGroup=new THREE.Group();
+    nodeGroup.position.set(wx+0.5,wy,wz+0.5);
+    const rot=((hash3_ore(wx,wy,wz,91)*4)|0);
+    nodeGroup.rotation.y=rot*(Math.PI*0.5);
+
+    const chunkMesh=new THREE.Mesh(tmpl.geos[stage],this._chunkMat);
+    chunkMesh.castShadow=!(typeof IS_MOBILE!=='undefined'&&IS_MOBILE);
+    chunkMesh.receiveShadow=true;
+    nodeGroup.add(chunkMesh);
+
+    const shellMesh=new THREE.Mesh(tmpl.shells[stage],this._outlineMat);
+    nodeGroup.add(shellMesh);
+
+    group.add(nodeGroup);
+    this.activeNodes.set(key,{
+      key,chunk:c,group:nodeGroup,chunkMesh,shellMesh,
+      template:tmpl,stage,wx,wy,wz,blockId,wobble:0
+    });
+  },
+
+  /* ========================================================================
+     COLLISION FOOTPRINT — seluruh bongkahan ore PADAT agar tidak ditembus.
+     Dipanggil dari World.blockedAt. Bongkahan lebar (~3.5 blok) jauh melebihi
+     1 kolom blok ore di data dunia, jadi tabrakannya diuji terhadap radius
+     horizontal bounding bongkahan, BUKAN hanya kolom pusatnya.
+     `x,y,z` = titik sampel tubuh pemain (dunia nyata).
+     ======================================================================== */
+  solidAt(x,y,z){
+    const FOOT_R=1.85;         // radius horizontal bongkahan (blok)
+    for(const node of this.activeNodes.values()){
+      const cx=node.wx+0.5, cz=node.wz+0.5;
+      const dx=x-cx, dz=z-cz;
+      if(dx*dx+dz*dz>FOOT_R*FOOT_R)continue;
+      /* tinggi padat bongkahan kira-kira 2.2 blok dari dasar node */
+      if(y<node.wy+2.2)return true;
+    }
+    return false;
+  },
+
+  buildChunkOres(c,group){
+    if(c.ores&&c.ores.length){
+      for(const o of c.ores){
+        if(c.data[World.idx(o.x,o.y,o.z)]===o.ore){
+          this.spawnNode(c,group,o.wx,o.wy,o.wz,o.ore,o.seed);
+        }
+      }
+    }
+  },
+
+  disposeChunkOres(c){
+    if(c.ores){
+      for(const o of c.ores){
+        this.activeNodes.delete(`${o.wx},${o.wy},${o.wz}`);
+      }
+    }
+  },
+
+  getNode(wx,wy,wz){
+    return this.activeNodes.get(`${wx},${wy},${wz}`);
+  },
+
+  wobble(wx,wy,wz,amount){
+    const node=this.getNode(wx,wy,wz);
+    if(node)node.wobble=Math.max(node.wobble,amount||0.25);
+  },
+
+  onFail(wx,wy,wz){
+    this.wobble(wx,wy,wz,0.36);
+  },
+
+  onHit(wx,wy,wz,blockId,hp,maxHp,newStage){
+    const node=this.getNode(wx,wy,wz);
+    if(node){
+      node.wobble=0.25;
+      if(newStage>node.stage){
+        const prevStage=node.stage;
+        node.stage=Math.min(2,newStage);
+        node.chunkMesh.geometry=node.template.geos[node.stage];
+        node.shellMesh.geometry=node.template.shells[node.stage];
+        OreFX.spawnFrags(node.template.frags[prevStage],node.group.position,1.0);
+      }
+    }
+  },
+
+  onDestroy(wx,wy,wz,blockId){
+    const key=`${wx},${wy},${wz}`;
+    const node=this.activeNodes.get(key);
+    if(node){
+      OreFX.spawnFrags(node.template.frags[2],node.group.position,1.4);
+      if(node.group.parent)node.group.parent.remove(node.group);
+      this.activeNodes.delete(key);
+    }
+  },
+
+  update(dt){
+    for(const node of this.activeNodes.values()){
+      if(node.wobble>0){
+        node.wobble=Math.max(0,node.wobble-dt*4.5);
+        const j=Math.sin(node.wobble*38)*node.wobble*0.12;
+        node.group.position.x=node.wx+0.5+j;
+        node.group.position.z=node.wz+0.5+j;
+      }
+    }
+  },
+
+  clear(){
+    this.activeNodes.clear();
+  }
+};
+
+/* =============================================================================
+   OreFX — FRAGMEN PECAHAN ORE DENGAN TOON OUTLINE
    ============================================================================= */
 const OreFX={
   list:[],
-  MAX:48,                        // batas fragmen aktif (bongkahan tertua dibuang)
-  _geoCache:{},
-  _mat:null,
+  MAX:64,
 
-  /* geometri bongkahan mini per palet ore: kubus bertingkat 2 tingkat dengan
-     tepi yang menyempit (kesan chamfer), warna di-bake ke vertex color */
-  geoFor(pal){
-    if(this._geoCache[pal])return this._geoCache[pal];
-    const P=[],N=[],C=[],I=[];let vi=0;
-    const FACES=[
-      {dir:[-1,0,0],corners:[[0,1,0],[0,0,0],[0,1,1],[0,0,1]]},
-      {dir:[1,0,0],corners:[[1,1,1],[1,0,1],[1,1,0],[1,0,0]]},
-      {dir:[0,-1,0],corners:[[1,0,1],[0,0,1],[1,0,0],[0,0,0]]},
-      {dir:[0,1,0],corners:[[0,1,1],[1,1,1],[0,1,0],[1,1,0]]},
-      {dir:[0,0,-1],corners:[[1,0,0],[0,0,0],[1,1,0],[0,1,0]]},
-      {dir:[0,0,1],corners:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]]},
-    ];
-    const push=(bx,by,bz,sx,sy,sz)=>{
-      for(let f=0;f<6;f++){
-        const d=FACES[f].dir;
-        const shade=d[1]===1?1.0:d[1]===-1?0.5:(d[0]!==0?0.72:0.85);
-        let c;
-        if(d[1]===1)c=pal.g;
-        else if(d[1]===-1)c=pal.b[0];
-        else c=(f%2===0)?pal.o[(f>>1)%3]:pal.b[(f+1)%3];
-        const r=shade*c[0],g=shade*c[1],b=shade*c[2];
-        for(const cn of FACES[f].corners){
-          P.push(bx+cn[0]*sx,by+cn[1]*sy,bz+cn[2]*sz);
-          N.push(d[0],d[1],d[2]);
-          C.push(r,g,b);
-        }
-        I.push(vi,vi+1,vi+2,vi+2,vi+1,vi+3);vi+=4;
-      }
-    };
-    /* bongkah bawah besar + bongkah atas kecil (chamfer bertingkat) */
-    push(-0.5,0   ,-0.5,1.0 ,0.72,1.0);
-    push(-0.32,0.72,-0.32,0.64,0.46,0.64);
-    const g=new THREE.BufferGeometry();
-    g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));
-    g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
-    g.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
-    g.setIndex(I);
-    return this._geoCache[pal]=g;
-  },
-
-  /* palet dari mesher (ORE_PAL di-konversi [r,g,b]) — fallback bila mesher
-     belum dimuat: warna netral batu */
-  palOf(blockId){
-    if(typeof Mesher!=='undefined'&&Mesher.orePalette&&Mesher.orePalette(blockId))
-      return Mesher.orePalette(blockId);
-    return {b:[[0.55,0.57,0.6],[0.52,0.55,0.58],[0.6,0.62,0.65]],
-            o:[[0.45,0.46,0.49],[0.5,0.52,0.55],[0.68,0.7,0.72]],
-            g:[0.85,0.87,0.9]};
-  },
-
-  /* lepaskan `n` pecahan dari titik (x,y,z) — power = skala kekuatan lempar */
-  burst(x,y,z,blockId,n,power){
-    if(typeof Game==='undefined'||!Game.scene)return;
-    if(!this._mat)this._mat=new THREE.MeshLambertMaterial({vertexColors:true});
-    const pal=this.palOf(blockId);
-    const geo=this.geoFor(pal);
-    power=power||1;
-    for(let k=0;k<n;k++){
+  spawnFrags(fragDefs,pos,boost){
+    if(!fragDefs||!fragDefs.length||typeof Game==='undefined'||!Game.scene)return;
+    boost=boost||1;
+    Env_Ore.init();
+    for(const f of fragDefs){
       if(this.list.length>=this.MAX){
         const old=this.list.shift();
-        Game.scene.remove(old.grp);
+        if(old.grp.parent)old.grp.parent.remove(old.grp);
       }
-      const grp=new THREE.Mesh(geo,this._mat);
-      const sc=0.20+Math.random()*0.16;               // ukuran bongkahan 0.2..0.36
-      grp.scale.setScalar(sc);
-      grp.position.set(x+(Math.random()-0.5)*0.5,y+0.3,z+(Math.random()-0.5)*0.5);
-      grp.rotation.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28);
+      const grp=new THREE.Group();
+      const m=new THREE.Mesh(f.geo,Env_Ore._chunkMat);
+      const sh=new THREE.Mesh(f.shell,Env_Ore._outlineMat);
+      grp.add(m);grp.add(sh);
+      grp.position.copy(pos).addScaledVector(f.off,1);
+      if(grp.position.y<f.r)grp.position.y=f.r+Math.random()*0.1;
+      const dir=f.off.clone();dir.y+=0.18;
+      if(dir.lengthSq()<0.001)dir.set(0,1,0);dir.normalize();
+      const s=(1.6+Math.random()*2.4)*boost;
       Game.scene.add(grp);
-      const a=Math.random()*Math.PI*2;
-      const s=(1.4+Math.random()*2.2)*power;
       this.list.push({
-        grp,sc,r:sc*0.75,
-        vel:new THREE.Vector3(Math.cos(a)*s,1.3+Math.random()*1.9*power,Math.sin(a)*s),
-        ang:2+Math.random()*6,
+        grp,r:f.r,
+        vel:new THREE.Vector3(dir.x*s,Math.abs(dir.y)*s*0.7+1.3+Math.random()*1.8*boost,dir.z*s),
         axis:new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize(),
-        resting:false,restT:0,age:0,
+        ang:2+Math.random()*6,
+        resting:false,restT:0,age:0
       });
     }
   },
 
-  /* fisika: port updateFrags prototipe — jatuh, memantul, MENGELINDING di
-     tanah mengikuti permukaan dunia, berhenti, mengecil, dibuang */
+  burst(x,y,z,blockId,n,power){
+    const tmpl=Env_Ore.getTemplate(blockId);
+    if(tmpl&&tmpl.frags){
+      const l=Math.min(2,Math.floor(Math.random()*3));
+      this.spawnFrags(tmpl.frags[l],new THREE.Vector3(x,y,z),power||1);
+    }
+  },
+
   update(dt){
     for(let i=this.list.length-1;i>=0;i--){
       const f=this.list[i];f.age+=dt;
@@ -110,24 +530,22 @@ const OreFX={
         f.grp.position.x+=f.vel.x*dt;
         f.grp.position.y+=f.vel.y*dt;
         f.grp.position.z+=f.vel.z*dt;
-        /* permukaan tanah di bawah fragmen: selalu di-ground-kan (tidak
-           pernah mengambang di atas lubang maupun di dalam tanah) */
-        const gy=World.groundAt(f.grp.position.x,f.grp.position.z,
-          f.grp.position.y+2)+f.r;
+        const gy=(typeof World!=='undefined'&&World.groundAt)
+          ?World.groundAt(f.grp.position.x,f.grp.position.z,f.grp.position.y+2)+f.r
+          :f.r;
         if(f.grp.position.y<=gy&&f.vel.y<0){
           f.grp.position.y=gy;
           f.vel.y*=-0.34;f.vel.x*=0.72;f.vel.z*=0.72;f.ang*=0.65;
           if(Math.abs(f.vel.y)<0.7)f.vel.y=0;
         }
         if(f.grp.position.y<=gy+0.02&&Math.abs(f.vel.y)<0.05){
-          /* MENGELINDING: rotasi pada sumbu tegak-lurus arah gerak */
           f.vel.x*=Math.exp(-1.6*dt);f.vel.z*=Math.exp(-1.6*dt);
           const hs=Math.hypot(f.vel.x,f.vel.z);
           if(hs>0.02){
             const ax=new THREE.Vector3(f.vel.z,0,-f.vel.x).normalize();
             f.grp.rotateOnWorldAxis(ax,hs*dt/f.r);
           }
-          if(hs<0.12){f.resting=true;f.restT=0.6+Math.random()*0.9;}
+          if(hs<0.12){f.resting=true;f.restT=0.8+Math.random()*0.9;}
         }else{
           f.grp.rotateOnAxis(f.axis,f.ang*dt);
         }
@@ -136,7 +554,7 @@ const OreFX={
         if(f.restT<=0){
           const s=f.grp.scale.x-dt*1.6;
           if(s<=0.02){
-            Game.scene.remove(f.grp);
+            if(f.grp.parent)f.grp.parent.remove(f.grp);
             this.list.splice(i,1);
             continue;
           }
@@ -144,17 +562,20 @@ const OreFX={
         }
       }
       if(f.age>7){
-        Game.scene.remove(f.grp);
+        if(f.grp.parent)f.grp.parent.remove(f.grp);
         this.list.splice(i,1);
       }
     }
   },
 
-  /* bersihkan semua fragmen (dipanggil saat keluar ke menu / ganti dunia) */
   clear(){
     if(typeof Game==='undefined'||!Game.scene)return;
-    for(const f of this.list)Game.scene.remove(f.grp);
+    for(const f of this.list){
+      if(f.grp.parent)f.grp.parent.remove(f.grp);
+    }
     this.list.length=0;
-  },
+  }
 };
+
+window.Env_Ore=Env_Ore;
 window.OreFX=OreFX;
