@@ -278,7 +278,14 @@ function buildOreChunkData(oreDef,seed){
     const shell=buildShell_ore(cSet,vox,map,center);
     const g2c=new THREE.Vector3(fx,fy,fz);
     let mr=0;cluster.forEach(i=>{mr=Math.max(mr,new THREE.Vector3(vox[i].wx,vox[i].wy,vox[i].wz).distanceTo(g2c));});
-    return {geo,shell,off:g2c,r:Math.max(VOX_ORE*.9,mr+VOX_ORE*.5)};
+    /* `lowY` = jarak vertikal dari pusat fragmen ke titik TERENDAH voxelnya.
+       Dipakai agar fragmen MENDARAT tepat di tanah (dasar fragmen menyentuh
+       permukaan), bukan mengambang setinggi radius bounding. Inilah kunci agar
+       serpihan terlihat natural menempel ke tanah, tidak melayang. */
+    let low=Infinity;
+    cluster.forEach(i=>{const d=g2c.y-vox[i].wy;if(d<low)low=d;});
+    if(!isFinite(low))low=0;
+    return {geo,shell,off:g2c,r:Math.max(VOX_ORE*.9,mr+VOX_ORE*.5),lowY:Math.max(0,low)+VOX_ORE*.5};
   }
 
   function makeFrags(L){
@@ -499,13 +506,20 @@ const OreFX={
       const sh=new THREE.Mesh(f.shell,Env_Ore._outlineMat);
       grp.add(m);grp.add(sh);
       grp.position.copy(pos).addScaledVector(f.off,1);
-      if(grp.position.y<f.r)grp.position.y=f.r+Math.random()*0.1;
+      /* NATURAL: JANGAN mendongkrak fragmen ke atas sembarangan. Bila fragmen
+         muncul TERKUBUR di bawah tanah (mis. dasar bongkahan), angkat HANYA
+         sampai dasarnya menyentuh tanah — bukan setinggi radius. Kalau tidak,
+         fragmen tampak melayang di udara sejak muncul. */
+      const restY=(typeof World!=='undefined'&&World.groundAt)
+        ?World.groundAt(grp.position.x,grp.position.z,grp.position.y+3)+(f.lowY||f.r)
+        :(f.lowY||f.r);
+      if(grp.position.y<restY)grp.position.y=restY;
       const dir=f.off.clone();dir.y+=0.18;
       if(dir.lengthSq()<0.001)dir.set(0,1,0);dir.normalize();
       const s=(1.6+Math.random()*2.4)*boost;
       Game.scene.add(grp);
       this.list.push({
-        grp,r:f.r,
+        grp,r:f.r,lowY:(f.lowY||f.r),
         vel:new THREE.Vector3(dir.x*s,Math.abs(dir.y)*s*0.7+1.3+Math.random()*1.8*boost,dir.z*s),
         axis:new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize(),
         ang:2+Math.random()*6,
@@ -530,9 +544,14 @@ const OreFX={
         f.grp.position.x+=f.vel.x*dt;
         f.grp.position.y+=f.vel.y*dt;
         f.grp.position.z+=f.vel.z*dt;
+        /* NATURAL LANDING: fragmen mendarat saat DASAR-nya (bukan pusatnya)
+           menyentuh tanah. `gy` = tinggi tanah + jarak pusat→dasar (lowY),
+           sehingga fragmen menempel ke permukaan, TIDAK melayang setinggi
+           radius bounding. */
+        const restOff=(f.lowY!==undefined)?f.lowY:f.r;
         const gy=(typeof World!=='undefined'&&World.groundAt)
-          ?World.groundAt(f.grp.position.x,f.grp.position.z,f.grp.position.y+2)+f.r
-          :f.r;
+          ?World.groundAt(f.grp.position.x,f.grp.position.z,f.grp.position.y+2)+restOff
+          :restOff;
         if(f.grp.position.y<=gy&&f.vel.y<0){
           f.grp.position.y=gy;
           f.vel.y*=-0.34;f.vel.x*=0.72;f.vel.z*=0.72;f.ang*=0.65;

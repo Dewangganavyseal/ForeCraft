@@ -688,7 +688,9 @@ const WGEN={
      jangkauan alas bongkahan yang grounded). Mengembalikan ketinggian DASAR
      (min) area supaya node bisa diletakkan menapak titik tertinggi. */
   ORE_FLAT_TOL:1,
-  oreFlatOK(wx,wz){
+  /* Mengembalikan ketinggian DASAR (MINIMUM) area 4x4 bila cukup datar,
+     atau false bila terlalu miring. Dipakai sebagai referensi flattening. */
+  oreFlatBase(wx,wz){
     const h=this.height(wx,wz);
     let mn=h,mx=h;
     for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++){
@@ -696,31 +698,91 @@ const WGEN={
       if(hh<mn)mn=hh; if(hh>mx)mx=hh;
       if(mx-mn>this.ORE_FLAT_TOL)return false;
     }
-    return true;
+    return mn;
+  },
+  oreFlatOK(wx,wz){return this.oreFlatBase(wx,wz)!==false;},
+  /* ========================================================================
+     NODE ORE PERMUKAAN — 1 bongkahan per lokasi, dengan FLATTENING 4x4
+     ------------------------------------------------------------------------
+     Mekanisme baru (permintaan desain):
+       · Ore BATU (basic) dibuat JAUH LEBIH BANYAK di semua biome — sel node
+         diperkecil (14 blok) & peluang dinaikkan (0.9).
+       · Syarat "harus sudah datar" DIHAPUS. Sebagai gantinya, saat ore spawn
+         di blok 1 lalu di sekitarnya ada tanjakan/curam, area 4x4 sebesar ore
+         akan DIRATAKAN (flattening) ke tinggi dasar — dengan tetap memakai
+         blok permukaan biome yang SESUAI (rumput tetap rumput, pasir tetap
+         pasir) agar warna ground konsisten. Ini mengatasi dua hal sekaligus:
+         bongkahan selalu menapak penuh + ore bisa spawn jauh lebih banyak.
+       · DILARANG spawn di dalam bangunan (desa/dungeon) maupun menembus pohon.
+     ======================================================================== */
+  ORE_NODE_CELL:11, ORE_NODE_CHANCE:0.95,
+  /* Pusat node ore untuk sel grid (nx,nz), atau null. Deterministik per sel. */
+  _oreCellCenter(cx,cz){
+    const S=this.ORE_NODE_CELL;
+    if(this.hash(cx,cz,401)>=this.ORE_NODE_CHANCE)return null;
+    return {
+      x:cx*S+3+((this.hash(cx,cz,403)*(S-6))|0),
+      z:cz*S+3+((this.hash(cx,cz,405)*(S-6))|0)
+    };
   },
   oreNodeAt(wx,wz){
     const S=this.ORE_NODE_CELL;
     const cx=Math.floor(wx/S),cz=Math.floor(wz/S);
-    if(this.hash(cx,cz,401)>=this.ORE_NODE_CHANCE)return null;
-    /* pusat node: jitter di dalam sel, menjauh dari tepi sel */
-    const nx=cx*S+5+((this.hash(cx,cz,403)*(S-10))|0);
-    const nz=cz*S+5+((this.hash(cx,cz,405)*(S-10))|0);
-    if(wx!==nx||wz!==nz)return null;           // HANYA 1 TITIK TUNGGAL (1 buah di permukaan)!
-    /* satu jenis ore untuk seluruh node — dari distribusi biome */
+    const c=this._oreCellCenter(cx,cz);
+    if(!c)return null;
+    if(wx!==c.x||wz!==c.z)return null;          // HANYA 1 TITIK TUNGGAL!
+    return this._oreNodeData(c.x,c.z);
+  },
+  /* Bangun data node ore di titik pusat (nx,nz). Dipakai oreNodeAt &
+     oreNodeNear. Mengembalikan null bila lokasi terlarang. */
+  _oreNodeData(nx,nz){
     const bio=this.biomeAt(nx,nz);
     if(bio===BIOME.OCEAN||bio===BIOME.BEACH)return null;
     const hP=this.height(nx,nz);
     if(hP<CFG.SEA)return null;                    // tidak di air/pantai basah
-    if(!this.oreFlatOK(nx,nz))return null;        // WAJIB blok DATAR 4x4
-    if(this.treeAt(nx,nz,hP))return null;         // tidak menggantungi pohon
-    /* tidak menimpa desa / dungeon */
+    /* tinggi dasar = MINIMUM area 4x4 (tanpa batas toleransi — flattening
+       akan meratakan sisanya). Bongkahan berdiri di titik terendah supaya
+       tidak ada sisi yang menggantung. */
+    let baseY=hP;
+    for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++){
+      const hh=this.height(nx+dx,nz+dz);if(hh<baseY)baseY=hh;
+    }
+    /* JANGAN di dalam bangunan: desa & dungeon (radius +margin footprint 3) */
     for(const v of this.villagesNear(nx,nz))
       if(Math.max(Math.abs(nx-v.x),Math.abs(nz-v.z))<=v.r+3)return null;
     if(this.dungeonsNear)
       for(const d of this.dungeonsNear(nx,nz))
         if(Math.max(Math.abs(nx-d.x),Math.abs(nz-d.z))<=d.r+3)return null;
+    /* JANGAN menembus pohon: periksa seluruh footprint 4x4, bukan hanya pusat.
+       treeAt deterministik per kolom, jadi aman diuji tanpa data chunk. */
+    for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++){
+      const tx=nx+dx,tz=nz+dz,th=this.height(tx,tz);
+      if(this.treeAt(tx,tz,th))return null;
+    }
     const ore=this.pickOre(nx,nz,1,bio);
-    return {baseY:hP,ore};
+    return {baseY,ore};
+  },
+  /* Mengembalikan node ore yang FOOTPRINT 4x4-nya mencakup kolom (wx,wz),
+     beserta baseY flattening-nya. Dipakai genChunk untuk meratakan tanah di
+     sekitar bongkahan (bukan hanya kolom pusat). Memindai sel node tetangga
+     karena footprint 4x4 bisa melampaui batas sel grid. */
+  oreNodeNear(wx,wz){
+    const S=this.ORE_NODE_CELL;
+    const cx=Math.floor(wx/S),cz=Math.floor(wz/S);
+    let best=null,bd=Infinity;
+    for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+      const c=this._oreCellCenter(cx+dx,cz+dz);
+      if(!c)continue;
+      /* kolom ini harus berada di dalam footprint 4x4 node (offset -2..+1) */
+      const ox=wx-c.x,oz=wz-c.z;
+      if(ox<-2||ox>1||oz<-2||oz>1)continue;
+      const d=Math.max(Math.abs(ox+0.5),Math.abs(oz+0.5));
+      if(d<bd){
+        const node=this._oreNodeData(c.x,c.z);
+        if(node){bd=d;best={node,cx:c.x,cz:c.z,center:(ox===0&&oz===0)};}
+      }
+    }
+    return best;
   },
 
   /* ---------- desa ----------
@@ -1094,15 +1156,48 @@ function genChunk(cx,cz){
       }
     }
 
-    /* ---------- NODE ORE PERMUKAAN (1 buah bongkahan ore per lokasi) ----------
-       Satu node per lokasi (hanya 1 koordinat tunggal), diletakkan tepat di atas
-       permukaan tanah (y = h). Tidak ada lagi tumpukan blok kubus alas / 2 lantai. */
-    if(!occupied&&h>=CFG.SEA&&!tree&&safe){
-      const node=WGEN.oreNodeAt(wx,wz);
-      if(node){
-        tree=true;                            // blokir tanaman di kolom node
-        const y=h;
-        if(y<H){
+    /* ---------- NODE ORE PERMUKAAN + FLATTENING 4x4 ----------
+       Mekanisme baru: bila kolom ini masuk footprint 4x4 sebuah node ore,
+       tanahnya DIRATAKAN ke node.baseY (tinggi minimum area) dengan tetap
+       memakai blok PERMUKAAN BIOME yang sesuai (rumput→rumput, pasir→pasir,
+       dst) supaya warna ground konsisten. Tanjakan/curam di sekitar bongkahan
+       diratakan → bongkahan selalu menapak penuh & ore bisa spawn lebih banyak.
+       Kolom pusat node mendapat blok ore; kolom sekitar hanya diratakan. */
+    const oreNear=(!occupied&&h>=CFG.SEA)?WGEN.oreNodeNear(wx,wz):null;
+    if(oreNear){
+      const node=oreNear.node;
+      const by=node.baseY;
+      /* RATAKAN kolom ini ke baseY: tambah/kurang blok sampai permukaan pas di
+         baseY, memakai blok biome yang benar. (h = tinggi kolom lokal saat ini,
+         blok permukaan ada di h-1.) */
+      const surf=BI.surface, sub=BI.sub;
+      if(by>h){
+        /* tanjakan lebih rendah dari baseY → TAMBAH blok sampai baseY */
+        for(let y=h;y<by;y++)data[idx(x,y,z)]=(y===by-1)?surf:sub;
+      }else if(by<h){
+        /* curam lebih tinggi dari baseY → PANGKAS blok di atas baseY */
+        for(let y=by;y<h;y++)data[idx(x,y,z)]=B.AIR;
+        if(by-1>=0)data[idx(x,by-1,z)]=surf;
+      }
+      /* PENOPANG WAJIB: pastikan kolom dari dasar sampai TEPAT di bawah
+         bongkahan (y = by-1) PADAT penuh — tidak ada celah AIR/WATER/rongga.
+         Tanpa ini bongkahan bisa berdiri di atas lubang/air bila kolom asli
+         berongga di bawah baseY. Blok permukaan (by-1) memakai blok permukaan
+         biome; lapisan di bawahnya memakai sub-biome. */
+      for(let y=0;y<by;y++){
+        const ii=idx(x,y,z);
+        if(data[ii]===B.AIR||data[ii]===B.WATER)
+          data[ii]=(y===by-1)?surf:sub;
+      }
+      tree=true;   // blokir tanaman di seluruh footprint (bukan hanya pusat)
+      /* kolom PUSAT node → letakkan blok ore di baseY */
+      if(oreNear.center){
+        const y=by;
+        if(y>=0&&y<H){
+          /* PAKSA padat tepat di bawah blok ore — garansi anti-menggantung.
+             Apa pun isi kolom sebelumnya (air/rongga/sisa pangkasan), blok
+             y-1 ditimpa jadi blok permukaan biome agar bongkahan menapak. */
+          if(y-1>=0)data[idx(x,y-1,z)]=surf;
           const ii=idx(x,y,z);
           if(data[ii]===B.AIR){
             data[ii]=node.ore;

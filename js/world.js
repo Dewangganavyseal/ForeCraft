@@ -908,6 +908,9 @@ const World={
           FX.text(new THREE.Vector3(wx+0.5,wy+1.4,wz+0.5),
             `🔒 Lv ${oreDef.req}`,'#ff9d8a');
         }
+        /* getaran GAGAL pada bongkahan — umpan balik "terlalu keras untuk
+           ditambang" walau level kurang (sama seperti gagal peluang). */
+        if(typeof Env_Ore!=='undefined'&&Env_Ore.onFail)Env_Ore.onFail(wx,wy,wz);
         return false;
       }
       const eff=Math.min(0.98,oreDef.chance+(mLv-oreDef.req)*0.015);
