@@ -661,8 +661,8 @@ const OreFX={
          muncul TERKUBUR di bawah tanah (mis. dasar bongkahan), angkat HANYA
          sampai dasarnya menyentuh tanah — bukan setinggi radius. Kalau tidak,
          fragmen tampak melayang di udara sejak muncul. */
-      const restY=(typeof World!=='undefined'&&World.groundAt)
-        ?World.groundAt(grp.position.x,grp.position.z,grp.position.y+3)+(f.lowY||f.r)
+      const restY=(typeof World!=='undefined'&&World.terrainAt)
+        ?World.terrainAt(grp.position.x,grp.position.z,grp.position.y+3)+(f.lowY||f.r)
         :(f.lowY||f.r);
       if(grp.position.y<restY)grp.position.y=restY;
       const dir=f.off.clone();dir.y+=0.18;
@@ -696,12 +696,14 @@ const OreFX={
         f.grp.position.y+=f.vel.y*dt;
         f.grp.position.z+=f.vel.z*dt;
         /* NATURAL LANDING: fragmen mendarat saat DASAR-nya (bukan pusatnya)
-           menyentuh tanah. `gy` = tinggi tanah + jarak pusat→dasar (lowY),
-           sehingga fragmen menempel ke permukaan, TIDAK melayang setinggi
-           radius bounding. */
+           menyentuh TANAH BIOME. Pakai World.terrainAt (bukan groundAt) supaya
+           serpihan TIDAK berhenti melayang di atas bongkahan ore yang masih
+           tersisa — groundAt menyertakan Env_Ore.topAt sebagai lantai, yang
+           membuat serpihan tampak mengambang di udara. `gy` = tinggi tanah +
+           jarak pusat→dasar (lowY). */
         const restOff=(f.lowY!==undefined)?f.lowY:f.r;
-        const gy=(typeof World!=='undefined'&&World.groundAt)
-          ?World.groundAt(f.grp.position.x,f.grp.position.z,f.grp.position.y+2)+restOff
+        const gy=(typeof World!=='undefined'&&World.terrainAt)
+          ?World.terrainAt(f.grp.position.x,f.grp.position.z,f.grp.position.y+2)+restOff
           :restOff;
         if(f.grp.position.y<=gy&&f.vel.y<0){
           f.grp.position.y=gy;

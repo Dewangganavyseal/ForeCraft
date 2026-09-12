@@ -129,6 +129,21 @@ const World={
     return g;
   },
 
+  /* Tinggi permukaan TANAH BIOME MURNI (hanya blok dunia) — TANPA bongkahan
+     ore, TANPA altar. Dipakai fisika SERPIHAN ore (OreFX) supaya pecahan batu
+     jatuh & menggelinding menyentuh TANAH, bukan melayang menempel di atas
+     bongkahan ore yang masih tersisa (groundAt menyertakan Env_Ore.topAt
+     sebagai lantai, yang membuat serpihan tampak berhenti di udara). */
+  terrainAt(x,z,fromY){
+    const yTop=(fromY===undefined)?CFG.WORLD_H-1
+              :clamp(Math.floor(fromY+0.02),0,CFG.WORLD_H-1);
+    const bx=Math.floor(x),bz=Math.floor(z);
+    for(let y=yTop;y>=0;y--){
+      if(this.isFloor(this.getBlock(bx,y,bz)))return y+1;
+    }
+    return 0;
+  },
+
   /* Permukaan terendah di ATAS ketinggian kaki `y` tempat pemain bisa berdiri
      pada kolom pusat (x,z). Memindai NAIK selama blok masih padat. Dipakai
      sebagai garansi anti-"terhisap terrain": bila kaki pemain sampai berada

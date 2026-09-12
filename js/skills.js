@@ -82,6 +82,12 @@ const Prof={
     return Math.round(s.base*Math.pow(this.level(id), s.exp));
   },
 
+  /* ---------- pengali XP global ----------
+     Permintaan keseimbangan: progres proficiency terasa TERLALU SERET, jadi
+     semua XP proficiency dinaikkan +50% (satu titik pusat, memengaruhi semua
+     sub-skill secara merata tanpa mengubah kurva graying / need). */
+  XP_MULT:1.5,
+
   /* ---------- graying (anti-grinding statis) ----------
      Aksi yang "level aksi"-nya jauh di bawah level proficiency memberi XP
      berkurang, mendorong pemain mencari tantangan setara. Ada floor 0.1 agar
@@ -97,7 +103,7 @@ const Prof={
   gain(id, baseXP, actionLevel){
     if(!SUBSKILLS[id]||baseXP<=0)return false;
     const s=SUBSKILLS[id];
-    const amount=baseXP*this.gray(id, actionLevel);
+    const amount=baseXP*this.gray(id, actionLevel)*this.XP_MULT;
     if(amount<=0)return false;
     this.xp[id]=(this.xp[id]||0)+amount;
     let leveled=false;
