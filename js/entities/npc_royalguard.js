@@ -217,10 +217,10 @@ const NPC_RoyalGuard={
           perisai. Tanpa itu, perisai ikut rebah/miring mengikuti siku yang
           ditekuk (fLx -1.15) — itulah "perisai tidak pas". Strukturnya
           direplikasi di sini dan quaternion-nya dihitung di animate(). */
-    const SWORD_GRIP_Y=0.22,SWORD_SCALE=1.6;
+    /* Slot pedang: grip di kepalan kanan, rotasi forward menghadap lurus ke depan */
     const swordSlot=new THREE.Group();foreR.add(swordSlot);
-    swordSlot.position.set(0,FIST_Y,SWORD_GRIP_Y*SWORD_SCALE);
-    /* pedang kini anak langsung foreR — builder mengatur rotasinya sendiri */
+    swordSlot.position.set(0,FIST_Y,0.04);
+    swordSlot.rotation.x=Math.PI/2+0.62; // Menghadap lurus ke depan (+Z)
     foreR.userData.swordSlot=swordSlot;
     /* shield chain: foreL → editorPivot(offset) → shieldSlot(pitch) → mesh */
     const shieldPivot=new THREE.Group();foreL.add(shieldPivot);

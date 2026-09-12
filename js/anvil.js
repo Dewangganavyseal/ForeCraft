@@ -20,10 +20,25 @@ const Anvil={
   DEF_PER_LV:0.06,
   COIN_BASE:{common:15,uncommon:30,rare:60,epic:120,legendary:250},
   /* bahan tempa per pedang */
-  SWORD_MAT:{sword_wood:'wood',sword_iron:'iron_ingot',sword_storm:'gold_ingot',
-    sword_venom:'venom',sword_frost:'crystal',sword_titan:'boss_core'},
+  SWORD_MAT:{
+    sword_berserker:'pelt', sword_elven:'wood', sword_wood:'wood',
+    sword_steampunk:'copper_ore', sword_copper:'copper_ore',
+    sword_iron:'iron_ingot',
+    sword_paladin:'gold_ingot', sword_gold:'gold_ingot', sword_storm:'gold_ingot',
+    sword_shadow:'tungsten_ore', sword_venom:'tungsten_ore',
+    sword_juggernaut:'tungsten_ore', sword_tungsten:'tungsten_ore',
+    sword_crystal:'crystal',
+    sword_reaper:'soul_shard',
+    sword_yeti:'crystal', sword_frost:'crystal',
+    sword_samurai:'tungstensteel_ore',
+    sword_dragon:'boss_core', sword_titan:'boss_core'
+  },
   /* bahan tempa per tier armor/tameng */
-  TIER_MAT:{leather:'leather',iron:'iron_ingot',gold:'gold_ingot',crystal:'crystal'},
+  TIER_MAT:{
+    leather:'leather', copper:'copper_ore', iron:'iron_ingot',
+    gold:'gold_ingot', tungsten:'tungsten_ore', crystal:'crystal',
+    tungstensteel:'tungstensteel_ore'
+  },
 
   sel:null,   // {kind:'equip',slot} | {kind:'held'} | {kind:'stack',g,i}
 

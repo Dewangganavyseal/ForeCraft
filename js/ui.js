@@ -1643,29 +1643,83 @@ const UI={
     shield_storm:'buttons/shield_storm.png',
     shield_dark:'buttons/shield_dark.png',
     shield_carapace:'buttons/shield_carapace.png',
+    /* 12 PEDANG OTENTIK */
+    sword_berserker:'buttons/sword_berserker.png',
+    sword_elven:'buttons/sword_elven.png',
+    sword_steampunk:'buttons/sword_steampunk.png',
     sword_iron:'buttons/sword_iron.png',
+    sword_paladin:'buttons/sword_paladin.png',
+    sword_shadow:'buttons/sword_shadow.png',
+    sword_juggernaut:'buttons/sword_juggernaut.png',
+    sword_crystal:'buttons/sword_crystal.png',
+    sword_reaper:'buttons/sword_reaper.png',
+    sword_yeti:'buttons/sword_yeti.png',
+    sword_samurai:'buttons/sword_samurai.png',
+    sword_dragon:'buttons/sword_dragon.png',
+    sword_wood:'buttons/sword_wood.png',
     sword_storm:'buttons/sword_storm.png',
     sword_venom:'buttons/sword_venom.png',
     sword_frost:'buttons/sword_frost.png',
     sword_titan:'buttons/sword_titan.png',
-    cap_leather:'buttons/cap_leather.png',
+
+    /* 12 SET ZIRAH OTENTIK */
+    helm_berserker:'buttons/helm_berserker.png',
+    plate_berserker:'buttons/plate_berserker.png',
+    greaves_berserker:'buttons/greaves_berserker.png',
+
+    helm_elven:'buttons/helm_elven.png',
+    plate_elven:'buttons/plate_elven.png',
+    greaves_elven:'buttons/greaves_elven.png',
+
+    helm_copper:'buttons/helm_copper.png',
+    plate_copper:'buttons/plate_copper.png',
+    greaves_copper:'buttons/greaves_copper.png',
+
     helm_iron:'buttons/helm_iron.png',
+    plate_iron:'buttons/plate_iron.png',
+    greaves_iron:'buttons/greaves_iron.png',
+
     helm_gold:'buttons/helm_gold.png',
+    plate_gold:'buttons/plate_gold.png',
+    greaves_gold:'buttons/greaves_gold.png',
+
+    helm_shadow:'buttons/helm_shadow.png',
+    plate_shadow:'buttons/plate_shadow.png',
+    greaves_shadow:'buttons/greaves_shadow.png',
+
+    helm_tungsten:'buttons/helm_tungsten.png',
+    plate_tungsten:'buttons/plate_tungsten.png',
+    greaves_tungsten:'buttons/greaves_tungsten.png',
+
     helm_crystal:'buttons/helm_crystal.png',
+    plate_crystal:'buttons/plate_crystal.png',
+    greaves_crystal:'buttons/greaves_crystal.png',
+
+    helm_reaper:'buttons/helm_reaper.png',
+    plate_reaper:'buttons/plate_reaper.png',
+    greaves_reaper:'buttons/greaves_reaper.png',
+
+    helm_yeti:'buttons/helm_yeti.png',
+    plate_yeti:'buttons/plate_yeti.png',
+    greaves_yeti:'buttons/greaves_yeti.png',
+
+    helm_samurai:'buttons/helm_samurai.png',
+    plate_samurai:'buttons/plate_samurai.png',
+    greaves_samurai:'buttons/greaves_samurai.png',
+
+    helm_dragon:'buttons/helm_dragon.png',
+    plate_dragon:'buttons/plate_dragon.png',
+    greaves_dragon:'buttons/greaves_dragon.png',
+
+    cap_leather:'buttons/cap_leather.png',
+    vest_leather:'buttons/vest_leather.png',
+    boots_leather:'buttons/boots_leather.png',
     helm_guard:'buttons/helm_guard.png',
     helm_thorns:'buttons/helm_thorns.png',
     helm_carapace:'buttons/helm_carapace.png',
-    vest_leather:'buttons/vest_leather.png',
-    plate_iron:'buttons/plate_iron.png',
-    plate_gold:'buttons/plate_gold.png',
-    plate_crystal:'buttons/plate_crystal.png',
     cloak_swift:'buttons/cloak_swift.png',
     plate_regen:'buttons/plate_regen.png',
     plate_carapace:'buttons/plate_carapace.png',
-    boots_leather:'buttons/boots_leather.png',
-    greaves_iron:'buttons/greaves_iron.png',
-    greaves_gold:'buttons/greaves_gold.png',
-    greaves_crystal:'buttons/greaves_crystal.png',
     boots_greed:'buttons/boots_greed.png',
     chat:'buttons/chat.png',
     gear:'buttons/gear.png',
@@ -1706,9 +1760,11 @@ const UI={
   itemIcon(id){
     const it=ITEMS[id];
     if(!it)return '';
-    const src=this.ITEM_IMG[id];
-    if(!src)return it.e;
-    return `<img class="iico" src="${src}" data-iico="${src}" alt="">`;
+    let src=this.ITEM_IMG[id];
+    if(!src&&id){
+      src='buttons/'+id+'.png';
+    }
+    return `<img class="iico" src="${src}" data-iico="${src}" alt="" onerror="this.outerHTML='${it.e}'">`;
   },
 
   /* HTML ikon potret NPC team (render 3D bust portrait) */

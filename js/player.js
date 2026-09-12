@@ -52,227 +52,34 @@ const Player={
     const m=this.box(w,h,d,color,0);m.position.set(x,y,z);return m;
   },
 
-  /* ---------- model karakter detail ---------- */
+  /* ---------- model karakter Ranger Penjelajah detail ---------- */
   buildModel(){
-    const SKIN=0xe8bd92,SKIN_D=0xd2a279,SKIN_L=0xf0cda2,TUNIC=0x40704a,TUNIC_D=0x33593b,
-          PANTS=0x4a3b2a,BELT=0x2c2419,HAIR=0x4a3222,HAIR_D=0x372417,BOOT=0x3b2c1d,
-          PANTS_D=0x3b2f21,TUNIC_L=0x4d8459,LEATHER=0x6b4a2a,LEATHER_D=0x4a3118;
-    this.mesh=new THREE.Group();
-    this.rollG=new THREE.Group();this.mesh.add(this.rollG);
-    const body=new THREE.Group();this.rollG.add(body);this.parts.body=body;
-
-    /* --- kaki: paha + lutut + tulang kering + sepatu bersol --- */
-    const mkLeg=(side)=>{
-      const g=new THREE.Group();g.position.set(0.13*side,0.66,0);
-      /* paha melebar di pinggul lalu menyempit ke lutut */
-      g.add(this.pl(0.20,0.16,0.22,PANTS,-0.08));
-      g.add(this.pl(0.185,0.20,0.205,PANTS_D,-0.24));
-      /* lipatan kain di sisi luar paha */
-      g.add(this.pl(0.035,0.26,0.06,PANTS_D,-0.18,0.09,0.10*side));
-      /* jahitan samping */
-      g.add(this.pl(0.02,0.28,0.02,PANTS_D,-0.18,0.0,-0.10*side));
-      const shin=new THREE.Group();shin.position.y=-0.34;
-      shin.add(this.pl(0.165,0.3,0.19,PANTS,-0.15));
-      /* pelindung lutut kulit + pembalut kain di tulang kering */
-      shin.add(this.pl(0.185,0.08,0.20,0x53401f,-0.02,0.01));
-      shin.add(this.pl(0.19,0.03,0.21,LEATHER_D,-0.06,0.015));
-      shin.add(this.pl(0.175,0.05,0.20,0x6a5230,-0.14));
-      shin.add(this.pl(0.175,0.04,0.20,0x6a5230,-0.21));
-      /* sepatu: bagian atas, badan, lalu sol gelap */
-      shin.add(this.pl(0.195,0.09,0.22,BOOT,-0.26,0.01));
-      shin.add(this.pl(0.2,0.1,0.26,BOOT,-0.31,0.03));
-      shin.add(this.pl(0.21,0.035,0.29,0x241a10,-0.37,0.05));
-      /* ujung sepatu + tali */
-      shin.add(this.pl(0.14,0.06,0.08,BOOT,-0.33,0.14));
-      shin.add(this.pl(0.16,0.02,0.02,LEATHER_D,-0.28,0.10));
-      g.add(shin);g.userData.shin=shin;body.add(g);return g;
-    };
-    const legL=mkLeg(1),legR=mkLeg(-1);
-
-    /* --- torso berlapis --- */
-    const torso=new THREE.Group();torso.position.y=0.66;body.add(torso);
-    torso.add(this.pl(0.42,0.14,0.28,TUNIC_D,0.07));
-    torso.add(this.pl(0.46,0.22,0.28,TUNIC,0.25));
-    torso.add(this.pl(0.54,0.26,0.31,TUNIC,0.49));
-    torso.add(this.pl(0.58,0.08,0.33,TUNIC_D,0.66));
-    /* rok tunik menjuntai di atas pinggul */
-    torso.add(this.pl(0.50,0.10,0.30,TUNIC_D,0.02));
-    torso.add(this.pl(0.16,0.09,0.05,TUNIC_D,-0.05,0.15));
-    torso.add(this.pl(0.16,0.09,0.05,TUNIC_D,-0.05,-0.15));
-    /* ikat pinggang + gesper emas berkilau */
-    torso.add(this.pl(0.48,0.07,0.30,BELT,0.14));
-    torso.add(this.pl(0.1,0.09,0.32,0xc9a227,0.14));
-    torso.add(this.pl(0.05,0.05,0.02,0xffe9a0,0.14,0.17));
-    /* kantung kulit di sisi pinggang (dengan tali pengikat) */
-    torso.add(this.pl(0.10,0.11,0.09,LEATHER,0.10,0.02,0.24));
-    torso.add(this.pl(0.11,0.03,0.10,0x3f2c17,0.16,0.02,0.24));
-    torso.add(this.pl(0.03,0.08,0.02,LEATHER_D,0.12,0.02,0.29));
-    /* kantung kecil di sisi lain */
-    torso.add(this.pl(0.08,0.09,0.07,LEATHER_D,0.08,0.02,-0.24));
-    torso.add(this.pl(0.09,0.025,0.08,0x3f2c17,0.13,0.02,-0.24));
-    /* dua tali bahu menyilang dada */
-    const strap=this.pl(0.5,0.07,0.02,0x5c3f24,0.42,0.165);
-    strap.rotation.z=0.55;torso.add(strap);
-    const strap2=this.pl(0.46,0.05,0.02,0x4a3319,0.44,-0.17);
-    strap2.rotation.z=-0.5;torso.add(strap2);
-    /* gesper tali */
-    torso.add(this.pl(0.06,0.06,0.03,0xc9a227,0.38,0.165,0.10));
-    /* kerah tunik, jahitan tengah, dan panel dada */
-    torso.add(this.pl(0.40,0.06,0.34,TUNIC_L,0.63,0.01));
-    torso.add(this.pl(0.03,0.30,0.02,TUNIC_D,0.47,0.158));
-    torso.add(this.pl(0.20,0.16,0.02,TUNIC_L,0.52,0.16,0.12));
-    torso.add(this.pl(0.20,0.16,0.02,TUNIC_L,0.52,0.16,-0.12));
-    /* kancing dada */
-    torso.add(this.pl(0.03,0.03,0.02,0xc9a227,0.56,0.165,0.0));
-    torso.add(this.pl(0.03,0.03,0.02,0xc9a227,0.48,0.165,0.0));
-    /* BUGFIX kepala-leher: leher lama (0.16,0.1,0.16 @ 0.72) terlalu pendek —
-       puncaknya y≈1.43 padahal dagu kepala mulai y≈1.45, sehingga kepala
-       terlihat mengambang terpisah dari badan. Leher kini lebih tebal & tinggi
-       (puncak y≈1.61) dan overlap dengan rahang bawah kepala. */
-    torso.add(this.pl(0.18,0.30,0.18,SKIN_D,0.80));
-    /* kalung liontin kecil */
-    torso.add(this.pl(0.02,0.12,0.02,0x8f6d1c,0.62,0.14));
-    torso.add(this.pl(0.05,0.05,0.02,0x4a9fd9,0.56,0.15));
-
-    /* --- lengan: bahu + lengan bawah + tangan ---
-       Lengan kini ANAK TORSO (y lokal 0.63 = 1.29 dunia) mengikuti prototipe
-       NEW MODEL/New Animation: putaran/condong torso ikut membawa lengan,
-       prasyarat keyframe combo baru (torso.y/z menggerakkan ayunan). */
-    const mkArm=(side)=>{
-      const g=new THREE.Group();g.position.set(0.35*side,0.63,0);
-      /* tutup bahu + lengan atas yang menyempit di siku */
-      g.add(this.pl(0.19,0.09,0.20,TUNIC_D,0.01));
-      g.add(this.pl(0.20,0.05,0.21,TUNIC_D,0.04));
-      g.add(this.pl(0.17,0.26,0.18,TUNIC,-0.13));
-      g.add(this.pl(0.155,0.06,0.17,TUNIC_D,-0.24));
-      /* jahitan lengan */
-      g.add(this.pl(0.02,0.22,0.02,TUNIC_D,-0.13,0.0,0.09*side));
-      const fore=new THREE.Group();fore.position.y=-0.26;
-      fore.add(this.pl(0.145,0.25,0.16,SKIN,-0.13));
-      /* bracer kulit dengan dua tali pengikat */
-      fore.add(this.pl(0.17,0.10,0.18,LEATHER,-0.05));
-      fore.add(this.pl(0.18,0.025,0.19,0x3f2c17,-0.02));
-      fore.add(this.pl(0.18,0.025,0.19,0x3f2c17,-0.09));
-      /* gesper bracer */
-      fore.add(this.pl(0.04,0.04,0.02,0xc9a227,-0.05,0.0,0.10*side));
-      /* pergelangan + kepalan tangan.
-         Referensi mesh kepalan disimpan supaya pose bertinju bisa
-         menebalkannya tanpa menebak indeks anak (armR juga memuat pedang). */
-      fore.add(this.pl(0.13,0.05,0.14,SKIN,-0.24));
-      const fist=this.pl(0.15,0.12,0.15,SKIN_D,-0.31);
-      fore.add(fist);
-      const knuckle=this.pl(0.155,0.04,0.15,SKIN,-0.28);
-      fore.add(knuckle);
-      /* jari-jari */
-      fore.add(this.pl(0.035,0.06,0.13,SKIN_D,-0.31,0.0,0.06));
-      fore.add(this.pl(0.035,0.06,0.13,SKIN_D,-0.31,0.0,-0.06));
-      fore.add(this.pl(0.035,0.07,0.13,SKIN_D,-0.31,0.0,0.0));
-      /* ibu jari */
-      fore.add(this.pl(0.04,0.05,0.06,SKIN_D,-0.29,0.05,0.09*side));
-      fore.userData.fist=fist;fore.userData.knuckle=knuckle;
-      g.add(fore);g.userData.fore=fore;torso.add(g);return g;
-    };
-    const armL=mkArm(1),armR=mkArm(-1);
-
-    /* --- pedang: model 3D unik per senjata (REWORK) ---
-       Setiap pedang kini punya file sendiri di js/player/weapons/ dengan
-       bentuk + aura dinamis khas (WeaponSwordWood/Iron/Storm/Venom/Frost/Titan).
-       Mesh dibangun & dipasang oleh refreshWeapon() lewat WeaponManager
-       (dipanggil refreshArmor di akhir buildModel) — tidak lagi dibangun
-       inline di sini, sehingga mengganti senjata mengganti seluruh model. */
-
-    /* --- kepala: wajah, rambut, telinga, alis ---
-        BUGFIX kepala-terlepas: kepala dulu anak `body` (saudara torso), sehingga
-        saat torso miring (lari/dash) kepala TIDAK ikut miring → terlihat lepas
-        dari leher. Sekarang kepala dijadikan ANAK TORSE (torso.add) sehingga
-        TERKUNCI mengikuti rotasi torso: badan miring → kepala ikut miring, dan
-        kepala tetap menempel di leher karena leher juga anak torso.
-        Posisi lokal (0,0.80,0) relatif torso = posisi dunia lama (0,1.46,0),
-        jadi tinggi kepala tidak berubah saat torso tegak. */
-    const head=new THREE.Group();head.position.set(0,0.80,0);torso.add(head);
-    head.add(this.pl(0.4,0.4,0.38,SKIN,0.2));
-    /* rahang & pipi sedikit lebih sempit dari tengkorak */
-    head.add(this.pl(0.34,0.10,0.34,SKIN_D,0.04));
-    head.add(this.pl(0.26,0.12,0.05,SKIN_D,0.12,0.19));
-    /* tulang pipi */
-    head.add(this.pl(0.08,0.06,0.04,SKIN_L,0.16,0.17,0.14));
-    head.add(this.pl(0.08,0.06,0.04,SKIN_L,0.16,0.17,-0.14));
-    /* rambut: batok, jambul depan, cambang, dan tengkuk */
-    head.add(this.pl(0.44,0.13,0.42,HAIR,0.42));
-    head.add(this.pl(0.42,0.09,0.10,HAIR,0.36,0.17));
-    head.add(this.pl(0.30,0.07,0.08,HAIR_D,0.40,0.20));
-    head.add(this.pl(0.44,0.16,0.08,HAIR_D,0.3,-0.18));
-    head.add(this.pl(0.06,0.20,0.30,HAIR,0.32,-0.02,0.20));
-    head.add(this.pl(0.06,0.20,0.30,HAIR,0.32,-0.02,-0.20));
-    /* helai rambut tambahan */
-    head.add(this.pl(0.08,0.12,0.06,HAIR_D,0.38,0.14,0.10));
-    head.add(this.pl(0.08,0.12,0.06,HAIR_D,0.38,0.14,-0.10));
-    /* telinga: daun + rongga dalam */
-    head.add(this.pl(0.05,0.12,0.09,SKIN_D,0.2,0,0.21));
-    head.add(this.pl(0.05,0.12,0.09,SKIN_D,0.2,0,-0.21));
-    head.add(this.pl(0.02,0.06,0.05,0xb98a68,0.2,0,0.235));
-    head.add(this.pl(0.02,0.06,0.05,0xb98a68,0.2,0,-0.235));
-    const eyeM=new THREE.MeshLambertMaterial({color:0x2a2118});
-    const scleraM=new THREE.MeshLambertMaterial({color:0xf6f1e6});
-    for(const x of[0.095,-0.095]){
-      /* putih mata di belakang pupil supaya tatapan lebih hidup */
-      const s=new THREE.Mesh(new THREE.BoxGeometry(0.085,0.075,0.02),scleraM);
-      s.position.set(x,0.22,0.19);head.add(s);
-      const e=new THREE.Mesh(new THREE.BoxGeometry(0.055,0.075,0.02),eyeM);
-      e.position.set(x,0.22,0.195);head.add(e);
-      /* iris berwarna */
-      const iris=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.05,0.02),
-        new THREE.MeshLambertMaterial({color:0x4a7a5a}));
-      iris.position.set(x,0.22,0.198);head.add(iris);
-      /* kilau mata */
-      const gl=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.02,0.01),
-        new THREE.MeshBasicMaterial({color:0xffffff}));
-      gl.position.set(x+0.015,0.245,0.205);head.add(gl);
-      /* alis tebal + kelopak bawah */
-      head.add(this.pl(0.09,0.035,0.02,HAIR_D,0.30,0.196,x));
-      head.add(this.pl(0.085,0.02,0.02,SKIN_D,0.185,0.198,x));
+    if(typeof PlayerModelBuilder!=='undefined'){
+      this.mesh=PlayerModelBuilder.build();
+      this.rollG=PlayerModelBuilder.rollG;
+      this.parts=PlayerModelBuilder.parts;
+      this.armorG=this.parts.armorG;
+    }else{
+      this.mesh=new THREE.Group();
+      this.rollG=new THREE.Group();this.mesh.add(this.rollG);
+      const body=new THREE.Group();this.rollG.add(body);
+      this.parts={body};
+      this.armorG={};
     }
-    /* hidung, mulut, dan dagu */
-    head.add(this.pl(0.05,0.05,0.04,SKIN_D,0.155,0.2));
-    head.add(this.pl(0.04,0.02,0.02,0xb98a68,0.135,0.205));
-    /* MULUT: referensinya disimpan (parts.mouth) supaya animasi bisa
-       membukanya — dipakai Teriakan Perang agar benar-benar terlihat berteriak.
-       Rongga gelap di belakang bibir membuat mulut terbuka terbaca jelas. */
-    const mouth=this.pl(0.1,0.02,0.02,0xb07a6a,0.09,0.196);
-    head.add(mouth);
-    const mouthIn=this.pl(0.085,0.02,0.015,0x3a1c1c,0.09,0.19);
-    mouthIn.visible=false;                 // baru terlihat saat mulut terbuka
-    head.add(mouthIn);
-    mouth.userData.baseY=0.09;mouth.userData.inner=mouthIn;
-    head.add(this.pl(0.12,0.05,0.03,SKIN_D,0.045,0.185));
-    /* bekas luka kecil di pipi (karakter detail) */
-    head.add(this.pl(0.015,0.06,0.01,0xc9856a,0.14,0.19,0.12));
-
-    /* --- wadah armor --- */
-    this.armorG={helm:new THREE.Group(),chest:new THREE.Group(),
-      bootL:new THREE.Group(),bootR:new THREE.Group(),
-      pauldL:new THREE.Group(),pauldR:new THREE.Group(),
-      /* tameng (khusus karakter utama) menempel di lengan kiri */
-      shield:new THREE.Group()};
-    head.add(this.armorG.helm);
-    torso.add(this.armorG.chest);
-    legL.userData.shin.add(this.armorG.bootL);
-    legR.userData.shin.add(this.armorG.bootR);
-    armL.add(this.armorG.pauldL);armR.add(this.armorG.pauldR);
-    armL.add(this.armorG.shield);
-
-    /* parts.sword diisi refreshWeapon() (model pedang per senjata) */
-    this.parts={...this.parts,legL,legR,armL,armR,head,torso,mouth,sword:null};
     Game.scene.add(this.mesh);
     this.refreshArmor();
   },
 
-  /* ---------- bangun ulang mesh armor sesuai equipment ----------
-     Setiap tier punya SILUET khas agar mudah dibedakan:
-       leather = kain sederhana, iron = pelat + paku keling,
-       gold    = ornamen mahkota + jubah, crystal = kristal menyala + duri. */
+  /* ---------- toggle visibilitas layer pakaian adaptif ---------- */
+  updateClothVisibility(opts={}){
+    if(typeof PlayerModelBuilder!=='undefined'&&PlayerModelBuilder.updateClothVisibility){
+      PlayerModelBuilder.updateClothVisibility(this.parts,opts);
+    }
+  },
+
+  /* ---------- bangun ulang mesh armor sesuai equipment (12 SET OTENTIK) ---------- */
   refreshArmor(){
-    if(!this.armorG.helm)return;
+    if(!this.armorG||!this.armorG.helm)return;
     for(const k in this.armorG){
       if(k==='shield')continue;  // dibersihkan & dibangun ulang oleh refreshShield()
       const g=this.armorG[k];
@@ -283,137 +90,78 @@ const Player={
       }
     }
     const eq=(typeof RPG!=='undefined'&&RPG.equip)?RPG.equip:{};
-    const glowMat=(color)=>new THREE.MeshPhongMaterial({color,emissive:color,
-      emissiveIntensity:0.55,transparent:true,opacity:0.9,shininess:100});
+    let hasHelm=false,hasChest=false,hasPauld=false,hasPants=false,hasBoots=false;
+    let setHelm=null;
 
-    /* ===== HELM =====
-       BUGFIX helm-rambut: helm lama berukuran hampir sama persis dengan
-       batok rambut (mis. kubah leather 0.44×0.42 vs rambut 0.44×0.42) sehingga
-       permukaan keduanya berimpit → Z-fighting "kedip-kedip", dan jambul depan
-       (z 0.24) menembus keluar kubah besi (z 0.22). Semua helm kini diperbesar:
-       kubah 0.54×0.26×0.52 (menutupi rambut + margin), rim lebih lebar,
-       pelat pipi digeser keluar, dan mata (y≈0.22) tetap terlihat di bawah
-       rim (y≥0.30). */
+    /* ===== HELM ===== */
     const eHelm=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('helm'):(eq.helm||null);
     if(eHelm&&ITEMS[eHelm]){
-      const t=ITEMS[eHelm].armor.tier,C=ARMOR_TIER[t],G=this.armorG.helm;
-      if(t==='leather'){
-        /* topi kulit: kubah besar + tepi lebar */
-        G.add(this.pl(0.54,0.26,0.52,C.main,0.46));
-        G.add(this.pl(0.58,0.07,0.56,C.trim,0.34));
-      }else if(t==='iron'){
-        /* helm besi: kubah + visor depan + pelat pipi + paku keling */
-        G.add(this.pl(0.54,0.26,0.52,C.main,0.46));
-        G.add(this.pl(0.58,0.08,0.56,C.trim,0.33));
-        G.add(this.pl(0.08,0.2,0.1,C.metal,0.30,0.29));          // visor hidung
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,0.25));       // pipi kanan
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,-0.25));      // pipi kiri
-        G.add(this.pl(0.05,0.1,0.05,C.metal,0.62));              // paku atas
-      }else if(t==='gold'){
-        /* helm emas mahkota: kubah + 3 sirip mahkota + pelat pipi */
-        G.add(this.pl(0.54,0.26,0.52,C.main,0.46));
-        G.add(this.pl(0.58,0.08,0.56,C.trim,0.33));
-        G.add(this.pl(0.06,0.24,0.08,C.metal,0.66,0,0));         // sirip tengah
-        G.add(this.pl(0.05,0.18,0.06,C.metal,0.62,0,0.15));      // sirip samping
-        G.add(this.pl(0.05,0.18,0.06,C.metal,0.62,0,-0.15));
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,0.25));
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,-0.25));
-        G.add(this.pl(0.1,0.06,0.1,C.metal,0.34,0.29));          // ornamen dahi
-      }else{ /* crystal */
-        /* helm kristal: kubah + tanduk kristal menyala + pelat pipi */
-        G.add(this.pl(0.54,0.26,0.52,C.main,0.46));
-        G.add(this.pl(0.58,0.08,0.56,C.trim,0.33));
-        const spike=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.26,0.07),glowMat(C.metal));
-        spike.position.y=0.68;G.add(spike);
-        const s2=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.05),glowMat(C.metal));
-        s2.position.set(0.17,0.60,0);G.add(s2);
-        const s3=s2.clone();s3.position.x=-0.17;G.add(s3);
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,0.25));
-        G.add(this.pl(0.08,0.28,0.38,C.trim,0.26,0,-0.25));
+      const it=ITEMS[eHelm];
+      const query=(it.armor&&it.armor.set)?it.armor.set:(it.armor?it.armor.tier:eHelm);
+      if(typeof ArmorManager!=='undefined'){
+        const set=ArmorManager.getSet(query);
+        if(set){
+          setHelm=set;
+          hasHelm=true;
+          this.armorG.helm.add(set.buildHelmet());
+        }
       }
     }
 
     /* ===== CHEST + PAULDRON ===== */
     const eChest=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('chest'):(eq.chest||null);
     if(eChest&&ITEMS[eChest]){
-      const t=ITEMS[eChest].armor.tier,C=ARMOR_TIER[t],G=this.armorG.chest;
-      if(t==='leather'){
-        /* rompi kulit: panel depan + tali silang */
-        G.add(this.pl(0.58,0.28,0.34,C.main,0.49));
-        G.add(this.pl(0.5,0.18,0.32,C.trim,0.27));
-        const strap=this.pl(0.48,0.05,0.02,C.metal,0.45,0.17);
-        strap.rotation.z=0.5;G.add(strap);
-      }else if(t==='iron'){
-        /* zirah besi: pelat dada + paku keling + sabuk logam */
-        G.add(this.pl(0.6,0.3,0.36,C.main,0.49));
-        G.add(this.pl(0.52,0.2,0.33,C.trim,0.26));
-        G.add(this.pl(0.62,0.06,0.37,C.metal,0.64));
-        G.add(this.pl(0.1,0.22,0.03,C.metal,0.5,0.19));         // garis tengah
-        G.add(this.pl(0.05,0.05,0.04,C.metal,0.56,0.17,0.14));  // keling
-        G.add(this.pl(0.05,0.05,0.04,C.metal,0.56,0.17,-0.14));
-      }else if(t==='gold'){
-        /* zirah emas: pelat + emblem singa + jubah belakang + trim berlapis */
-        G.add(this.pl(0.6,0.3,0.36,C.main,0.49));
-        G.add(this.pl(0.52,0.2,0.33,C.trim,0.26));
-        G.add(this.pl(0.62,0.06,0.37,C.metal,0.64));
-        G.add(this.pl(0.64,0.05,0.38,C.metal,0.34));            // sabuk emas
-        G.add(this.pl(0.18,0.18,0.04,C.metal,0.5,0.2));         // emblem dada
-        G.add(this.pl(0.1,0.1,0.05,C.trim,0.5,0.2));            // inti emblem
-        const cape=this.pl(0.44,0.4,0.03,0x9E1B1B,0.3,-0.19);   // jubah merah
-        G.add(cape);
-      }else{ /* crystal */
-        /* zirah kristal: pelat + inti kristal menyala + duri bahu */
-        G.add(this.pl(0.6,0.3,0.36,C.main,0.49));
-        G.add(this.pl(0.52,0.2,0.33,C.trim,0.26));
-        G.add(this.pl(0.62,0.06,0.37,C.metal,0.64));
-        const core=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.14,0.06),glowMat(C.metal));
-        core.position.set(0,0.5,0.2);core.rotation.y=Math.PI/4;G.add(core);
-        G.add(this.pl(0.2,0.2,0.02,C.metal,0.52,0.195));
-      }
-      /* pauldron berbeda per tier */
-      for(const g of[this.armorG.pauldL,this.armorG.pauldR]){
-        if(t==='leather'){
-          g.add(this.pl(0.2,0.1,0.22,C.main,-0.02));
-        }else if(t==='iron'){
-          g.add(this.pl(0.24,0.12,0.26,C.main,-0.02));
-          g.add(this.pl(0.2,0.06,0.22,C.metal,0.06));
-        }else if(t==='gold'){
-          g.add(this.pl(0.26,0.14,0.28,C.main,-0.02));
-          g.add(this.pl(0.22,0.07,0.24,C.metal,0.07));
-          g.add(this.pl(0.06,0.12,0.06,C.metal,0.12));          // sirip pauldron
-        }else{
-          g.add(this.pl(0.24,0.13,0.26,C.main,-0.02));
-          const sp=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.14,0.05),glowMat(C.metal));
-          sp.position.set(0,0.1,0);g.add(sp);
+      const it=ITEMS[eChest];
+      const query=(it.armor&&it.armor.set)?it.armor.set:(it.armor?it.armor.tier:eChest);
+      if(typeof ArmorManager!=='undefined'){
+        const set=ArmorManager.getSet(query);
+        if(set){
+          hasChest=true;
+          hasPauld=true;
+          this.armorG.chest.add(set.buildChestplate());
+          if(this.armorG.pauldL)this.armorG.pauldL.add(set.buildPauldron());
+          if(this.armorG.pauldR)this.armorG.pauldR.add(set.buildPauldron());
         }
       }
     }
 
-    /* ===== BOOTS ===== */
+    /* ===== BOOTS / GREAVES & PANTS ===== */
     const eBoots=(typeof RPG!=='undefined'&&RPG.equipId)?RPG.equipId('boots'):(eq.boots||null);
     if(eBoots&&ITEMS[eBoots]){
-      const t=ITEMS[eBoots].armor.tier,C=ARMOR_TIER[t];
-      for(const g of[this.armorG.bootL,this.armorG.bootR]){
-        if(t==='leather'){
-          g.add(this.pl(0.2,0.16,0.2,C.main,-0.2));
-          g.add(this.pl(0.22,0.09,0.27,C.trim,-0.31,0.04));
-        }else if(t==='iron'){
-          g.add(this.pl(0.21,0.2,0.21,C.main,-0.18));
-          g.add(this.pl(0.23,0.11,0.29,C.trim,-0.31,0.04));
-          g.add(this.pl(0.19,0.07,0.2,C.metal,-0.06));         // pelat tulang kering
-        }else if(t==='gold'){
-          g.add(this.pl(0.21,0.22,0.21,C.main,-0.17));
-          g.add(this.pl(0.23,0.11,0.29,C.trim,-0.31,0.04));
-          g.add(this.pl(0.19,0.09,0.2,C.metal,-0.05));
-          g.add(this.pl(0.05,0.08,0.05,C.metal,-0.02,0,0.1));   // ornamen
-        }else{ /* crystal */
-          g.add(this.pl(0.21,0.22,0.21,C.main,-0.17));
-          g.add(this.pl(0.23,0.11,0.29,C.trim,-0.31,0.04));
-          const gl=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1,0.05),glowMat(C.metal));
-          gl.position.set(0,-0.08,0);g.add(gl);
+      const it=ITEMS[eBoots];
+      const query=(it.armor&&it.armor.set)?it.armor.set:(it.armor?it.armor.tier:eBoots);
+      if(typeof ArmorManager!=='undefined'){
+        const set=ArmorManager.getSet(query);
+        if(set){
+          hasBoots=true;
+          if(this.armorG.bootL)this.armorG.bootL.add(set.buildBoots());
+          if(this.armorG.bootR)this.armorG.bootR.add(set.buildBoots());
+          if(set.buildPants){
+            const p=set.buildPants();
+            if(p){
+              hasPants=true;
+              if(p.waist&&this.armorG.pantsWaist)this.armorG.pantsWaist.add(p.waist);
+              if(p.legL&&this.armorG.pantsL)this.armorG.pantsL.add(p.legL);
+              if(p.legR&&this.armorG.pantsR)this.armorG.pantsR.add(p.legR);
+            }
+          }
         }
       }
     }
+
+    // Periksa apakah helm full-face
+    const fullFaceSets=['samurai','dragonscale','dragon','shadow assassin','shadow','iron knight','iron','gold paladin','gold','tungsten juggernaut','tungsten'];
+    const isFullFace=setHelm&&fullFaceSets.includes((setHelm.name||'').toLowerCase());
+
+    this.updateClothVisibility({
+      hasHelm,
+      hasChest,
+      hasPauld,
+      hasPants,
+      hasBoots,
+      isFullFace
+    });
+
     this.refreshShield();
     this.refreshWeapon();
   },
@@ -463,13 +211,9 @@ const Player={
       WeaponManager.attachToCharacterHand(this.parts,id);
       const sw=this.parts.sword;
       if(sw){
-        /* Posisi grip di kepalan (y=-0.31 dari fore). Builder menyetel z=0.02,
-           tapi itu membuat tangan jatuh di pangkal bilah (terlihat memegang
-           mata pisau). Semua gagang pedang berada di lokal y≈0.22-0.235, jadi
-           digeser maju ke z=0.22 agar gagang pas di kepalan & bilah memanjang
-           ke depan. Rotasi -90° X memetakan bilah (-Y lokal) ke +Z (depan). */
-        sw.position.set(0,-0.31,0.22);
-        sw.rotation.x=-Math.PI/2;
+        /* Normalisasi posisi grip di kepalan & rotasi forward 90 derajat */
+        sw.position.set(0,-0.29,0.02);
+        sw.rotation.set(Math.PI/2,0,0);
         /* kompatibilitas nyala combo (updateSwordGlow): kumpulkan material
            ber-emissive sebagai glowMats + warna dasarnya. Grup aura (userData.fx)
            dianimasikan builder sendiri via tick(), jadi dilewati agar tidak
@@ -502,7 +246,7 @@ const Player={
     if(!id&&held&&typeof HeldModels!=='undefined'){
       const h=HeldModels.build(held);
       const hold=h.userData.hold||{};
-      const hp=hold.pos||[0,-0.31,0.22];
+      const hp=hold.pos||[0,-0.29,0.02];
       const hr=hold.rot||[Math.PI/2,0,0];
       h.position.set(hp[0],hp[1],hp[2]);
       h.rotation.set(hr[0],hr[1],hr[2]);

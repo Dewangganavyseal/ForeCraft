@@ -130,8 +130,14 @@ const Chat={
      masa depan otomatis ikut muncul tanpa perlu mengubah terminal */
   itemGroups(){
     const g={food:[],mat:[],weapon:[],armor:[],furni:[]};
+    const legacyAliases=new Set([
+      'sword_wood','sword_copper','sword_gold','sword_storm','sword_venom',
+      'sword_tungsten','sword_frost','sword_titan','cap_leather','vest_leather','boots_leather'
+    ]);
     for(const id in ITEMS){
+      if(legacyAliases.has(id))continue;
       const it=ITEMS[id];
+      if(!it)continue;
       if(it.weapon)g.weapon.push(id);
       else if(it.armor)g.armor.push(id);
       else if(it.food)g.food.push(id);
@@ -172,7 +178,8 @@ const Chat={
       const b=document.createElement('button');
       b.className='tbtn';
       const rar=(it.rarity&&RARITY[it.rarity])?` <small>${RARITY[it.rarity].n}</small>`:'';
-      b.innerHTML=`<span class="te">${it.e}</span>${it.n}${rar}`;
+      const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):it.e;
+      b.innerHTML=`<span class="te">${ico}</span>${it.n}${rar}`;
       b.addEventListener('click',()=>this.giveItem(id,this.qty()));
       grid.appendChild(b);
     };

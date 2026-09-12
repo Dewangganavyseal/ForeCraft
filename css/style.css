@@ -158,9 +158,14 @@ body.touch #panel-bag .tip{font-size:10px}
 .slot.r-rare{background:rgba(77,163,255,.12);box-shadow:inset 0 0 12px rgba(77,163,255,.28)}
 .slot.r-epic{background:rgba(180,107,255,.14);box-shadow:inset 0 0 14px rgba(180,107,255,.34)}
 .slot.r-legendary{background:rgba(255,162,39,.16);box-shadow:inset 0 0 16px rgba(255,162,39,.42),0 0 10px rgba(255,162,39,.35);animation:rarePulse 1.8s ease-in-out infinite}
+.slot.r-mythic{background:rgba(255,56,56,.20);border-color:#ff3838;box-shadow:inset 0 0 18px rgba(255,56,56,.5),0 0 12px rgba(255,56,56,.45);animation:mythicPulse 1.5s ease-in-out infinite}
 @keyframes rarePulse{
   0%,100%{box-shadow:inset 0 0 14px rgba(255,162,39,.34),0 0 8px rgba(255,162,39,.25)}
   50%{box-shadow:inset 0 0 20px rgba(255,162,39,.55),0 0 16px rgba(255,162,39,.5)}
+}
+@keyframes mythicPulse{
+  0%,100%{box-shadow:inset 0 0 16px rgba(255,56,56,.4),0 0 10px rgba(255,56,56,.35)}
+  50%{box-shadow:inset 0 0 24px rgba(255,56,56,.65),0 0 18px rgba(255,56,56,.6)}
 }
 
 /* ---- slot perlengkapan (senjata + armor: 4 slot) ---- */
@@ -241,6 +246,7 @@ body.touch #panel-bag .tip{font-size:10px}
 .ngear.r-rare{background:rgba(77,163,255,.15);border-color:#4da3ff;box-shadow:inset 0 0 12px rgba(77,163,255,.32)}
 .ngear.r-epic{background:rgba(180,107,255,.16);border-color:#b46bff;box-shadow:inset 0 0 14px rgba(180,107,255,.4)}
 .ngear.r-legendary{background:rgba(255,162,39,.18);border-color:#ffa227;box-shadow:inset 0 0 16px rgba(255,162,39,.45),0 0 8px rgba(255,162,39,.35);animation:rarePulse 1.8s ease-in-out infinite}
+.ngear.r-mythic{background:rgba(255,56,56,.22);border-color:#ff3838;box-shadow:inset 0 0 18px rgba(255,56,56,.5),0 0 10px rgba(255,56,56,.45);animation:mythicPulse 1.5s ease-in-out infinite}
 .coin-ico{display:inline-block;vertical-align:middle;object-fit:contain;pointer-events:none}
 .npc-cmd{display:flex;flex-wrap:wrap;gap:6px}
 .npc-cmd button{background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:12px;padding:7px 11px;border-radius:8px;cursor:pointer}
@@ -1405,7 +1411,8 @@ body.touch.chat-open #toast{top:auto}
   padding:6px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .tbtn:hover,.tbtn:active{border-color:#7dff9d;background:rgba(22,52,30,.92);
   box-shadow:0 0 9px rgba(125,255,157,.35)}
-.tbtn .te{font-size:16px;line-height:1}
+.tbtn .te{font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.tbtn .te img{width:18px;height:18px;vertical-align:middle;display:inline-block;object-fit:contain}
 .tbtn small{opacity:.6;font-size:9px;margin-left:2px}
 #term-log{margin-top:14px;background:#020804;border:1px solid rgba(125,255,157,.25);
   border-radius:8px;padding:8px 10px;min-height:52px;max-height:112px;

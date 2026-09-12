@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.11',
+  VERSION:'0.2.12',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -414,6 +414,7 @@ const RARITY={
   rare     :{n:'Langka',      e:'🔵',c:0x4da3ff,css:'#4da3ff',mul:1.16,order:2},
   epic     :{n:'Epik',        e:'💜',c:0xb46bff,css:'#b46bff',mul:1.26,order:3},
   legendary:{n:'Legendaris',  e:'⭐',c:0xffa227,css:'#ffa227',mul:1.40,order:4},
+  mythic   :{n:'Mitik',        e:'🔥',c:0xff3838,css:'#ff3838',mul:1.55,order:5},
 };
 
 /* ================= efek perlengkapan =================
@@ -690,59 +691,116 @@ const ITEMS={
   dungeon_changer:{n:'Dungeon Changer',e:'🗝️',tool:'dchange',rarity:'epic'},
   /* drop boss */
   boss_core:{n:'Inti Boss',e:'🔮',rarity:'epic'},
-  /* ---------- set emas: tier tertinggi hasil tempa ---------- */
-  helm_gold  :{n:'Helm Emas',e:'👑',rarity:'epic',armor:{slot:'helm', def:0.17,tier:'gold'}},
-  plate_gold :{n:'Zirah Emas',e:'🎽',rarity:'epic',armor:{slot:'chest',def:0.26,tier:'gold'}},
-  greaves_gold:{n:'Pelindung Kaki Emas',e:'👖',rarity:'epic',armor:{slot:'boots',def:0.14,tier:'gold'}},
-  /* ---------- set kristal: butuh inti boss ---------- */
-  helm_crystal :{n:'Helm Kristal',e:'🔷',rarity:'epic',armor:{slot:'helm', def:0.22,tier:'crystal'}},
-  plate_crystal:{n:'Zirah Kristal',e:'🛡',rarity:'epic',armor:{slot:'chest',def:0.32,tier:'crystal'}},
-  greaves_crystal:{n:'Pelindung Kaki Kristal',e:'❄️',rarity:'epic',armor:{slot:'boots',def:0.18,tier:'crystal'}},
+  /* ================= 12 SET ZIRAH OTENTIK FORECRAFT ================= */
+  /* 1. Berserker Fur Set (Tier Leather, Lv 1 - common) */
+  helm_berserker  :{n:'Tudung Serigala Barbar',e:'🐺',rarity:'common',armor:{slot:'helm', def:0.07,tier:'leather',set:'berserker'}},
+  plate_berserker :{n:'Mantel Bulu Barbar',e:'🧥',rarity:'common',armor:{slot:'chest',def:0.13,tier:'leather',set:'berserker'}},
+  greaves_berserker:{n:'Celana & Sepatu Bulu Barbar',e:'👖',rarity:'common',armor:{slot:'boots',def:0.06,tier:'leather',set:'berserker'}},
 
-  /* ---------- armor yang bisa dipasang ---------- */
-  cap_leather  :{n:'Topi Kulit',e:'🧢',rarity:'common',armor:{slot:'helm', def:0.06,tier:'leather'}},
-  vest_leather :{n:'Rompi Kulit',e:'👚',rarity:'common',armor:{slot:'chest',def:0.11,tier:'leather'}},
-  boots_leather:{n:'Sepatu Kulit',e:'👟',rarity:'common',armor:{slot:'boots',def:0.05,tier:'leather'}},
-  helm_iron    :{n:'Helm Besi',e:'⛑️',rarity:'uncommon',armor:{slot:'helm', def:0.12,tier:'iron'}},
-  plate_iron   :{n:'Zirah Besi',e:'🛡️',rarity:'uncommon',armor:{slot:'chest',def:0.20,tier:'iron'}},
-  greaves_iron :{n:'Pelindung Kaki Besi',e:'👢',rarity:'uncommon',armor:{slot:'boots',def:0.10,tier:'iron'}},
+  /* 2. Elven Ranger Set (Tier Leather, Lv 1 - common) */
+  helm_elven   :{n:'Tudung Elven Ranger',e:'🍃',rarity:'common',armor:{slot:'helm', def:0.06,tier:'leather',set:'elven'}},
+  plate_elven  :{n:'Jubah Elven Ranger',e:'🎽',rarity:'common',armor:{slot:'chest',def:0.11,tier:'leather',set:'elven',fx:'swift'}},
+  greaves_elven:{n:'Celana & Sepatu Elven Ranger',e:'👖',rarity:'common',armor:{slot:'boots',def:0.05,tier:'leather',set:'elven'}},
 
-  /* ---------- set karapas kelabang (dari Kulit Kelabang, boss REDLANDS) ----------
-     Setara tier besi-plus: pertahanan tinggi tanpa perlu inti boss. Model 3D
-     memakai tier 'iron' (belum ada set voxel khusus) tapi warna drop merah. */
+  /* 3. Steampunk Engineer Set (Tier Copper, Lv 7 - uncommon) */
+  helm_copper  :{n:'Goggle Montir Tembaga',e:'🥽',rarity:'uncommon',armor:{slot:'helm', def:0.09,tier:'copper',set:'copper'}},
+  plate_copper :{n:'Rompi Tembaga Steampunk',e:'🦺',rarity:'uncommon',armor:{slot:'chest',def:0.16,tier:'copper',set:'copper',fx:'guard'}},
+  greaves_copper:{n:'Celana Montir Tembaga',e:'👖',rarity:'uncommon',armor:{slot:'boots',def:0.08,tier:'copper',set:'copper'}},
+
+  /* 4. Iron Knight Set (Tier Iron, Lv 12 - uncommon) */
+  helm_iron    :{n:'Greathelm Ksatria Besi',e:'⛑️',rarity:'uncommon',armor:{slot:'helm', def:0.12,tier:'iron',set:'iron'}},
+  plate_iron   :{n:'Cuirass Ksatria Besi',e:'🛡️',rarity:'uncommon',armor:{slot:'chest',def:0.20,tier:'iron',set:'iron',fx:'guard'}},
+  greaves_iron :{n:'Greaves Ksatria Besi',e:'👢',rarity:'uncommon',armor:{slot:'boots',def:0.10,tier:'iron',set:'iron'}},
+
+  /* 5. Gold Paladin Set (Tier Gold, Lv 22 - rare) */
+  helm_gold    :{n:'Topeng Sayap Gold Paladin',e:'👑',rarity:'rare',armor:{slot:'helm', def:0.16,tier:'gold',set:'gold'}},
+  plate_gold   :{n:'Cuirass Emas Gold Paladin',e:'🛡️',rarity:'rare',armor:{slot:'chest',def:0.26,tier:'gold',set:'gold',fx:'greed'}},
+  greaves_gold :{n:'Greaves Emas Gold Paladin',e:'✨',rarity:'rare',armor:{slot:'boots',def:0.13,tier:'gold',set:'gold'}},
+
+  /* 6. Shadow Assassin Set (Tier Tungsten, Lv 26 - epic) */
+  helm_shadow  :{n:'Cowl Ninja Shadow Assassin',e:'🥷',rarity:'epic',armor:{slot:'helm', def:0.18,tier:'tungsten',set:'shadow',fx:'swift'}},
+  plate_shadow :{n:'Rompi Siluman Shadow Assassin',e:'🥋',rarity:'epic',armor:{slot:'chest',def:0.28,tier:'tungsten',set:'shadow',fx:'swift'}},
+  greaves_shadow:{n:'Celana Siluman Shadow Assassin',e:'👖',rarity:'epic',armor:{slot:'boots',def:0.15,tier:'tungsten',set:'shadow'}},
+
+  /* 7. Tungsten Juggernaut Set (Tier Tungsten, Lv 26 - epic) */
+  helm_tungsten  :{n:'Helm Bunker Tungsten Juggernaut',e:'🪖',rarity:'epic',armor:{slot:'helm', def:0.22,tier:'tungsten',set:'tungsten',fx:'guard'}},
+  plate_tungsten :{n:'Pelat Benteng Tungsten Juggernaut',e:'🛡️',rarity:'epic',armor:{slot:'chest',def:0.34,tier:'tungsten',set:'tungsten',fx:'guard'}},
+  greaves_tungsten:{n:'Balok Pelindung Tungsten Juggernaut',e:'👢',rarity:'epic',armor:{slot:'boots',def:0.17,tier:'tungsten',set:'tungsten'}},
+
+  /* 8. Crystal Mage Set (Tier Crystal, Lv 32 - legendary) */
+  helm_crystal :{n:'Tudung Rune Crystal Mage',e:'🔷',rarity:'legendary',armor:{slot:'helm', def:0.22,tier:'crystal',set:'crystal'}},
+  plate_crystal:{n:'Jubah Prisma Crystal Mage',e:'💠',rarity:'legendary',armor:{slot:'chest',def:0.33,tier:'crystal',set:'crystal',fx:'regen'}},
+  greaves_crystal:{n:'Celana Sutra Crystal Mage',e:'❄️',rarity:'legendary',armor:{slot:'boots',def:0.17,tier:'crystal',set:'crystal'}},
+
+  /* 9. Reaper Cult Set (Tier Crystal / Soul, Lv 32 - legendary) */
+  helm_reaper  :{n:'Topeng Tengkorak Reaper Cult',e:'💀',rarity:'legendary',armor:{slot:'helm', def:0.24,tier:'crystal',set:'reaper',fx:'swift'}},
+  plate_reaper :{n:'Jubah Rusuk Maut Reaper Cult',e:'🎽',rarity:'legendary',armor:{slot:'chest',def:0.35,tier:'crystal',set:'reaper',fx:'regen'}},
+  greaves_reaper:{n:'Celana Api Jiwa Reaper Cult',e:'👖',rarity:'legendary',armor:{slot:'boots',def:0.18,tier:'crystal',set:'reaper'}},
+
+  /* 10. Frost Yeti Set (Tier Crystal, Lv 32 - legendary) */
+  helm_yeti  :{n:'Tanduk Ram Frost Yeti',e:'❄️',rarity:'legendary',armor:{slot:'helm', def:0.23,tier:'crystal',set:'yeti',fx:'guard'}},
+  plate_yeti :{n:'Mantel Bulu Es Frost Yeti',e:'🧥',rarity:'legendary',armor:{slot:'chest',def:0.35,tier:'crystal',set:'yeti',fx:'guard'}},
+  greaves_yeti:{n:'Kilt Bulu Es Frost Yeti',e:'👖',rarity:'legendary',armor:{slot:'boots',def:0.18,tier:'crystal',set:'yeti'}},
+
+  /* 11. Samurai Set (Tier Tungstensteel, Lv 38 - legendary) */
+  helm_samurai  :{n:'Kabuto Mengu Samurai',e:'👺',rarity:'legendary',armor:{slot:'helm', def:0.26,tier:'tungstensteel',set:'samurai',fx:'thorns'}},
+  plate_samurai :{n:'Dou Lak Baja Samurai',e:'🥋',rarity:'legendary',armor:{slot:'chest',def:0.38,tier:'tungstensteel',set:'samurai',fx:'thorns'}},
+  greaves_samurai:{n:'Haidate Kusazuri Samurai',e:'👖',rarity:'legendary',armor:{slot:'boots',def:0.20,tier:'tungstensteel',set:'samurai'}},
+
+  /* 12. Dragonscale Set (Tier Tungstensteel, Lv 38 - mythic) */
+  helm_dragon  :{n:'Helm Mengaum Dragonscale',e:'🐲',rarity:'mythic',armor:{slot:'helm', def:0.30,tier:'tungstensteel',set:'dragon',fx:'thorns'}},
+  plate_dragon :{n:'Zirah Sisik Dragonscale',e:'🛡️',rarity:'mythic',armor:{slot:'chest',def:0.44,tier:'tungstensteel',set:'dragon',fx:'thorns'}},
+  greaves_dragon:{n:'Pelindung Kaki & Ekor Dragonscale',e:'👖',rarity:'mythic',armor:{slot:'boots',def:0.22,tier:'tungstensteel',set:'dragon',fx:'guard'}},
+
+  /* ---------- set karapas kelabang (dari Kulit Kelabang, boss REDLANDS) ---------- */
   helm_carapace :{n:'Helm Karapas Kelabang',e:'🐛',rarity:'rare',
-    armor:{slot:'helm', def:0.16,tier:'iron'}},
+    armor:{slot:'helm', def:0.16,tier:'iron',set:'berserker'}},
   plate_carapace:{n:'Zirah Karapas Kelabang',e:'🐛',rarity:'rare',
-    armor:{slot:'chest',def:0.27,tier:'iron'}},
+    armor:{slot:'chest',def:0.27,tier:'iron',set:'berserker'}},
   shield_carapace:{n:'Tameng Karapas Kelabang',e:'🛡️',rarity:'rare',
     armor:{slot:'shield',def:0.14,tier:'iron',blk:0.20,bkp:0.52}},
 
-  /* ================= PEDANG =================
-     weapon: { dmg  = damage dasar per pukulan (base 12 = pedang awal)
-               spd  = pengali kecepatan combo (>1 lebih cepat)
-               crit = peluang critical (damage ×2)
-               reach= jangkauan ayunan dalam blok
-               fx   = id efek unik dari EFFECTS
-               blade/trim = warna model 3D bilah & guard }
-     Lima pedang, satu per rarity, masing-masing dengan efek berbeda. */
-  sword_wood:{n:'Pedang Kayu',e:'🗡️',rarity:'common',
-    weapon:{dmg:12,spd:1.00,crit:0.05,reach:3.2,fx:null,
-      blade:0xc2a06a,trim:0x8a6a3f}},
-  sword_iron:{n:'Bilah Besi Bergerigi',e:'⚔️',rarity:'uncommon',
-    weapon:{dmg:18,spd:1.05,crit:0.08,reach:3.4,fx:'bleed',
-      blade:0xdce2ea,trim:0x9aa2ac}},
-  sword_storm:{n:'Pedang Badai',e:'🌩️',rarity:'rare',
-    weapon:{dmg:24,spd:1.15,crit:0.12,reach:3.5,fx:'shock',
-      blade:0xbfe6ff,trim:0xffe066}},
-  sword_venom:{n:'Taring Racun',e:'🐍',rarity:'epic',
-    weapon:{dmg:30,spd:1.22,crit:0.16,reach:3.6,fx:'venomB',
-      blade:0xa8e86a,trim:0x4f7d3a}},
-  sword_frost:{n:'Pedang Fajar Beku',e:'❄️',rarity:'legendary',
-    weapon:{dmg:38,spd:1.18,crit:0.22,reach:3.8,fx:'frost',
-      blade:0xd6f4ff,trim:0x3f8fbf}},
-  sword_titan:{n:'Penghancur Titan',e:'🔥',rarity:'legendary',
-    weapon:{dmg:44,spd:0.92,crit:0.14,reach:4.0,fx:'quake',
-      blade:0xffb066,trim:0x8f3c1c}},
+  /* ================= 12 PEDANG OTENTIK FORECRAFT ================= */
+  /* Common (Lv 1) */
+  sword_elven:{n:'Elven Leafblade',e:'🍃',rarity:'common',
+    weapon:{dmg:12,spd:1.20,crit:0.06,reach:3.2,fx:null,blade:0x5f9e50,trim:0xd9c26a}},
+  sword_berserker:{n:'Berserker Bonecleaver',e:'🪓',rarity:'common',
+    weapon:{dmg:14,spd:1.00,crit:0.08,reach:3.2,fx:'bleed',blade:0xe8e0d0,trim:0x3d2a1a}},
+
+  /* Uncommon (Lv 7 - 12) */
+  sword_steampunk:{n:'Steam Cogblade',e:'⚙️',rarity:'uncommon',
+    weapon:{dmg:18,spd:1.15,crit:0.10,reach:3.4,fx:null,blade:0xd98a4a,trim:0xb06a3a}},
+  sword_iron:{n:"Knight's Iron Greatsword",e:'⚔️',rarity:'uncommon',
+    weapon:{dmg:22,spd:1.05,crit:0.10,reach:3.8,fx:'bleed',blade:0xdce2ea,trim:0x9aa2ac}},
+
+  /* Rare (Lv 22) */
+  sword_paladin:{n:'Paladin Sunblade',e:'✨',rarity:'rare',
+    weapon:{dmg:28,spd:1.10,crit:0.14,reach:4.0,fx:'shock',blade:0xffe07a,trim:0xd9b23a}},
+
+  /* Epic (Lv 26) */
+  sword_shadow:{n:'Shadow Tungsten Ninjato',e:'🗡️',rarity:'epic',
+    weapon:{dmg:34,spd:1.35,crit:0.24,reach:3.6,fx:'venomB',blade:0x2e333a,trim:0xb52233}},
+  sword_juggernaut:{n:'Colossus Siege Greatsword',e:'🗡️',rarity:'epic',
+    weapon:{dmg:40,spd:0.88,crit:0.12,reach:4.4,fx:'quake',blade:0x4a4f52,trim:0x6a7076}},
+
+  /* Legendary (Lv 32 - 38) */
+  sword_crystal:{n:'Glacial Spellblade',e:'💎',rarity:'legendary',
+    weapon:{dmg:44,spd:1.20,crit:0.18,reach:4.0,fx:'frost',blade:0x7fd8ff,trim:0xd6f4ff}},
+  sword_reaper:{n:'Soul Reaper Scythe',e:'💀',rarity:'legendary',
+    weapon:{dmg:46,spd:1.10,crit:0.20,reach:4.2,fx:'venomB',blade:0x42265e,trim:0xe8d0ff}},
+  sword_yeti:{n:'Yeti Glacier Claymore',e:'❄️',rarity:'legendary',
+    weapon:{dmg:48,spd:0.95,crit:0.16,reach:4.4,fx:'frost',blade:0x9fd8f0,trim:0xf0f4f8}},
+  sword_samurai:{n:'Muramasa Baja Tungsten',e:'⚔️',rarity:'legendary',
+    weapon:{dmg:52,spd:1.30,crit:0.28,reach:4.2,fx:'bleed',blade:0x3d4855,trim:0x8a1a1a}},
+
+  /* Mythic (Lv 38) */
+  sword_dragon:{n:'Dragonfang Greatsword',e:'🔥',rarity:'mythic',
+    weapon:{dmg:60,spd:1.05,crit:0.22,reach:4.8,fx:'quake',blade:0xC8352A,trim:0xEDE0C2}},
+
+  /* ---------- ALIAS BACKWARDS COMPATIBILITY UNTUK SAVE/DROP LAMA ---------- */
+  cap_leather: null, vest_leather: null, boots_leather: null,
+  sword_wood: null, sword_copper: null, sword_gold: null, sword_storm: null,
+  sword_venom: null, sword_tungsten: null, sword_frost: null, sword_titan: null,
 
   /* ================= EQUIPMENT BARU (satu efek unik per item) ================= */
   cloak_swift:{n:'Mantel Angin',e:'🧣',rarity:'uncommon',
@@ -782,13 +840,19 @@ const ITEMS={
   shield_dark:  {n:'Tameng Bayangan',  e:'🛡️',rarity:'legendary',
     armor:{slot:'shield',def:0.20,tier:'crystal',blk:0.28,bkp:0.68}},
 };
-/* rarity default untuk item lama agar UI tetap konsisten */
+/* Hubungkan alias item lama ke item otentik baru */
 (function(){
-  const R={cap_leather:'common',vest_leather:'common',boots_leather:'common',
-    helm_iron:'uncommon',plate_iron:'uncommon',greaves_iron:'uncommon',
-    helm_gold:'rare',plate_gold:'rare',greaves_gold:'rare',
-    helm_crystal:'epic',plate_crystal:'epic',greaves_crystal:'epic'};
-  for(const id in R)if(ITEMS[id])ITEMS[id].rarity=R[id];
+  ITEMS.cap_leather   = ITEMS.helm_elven;
+  ITEMS.vest_leather  = ITEMS.plate_elven;
+  ITEMS.boots_leather = ITEMS.greaves_elven;
+  ITEMS.sword_wood    = ITEMS.sword_elven;
+  ITEMS.sword_copper  = ITEMS.sword_steampunk;
+  ITEMS.sword_gold    = ITEMS.sword_paladin;
+  ITEMS.sword_storm   = ITEMS.sword_paladin;
+  ITEMS.sword_venom   = ITEMS.sword_shadow;
+  ITEMS.sword_tungsten= ITEMS.sword_juggernaut;
+  ITEMS.sword_frost   = ITEMS.sword_yeti;
+  ITEMS.sword_titan   = ITEMS.sword_dragon;
 })();
 
 /* palet warna material armor untuk model 3D */
@@ -884,37 +948,84 @@ const RECIPES=[
   {out:'seed_cabbage',need:{cabbage:1},name:'Benih Kubis'},
   {out:'seed_tomato',need:{tomato:1},name:'Benih Tomat'},
   {out:'seed_watermelon',need:{watermelon:1},name:'Benih Semangka'},
-  {out:'cap_leather',need:{leather:2,fiber:2},name:'Topi Kulit'},
-  {out:'vest_leather',need:{leather:4,fiber:3,resin:1},name:'Rompi Kulit'},
-  {out:'boots_leather',need:{leather:2,fiber:1},name:'Sepatu Kulit'},
-  /* tempa besi: butuh pengalaman menambang (proficiency mining) — "dua kunci"
-     ala Durango: skill tree membuka resepnya, proficiency membuka tier-nya. */
-  {out:'helm_iron',need:{stone:5,wood:1,resin:1},skill:'smith',prof:{mining:5},name:'Helm Besi'},
-  {out:'plate_iron',need:{stone:8,wood:2,leather:2},skill:'smith',prof:{mining:5},name:'Zirah Besi'},
-  {out:'greaves_iron',need:{stone:5,leather:1},skill:'smith',prof:{mining:5},name:'Pelindung Kaki Besi'},
+  /* ================= TEMPA ZIRAH (12 SET OTENTIK FORECRAFT) ================= */
+  /* 1. Berserker Fur (Tier Leather, Lv 1) */
+  {out:'helm_berserker',need:{pelt:4,leather:2,resin:1},name:'Tudung Serigala Barbar'},
+  {out:'plate_berserker',need:{pelt:6,leather:4,resin:1},name:'Mantel Bulu Barbar'},
+  {out:'greaves_berserker',need:{pelt:4,leather:2},name:'Celana & Sepatu Bulu Barbar'},
+
+  /* 2. Elven Ranger (Tier Leather, Lv 1) */
+  {out:'helm_elven',need:{leather:4,fiber:4,resin:2},name:'Tudung Elven Ranger'},
+  {out:'plate_elven',need:{leather:6,fiber:6,resin:2},name:'Jubah Elven Ranger'},
+  {out:'greaves_elven',need:{leather:4,fiber:4},name:'Celana & Sepatu Elven Ranger'},
+
+  /* 3. Steampunk Engineer (Tier Copper, Lv 7) */
+  {out:'helm_copper',need:{copper_ore:4,sand:2,leather:1},skill:'smith',prof:{mining:3},name:'Goggle Montir Tembaga'},
+  {out:'plate_copper',need:{copper_ore:6,sand:2,iron_ingot:1},skill:'smith',prof:{mining:3},name:'Rompi Tembaga Steampunk'},
+  {out:'greaves_copper',need:{copper_ore:4,leather:2},skill:'smith',prof:{mining:3},name:'Celana Montir Tembaga'},
+
+  /* 4. Iron Knight (Tier Iron, Lv 12) */
+  {out:'helm_iron',need:{iron_ingot:4,iron_ore:2,coal:1},skill:'smith',prof:{mining:5},name:'Greathelm Ksatria Besi'},
+  {out:'plate_iron',need:{iron_ingot:6,iron_ore:4,leather:2},skill:'smith',prof:{mining:5},name:'Cuirass Ksatria Besi'},
+  {out:'greaves_iron',need:{iron_ingot:4,leather:2},skill:'smith',prof:{mining:5},name:'Greaves Ksatria Besi'},
+
+  /* 5. Gold Paladin (Tier Gold, Lv 22) */
+  {out:'helm_gold',need:{gold_ingot:4,iron_ingot:2,coal:2},skill:'smith',prof:{mining:10},name:'Topeng Sayap Gold Paladin'},
+  {out:'plate_gold',need:{gold_ingot:6,iron_ingot:4,boss_core:1},skill:'smith',prof:{mining:10},name:'Cuirass Emas Gold Paladin'},
+  {out:'greaves_gold',need:{gold_ingot:4,iron_ingot:2},skill:'smith',prof:{mining:10},name:'Greaves Emas Gold Paladin'},
+
+  /* 6. Shadow Assassin (Tier Tungsten, Lv 26) */
+  {out:'helm_shadow',need:{tungsten_ore:4,soul_shard:1,steel_ore:2},skill:'smith',prof:{mining:14},name:'Cowl Ninja Shadow Assassin'},
+  {out:'plate_shadow',need:{tungsten_ore:6,soul_shard:2,steel_ore:3},skill:'smith',prof:{mining:14},name:'Rompi Siluman Shadow Assassin'},
+  {out:'greaves_shadow',need:{tungsten_ore:4,soul_shard:1},skill:'smith',prof:{mining:14},name:'Celana Siluman Shadow Assassin'},
+
+  /* 7. Tungsten Juggernaut (Tier Tungsten, Lv 26) */
+  {out:'helm_tungsten',need:{tungsten_ore:6,iron_ingot:3,coal:2},skill:'smith',prof:{mining:14},name:'Helm Bunker Tungsten Juggernaut'},
+  {out:'plate_tungsten',need:{tungsten_ore:8,iron_ingot:4,coal:4},skill:'smith',prof:{mining:14},name:'Pelat Benteng Tungsten Juggernaut'},
+  {out:'greaves_tungsten',need:{tungsten_ore:6,iron_ingot:2},skill:'smith',prof:{mining:14},name:'Balok Pelindung Tungsten Juggernaut'},
+
+  /* 8. Crystal Mage (Tier Crystal, Lv 32) */
+  {out:'helm_crystal',need:{crystal:4,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Tudung Rune Crystal Mage'},
+  {out:'plate_crystal',need:{crystal:6,gold_ingot:3,boss_core:1},skill:'smith',prof:{mining:18},name:'Jubah Prisma Crystal Mage'},
+  {out:'greaves_crystal',need:{crystal:4,gold_ingot:2},skill:'smith',prof:{mining:18},name:'Celana Sutra Crystal Mage'},
+
+  /* 9. Reaper Cult (Tier Crystal, Lv 32) */
+  {out:'helm_reaper',need:{soul_shard:4,crystal:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Topeng Tengkorak Reaper Cult'},
+  {out:'plate_reaper',need:{soul_shard:6,crystal:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Jubah Rusuk Maut Reaper Cult'},
+  {out:'greaves_reaper',need:{soul_shard:4,crystal:2},skill:'smith',prof:{mining:18},name:'Celana Api Jiwa Reaper Cult'},
+
+  /* 10. Frost Yeti (Tier Crystal, Lv 32) */
+  {out:'helm_yeti',need:{crystal:4,pelt:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Tanduk Ram Frost Yeti'},
+  {out:'plate_yeti',need:{crystal:6,pelt:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Mantel Bulu Es Frost Yeti'},
+  {out:'greaves_yeti',need:{crystal:4,pelt:4},skill:'smith',prof:{mining:18},name:'Kilt Bulu Es Frost Yeti'},
+
+  /* 11. Samurai (Tier Tungstensteel, Lv 38) */
+  {out:'helm_samurai',need:{tungstensteel_ore:5,gold_ingot:3,centipede_shell:1},skill:'smith',prof:{mining:22},name:'Kabuto Mengu Samurai'},
+  {out:'plate_samurai',need:{tungstensteel_ore:8,gold_ingot:4,centipede_shell:2},skill:'smith',prof:{mining:22},name:'Dou Lak Baja Samurai'},
+  {out:'greaves_samurai',need:{tungstensteel_ore:5,gold_ingot:2},skill:'smith',prof:{mining:22},name:'Haidate Kusazuri Samurai'},
+
+  /* 12. Dragonscale (Tier Tungstensteel, Lv 38) */
+  {out:'helm_dragon',need:{tungstensteel_ore:6,boss_core:1,pelt:3},skill:'smith',prof:{mining:25},name:'Helm Mengaum Dragonscale'},
+  {out:'plate_dragon',need:{tungstensteel_ore:10,boss_core:2,pelt:4},skill:'smith',prof:{mining:25},name:'Zirah Sisik Dragonscale'},
+  {out:'greaves_dragon',need:{tungstensteel_ore:6,boss_core:1},skill:'smith',prof:{mining:25},name:'Pelindung Kaki & Ekor Dragonscale'},
+
   /* ---------- peleburan bijih hasil menambang ---------- */
   {out:'iron_ingot',need:{iron_ore:2,wood:1},name:'Batang Besi'},
   {out:'gold_ingot',need:{gold_ore:2,wood:2},name:'Batang Emas'},
-  /* ---------- tempa set emas (butuh Pandai Besi) ---------- */
-  {out:'helm_gold',need:{gold_ingot:2,leather:1},skill:'smith',prof:{mining:12},name:'Helm Emas'},
-  {out:'plate_gold',need:{gold_ingot:4,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Zirah Emas'},
-  {out:'greaves_gold',need:{gold_ingot:2,iron_ingot:1},skill:'smith',prof:{mining:12},name:'Pelindung Kaki Emas'},
-  /* ---------- tempa set kristal: butuh inti boss ---------- */
-  {out:'helm_crystal',need:{crystal:3,iron_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Helm Kristal'},
-  {out:'plate_crystal',need:{crystal:5,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Zirah Kristal'},
-  {out:'greaves_crystal',need:{crystal:3,iron_ingot:1,boss_core:1},skill:'smith',prof:{mining:18},name:'Pelindung Kaki Kristal'},
 
-  /* ================= TEMPA PEDANG =================
-     Rantai progresi: kayu (tanpa skill) → besi → badai → racun → beku → titan.
-     Pedang tier atas memakai pedang tier bawah sebagai bahan supaya
-     pemain merasakan urutan upgrade yang jelas. Tier logam juga menuntut
-     proficiency menambang yang makin tinggi. */
-  {out:'sword_wood',need:{wood:4,fiber:2},name:'Pedang Kayu'},
-  {out:'sword_iron',need:{sword_wood:1,iron_ingot:3,leather:1},skill:'smith',prof:{mining:5},name:'Bilah Besi Bergerigi'},
-  {out:'sword_storm',need:{sword_iron:1,gold_ingot:2,crystal:2},skill:'smith',prof:{mining:10},name:'Pedang Badai'},
-  {out:'sword_venom',need:{sword_storm:1,venom:4,iron_ingot:2},skill:'smith',prof:{mining:15},name:'Taring Racun'},
-  {out:'sword_frost',need:{sword_storm:1,crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Pedang Fajar Beku'},
-  {out:'sword_titan',need:{sword_venom:1,gold_ingot:4,boss_core:2},skill:'smith',prof:{mining:22},name:'Penghancur Titan'},
+  /* ================= TEMPA PEDANG (12 PEDANG OTENTIK FORECRAFT) ================= */
+  {out:'sword_elven',need:{wood:4,fiber:4,resin:2},name:'Elven Leafblade'},
+  {out:'sword_berserker',need:{pelt:4,wood:2,resin:2},name:'Berserker Bonecleaver'},
+  {out:'sword_steampunk',need:{copper_ore:6,sand:2,iron_ingot:2},skill:'smith',prof:{mining:3},name:'Steam Cogblade'},
+  {out:'sword_iron',need:{iron_ingot:5,iron_ore:4,coal:2},skill:'smith',prof:{mining:5},name:"Knight's Iron Greatsword"},
+  {out:'sword_paladin',need:{gold_ingot:6,boss_core:1,iron_ingot:2},skill:'smith',prof:{mining:10},name:'Paladin Sunblade'},
+  {out:'sword_shadow',need:{tungsten_ore:6,soul_shard:2,steel_ore:3},skill:'smith',prof:{mining:14},name:'Shadow Tungsten Ninjato'},
+  {out:'sword_juggernaut',need:{tungsten_ore:8,iron_ingot:4,coal:4},skill:'smith',prof:{mining:14},name:'Colossus Siege Greatsword'},
+  {out:'sword_crystal',need:{crystal:6,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Glacial Spellblade'},
+  {out:'sword_reaper',need:{soul_shard:6,crystal:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Soul Reaper Scythe'},
+  {out:'sword_yeti',need:{crystal:6,pelt:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Yeti Glacier Claymore'},
+  {out:'sword_samurai',need:{tungstensteel_ore:8,gold_ingot:4,centipede_shell:2},skill:'smith',prof:{mining:22},name:'Muramasa Baja Tungsten'},
+  {out:'sword_dragon',need:{tungstensteel_ore:10,boss_core:2,pelt:4},skill:'smith',prof:{mining:25},name:'Dragonfang Greatsword'},
 
   /* ================= TEMPA EQUIPMENT EFEK ================= */
   {out:'cloak_swift',need:{pelt:3,fiber:4,resin:1},name:'Mantel Angin'},

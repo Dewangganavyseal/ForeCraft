@@ -401,9 +401,9 @@ const I18N_QUESTS={
     ja:["砂漠の金鉱石","砂漠の鉱山は金が豊富です — 村の金庫のために集めてください。"]
   },
   q_frost:{
-    en:["Frost Dawn Sword","Forge a legendary frost blade for the village champions."],
-    zh:["霜晨之剑","为村庄勇士锻造一把散发冰霜气息的传奇宝剑。"],
-    ja:["霜の夜明けの剣","村の勇士のために冷気を纏う伝説の剣を鍛造してください。"]
+    en:["Yeti Glacier Claymore","Forge the glacial tundra claymore for the village champions."],
+    zh:["雪人冰川大剑","为村庄勇士锻造一把散发极寒冰霜气息的冰川大剑。"],
+    ja:["イエティ氷河大剣","村の勇士のために極寒の氷河大剣を鍛造してください。"]
   },
   q_kumbang:{
     en:["Redlands Beetles","Horned beetles hurl boulder fragments onto trade pathways."],
@@ -441,9 +441,9 @@ const I18N_QUESTS={
     ja:["最深部のアリの巣","赤土の最深部にあるアリの巣を壊滅させなければなりません。"]
   },
   q_titan:{
-    en:["Titan Crusher","Forge the ultimate blade from a Redlands boss core."],
-    zh:["泰坦粉碎者","用红土霸主的核心锻造最强大的神兵。"],
-    ja:["タイタンクラッシャー","赤土のボスコアから最強の剣を鍛造してください。"]
+    en:["Dragonfang Greatsword","Forge the ultimate dragonfang greatsword from a Redlands boss core."],
+    zh:["龙牙大剑","用红土霸主的核心锻造最强的大地龙牙大剑。"],
+    ja:["竜牙の大剣","赤土のボスコアから最強の竜牙大剣を鍛造してください。"]
   },
   q_dragon:{
     en:["Mountain Dragon","The mountain dragon scorches forests every time it takes flight. Mountains are now Lv 50–75 zone."],

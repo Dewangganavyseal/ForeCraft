@@ -69,24 +69,81 @@ const I18N_ITEMS={
   boss_core:{en:'Boss Core',zh:'首领核心',ja:'ボスコア'},
   soul_shard:{en:'Soul Shard',zh:'灵魂碎片',ja:'魂の破片'},
   dungeon_changer:{en:'Dungeon Changer',zh:'地牢变换器',ja:'ダンジョンチェンジャー'},
-  helm_gold:{en:'Gold Helm',zh:'黄金头盔',ja:'黄金の兜'},
-  plate_gold:{en:'Gold Armor',zh:'黄金铠甲',ja:'黄金の鎧'},
-  greaves_gold:{en:'Gold Greaves',zh:'黄金护腿',ja:'黄金のグリーヴ'},
-  helm_crystal:{en:'Crystal Helm',zh:'水晶头盔',ja:'クリスタルの兜'},
-  plate_crystal:{en:'Crystal Armor',zh:'水晶铠甲',ja:'クリスタルの鎧'},
-  greaves_crystal:{en:'Crystal Greaves',zh:'水晶护腿',ja:'クリスタルのグリーヴ'},
-  cap_leather:{en:'Leather Cap',zh:'皮帽',ja:'革の帽子'},
-  vest_leather:{en:'Leather Vest',zh:'皮背心',ja:'革のベスト'},
-  boots_leather:{en:'Leather Boots',zh:'皮靴',ja:'革のブーツ'},
-  helm_iron:{en:'Iron Helm',zh:'铁头盔',ja:'鉄の兜'},
-  plate_iron:{en:'Iron Armor',zh:'铁铠甲',ja:'鉄の鎧'},
-  greaves_iron:{en:'Iron Greaves',zh:'铁护腿',ja:'鉄のグリーヴ'},
-  sword_wood:{en:'Wooden Sword',zh:'木剑',ja:'木の剣'},
-  sword_iron:{en:'Serrated Iron Blade',zh:'锯齿铁刃',ja:'鋸歯の鉄刃'},
-  sword_storm:{en:'Storm Sword',zh:'风暴之剑',ja:'嵐の剣'},
-  sword_venom:{en:'Venom Fang',zh:'毒牙',ja:'毒牙'},
-  sword_frost:{en:'Frost Dawn Sword',zh:'霜晓之剑',ja:'氷暁の剣'},
-  sword_titan:{en:'Titan Breaker',zh:'泰坦破坏者',ja:'タイタンブレイカー'},
+  /* 12 SET ZIRAH OTENTIK */
+  helm_berserker:{en:'Berserker Wolf Hood',zh:'狂战士狼皮兜帽',ja:'バーサーカーの狼頭巾'},
+  plate_berserker:{en:'Berserker Fur Coat',zh:'狂战士毛皮大衣',ja:'バーサーカーの毛皮マント'},
+  greaves_berserker:{en:'Berserker Fur Greaves',zh:'狂战士毛皮护腿',ja:'バーサーカーの毛皮ズボン'},
+
+  helm_elven:{en:'Elven Ranger Hood',zh:'精灵游侠兜帽',ja:'エルフレンジャーの頭巾'},
+  plate_elven:{en:'Elven Ranger Robe',zh:'精灵游侠长袍',ja:'エルフレンジャーのローブ'},
+  greaves_elven:{en:'Elven Ranger Greaves',zh:'精灵游侠护腿',ja:'エルフレンジャーの具足'},
+
+  helm_copper:{en:'Steampunk Mechanic Goggles',zh:'蒸汽机工护目镜',ja:'スチームパンク技師のゴーグル'},
+  plate_copper:{en:'Steampunk Copper Vest',zh:'蒸汽铜制马甲',ja:'スチームパンク銅のベスト'},
+  greaves_copper:{en:'Steampunk Mechanic Pants',zh:'蒸汽机工工装裤',ja:'スチームパンク技師のズボン'},
+
+  helm_iron:{en:"Knight's Iron Greathelm",zh:'铁骑士巨盔',ja:'鉄騎士のグレートヘルム'},
+  plate_iron:{en:"Knight's Iron Cuirass",zh:'铁骑士胸甲',ja:'鉄騎士の胸甲'},
+  greaves_iron:{en:"Knight's Iron Greaves",zh:'铁骑士护腿',ja:'鉄騎士のグリーヴ'},
+
+  helm_gold:{en:'Gold Paladin Wing Mask',zh:'圣骑士金翼战盔',ja:'金パラディンの翼仮面'},
+  plate_gold:{en:'Gold Paladin Cuirass',zh:'圣骑士金铠胸甲',ja:'金パラディンの胸甲'},
+  greaves_gold:{en:'Gold Paladin Greaves',zh:'圣骑士金甲护腿',ja:'金パラディンのグリーヴ'},
+
+  helm_shadow:{en:'Shadow Assassin Ninja Cowl',zh:'暗影刺客忍者头巾',ja:'シャドウアサシンの忍頭巾'},
+  plate_shadow:{en:'Shadow Assassin Stealth Vest',zh:'暗影刺客隐匿背心',ja:'シャドウアサシンの忍装束'},
+  greaves_shadow:{en:'Shadow Assassin Stealth Pants',zh:'暗影刺客隐匿长裤',ja:'シャドウアサシンの忍袴'},
+
+  helm_tungsten:{en:'Tungsten Juggernaut Bunker Helm',zh:'钨钢主宰碉堡战盔',ja:'タングステン重装甲兜'},
+  plate_tungsten:{en:'Tungsten Juggernaut Fortress Plate',zh:'钨钢主宰壁垒重甲',ja:'タングステン重装甲鎧'},
+  greaves_tungsten:{en:'Tungsten Juggernaut Block Greaves',zh:'钨钢主宰铁壁护腿',ja:'タングステン重装甲具足'},
+
+  helm_crystal:{en:'Crystal Mage Rune Hood',zh:'水晶法师符文兜帽',ja:'クリスタル魔導士のルーン頭巾'},
+  plate_crystal:{en:'Crystal Mage Prism Robe',zh:'水晶法师棱镜长袍',ja:'クリスタル魔導士のプリズムローブ'},
+  greaves_crystal:{en:'Crystal Mage Silk Pants',zh:'水晶法师丝绸长裤',ja:'クリスタル魔導士の絹ズボン'},
+
+  helm_reaper:{en:'Reaper Cult Skull Mask',zh:'死神教派颅骨面具',ja:'死神教団の頭蓋仮面'},
+  plate_reaper:{en:'Reaper Cult Ribcage Robe',zh:'死神教派肋骨长袍',ja:'死神教団の肋骨法衣'},
+  greaves_reaper:{en:'Reaper Cult Soulfire Pants',zh:'死神教派魂火长裤',ja:'死神教団の魂火袴'},
+
+  helm_yeti:{en:'Frost Yeti Ram Horns',zh:'霜冻雪人巨角头盔',ja:'フロストイエティの羊角兜'},
+  plate_yeti:{en:'Frost Yeti Fur Mantle',zh:'霜冻雪人冰皮披肩',ja:'フロストイエティの毛皮外套'},
+  greaves_yeti:{en:'Frost Yeti Fur Kilt',zh:'霜冻雪人毛皮褶裙',ja:'フロストイエティの毛皮キルト'},
+
+  helm_samurai:{en:'Samurai Mengu Kabuto',zh:'武士面具兜',ja:'サムライ面具兜'},
+  plate_samurai:{en:'Samurai Red Lacquer Dou',zh:'武士赤漆胴甲',ja:'サムライ赤漆胴'},
+  greaves_samurai:{en:'Samurai Haidate Kusazuri',zh:'武士佩楯草摺',ja:'サムライ佩楯草摺'},
+
+  helm_dragon:{en:'Dragonscale Roaring Helm',zh:'龙鳞咆哮战盔',ja:'竜鱗の咆哮兜'},
+  plate_dragon:{en:'Dragonscale Scale Cuirass',zh:'龙鳞甲胄',ja:'竜鱗の胸甲'},
+  greaves_dragon:{en:'Dragonscale Greaves & Tail',zh:'龙鳞护腿与龙尾',ja:'竜鱗の具足と尻尾'},
+
+  /* 12 PEDANG OTENTIK */
+  sword_berserker:{en:'Berserker Bonecleaver',zh:'狂战士白骨重斧',ja:'バーサーカーの骨大斧'},
+  sword_elven:{en:'Elven Leafblade',zh:'精灵翠叶之刃',ja:'エルフの葉刃剣'},
+  sword_steampunk:{en:'Steam Cogblade',zh:'蒸汽齿轮之刃',ja:'スチームコグブレード'},
+  sword_iron:{en:"Knight's Iron Greatsword",zh:'骑士铁巨剑',ja:'騎士の鉄大剣'},
+  sword_paladin:{en:'Paladin Sunblade',zh:'圣骑士日光之刃',ja:'パラディンサンブレード'},
+  sword_shadow:{en:'Shadow Tungsten Ninjato',zh:'暗影钨钢忍者刀',ja:'シャドウタングステン忍者刀'},
+  sword_juggernaut:{en:'Colossus Siege Greatsword',zh:'巨像攻城大剑',ja:'巨像包囲大剣'},
+  sword_crystal:{en:'Glacial Spellblade',zh:'冰河魔剑',ja:'氷河の魔剣'},
+  sword_reaper:{en:'Soul Reaper Scythe',zh:'夺魂者死神之镰',ja:'ソウルリーパーの大鎌'},
+  sword_yeti:{en:'Yeti Glacier Claymore',zh:'雪人冰川大剑',ja:'イエティ氷河大剣'},
+  sword_samurai:{en:'Muramasa Tungsten Katana',zh:'村正钨钢武士刀',ja:'村正タングステン刀'},
+  sword_dragon:{en:'Dragonfang Greatsword',zh:'龙牙大剑',ja:'竜牙の大剣'},
+
+  /* Aliases */
+  cap_leather:{en:'Elven Ranger Hood',zh:'精灵游侠兜帽',ja:'エルフレンジャーの頭巾'},
+  vest_leather:{en:'Elven Ranger Robe',zh:'精灵游侠长袍',ja:'エルフレンジャーのローブ'},
+  boots_leather:{en:'Elven Ranger Greaves',zh:'精灵游侠护腿',ja:'エルフレンジャーの具足'},
+  sword_wood:{en:'Elven Leafblade',zh:'精灵翠叶之刃',ja:'エルフの葉刃剣'},
+  sword_copper:{en:'Steam Cogblade',zh:'蒸汽齿轮之刃',ja:'スチームコグブレード'},
+  sword_gold:{en:'Paladin Sunblade',zh:'圣骑士日光之刃',ja:'パラディンサンブレード'},
+  sword_storm:{en:'Paladin Sunblade',zh:'圣骑士日光之刃',ja:'パラディンサンブレード'},
+  sword_venom:{en:'Shadow Tungsten Ninjato',zh:'暗影钨钢忍者刀',ja:'シャドウタングステン忍者刀'},
+  sword_tungsten:{en:'Colossus Siege Greatsword',zh:'巨像攻城大剑',ja:'巨像包囲大剣'},
+  sword_frost:{en:'Yeti Glacier Claymore',zh:'雪人冰川大剑',ja:'イエティ氷河大剣'},
+  sword_titan:{en:'Dragonfang Greatsword',zh:'龙牙大剑',ja:'竜牙の大剣'},
   cloak_swift:{en:'Wind Cloak',zh:'疾风斗篷',ja:'風のマント'},
   helm_guard:{en:'Guardian Helm',zh:'守卫头盔',ja:'守衛の兜'},
   boots_greed:{en:'Treasure Hunter Boots',zh:'寻宝者之靴',ja:'宝探しのブーツ'},
@@ -157,6 +214,7 @@ const I18N_RARITY={
   rare:{en:'Rare',zh:'稀有',ja:'レア'},
   epic:{en:'Epic',zh:'史诗',ja:'エピック'},
   legendary:{en:'Legendary',zh:'传说',ja:'レジェンダリー'},
+  mythic:{en:'Mythic',zh:'神话',ja:'ミシック'},
 };
 
 /* ------------------------------------------------------- EQUIPMENT EFFECTS */
