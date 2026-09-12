@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Armor Sets — Three.js</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#161a20;font-family:'Segoe UI',system-ui,sans-serif}
+  canvas{display:block;cursor:grab}
+  canvas:active{cursor:grabbing}
+  #ui{position:fixed;top:14px;left:14px;z-index:10;background:rgba(18,22,30,.93);
+      border:1px solid rgba(200,160,80,.3);border-radius:14px;padding:14px 16px;
+      color:#e8dcc2;width:262px;box-shadow:0 8px 30px rgba(0,0,0,.5);backdrop-filter:blur(6px)}
+  #ui h1{font-size:14px;letter-spacing:2px;color:#f0c060}
+  #ui .sub{font-size:10px;color:#b0a488;margin:3px 0 10px;line-height:1.5}
+  .row{display:flex;align-items:center;gap:6px;margin-top:7px}
+  .row label{font-size:10px;color:#b0a488;min-width:64px;letter-spacing:.5px}
+  select{flex:1;background:#262a32;color:#e8dcc2;border:1px solid #4a4438;border-radius:6px;
+         padding:5px 6px;font-size:11px;font-family:inherit;cursor:pointer;max-width:170px}
+  button{cursor:pointer;padding:7px 9px;font-size:11px;font-weight:600;letter-spacing:.4px;
+         color:#e8dcc2;background:#2c2a24;border:1px solid #4a4438;border-radius:7px;transition:.15s}
+  button:hover{background:#3a362c;transform:translateY(-1px)}
+  button.active{background:#c89a40!important;color:#1a1204;border-color:#c89a40}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+  .sep{height:1px;background:#3a362c;margin:11px 0 3px}
+  .stat{margin-top:6px;font-size:10px;color:#c8bca0;display:flex;justify-content:space-between}
+  .stat b{color:#f0c060;font-weight:600}
+  .hint{margin-top:8px;font-size:9px;color:#8a8270;line-height:1.6}
+  #armorName{margin-top:8px;font-size:12px;color:#f0c060;font-weight:700;letter-spacing:1px;min-height:16px}
+  #armorDesc{font-size:9px;color:#a89c82;line-height:1.5;margin-top:2px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>ARMOR SETS v2</h1>
+  <div class="sub">12 set armor bervariasi, tiap set punya <b>ciri khas siluet</b> sendiri.<br>
+    Dipasang ke karakter via anchor <b>armorG</b> (helm/chest/pauldron/boots).</div>
+  <div class="row"><label>Armor Set</label><select id="setSel"></select></div>
+  <div id="armorName"></div>
+  <div id="armorDesc"></div>
+  <div class="row"><label>Bagian</label><select id="partSel">
+    <option value="full">Full Set</option><option value="helm">Helm saja</option>
+    <option value="chest">Chest saja</option><option value="pauldron">Pauldron saja</option>
+    <option value="boots">Boots saja</option><option value="none">Tanpa Armor</option>
+  </select></div>
+  <div class="grid">
+    <button data-anim="idle" class="active">🧍 Idle</button>
+    <button data-anim="walk">🚶 Jalan</button>
+    <button id="rotBtn" class="active" style="grid-column:1/-1">🔄 Rotasi Otomatis</button>
+  </div>
+  <div class="sep"></div>
+  <div class="stat"><span>Jumlah set</span><b id="setCount">12</b></div>
+  <div class="stat"><span>Kompatibel</span><b>ArmorManager</b></div>
+  <div class="hint">🖱️ Drag = orbit · Scroll = zoom<br>Diekspor ke <b>window.NewArmorSets</b></div>
+</div>
+
+<script src="../js/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   ARMOR SETS v2 — 12 SET ARMOR BERVARIASI DENGAN CIRI KHAS MASING-MASING
+   ---------------------------------------------------------------------
+   Tiap set mengikuti KONTRAK ArmorManager yang sudah ada di game:
+     buildHelmet() buildChestplate() buildPauldron() buildBoots()
+     → masing2 mengembalikan THREE.Group, dipasang ke:
+       armorG.helm (pivot kepala) · armorG.chest (pivot torso)
+       armorG.pauldL/R (pivot lengan) · armorG.bootL/R (pivot shin)
+   Pivot & skala SAMA dengan armor lama sehingga tinggal ganti.
+   ===================================================================== */
+
+/* ---------------- renderer / scene / kamera ---------------- */
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x161a20);
+scene.fog=new THREE.Fog(0x161a20,9,26);
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.1,100);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xcfe4ff,0x2a2620,0.8));
+const sun=new THREE.DirectionalLight(0xfff0d8,1.05);
+sun.position.set(4,7,3);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-5;sun.shadow.camera.right=5;sun.shadow.camera.top=5;sun.shadow.camera.bottom=-5;
+scene.add(sun);
+const rim=new THREE.DirectionalLight(0x80b0ff,0.4);rim.position.set(-3,4,-4);scene.add(rim);
+const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.3,0.1,28),
+  new THREE.MeshLambertMaterial({color:0x20242c}));
+floor.position.y=-0.05;floor.receiveShadow=true;scene.add(floor);
+const grid=new THREE.GridHelper(4.4,22,0x3a4048,0x2a3038);grid.position.y=0.001;scene.add(grid);
+
+/* ---------------- helper voxel ---------------- */
+const M={
+  box(w,h,d,color,emissive){
+    const mat=new THREE.MeshLambertMaterial({color});
+    if(emissive){mat.emissive=new THREE.Color(emissive);mat.emissiveIntensity=0.55;}
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    m.castShadow=true;m.receiveShadow=true;return m;
+  },
+  pl(w,h,d,color,y=0,z=0,x=0,emissive){
+    const m=this.box(w,h,d,color,emissive);m.position.set(x,y,z);return m;
+  }
+};
+
+/* =====================================================================
+   KARAKTER DASAR (ringkas) — pivot armorG sama seperti player_model
+   ===================================================================== */
+function buildBaseChar(){
+  const SKIN=0xe8bd92,SKIN_D=0xd2a279,CLOTH=0x3a4149,CLOTH_D=0x2c323a;
+  const mesh=new THREE.Group();const body=new THREE.Group();mesh.add(body);
+  const parts={body};
+  const mkLeg=(side)=>{const g=new THREE.Group();g.position.set(0.13*side,0.66,0);
+    g.add(M.pl(0.20,0.34,0.22,CLOTH,-0.17));
+    const shin=new THREE.Group();shin.position.y=-0.34;
+    shin.add(M.pl(0.17,0.30,0.19,CLOTH_D,-0.15));shin.add(M.pl(0.20,0.10,0.26,0x2c2018,-0.32,0.03));
+    g.add(shin);g.userData.shin=shin;body.add(g);return g;};
+  const legL=mkLeg(1),legR=mkLeg(-1);
+  const torso=new THREE.Group();torso.position.y=0.66;body.add(torso);
+  torso.add(M.pl(0.50,0.5,0.32,CLOTH,0.32));torso.add(M.pl(0.56,0.2,0.34,CLOTH_D,0.62));
+  torso.add(M.pl(0.18,0.30,0.18,SKIN_D,0.80));
+  const mkArm=(side)=>{const g=new THREE.Group();g.position.set(0.35*side,0.63,0);
+    g.add(M.pl(0.18,0.30,0.19,CLOTH,-0.10));
+    const fore=new THREE.Group();fore.position.y=-0.26;
+    fore.add(M.pl(0.15,0.28,0.16,SKIN,-0.14));
+    g.add(fore);g.userData.fore=fore;torso.add(g);return g;};
+  const armL=mkArm(1),armR=mkArm(-1);
+  const head=new THREE.Group();head.position.set(0,0.80,0);torso.add(head);
+  head.add(M.pl(0.40,0.40,0.38,SKIN,0.2));
+  const eyeM=new THREE.MeshLambertMaterial({color:0x241d14});
+  for(const x of[0.095,-0.095]){const e=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.075,0.02),eyeM);e.position.set(x,0.22,0.195);head.add(e);}
+  head.add(M.pl(0.44,0.13,0.42,0x3a2a1c,0.42));
+  const armorG={helm:new THREE.Group(),chest:new THREE.Group(),bootL:new THREE.Group(),
+    bootR:new THREE.Group(),pauldL:new THREE.Group(),pauldR:new THREE.Group()};
+  head.add(armorG.helm);torso.add(armorG.chest);
+  legL.userData.shin.add(armorG.bootL);legR.userData.shin.add(armorG.bootR);
+  armL.add(armorG.pauldL);armR.add(armorG.pauldR);
+  Object.assign(parts,{legL,legR,armL,armR,head,torso,body,armorG});
+  return {mesh,parts};
+}
+
+/* =====================================================================
+   12 ARMOR SET — tiap set CIRI KHASnya sendiri
+   ===================================================================== */
+const ARMOR_SETS=[
+
+/* 1. IRON KNIGHT — full plate baja, kubah helm + visor, bulky & kokoh */
+{name:'Iron Knight',tier:'iron',desc:'Full plate baja. Bulky, visor helm, faulds bertingkat. Ksatria klasik.',
+ colors:{main:0x9aa2ac,trim:0x6d747d,metal:0xd2d9e2,dark:0x3a3f45},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.54,0.22,0.52,C.main,0.46));g.add(M.pl(0.56,0.09,0.54,C.trim,0.33));
+   g.add(M.pl(0.48,0.14,0.10,C.metal,0.37,0.24));g.add(M.pl(0.48,0.16,0.10,C.main,0.08,0.24));
+   for(const x of[-0.08,0,0.08])g.add(M.pl(0.03,0.03,0.02,C.dark,0.10,0.295,x));
+   g.add(M.pl(0.08,0.24,0.40,C.trim,0.26,0,0.25));g.add(M.pl(0.08,0.24,0.40,C.trim,0.26,0,-0.25));
+   g.add(M.pl(0.42,0.14,0.08,C.trim,0.18,-0.24));g.add(M.pl(0.08,0.08,0.46,C.metal,0.59));
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.72,0.36,0.42,C.main,0.50));g.add(M.pl(0.76,0.08,0.44,C.metal,0.70));
+   g.add(M.pl(0.62,0.22,0.38,C.trim,0.24));g.add(M.pl(0.14,0.30,0.04,C.metal,0.52,0.22));
+   g.add(M.pl(0.22,0.20,0.04,C.metal,0.55,0.22,0.16));g.add(M.pl(0.22,0.20,0.04,C.metal,0.55,0.22,-0.16));
+   for(const x of[-0.28,-0.14,0,0.14,0.28])g.add(M.pl(0.04,0.04,0.03,C.metal,0.66,0.225,x));
+   g.add(M.pl(0.06,0.28,0.32,C.trim,0.46,0,0.37));g.add(M.pl(0.06,0.28,0.32,C.trim,0.46,0,-0.37));
+   g.add(M.pl(0.58,0.08,0.36,C.main,0.12));g.add(M.pl(0.54,0.08,0.34,C.trim,0.04));g.add(M.pl(0.50,0.08,0.32,C.main,-0.04));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.34,0.16,0.34,C.main,-0.02));g.add(M.pl(0.36,0.06,0.36,C.metal,0.08));
+   g.add(M.pl(0.30,0.07,0.30,C.trim,-0.13));g.add(M.pl(0.26,0.07,0.26,C.main,-0.21));
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.26,0.26,0.26,C.main,-0.16));g.add(M.pl(0.28,0.07,0.28,C.metal,-0.02));
+   g.add(M.pl(0.27,0.13,0.34,C.trim,-0.32,0.04));g.add(M.pl(0.23,0.08,0.12,C.metal,-0.34,0.18));
+   g.add(M.pl(0.25,0.05,0.32,C.dark,-0.38,0.04));return g;}},
+
+/* 2. SHADOW ASSASSIN — ramping gelap, tudung lancip, pisau di mana-mana */
+{name:'Shadow Assassin',tier:'steel',desc:'Ramping gelap. Tudung lancip, masker, ringan & mematikan.',
+ colors:{main:0x2a2d34,trim:0x1a1c22,metal:0x4a4e58,accent:0x8a2a3a},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.46,0.20,0.44,C.main,0.42));g.add(M.pl(0.48,0.06,0.46,C.trim,0.32));
+   g.add(M.pl(0.44,0.26,0.10,C.main,0.16,-0.20));             // tudung belakang
+   g.add(M.pl(0.10,0.30,0.34,C.main,0.24,0,0.22));g.add(M.pl(0.10,0.30,0.34,C.main,0.24,0,-0.22));
+   g.add(M.pl(0.30,0.10,0.06,C.trim,0.10,0.22));              // masker bawah
+   g.add(M.pl(0.08,0.04,0.02,C.accent,0.22,0.24,0.10));g.add(M.pl(0.08,0.04,0.02,C.accent,0.22,0.24,-0.10));
+   g.add(M.pl(0.06,0.10,0.40,C.trim,0.50,0,0));               // lancip atas
+   return g;},
+  buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   /* OPTIMASI: dada dilebarkan sedikit agar elemen dekoratif tidak press-body */
+   g.add(M.pl(0.64,0.34,0.40,C.main,0.50));g.add(M.pl(0.58,0.10,0.36,C.trim,0.68));
+   g.add(M.pl(0.56,0.20,0.34,C.trim,0.26));
+   g.add(M.pl(0.11,0.26,0.03,C.accent,0.52,0.215));           // garis merah dada (menonjol keluar)
+   g.add(M.pl(0.05,0.30,0.34,C.trim,0.46,0,0.33));g.add(M.pl(0.05,0.30,0.34,C.trim,0.46,0,-0.33));
+   g.add(M.pl(0.54,0.10,0.34,C.main,0.08));
+   /* kantong pisau di dada (menonjol keluar permukaan) */
+   for(const x of[-0.18,-0.06,0.06,0.18])g.add(M.pl(0.04,0.12,0.03,C.metal,0.40,0.225,x));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.26,0.10,0.26,C.main,-0.04));g.add(M.pl(0.28,0.04,0.28,C.trim,0.03));
+   g.add(M.pl(0.20,0.05,0.20,C.trim,-0.12));
+   g.add(M.pl(0.04,0.10,0.04,C.metal,-0.16,0,0.10));          // spike kecil
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.20,0.26,0.20,C.main,-0.16));g.add(M.pl(0.22,0.05,0.22,C.trim,-0.02));
+   g.add(M.pl(0.21,0.10,0.28,C.trim,-0.32,0.03));g.add(M.pl(0.18,0.05,0.10,C.metal,-0.34,0.15));
+   g.add(M.pl(0.20,0.04,0.26,C.trim,-0.38,0.03));return g;}},
+
+/* 3. GOLD PALADIN — emas berkilau, sayap di helm, suci & megah */
+{name:'Gold Paladin',tier:'gold',desc:'Emas suci. Sayap helm, salib dada, kilau megah.',
+ colors:{main:0xd9b23a,trim:0x9c7c1e,metal:0xffe07a,accent:0xfff6c4,glow:0xffd24d},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.52,0.20,0.50,C.main,0.44));g.add(M.pl(0.54,0.07,0.52,C.metal,0.33));
+   g.add(M.pl(0.46,0.13,0.10,C.metal,0.36,0.24));g.add(M.pl(0.46,0.15,0.10,C.main,0.09,0.24));
+   g.add(M.pl(0.10,0.22,0.38,C.main,0.24,0,0.24));g.add(M.pl(0.10,0.22,0.38,C.main,0.24,0,-0.24));
+   /* sayap emas di sisi helm (ciri paladin) */
+   g.add(M.pl(0.04,0.20,0.16,C.metal,0.50,0,0.28));g.add(M.pl(0.04,0.20,0.16,C.metal,0.50,0,-0.28));
+   g.add(M.pl(0.04,0.12,0.24,C.accent,0.56,0,0.26));g.add(M.pl(0.04,0.12,0.24,C.accent,0.56,0,-0.26));
+   g.add(M.pl(0.06,0.10,0.44,C.accent,0.60,0,0,0,C.glow?C.glow:0xffd24d)); // jambul bercahaya
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.70,0.36,0.42,C.main,0.50));g.add(M.pl(0.74,0.08,0.44,C.metal,0.70));
+   g.add(M.pl(0.60,0.22,0.38,C.trim,0.24));
+   /* salib suci di dada */
+   g.add(M.pl(0.08,0.28,0.04,C.accent,0.52,0.22));g.add(M.pl(0.24,0.08,0.04,C.accent,0.56,0.22));
+   g.add(M.pl(0.06,0.28,0.32,C.trim,0.46,0,0.37));g.add(M.pl(0.06,0.28,0.32,C.trim,0.46,0,-0.37));
+   g.add(M.pl(0.56,0.08,0.36,C.main,0.12));g.add(M.pl(0.52,0.08,0.34,C.metal,0.04));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.32,0.15,0.32,C.main,-0.02));g.add(M.pl(0.34,0.06,0.34,C.metal,0.07));
+   g.add(M.pl(0.28,0.06,0.28,C.trim,-0.13));
+   g.add(M.pl(0.06,0.12,0.06,C.accent,0.12,0,0));             // tombak kecil atas
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.26,0.26,0.26,C.main,-0.16));g.add(M.pl(0.28,0.07,0.28,C.metal,-0.02));
+   g.add(M.pl(0.27,0.13,0.34,C.trim,-0.32,0.04));g.add(M.pl(0.23,0.08,0.12,C.accent,-0.34,0.18));
+   g.add(M.pl(0.25,0.05,0.32,C.trim,-0.38,0.04));return g;}},
+
+/* 4. CRYSTAL MAGE — kristal es bercahaya, rune mengambang, magis */
+{name:'Crystal Mage',tier:'crystal',desc:'Kristal es bercahaya. Rune, tudung runcing, transenden.',
+ colors:{main:0x7fd8ff,trim:0x3f8fbf,metal:0xd6f4ff,glow:0x9fe8ff,deep:0x2a5a80},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.48,0.18,0.46,C.main,0.42));g.add(M.pl(0.50,0.05,0.48,C.metal,0.33));
+   /* tudung runcing penyihir */
+   g.add(M.pl(0.30,0.20,0.30,C.main,0.56));g.add(M.pl(0.20,0.16,0.20,C.trim,0.70));
+   g.add(M.pl(0.12,0.12,0.12,C.metal,0.82,0,0,0,C.glow));
+   g.add(M.pl(0.08,0.20,0.36,C.main,0.24,0,0.23));g.add(M.pl(0.08,0.20,0.36,C.main,0.24,0,-0.23));
+   /* kristal di dahi */
+   g.add(M.pl(0.06,0.10,0.04,C.glow,0.36,0.24,0,0,C.glow));
+   return g;},
+  buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.64,0.34,0.40,C.main,0.50));g.add(M.pl(0.68,0.06,0.42,C.metal,0.70));
+   g.add(M.pl(0.56,0.20,0.36,C.trim,0.26));
+   /* kristal rune bercahaya di dada (menonjol keluar, anti z-fight) */
+   g.add(M.pl(0.08,0.12,0.04,C.glow,0.54,0.225,0,0,C.glow));
+   g.add(M.pl(0.05,0.05,0.04,C.glow,0.50,0.225,0.14,0,C.glow));
+   g.add(M.pl(0.05,0.05,0.04,C.glow,0.50,0.225,-0.14,0,C.glow));
+   g.add(M.pl(0.05,0.26,0.34,C.trim,0.46,0,0.35));g.add(M.pl(0.05,0.26,0.34,C.trim,0.46,0,-0.35));
+   g.add(M.pl(0.54,0.08,0.36,C.main,0.10));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.28,0.12,0.28,C.main,-0.03));g.add(M.pl(0.30,0.04,0.30,C.metal,0.05));
+   g.add(M.pl(0.06,0.12,0.06,C.glow,0.10,0,0,0,C.glow));      // kristal bahu
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.22,0.26,0.22,C.main,-0.16));g.add(M.pl(0.24,0.05,0.24,C.metal,-0.02));
+   g.add(M.pl(0.23,0.11,0.30,C.trim,-0.32,0.03));g.add(M.pl(0.20,0.06,0.10,C.glow,-0.34,0.15));
+   g.add(M.pl(0.22,0.04,0.28,C.deep,-0.38,0.03));return g;}},
+
+/* 5. BERSERKER FUR — bulu & tanduk viking, brutal, otot terbuka */
+{name:'Berserker Fur',tier:'tungstensteel',desc:'Bulu viking & tanduk. Kasar, brutal, dadanya terbuka.',
+ colors:{main:0x6a4a2e,trim:0x4a3118,fur:0x8a7a6a,bone:0xe0d8c8,accent:0x8a2a1a},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.48,0.16,0.46,C.main,0.40));
+   g.add(M.pl(0.50,0.10,0.48,C.fur,0.34));                    // bulu tebal keliling
+   /* tanduk melengkung di sisi helm (ciri viking) */
+   for(const s of[1,-1]){
+     g.add(M.pl(0.06,0.06,0.16,C.bone,0.44,0,0.30*s));
+     g.add(M.pl(0.05,0.05,0.14,C.bone,0.52,0,0.34*s));
+     g.add(M.pl(0.04,0.10,0.06,C.bone,0.58,0,0.36*s));
+   }
+   g.add(M.pl(0.40,0.10,0.06,C.fur,0.32,0.20));               // bulu dahi
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+    g.add(M.pl(0.64,0.20,0.40,C.main,0.58));                   // hanya atas (dada terbuka)
+   g.add(M.pl(0.68,0.10,0.42,C.fur,0.68));                    // kerah bulu lebat
+   g.add(M.pl(0.20,0.16,0.04,C.fur,0.56,0.22,0.14));g.add(M.pl(0.20,0.16,0.04,C.fur,0.56,0.22,-0.14));
+   /* strap silang kulit di perut */
+   const s1=M.pl(0.56,0.06,0.03,C.trim,0.36,0.21);s1.rotation.z=0.5;g.add(s1);
+   const s2=M.pl(0.56,0.06,0.03,C.trim,0.36,0.21);s2.rotation.z=-0.5;g.add(s2);
+   g.add(M.pl(0.56,0.10,0.36,C.trim,0.12));                   // cawat kulit
+   g.add(M.pl(0.08,0.08,0.05,C.bone,0.40,0.23));              // gesper tulang (menonjol keluar)
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.32,0.14,0.32,C.fur,-0.03));                   // bahu bulu lebat
+   g.add(M.pl(0.30,0.06,0.30,C.main,0.05));
+   g.add(M.pl(0.06,0.12,0.06,C.bone,0.10,0,0.10));            // tanduk kecil
+   g.add(M.pl(0.06,0.12,0.06,C.bone,0.10,0,-0.10));
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.24,0.20,0.24,C.fur,-0.10));                   // bulu betis
+   g.add(M.pl(0.22,0.18,0.22,C.main,-0.22));
+   g.add(M.pl(0.24,0.12,0.30,C.trim,-0.32,0.03));g.add(M.pl(0.20,0.08,0.10,C.bone,-0.34,0.16));
+   g.add(M.pl(0.22,0.05,0.28,C.trim,-0.38,0.03));return g;}},
+
+/* 6. SAMURAI — kabuto Jepang, menpo, lamellar merah-hitam */
+{name:'Samurai',tier:'steel',desc:'Kabuto Jepang + menpo. Lamellar merah-hitam, terhormat.',
+ colors:{main:0x8a1a1a,trim:0x1a1a1e,metal:0xc8b06a,accent:0xe0c060,lac:0x3a0e0e},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.52,0.18,0.50,C.main,0.42));                   // kubah kabuto
+   g.add(M.pl(0.56,0.06,0.54,C.trim,0.32));                   // tepi lebar (fukigaeshi)
+   g.add(M.pl(0.08,0.12,0.30,C.trim,0.24,0,0.26));g.add(M.pl(0.08,0.12,0.30,C.trim,0.24,0,-0.26));
+   /* maedate (lambang dahi) — bulan sabit emas */
+   g.add(M.pl(0.04,0.16,0.06,C.metal,0.52,0.10));g.add(M.pl(0.16,0.04,0.06,C.metal,0.58,0.10));
+   /* menpo (topeng wajah) */
+   g.add(M.pl(0.30,0.12,0.06,C.lac,0.10,0.22));g.add(M.pl(0.10,0.05,0.04,C.trim,0.16,0.24));
+   /* shikoro (pelindung leher bertingkat) */
+   g.add(M.pl(0.44,0.06,0.40,C.main,0.20,-0.10));g.add(M.pl(0.42,0.06,0.38,C.trim,0.14,-0.10));
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.68,0.30,0.40,C.main,0.54));                   // dou (cuirass)
+   /* lamellar bertingkat khas samurai */
+   for(let i=0;i<3;i++)g.add(M.pl(0.70-i*0.04,0.05,0.42-i*0.02,i%2?C.trim:C.main,0.40-i*0.06,0.0));
+   g.add(M.pl(0.60,0.20,0.36,C.trim,0.22));
+   /* kusazuri (rok pelindung paha) 4 panel */
+   g.add(M.pl(0.30,0.14,0.06,C.main,0.06,0.18,0.10));g.add(M.pl(0.30,0.14,0.06,C.main,0.06,0.18,-0.10));
+   g.add(M.pl(0.30,0.14,0.06,C.trim,0.06,-0.18,0.10));g.add(M.pl(0.30,0.14,0.06,C.trim,0.06,-0.18,-0.10));
+    g.add(M.pl(0.10,0.20,0.04,C.accent,0.56,0.23));            // benih simpul dada (menonjol keluar)
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   /* sode (bahu persegi lebar khas samurai) */
+   g.add(M.pl(0.38,0.05,0.36,C.main,0.04));g.add(M.pl(0.36,0.05,0.34,C.trim,-0.03));
+   g.add(M.pl(0.34,0.05,0.32,C.main,-0.10));
+   g.add(M.pl(0.36,0.03,0.05,C.accent,0.0,0.16));
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   /* suneate (pelindung tulang kering) */
+   g.add(M.pl(0.22,0.24,0.22,C.trim,-0.16));g.add(M.pl(0.24,0.05,0.24,C.main,-0.03));
+   g.add(M.pl(0.06,0.20,0.20,C.main,-0.16,0.10));
+   g.add(M.pl(0.23,0.10,0.28,C.main,-0.32,0.03));g.add(M.pl(0.20,0.05,0.28,C.trim,-0.38,0.03));
+   return g;}},
+
+/* 7. DRAGONSCALE — sisik naga merah, tanduk punggung, buas */
+{name:'Dragonscale',tier:'tungstensteel',desc:'Sisik naga merah. Tanduk punggung, cakar, buas & langka.',
+ colors:{main:0x8a2a2a,trim:0x5a1a1a,scale:0xb04040,bone:0xe8d8b8,glow:0xff6a3a},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.50,0.20,0.48,C.main,0.44));g.add(M.pl(0.52,0.06,0.50,C.trim,0.33));
+   /* sisik bertumpuk di kubah */
+   for(let i=0;i<3;i++)g.add(M.pl(0.46-i*0.08,0.05,0.10,C.scale,0.50+i*0.05,-0.10));
+   /* tanduk naga ke belakang */
+   for(const s of[1,-1]){
+     g.add(M.pl(0.06,0.06,0.20,C.bone,0.46,-0.10,0.18*s));
+     g.add(M.pl(0.05,0.05,0.14,C.bone,0.50,-0.20,0.18*s));
+   }
+   g.add(M.pl(0.40,0.14,0.10,C.trim,0.10,0.24));              // rahang naga
+   g.add(M.pl(0.08,0.05,0.02,C.glow,0.24,0.26,0.10));g.add(M.pl(0.08,0.05,0.02,C.glow,0.24,0.26,-0.10));
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.68,0.36,0.40,C.main,0.50));g.add(M.pl(0.72,0.06,0.42,C.trim,0.70));
+   /* sisik naga bertumpuk menutupi dada */
+   for(let r=0;r<4;r++)for(const x of[-0.24,-0.08,0.08,0.24])
+     g.add(M.pl(0.14,0.08,0.03,C.scale,0.60-r*0.10,0.20,x+(r%2?0.08:0)));
+   g.add(M.pl(0.58,0.20,0.34,C.trim,0.22));
+   /* duri punggung */
+   for(const x of[-0.15,0,0.15])g.add(M.pl(0.05,0.14,0.05,C.bone,0.56,-0.22,x));
+   g.add(M.pl(0.54,0.08,0.34,C.main,0.10));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.32,0.14,0.32,C.main,-0.02));g.add(M.pl(0.34,0.05,0.34,C.scale,0.06));
+   g.add(M.pl(0.05,0.14,0.05,C.bone,0.12,0,0));               // tanduk bahu
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.24,0.26,0.24,C.main,-0.16));g.add(M.pl(0.26,0.05,0.26,C.scale,-0.02));
+   g.add(M.pl(0.25,0.12,0.32,C.trim,-0.32,0.03));
+   /* cakar di ujung boot */
+   for(const x of[-0.07,0,0.07])g.add(M.pl(0.04,0.05,0.08,C.bone,-0.36,0.20,x));
+   g.add(M.pl(0.23,0.05,0.30,C.trim,-0.38,0.03));return g;}},
+
+/* 8. TUNGSTEN JUGGERNAUT — pelat super tebal abu gelap, tak tembus */
+{name:'Tungsten Juggernaut',tier:'tungsten',desc:'Pelat super tebal. Sangat berat, hampir tak tembus.',
+ colors:{main:0x4a4f52,trim:0x32363a,metal:0x6a7076,accent:0x8b9a7e,dark:0x1e2124},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.58,0.24,0.56,C.main,0.46));                   // kubah ekstra tebal
+   g.add(M.pl(0.60,0.10,0.58,C.trim,0.32));
+   g.add(M.pl(0.50,0.16,0.12,C.metal,0.36,0.26));g.add(M.pl(0.50,0.18,0.12,C.main,0.08,0.26));
+   g.add(M.pl(0.12,0.26,0.44,C.trim,0.26,0,0.28));g.add(M.pl(0.12,0.26,0.44,C.trim,0.26,0,-0.28));
+   g.add(M.pl(0.44,0.16,0.10,C.trim,0.16,-0.26));
+   for(const x of[-0.06,0.06])g.add(M.pl(0.04,0.04,0.03,C.accent,0.24,0.30,x)); // celah mata sempit
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.78,0.40,0.46,C.main,0.50));                   // dada super lebar
+   g.add(M.pl(0.82,0.10,0.48,C.metal,0.70));
+   g.add(M.pl(0.68,0.24,0.42,C.trim,0.22));
+   g.add(M.pl(0.20,0.34,0.05,C.metal,0.52,0.24));             // sternum tebal
+   g.add(M.pl(0.08,0.30,0.36,C.trim,0.46,0,0.40));g.add(M.pl(0.08,0.30,0.36,C.trim,0.46,0,-0.40));
+   for(const x of[-0.3,-0.15,0,0.15,0.3])g.add(M.pl(0.05,0.05,0.04,C.metal,0.64,0.245,x));
+   g.add(M.pl(0.62,0.10,0.40,C.main,0.10));g.add(M.pl(0.58,0.08,0.38,C.trim,0.02));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.40,0.18,0.40,C.main,-0.03));                  // bahu ekstra besar
+   g.add(M.pl(0.42,0.07,0.42,C.metal,0.08));
+   g.add(M.pl(0.34,0.08,0.34,C.trim,-0.15));
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.30,0.28,0.30,C.main,-0.17));                  // greaves super tebal
+   g.add(M.pl(0.32,0.08,0.32,C.metal,-0.02));
+   g.add(M.pl(0.30,0.14,0.38,C.trim,-0.33,0.04));g.add(M.pl(0.26,0.09,0.14,C.metal,-0.35,0.20));
+   g.add(M.pl(0.29,0.06,0.36,C.dark,-0.39,0.04));return g;}},
+
+/* 9. ELVEN RANGER — daun & kulit hijau, ringan, lincah, motif alam */
+{name:'Elven Ranger',tier:'leather',desc:'Kulit & daun elf. Ringan, lincah, motif alam.',
+ colors:{main:0x4a7a4a,trim:0x33582f,leaf:0x5f9e50,wood:0x6a4a2a,accent:0xd9c26a},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.48,0.15,0.46,C.main,0.42));                   // tudung ringan elf (diperlebar, anti-z-fight)
+   g.add(M.pl(0.50,0.05,0.48,C.trim,0.33));
+   g.add(M.pl(0.44,0.22,0.10,C.main,0.22,-0.21));             // juntai belakang
+   /* daun hias di sisi (digorong keluar agar tak menempel tengkorak) */
+   g.add(M.pl(0.03,0.10,0.06,C.leaf,0.46,0,0.24));g.add(M.pl(0.03,0.10,0.06,C.leaf,0.46,0,-0.24));
+   g.add(M.pl(0.03,0.06,0.10,C.leaf,0.50,0,0.22));g.add(M.pl(0.03,0.06,0.10,C.leaf,0.50,0,-0.22));
+   g.add(M.pl(0.06,0.06,0.06,C.accent,0.44,0.24));            // bros dahi
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   /* ROMBAK: armor diberi jarak dari badan (lebih lebar & lebih dalam) supaya
+      tidak press-body / z-fighting dengan blok badan. Badan depth max 0.34,
+      jadi armor dibuat depth 0.42 dan motif daun digeser ke z>=0.21. */
+   g.add(M.pl(0.68,0.34,0.42,C.main,0.50));g.add(M.pl(0.64,0.09,0.40,C.trim,0.66));
+   g.add(M.pl(0.60,0.20,0.38,C.trim,0.24));
+   /* motif sulur daun di dada — MENONJOL keluar permukaan armor */
+   g.add(M.pl(0.05,0.26,0.03,C.leaf,0.50,0.225,0.09));g.add(M.pl(0.05,0.26,0.03,C.leaf,0.50,0.225,-0.09));
+   g.add(M.pl(0.12,0.05,0.03,C.leaf,0.42,0.225,0.05));g.add(M.pl(0.12,0.05,0.03,C.leaf,0.42,0.225,-0.05));
+   g.add(M.pl(0.58,0.09,0.38,C.main,0.10));
+   g.add(M.pl(0.07,0.07,0.04,C.accent,0.56,0.225));           // bros dada
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.30,0.11,0.30,C.main,-0.03));g.add(M.pl(0.32,0.05,0.32,C.leaf,0.05));
+   g.add(M.pl(0.05,0.11,0.05,C.leaf,-0.13,0,0.10));           // daun menjuntai
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.22,0.26,0.22,C.main,-0.16));g.add(M.pl(0.24,0.05,0.24,C.leaf,-0.02));
+   g.add(M.pl(0.23,0.10,0.30,C.wood,-0.32,0.03));g.add(M.pl(0.20,0.05,0.11,C.trim,-0.34,0.16));
+   g.add(M.pl(0.22,0.04,0.28,C.trim,-0.38,0.03));return g;}},
+
+/* 10. REAPER CULT — jubah kematian ungu-hitam, tengkorak, mengerikan */
+{name:'Reaper Cult',tier:'crystal',desc:'Jubah kematian. Tengkorak, ungu gelap, mengerikan.',
+ colors:{main:0x2a1a3a,trim:0x1a1024,bone:0xd8d0c0,accent:0x7a4ab0,glow:0xa060ff},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.50,0.20,0.48,C.main,0.42));                   // tudung dalam
+   g.add(M.pl(0.52,0.06,0.50,C.trim,0.32));
+   g.add(M.pl(0.48,0.28,0.10,C.main,0.16,-0.20));             // tudung menjulang belakang
+   g.add(M.pl(0.10,0.32,0.36,C.main,0.22,0,0.23));g.add(M.pl(0.10,0.32,0.36,C.main,0.22,0,-0.23));
+   /* wajah tengkorak di dalam tudung */
+   g.add(M.pl(0.24,0.20,0.06,C.bone,0.20,0.20));
+   g.add(M.pl(0.06,0.07,0.03,C.trim,0.24,0.23,0.06));g.add(M.pl(0.06,0.07,0.03,C.trim,0.24,0.23,-0.06)); // rongga mata
+   g.add(M.pl(0.03,0.04,0.03,C.trim,0.18,0.23));              // rongga hidung
+   for(const x of[-0.05,0,0.05])g.add(M.pl(0.02,0.04,0.02,C.trim,0.11,0.23,x)); // gigi
+   g.add(M.pl(0.08,0.08,0.40,C.trim,0.54,0,0));               // lancip tudung
+   return g;},
+  buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.66,0.40,0.42,C.main,0.48));                   // jubah panjang
+   g.add(M.pl(0.62,0.10,0.40,C.trim,0.68));
+   g.add(M.pl(0.58,0.26,0.38,C.main,0.20));
+   /* tulang rusuk dekor di dada (menonjol keluar permukaan, anti z-fight) */
+   for(const x of[-0.16,-0.08,0.08,0.16])g.add(M.pl(0.04,0.16,0.03,C.bone,0.52,0.225,x));
+   g.add(M.pl(0.08,0.10,0.04,C.glow,0.56,0.235,0,0,C.glow));   // jiwa bercahaya
+   g.add(M.pl(0.54,0.12,0.36,C.trim,0.06));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.30,0.14,0.30,C.main,-0.03));
+   /* tengkorak kecil di bahu */
+   g.add(M.pl(0.16,0.14,0.14,C.bone,0.02,0.10));
+   g.add(M.pl(0.04,0.05,0.03,C.trim,0.05,0.16,0.04));g.add(M.pl(0.04,0.05,0.03,C.trim,0.05,0.16,-0.04));
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.22,0.26,0.22,C.main,-0.16));g.add(M.pl(0.24,0.05,0.24,C.trim,-0.02));
+   g.add(M.pl(0.23,0.11,0.30,C.main,-0.32,0.03));g.add(M.pl(0.20,0.06,0.10,C.bone,-0.34,0.15));
+   g.add(M.pl(0.22,0.04,0.28,C.trim,-0.38,0.03));return g;}},
+
+/* 11. STEAMPUNK ENGINEER — kuningan & roda gigi, kacamata, pipa uap */
+{name:'Steampunk Engineer',tier:'copper',desc:'Kuningan & roda gigi. Goggle, pipa uap, jenius.',
+ colors:{main:0x8a6a3a,trim:0x5a4426,brass:0xc89a4a,copper:0xb06a3a,accent:0x4a6a8a},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.46,0.16,0.44,C.main,0.40));                   // topi kulit
+   g.add(M.pl(0.48,0.06,0.46,C.trim,0.32));
+   g.add(M.pl(0.40,0.10,0.10,C.trim,0.30,0.22));              // pita goggle
+   /* goggle kuningan di dahi (ciri steampunk) */
+   for(const x of[0.10,-0.10]){
+     g.add(M.pl(0.12,0.12,0.04,C.brass,0.36,0.24,x));
+     g.add(M.pl(0.08,0.08,0.03,0x3a5a6a,0.36,0.26,x));        // lensa
+   }
+   g.add(M.pl(0.04,0.04,0.10,C.brass,0.36,0.22));             // jembatan goggle
+   /* roda gigi kecil di sisi */
+   g.add(M.pl(0.10,0.10,0.03,C.brass,0.42,0,0.22));g.add(M.pl(0.06,0.06,0.04,C.trim,0.42,0,0.22));
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.64,0.34,0.38,C.main,0.50));g.add(M.pl(0.68,0.07,0.40,C.brass,0.68));
+   g.add(M.pl(0.56,0.20,0.34,C.trim,0.24));
+   /* pelat dada kuningan + roda gigi */
+   g.add(M.pl(0.24,0.24,0.04,C.brass,0.52,0.20));
+   g.add(M.pl(0.12,0.12,0.03,C.copper,0.52,0.22));g.add(M.pl(0.06,0.06,0.04,C.trim,0.52,0.24));
+   for(const a of[0,1,2,3,4,5])g.add(M.pl(0.04,0.04,0.03,C.trim,0.52+Math.sin(a)*0.10,0.235,Math.cos(a)*0.10));
+   /* pipa uap di bahu */
+   g.add(M.pl(0.06,0.06,0.20,C.copper,0.62,-0.10,0.30));g.add(M.pl(0.06,0.06,0.20,C.copper,0.62,-0.10,-0.30));
+   g.add(M.pl(0.54,0.08,0.34,C.main,0.10));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.30,0.14,0.30,C.brass,-0.02));g.add(M.pl(0.32,0.05,0.32,C.copper,0.06));
+   g.add(M.pl(0.08,0.08,0.08,C.trim,0.10,0,0));               // baut besar
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.24,0.26,0.24,C.main,-0.16));g.add(M.pl(0.26,0.06,0.26,C.brass,-0.02));
+   g.add(M.pl(0.25,0.12,0.32,C.trim,-0.32,0.03));g.add(M.pl(0.22,0.08,0.12,C.brass,-0.34,0.18));
+   g.add(M.pl(0.04,0.10,0.10,C.copper,-0.20,0,0.13));         // pipa betis
+   g.add(M.pl(0.23,0.05,0.30,C.trim,-0.38,0.03));return g;}},
+
+/* 12. FROST YETI — es & bulu putih beku, tanduk es, dingin membeku */
+{name:'Frost Yeti',tier:'crystal',desc:'Es & bulu beku. Tanduk es, biru membeku, dari tundra.',
+ colors:{main:0xd8e8f0,trim:0xa8c0d0,ice:0x9fd8f0,fur:0xf0f4f8,accent:0x5ab0e0,glow:0x8fdcff},
+ buildHelmet(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.50,0.18,0.48,C.fur,0.40));                    // bulu putih tebal
+   g.add(M.pl(0.52,0.08,0.50,C.trim,0.32));
+   /* tanduk es biru di sisi */
+   for(const s of[1,-1]){
+     g.add(M.pl(0.06,0.06,0.14,C.ice,0.44,0,0.30*s,0,C.glow));
+     g.add(M.pl(0.05,0.05,0.12,C.ice,0.50,0,0.34*s));
+   }
+   g.add(M.pl(0.44,0.10,0.06,C.fur,0.34,0.20));               // bulu dahi
+   g.add(M.pl(0.08,0.20,0.36,C.fur,0.22,0,0.24));g.add(M.pl(0.08,0.20,0.36,C.fur,0.22,0,-0.24));
+   g.add(M.pl(0.06,0.08,0.04,C.accent,0.38,0.24));            // kristal dahi
+   return g;},
+ buildChestplate(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.66,0.34,0.40,C.fur,0.50));                    // mantel bulu
+   g.add(M.pl(0.70,0.10,0.42,C.trim,0.68));                   // kerah bulu lebat
+   g.add(M.pl(0.58,0.22,0.36,C.main,0.24));
+   /* pelat es di dada */
+   g.add(M.pl(0.20,0.24,0.04,C.ice,0.52,0.21));g.add(M.pl(0.12,0.12,0.03,C.accent,0.52,0.23));
+   g.add(M.pl(0.06,0.28,0.34,C.main,0.46,0,0.36));g.add(M.pl(0.06,0.28,0.34,C.main,0.46,0,-0.36));
+   g.add(M.pl(0.56,0.10,0.36,C.fur,0.10));
+   return g;},
+ buildPauldron(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.34,0.16,0.34,C.fur,-0.03));                   // bahu bulu lebat
+   g.add(M.pl(0.30,0.06,0.30,C.ice,0.06));
+   g.add(M.pl(0.05,0.12,0.05,C.ice,0.12,0,0.08));             // kristal es
+   return g;},
+ buildBoots(){const g=new THREE.Group(),C=this.colors;
+   g.add(M.pl(0.26,0.24,0.26,C.fur,-0.14));                   // bulu betis
+   g.add(M.pl(0.24,0.18,0.24,C.main,-0.24));
+   g.add(M.pl(0.26,0.12,0.32,C.trim,-0.32,0.03));g.add(M.pl(0.22,0.08,0.12,C.ice,-0.34,0.18));
+    g.add(M.pl(0.24,0.05,0.30,C.trim,-0.38,0.03));return g;} }
+];
+
+/* =====================================================================
+   URUTAN TIER ORE — armor disusun dari PALING JELEK ke PALING BAGUS
+   mengikuti jenjang ore yang ada di game (lihat ORE_INFO di config.js):
+     leather (non-ore, terlemah)
+     → copper(7) → iron(12) → steel(18) → gold(22)
+     → tungsten(26) → crystal(32) → tungstensteel(38, terkuat)
+   Angka = level Penambangan minimum ore tsb. Stone & Coal tidak ditempa
+   jadi armor (bukan logam), jadi Copper adalah armor logam pertama.
+   `rank` dipakai untuk mengurutkan tampilan & membaca jenjang kekuatan.
+   ===================================================================== */
+const ARMOR_TIER_RANK={leather:0,copper:1,iron:2,steel:3,gold:4,tungsten:5,crystal:6,tungstensteel:7};
+ARMOR_SETS.forEach(s=>{s.rank=(ARMOR_TIER_RANK[s.tier]!==undefined)?ARMOR_TIER_RANK[s.tier]:99;});
+ARMOR_SETS.sort((a,b)=>a.rank-b.rank);
+
+/* =====================================================================
+   STATE + UI
+   ===================================================================== */
+const char=buildBaseChar();scene.add(char.mesh);
+const parts=char.parts;
+let anim='idle',autoRot=true,curSet=0,curPart='full';
+const clock=new THREE.Clock();
+
+function clearArmor(){
+  for(const k in parts.armorG){
+    const g=parts.armorG[k];
+    while(g.children.length){const c=g.children.pop();if(c.geometry)c.geometry.dispose();if(c.material)c.material.dispose();}
+  }
+}
+function applyArmor(){
+  clearArmor();
+  if(curPart==='none')return;
+  const s=ARMOR_SETS[curSet];
+  const want=p=>curPart==='full'||curPart===p;
+  if(want('helm'))parts.armorG.helm.add(s.buildHelmet());
+  if(want('chest'))parts.armorG.chest.add(s.buildChestplate());
+  if(want('pauldron')){parts.armorG.pauldL.add(s.buildPauldron());parts.armorG.pauldR.add(s.buildPauldron());}
+  if(want('boots')){parts.armorG.bootL.add(s.buildBoots());parts.armorG.bootR.add(s.buildBoots());}
+}
+applyArmor();
+window.NewArmorSets={ARMOR_SETS,applyArmor,parts};
+
+/* animasi idle/walk ringkas */
+function resetPose(){
+  for(const g of[parts.legL,parts.legR,parts.armL,parts.armR]){g.rotation.set(0,0,0);if(g.userData.shin)g.userData.shin.rotation.set(0,0,0);if(g.userData.fore)g.userData.fore.rotation.set(0,0,0);}
+  parts.head.rotation.set(0,0,0);parts.torso.rotation.set(0,0,0);parts.body.position.set(0,0,0);
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05),t=clock.elapsedTime;
+  resetPose();
+  if(anim==='idle'){
+    const br=Math.sin(t*2.2)*0.012;parts.body.position.y=br;
+    parts.armL.rotation.x=Math.sin(t*2.2)*0.06;parts.armR.rotation.x=-Math.sin(t*2.2)*0.06;
+    parts.armL.userData.fore.rotation.x=-0.15;parts.armR.userData.fore.rotation.x=-0.15;
+    parts.head.rotation.y=Math.sin(t*0.8)*0.12;
+  }else{
+    const s=Math.sin(t*6),c=Math.cos(t*6);
+    parts.legL.rotation.x=s*0.55;parts.legR.rotation.x=-s*0.55;
+    parts.legL.userData.shin.rotation.x=Math.max(0,-c)*0.6;parts.legR.userData.shin.rotation.x=Math.max(0,c)*0.6;
+    parts.armL.rotation.x=-s*0.45;parts.armR.rotation.x=s*0.45;
+    parts.body.position.y=Math.abs(Math.sin(t*6))*0.05;
+  }
+  if(autoRot)char.mesh.rotation.y+=dt*0.4;
+  renderer.render(scene,camera);
+}
+animate();
+
+/* orbit */
+let dragging=false,px=0,py=0,theta=0.7,phi=1.05,dist=4.6;
+function updCam(){camera.position.set(dist*Math.sin(phi)*Math.sin(theta),dist*Math.cos(phi)+0.7,dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(0,0.9,0);}
+updCam();
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointermove',e=>{if(!dragging)return;theta-=(e.clientX-px)*0.005;phi=Math.max(0.2,Math.min(2.6,phi-(e.clientY-py)*0.005));px=e.clientX;py=e.clientY;updCam();});
+addEventListener('pointerup',()=>dragging=false);
+renderer.domElement.addEventListener('wheel',e=>{dist=Math.max(2,Math.min(12,dist+e.deltaY*0.005));updCam();});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+/* dropdown */
+const setSel=document.getElementById('setSel'),partSel=document.getElementById('partSel');
+const TIER_LABEL={leather:'Kulit',copper:'Tembaga',iron:'Besi',steel:'Baja',gold:'Emas',tungsten:'Tungsten',crystal:'Kristal',tungstensteel:'Baja Tungsten'};
+ARMOR_SETS.forEach((s,i)=>{
+  const o=document.createElement('option');o.value=i;
+  o.textContent=(i+1)+'. '+s.name+'  ['+(TIER_LABEL[s.tier]||s.tier)+']';
+  setSel.appendChild(o);
+});
+function updInfo(){
+  const s=ARMOR_SETS[curSet];
+  document.getElementById('armorName').textContent=s.name;
+  document.getElementById('armorDesc').textContent=s.desc+'  ·  Tier: '+(TIER_LABEL[s.tier]||s.tier)+' (kekuatan #'+(s.rank+1)+' dari 8)';
+}
+setSel.addEventListener('change',e=>{curSet=parseInt(e.target.value);applyArmor();updInfo();});
+partSel.addEventListener('change',e=>{curPart=e.target.value;applyArmor();});
+updInfo();
+document.querySelectorAll('[data-anim]').forEach(b=>b.addEventListener('click',()=>{
+  anim=b.dataset.anim;document.querySelectorAll('[data-anim]').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+}));
+document.getElementById('rotBtn').addEventListener('click',e=>{autoRot=!autoRot;e.target.classList.toggle('active',autoRot);});
+</script>
+</body>
+</html>

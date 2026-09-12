@@ -23,7 +23,9 @@ __pycache__/
 3D Studio/
 Button UI/
 Modeling/
-NEW MODEL/
+# CATATAN BRANCH feature/new-models: folder NEW MODEL/ DILACAK di branch ini
+# (berisi prototipe model 3D baru: Player Character & Armor Sets).
+# Di branch main folder ini tetap di-ignore demi Clean Repository Policy.
 tools/
 Model.html
 Qwen_html_*.html

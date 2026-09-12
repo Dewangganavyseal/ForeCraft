@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Player Character (Baru) — Three.js</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#1a2028;font-family:'Segoe UI',system-ui,sans-serif}
+  canvas{display:block;cursor:grab}
+  canvas:active{cursor:grabbing}
+  #ui{position:fixed;top:14px;left:14px;z-index:10;background:rgba(16,22,30,.92);
+      border:1px solid rgba(90,150,200,.3);border-radius:14px;padding:14px 16px;
+      color:#dce8f2;width:250px;box-shadow:0 8px 30px rgba(0,20,40,.5);backdrop-filter:blur(6px)}
+  #ui h1{font-size:14px;letter-spacing:2px;color:#6cc0ff}
+  #ui .sub{font-size:10px;color:#8aa2b8;margin:3px 0 10px;line-height:1.5}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  button{cursor:pointer;padding:8px 9px;font-size:11px;font-weight:600;letter-spacing:.4px;
+         color:#d5e6f5;background:#22303e;border:1px solid #3a5064;border-radius:7px;transition:.15s}
+  button:hover{background:#2c3e50;transform:translateY(-1px)}
+  button.full{grid-column:1/-1}
+  button.active{background:#4a9fd9!important;color:#08141f;border-color:#4a9fd9}
+  .row{display:flex;align-items:center;gap:6px;margin-top:8px}
+  .row label{font-size:10px;color:#8aa2b8;min-width:60px;letter-spacing:.5px}
+  input[type=range]{flex:1;accent-color:#4a9fd9;cursor:pointer}
+  .sep{height:1px;background:#2c3e50;margin:11px 0 3px}
+  .hint{margin-top:8px;font-size:9px;color:#6a8098;line-height:1.6}
+  .stat{margin-top:6px;font-size:10px;color:#b8ccdd;display:flex;justify-content:space-between}
+  .stat b{color:#6cc0ff;font-weight:600}
+  select{flex:1;background:#22303e;color:#d5e6f5;border:1px solid #3a5064;border-radius:6px;
+         padding:5px 6px;font-size:11px;font-family:inherit;cursor:pointer;max-width:150px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>PLAYER CHARACTER v2</h1>
+  <div class="sub">Model karakter pemain baru (fresh).<br>
+    Skala &amp; titik sendi <b>sama persis</b> dengan model lama —<br>
+    tinggal tukar bentuk voxelnya.</div>
+  <div class="grid">
+    <button data-anim="idle" class="active">🧍 Idle</button>
+    <button data-anim="walk">🚶 Jalan</button>
+    <button data-anim="run">🏃 Lari</button>
+    <button data-anim="jump">⤴️ Lompat</button>
+    <button data-anim="swing" class="full">⚔️ Ayun Serang</button>
+    <button id="rotBtn" class="full active">🔄 Rotasi Otomatis</button>
+  </div>
+  <div class="sep"></div>
+  <div class="row"><label>Rambut</label><select id="hairSel"></select></div>
+  <div class="row"><label>Warna</label><select id="hairCol"></select></div>
+  <div class="row"><label>Kecepatan</label><input id="spd" type="range" min="0.3" max="2" step="0.1" value="1"></div>
+  <div class="stat"><span>Tinggi total</span><b>~1.86 blok</b></div>
+  <div class="stat"><span>Sendi</span><b>identik dgn lama</b></div>
+  <div class="stat"><span>Model rambut</span><b id="hairCount">30</b></div>
+  <div class="hint">🖱️ Drag = orbit · Scroll = zoom<br>Ganti model &amp; warna rambut lewat dropdown.<br>Model diekspor ke <b>window.NewPlayerModel</b></div>
+</div>
+
+<script src="../js/three.min.js"></script>
+<script>
+/* =====================================================================
+   PLAYER CHARACTER v2 — MODEL KARAKTER PEMAIN BARU (FRESH)
+   ---------------------------------------------------------------------
+   Dibuat dengan MEROMBAK model lama (js/player/player_model.js):
+     · SKALA UKURAN BADAN  : sama persis (tidak diubah)
+     · TITIK SENDI & PIVOT : sama persis (animasi lama tetap kompatibel)
+     · STRUKTUR parts      : sama (legL/R, armL/R, head, torso, body, armorG)
+     · userData            : shin/fore/fist/knuckle tetap ada
+     · armorG anchors      : helm/chest/bootL/bootR/pauldL/pauldR tetap ada
+     YANG BERBEDA hanyalah BENTUK & WARNA voxelnya — desain karakter baru:
+     tema "Ranger Penjelajah": hood, jaket kulit panjang, sarung tangan,
+     celana kargo, sepatu bot tinggi, ikat pinggang utilitas + jumbai sabuk.
+   ===================================================================== */
+'use strict';
+
+/* ---------------- renderer / scene / kamera ---------------- */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1a2028);
+scene.fog=new THREE.Fog(0x1a2028,8,26);
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.1,100);
+camera.position.set(2.6,2.1,3.4);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+/* ---------------- cahaya ---------------- */
+scene.add(new THREE.HemisphereLight(0xcfe4ff,0x2a2620,0.85));
+const sun=new THREE.DirectionalLight(0xfff0d8,1.0);
+sun.position.set(4,7,3);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-5;sun.shadow.camera.right=5;
+sun.shadow.camera.top=5;sun.shadow.camera.bottom=-5;
+scene.add(sun);
+const rim=new THREE.DirectionalLight(0x6cc0ff,0.4);
+rim.position.set(-3,4,-4);scene.add(rim);
+
+/* ---------------- lantai grid ---------------- */
+const floor=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.3,0.1,28),
+  new THREE.MeshLambertMaterial({color:0x24303c}));
+floor.position.y=-0.05;floor.receiveShadow=true;scene.add(floor);
+const grid=new THREE.GridHelper(4.4,22,0x3a5064,0x2a3a48);
+grid.position.y=0.001;scene.add(grid);
+
+/* =====================================================================
+   BUILDER — helper sama seperti model lama (box/pl) supaya mudah diport
+   ===================================================================== */
+const M={
+  box(w,h,d,color,yOff=0){
+    const g=new THREE.BoxGeometry(w,h,d);g.translate(0,yOff,0);
+    const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color}));
+    m.castShadow=true;m.receiveShadow=true;return m;
+  },
+  pl(w,h,d,color,y=0,z=0,x=0){const m=this.box(w,h,d,color,0);m.position.set(x,y,z);return m;}
+};
+
+/* =====================================================================
+   SISTEM 30 MODEL RAMBUT — bisa diganti-ganti
+   ---------------------------------------------------------------------
+   buildHair(styleIndex, color) mengembalikan THREE.Group berisi rambut
+   voxel yang PAS menempel di kepala (tengkorak 0.40×0.40×0.38, puncak
+   kepala di y≈0.40 relatif pivot head). Setiap model mengembalikan group
+   dengan pivot yang sama di `head`, jadi tinggal head.add(buildHair(i)).
+   Warna rambut bisa diubah lewat argumen `color`.
+   ===================================================================== */
+const HAIR_COLORS=[0x2c1f14,0x4a3222,0x6a4a2a,0x8a5a30,0xb8865a,0xd9b98a,
+  0x1a1a1c,0x3a3a3e,0x6a6a70,0xb8b8be,0x8a2a1a,0xc85a2a,0x2a4a6a,0x4a7ab0,0xd9d9e0];
+const HAIRSTYLES=[
+  'Plontos','Cepak','Cepak Tinggi','Belah Samping','Undercut','Poni Lurus',
+  'Poni Miring','Jambul','Spiky','Acak Pendek','Klimis Belakang','Mohawk',
+  'Fade Samping','Ikal Pendek','Gondrong','Bob','Bob Poni','Ekor Kuda',
+  'Ekor Kuda Tinggi','Kuncir Dua','Kepang Samping','Gelung','Panjang Berponi',
+  'Shaggy','Surai Panggul','Surai Panjang','Ikal Panjang','Man Bun','Slick Poni','Afro'
+];
+
+function buildHair(style,color){
+  color=(color===undefined)?0x2c1f14:color;
+  const g=new THREE.Group();
+  const H=(w,h,d,y,z,x,c)=>{const m=M.pl(w,h,d,(c===undefined?color:c),y,z,x);g.add(m);return m;};
+  const HL=0xffffff; // highlight tidak dipakai; gunakan tonal lewat bayangan
+  const dark=new THREE.Color(color).multiplyScalar(0.7).getHex();
+  const lite=new THREE.Color(color).multiplyScalar(1.25).getHex();
+  const s=style|0;
+  /* helper poni & sisi yang sering dipakai */
+  const fringe=(dp)=>{H(0.36,0.10,0.06,0.40,0.20);H(0.30,0.06,0.05,0.36,0.215,0,dp);};
+  const sides=(len)=>{H(0.06,len,0.34,0.30,-0.02,0.21);H(0.06,len,0.34,0.30,-0.02,-0.21);};
+  const back=(len,wd)=>{H(wd||0.44,len,0.10,0.30,-0.20);};
+  const topCap=(hh)=>{H(0.44,hh||0.13,0.42,0.44);};
+  switch(s){
+    case 0: break;                                                   /* Plontos */
+    case 1: topCap(0.10);                                            /* Cepak */
+      break;
+    case 2: topCap(0.16);H(0.40,0.06,0.38,0.52);                     /* Cepak Tinggi */
+      break;
+    case 3: topCap();H(0.36,0.08,0.06,0.40,0.20);                    /* Belah Samping */
+      H(0.05,0.14,0.40,0.46,0.0,0.10);sides(0.16);back(0.18);        /* belah */
+      break;
+    case 4: H(0.40,0.12,0.38,0.46);H(0.36,0.08,0.06,0.40,0.20);      /* Undercut */
+      H(0.30,0.10,0.30,0.50);                                        /* atas panjang */
+      break;
+    case 5: topCap();fringe();sides(0.18);back(0.20);                /* Poni Lurus */
+      break;
+    case 6: topCap();H(0.36,0.10,0.06,0.40,0.20);                    /* Poni Miring */
+      H(0.22,0.07,0.05,0.35,0.215,0.08);H(0.12,0.05,0.05,0.33,0.215,-0.12);
+      sides(0.18);back(0.20);
+      break;
+    case 7: topCap();H(0.20,0.16,0.30,0.52,0.02,0);                  /* Jambul */
+      H(0.16,0.10,0.24,0.58,0.04);fringe();sides(0.14);
+      break;
+    case 8: topCap(0.10);                                            /* Spiky */
+      for(let i=-2;i<=2;i++)H(0.07,0.16+(i%2?0.05:0),0.10,0.52,-0.05-i*0.07,i*0.09);
+      fringe();sides(0.12);
+      break;
+    case 9: topCap();                                                /* Acak Pendek */
+      H(0.12,0.10,0.12,0.50,0.0,0.12);H(0.10,0.12,0.10,0.50,0.0,-0.10);
+      H(0.11,0.09,0.11,0.51,0.0,0.02);fringe();sides(0.16);back(0.18);
+      break;
+    case 10: topCap();H(0.40,0.10,0.30,0.40,-0.10);                  /* Klimis Belakang */
+      H(0.42,0.08,0.14,0.42,-0.18);sides(0.16);
+      break;
+    case 11: H(0.12,0.22,0.40,0.50);                                 /* Mohawk */
+      H(0.10,0.16,0.36,0.58);
+      break;
+    case 12: topCap(0.11);H(0.40,0.10,0.38,0.50);                    /* Fade Samping */
+      sides(0.08);H(0.36,0.07,0.06,0.40,0.20);
+      break;
+    case 13: topCap();                                               /* Ikal Pendek */
+      for(const px of[-0.14,0,0.14])H(0.12,0.10,0.12,0.50,0.0,px);
+      fringe();sides(0.18);back(0.20);
+      break;
+    case 14: topCap();fringe();sides(0.30);back(0.30);               /* Gondrong */
+      H(0.06,0.34,0.30,0.12,-0.02,0.22);H(0.06,0.34,0.30,0.12,-0.02,-0.22);
+      break;
+    case 15: topCap();H(0.46,0.18,0.42,0.34);                        /* Bob */
+      H(0.44,0.10,0.40,0.24);fringe();
+      break;
+    case 16: topCap();H(0.46,0.18,0.42,0.34);H(0.44,0.10,0.40,0.24); /* Bob Poni */
+      H(0.36,0.11,0.06,0.40,0.20);H(0.30,0.07,0.05,0.35,0.215);
+      break;
+    case 17: topCap();fringe();sides(0.18);back(0.20);               /* Ekor Kuda */
+      H(0.12,0.30,0.12,0.20,-0.26);H(0.10,0.18,0.10,0.02,-0.28);
+      break;
+    case 18: topCap();fringe();sides(0.18);back(0.18);               /* Ekor Kuda Tinggi */
+      H(0.14,0.14,0.14,0.56,-0.10);H(0.11,0.28,0.11,0.36,-0.20);H(0.09,0.16,0.09,0.16,-0.26);
+      break;
+    case 19: topCap();fringe();                                      /* Kuncir Dua */
+      H(0.12,0.26,0.12,0.16,-0.04,0.24);H(0.12,0.26,0.12,0.16,-0.04,-0.24);
+      H(0.10,0.12,0.10,0.02,-0.04,0.26);H(0.10,0.12,0.10,0.02,-0.04,-0.26);
+      break;
+    case 20: topCap();fringe();sides(0.20);back(0.22);               /* Kepang Samping */
+      H(0.12,0.34,0.12,0.10,-0.02,0.24);H(0.10,0.10,0.10,-0.06,0.0,0.26);
+      break;
+    case 21: topCap();fringe();sides(0.16);                          /* Gelung */
+      H(0.22,0.16,0.20,0.30,-0.24);H(0.16,0.10,0.14,0.36,-0.26);
+      break;
+    case 22: topCap();fringe();sides(0.34);back(0.36,0.46);          /* Panjang Berponi */
+      H(0.06,0.40,0.32,0.06,-0.02,0.22);H(0.06,0.40,0.32,0.06,-0.02,-0.22);
+      break;
+    case 23: topCap();                                               /* Shaggy */
+      H(0.12,0.12,0.12,0.50,0.0,0.12);H(0.12,0.10,0.12,0.49,0.0,-0.12);
+      fringe();sides(0.26);back(0.28,0.46);
+      break;
+    case 24: topCap();fringe();sides(0.42);back(0.42,0.46);          /* Surai Panggul */
+      H(0.05,0.46,0.30,-0.02,-0.02,0.21);H(0.05,0.46,0.30,-0.02,-0.02,-0.21);
+      break;
+    case 25: topCap();fringe();sides(0.52);back(0.52,0.48);          /* Surai Panjang */
+      H(0.05,0.56,0.30,-0.10,-0.02,0.21);H(0.05,0.56,0.30,-0.10,-0.02,-0.21);
+      break;
+    case 26: topCap();                                               /* Ikal Panjang */
+      for(const px of[-0.16,-0.05,0.06,0.16])H(0.10,0.12,0.10,0.50,0.0,px);
+      fringe();sides(0.30);back(0.40,0.46);
+      H(0.09,0.30,0.09,0.08,-0.02,0.22);H(0.09,0.30,0.09,0.08,-0.02,-0.22);
+      break;
+    case 27: topCap();H(0.40,0.10,0.34,0.42,-0.04);                  /* Man Bun */
+      H(0.16,0.14,0.16,0.48,-0.16);sides(0.16);fringe();
+      break;
+    case 28: topCap();H(0.40,0.10,0.10,0.42,0.16);                   /* Slick Poni */
+      H(0.36,0.08,0.06,0.38,0.20);sides(0.18);back(0.20);
+      break;
+    case 29: H(0.52,0.20,0.50,0.44);                                 /* Afro */
+      H(0.54,0.14,0.52,0.50);H(0.46,0.14,0.44,0.54);
+      H(0.50,0.12,0.12,0.30,0.0,0.20);H(0.50,0.12,0.12,0.30,0.0,-0.20);
+      break;
+    default: topCap();
+  }
+  /* bayangan bawah rambut agar tidak "menyatu" dengan tengkorak */
+  if(s!==0)H(0.42,0.03,0.40,0.395,0,0,dark);
+  return g;
+}
+
+/* =====================================================================
+   BUILD KARAKTER BARU
+   Struktur group & posisi sendi SAMA dengan model lama.
+   ===================================================================== */
+function buildNewPlayer(){
+  /* ---- PALET BARU: Ranger Penjelajah ---- */
+  const SKIN=0xe8bd92,SKIN_D=0xd2a279,SKIN_L=0xf0cda2,
+    HOOD=0x4a5a68,HOOD_D=0x39454f,HOOD_L=0x5b6e7d,      // hood & lapisan
+    JACKET=0x6a4a2e,JACKET_D=0x53381f,JACKET_L=0x7d5a3a, // jaket kulit panjang
+    PANTS=0x3a4149,PANTS_D=0x2c323a,                    // kargo gelap
+    BELT=0x241a12,BOOT=0x2c2018,BOOT_D=0x20160f,
+    STRAP=0x8a6a3a,GLOVE=0x4a3319,ACCENT=0xd9a63a,      // tali & aksen emas
+    GEAR=0xb08a4a;
+
+  const mesh=new THREE.Group();mesh.name='NewPlayerCharacter';
+  const rollG=new THREE.Group();mesh.add(rollG);
+  const body=new THREE.Group();rollG.add(body);
+  const parts={};parts.body=body;
+
+  /* ---------------- KAKI (sendi sama: (±0.13, 0.66, 0), shin y=-0.34) ----
+     Bentuk baru: celana kargo dengan saku samping + sepatu bot tinggi berlipat. */
+  const mkLeg=(side)=>{
+    const g=new THREE.Group();
+    g.position.set(0.13*side,0.66,0);
+    g.add(M.pl(0.21,0.15,0.23,PANTS,-0.07));            // paha atas
+    g.add(M.pl(0.19,0.20,0.21,PANTS_D,-0.24));          // paha bawah
+    /* saku kargo di sisi luar paha (ciri khas ranger) */
+    g.add(M.pl(0.06,0.13,0.15,PANTS_D,-0.16,0.0,0.12*side));
+    g.add(M.pl(0.065,0.03,0.16,PANTS,-0.11,0.0,0.12*side));
+    g.add(M.pl(0.02,0.26,0.02,PANTS_D,-0.18,0.10,-0.10*side)); // jahitan
+    const shin=new THREE.Group();shin.position.y=-0.34;
+    shin.add(M.pl(0.17,0.30,0.19,PANTS,-0.15));         // betis
+    shin.add(M.pl(0.05,0.20,0.05,PANTS_D,-0.14,0.10,0.07*side)); // strap betis
+    /* sepatu bot tinggi dengan lipatan atas & sol tebal */
+    shin.add(M.pl(0.20,0.10,0.22,BOOT_D,-0.04,0.01));   // lipatan boot atas
+    shin.add(M.pl(0.185,0.16,0.21,BOOT,-0.16,0.005));
+    shin.add(M.pl(0.20,0.04,0.24,GEAR,-0.23,0.02));     // trim metal
+    shin.add(M.pl(0.21,0.09,0.27,BOOT,-0.29,0.03));     // ujung boot
+    shin.add(M.pl(0.22,0.035,0.30,BOOT_D,-0.35,0.05));  // sol
+    shin.add(M.pl(0.15,0.05,0.10,BOOT_D,-0.30,0.15));   // tumit
+    shin.add(M.pl(0.03,0.05,0.16,ACCENT,-0.16,0.0,0.10*side)); // gesper samping
+    g.add(shin);g.userData.shin=shin;body.add(g);return g;
+  };
+  const legL=mkLeg(1),legR=mkLeg(-1);
+
+  /* ---------------- TORSO (sendi sama: y=0.66) --------------------------
+     Bentuk baru: jaket kulit panjang dengan kerah tinggi, panel dada,
+     ikat pinggang utilitas + jumbai sabuk, strap dada diagonal. */
+  const torso=new THREE.Group();torso.position.y=0.66;body.add(torso);
+  torso.add(M.pl(0.44,0.16,0.30,JACKET_D,0.08));        // hem jaket bawah
+  torso.add(M.pl(0.48,0.24,0.30,JACKET,0.26));          // badan jaket
+  torso.add(M.pl(0.56,0.26,0.33,JACKET,0.50));          // dada atas
+  torso.add(M.pl(0.60,0.10,0.35,JACKET_D,0.68));        // bahu / kerah belakang
+  torso.add(M.pl(0.50,0.10,0.31,JACKET_D,0.02));        // lipatan hem
+  /* ujung jaket menjuntai (coat tail) di sisi kiri-kanan bawah */
+  torso.add(M.pl(0.16,0.20,0.06,JACKET_D,-0.10,0.02,0.20));
+  torso.add(M.pl(0.16,0.20,0.06,JACKET_D,-0.10,0.02,-0.20));
+  torso.add(M.pl(0.06,0.22,0.30,JACKET_D,-0.06,0.0,0.27));
+  torso.add(M.pl(0.06,0.22,0.30,JACKET_D,-0.06,0.0,-0.27));
+  /* kerah tinggi (turtleneck) di bawah leher */
+  torso.add(M.pl(0.34,0.14,0.30,HOOD_D,0.72));
+  torso.add(M.pl(0.30,0.06,0.28,HOOD,0.78));
+  /* panel dada + resleting */
+  torso.add(M.pl(0.04,0.34,0.02,JACKET_D,0.46,0.165));
+  torso.add(M.pl(0.22,0.04,0.02,JACKET_L,0.56,0.165,0.13));
+  torso.add(M.pl(0.22,0.04,0.02,JACKET_L,0.56,0.165,-0.13));
+  torso.add(M.pl(0.04,0.04,0.02,ACCENT,0.50,0.17,0));   // kancing atas
+  torso.add(M.pl(0.035,0.035,0.02,ACCENT,0.40,0.17,0)); // kancing tengah
+  /* ikat pinggang utilitas lebar + buckle besar + kantong */
+  torso.add(M.pl(0.50,0.08,0.32,BELT,0.14));
+  torso.add(M.pl(0.12,0.10,0.34,ACCENT,0.14));          // buckle emas
+  torso.add(M.pl(0.05,0.05,0.02,0xfff0b8,0.14,0.18));
+  torso.add(M.pl(0.11,0.12,0.10,JACKET_L,0.10,0.0,0.25));  // kantong kanan
+  torso.add(M.pl(0.12,0.03,0.11,JACKET_D,0.17,0.0,0.25));
+  torso.add(M.pl(0.03,0.09,0.02,BELT,0.11,0.0,0.30));      // tali kantong
+  torso.add(M.pl(0.09,0.10,0.08,JACKET_D,0.08,0.0,-0.25)); // kantong kiri
+  /* jumbai sabuk kulit di pinggang belakang (ciri ranger) */
+  torso.add(M.pl(0.05,0.16,0.02,STRAP,0.04,-0.16,0.10));
+  torso.add(M.pl(0.05,0.14,0.02,STRAP,0.05,-0.16,0.02));
+  torso.add(M.pl(0.05,0.15,0.02,STRAP,0.045,-0.16,-0.08));
+  /* (tali selempang dada DIHAPUS sesuai permintaan) */
+  /* leher (ukuran sama dengan model baru lama: tebal & tinggi menyatu) */
+  torso.add(M.pl(0.18,0.30,0.18,SKIN_D,0.80));
+  /* kalung / liontin kompas kecil */
+  torso.add(M.pl(0.02,0.14,0.02,STRAP,0.60,0.15));
+  torso.add(M.pl(0.06,0.06,0.02,GEAR,0.53,0.16));
+  torso.add(M.pl(0.03,0.03,0.01,0x9adfff,0.53,0.17));
+
+  /* ---------------- LENGAN (sendi sama: (±0.35, 0.63, 0), fore y=-0.26) ----
+     Bentuk baru: bahu jaket empuk + sarung tangan (glove) dengan buku jari. */
+  const mkArm=(side)=>{
+    const g=new THREE.Group();
+    g.position.set(0.35*side,0.63,0);
+    g.add(M.pl(0.21,0.10,0.22,JACKET_D,0.01));          // bahu jaket
+    g.add(M.pl(0.22,0.05,0.23,JACKET_D,0.05));
+    g.add(M.pl(0.04,0.03,0.23,ACCENT,0.06,0.0,0.0));    // trim bahu
+    g.add(M.pl(0.18,0.26,0.19,JACKET,-0.13));           // lengan atas
+    g.add(M.pl(0.16,0.06,0.18,JACKET_D,-0.24));         // manset
+    g.add(M.pl(0.02,0.22,0.02,JACKET_D,-0.13,0.0,0.09*side)); // jahitan
+    const fore=new THREE.Group();fore.position.y=-0.26;
+    fore.add(M.pl(0.15,0.25,0.17,JACKET,-0.13));        // lengan bawah (jaket)
+    fore.add(M.pl(0.16,0.05,0.18,JACKET_D,-0.05));      // lipatan manset
+    /* sarung tangan (glove) menutupi tangan — bagian kulit gelap */
+    fore.add(M.pl(0.16,0.11,0.18,GLOVE,-0.22));         // punggung glove
+    fore.add(M.pl(0.17,0.03,0.19,BELT,-0.16));          // strap pergelangan
+    const fist=M.pl(0.16,0.12,0.17,GLOVE,-0.30);fore.add(fist); // kepalan glove
+    const knuckle=M.pl(0.165,0.045,0.17,JACKET_D,-0.27);fore.add(knuckle);
+    fore.add(M.pl(0.04,0.06,0.14,JACKET_D,-0.30,0.0,0.06));  // jari glove
+    fore.add(M.pl(0.04,0.06,0.14,JACKET_D,-0.30,0.0,-0.06));
+    fore.add(M.pl(0.04,0.07,0.14,JACKET_D,-0.30,0.0,0.0));
+    fore.add(M.pl(0.045,0.05,0.07,GLOVE,-0.28,0.06,0.10*side)); // ibu jari
+    fore.add(M.pl(0.03,0.03,0.03,ACCENT,-0.16,0.0,0.10*side)); // rivet
+    fore.userData.fist=fist;fore.userData.knuckle=knuckle;
+    g.add(fore);g.userData.fore=fore;torso.add(g);return g;
+  };
+  const armL=mkArm(1),armR=mkArm(-1);
+
+  /* ---------------- KEPALA (sendi sama: y=0.80 dalam torso) --------------
+     Wajah fresh. TANPA helm/hood (helm nanti dari armor). Rambut dibuat
+     terpisah lewat sistem 30 MODEL RAMBUT yang bisa diganti-ganti
+     (lihat HAIRSTYLES + buildHair di bawah). */
+  const head=new THREE.Group();head.position.set(0,0.80,0);torso.add(head);
+  head.add(M.pl(0.40,0.40,0.38,SKIN,0.2));              // tengkorak
+  head.add(M.pl(0.34,0.10,0.34,SKIN_D,0.04));           // rahang
+  /* pipi: tulang pipi halus di kedua sisi (lebih manusiawi, tidak menyatu) */
+  head.add(M.pl(0.07,0.08,0.03,SKIN_L,0.17,0.185,0.13));
+  head.add(M.pl(0.07,0.08,0.03,SKIN_L,0.17,0.185,-0.13));
+  /* telinga */
+  head.add(M.pl(0.05,0.12,0.09,SKIN_D,0.2,0,0.21));
+  head.add(M.pl(0.05,0.12,0.09,SKIN_D,0.2,0,-0.21));
+  head.add(M.pl(0.02,0.06,0.05,0xb98a68,0.2,0,0.235));
+  head.add(M.pl(0.02,0.06,0.05,0xb98a68,0.2,0,-0.235));
+  /* mata baru (iris biru-hazel ranger) */
+  const eyeM=new THREE.MeshLambertMaterial({color:0x241d14});
+  const scleraM=new THREE.MeshLambertMaterial({color:0xf6f1e6});
+  for(const x of [0.095,-0.095]){
+    const s=new THREE.Mesh(new THREE.BoxGeometry(0.085,0.075,0.02),scleraM);
+    s.position.set(x,0.22,0.19);head.add(s);
+    const e=new THREE.Mesh(new THREE.BoxGeometry(0.055,0.075,0.02),eyeM);
+    e.position.set(x,0.22,0.195);head.add(e);
+    const iris=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.05,0.02),
+      new THREE.MeshLambertMaterial({color:0x4a8ab0}));
+    iris.position.set(x,0.22,0.198);head.add(iris);
+    const gl=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.02,0.01),
+      new THREE.MeshBasicMaterial({color:0xffffff}));
+    gl.position.set(x+0.015,0.245,0.205);head.add(gl);
+    head.add(M.pl(0.09,0.035,0.02,0x2c1f14,0.30,0.196,x)); // alis
+    head.add(M.pl(0.085,0.02,0.02,SKIN_D,0.185,0.198,x));  // kelopak
+  }
+  /* ========================================================================
+     HIDUNG — MENONJOL KELUAR dari wajah, terpisah jelas dari mulut.
+     Dibangun 3 lapis menurun (bridge → batang → ujung + lubang hidung),
+     menonjol ke depan (sumbu z) sehingga terbaca sebagai hidung manusia.
+     ======================================================================== */
+  head.add(M.pl(0.05,0.07,0.03,SKIN_D,0.205,0.195));      // bridge ( pangkal di antara mata )
+  head.add(M.pl(0.045,0.06,0.05,SKIN_D,0.16,0.21));       // batang hidung menonjol
+  head.add(M.pl(0.06,0.04,0.06,SKIN_L,0.115,0.215));      // ujung/bola hidung
+  head.add(M.pl(0.018,0.02,0.02,0x8a5f46,0.095,0.235,0.02));  // lubang hidung kanan
+  head.add(M.pl(0.018,0.02,0.02,0x8a5f46,0.095,0.235,-0.02)); // lubang hidung kiri
+  head.add(M.pl(0.05,0.02,0.04,SKIN,0.10,0.19));          // alas bawah hidung
+  /* ========================================================================
+     MULUT — POSISI JELAS DI BAWAH HIDUNG, terpisah oleh philtrum (alur).
+     Bibir atas tipis + garis mulut + bibir bawah penuh + sudut bibir,
+     sehingga terbaca sebagai mulut manusia, bukan blob menyatu.
+     ======================================================================== */
+  head.add(M.pl(0.02,0.035,0.02,SKIN_D,0.075,0.195));     // philtrum (alur di atas bibir)
+  head.add(M.pl(0.11,0.022,0.02,0xc9826f,0.055,0.20));    // bibir atas (cupid's bow)
+  head.add(M.pl(0.13,0.018,0.018,0x9a5a4a,0.038,0.20));   // garis mulut (celah)
+  head.add(M.pl(0.10,0.03,0.022,0xd99a86,0.02,0.20));     // bibir bawah penuh
+  head.add(M.pl(0.02,0.03,0.02,0xa06850,0.045,0.205,0.075));  // sudut bibir kanan
+  head.add(M.pl(0.02,0.03,0.02,0xa06850,0.045,0.205,-0.075)); // sudut bibir kiri
+  head.add(M.pl(0.06,0.025,0.02,SKIN_D,0.005,0.19));      // dagu di bawah bibir
+
+  /* ---------------- RAMBUT (30 model, bisa diganti) ----------------
+     Rambut dibangun terpisah oleh buildHair() lalu ditempel ke head.
+     Dikelompokkan dalam group `hairG` supaya mudah diganti-ganti. */
+  const hairG=new THREE.Group();hairG.name='Hair';
+  head.add(hairG);
+
+  /* ---------------- ANCHORS ARMOR (struktur sama) ---------------- */
+  const armorG={
+    helm:new THREE.Group(),chest:new THREE.Group(),
+    bootL:new THREE.Group(),bootR:new THREE.Group(),
+    pauldL:new THREE.Group(),pauldR:new THREE.Group()
+  };
+  head.add(armorG.helm);torso.add(armorG.chest);
+  legL.userData.shin.add(armorG.bootL);legR.userData.shin.add(armorG.bootR);
+  armL.add(armorG.pauldL);armR.add(armorG.pauldR);
+
+  Object.assign(parts,{legL,legR,armL,armR,head,torso,body,armorG,hairG});
+  mesh.userData.parts=parts;
+  return {mesh,parts};
+}
+
+/* Ganti model rambut pada karakter yang sudah dibangun.
+   styleIndex: 0..29 · color: hex (opsional, default cokelat tua) */
+function setHair(parts,styleIndex,color){
+  if(!parts||!parts.hairG)return;
+  const hg=parts.hairG;
+  while(hg.children.length){
+    const c=hg.children.pop();
+    if(c.geometry)c.geometry.dispose();
+    if(c.material)c.material.dispose();
+    hg.remove(c);
+  }
+  hg.add(buildHair(styleIndex,color));
+  parts.hairStyle=styleIndex;
+}
+
+const built=buildNewPlayer();
+const player=built.mesh,parts=built.parts;
+setHair(parts,4,HAIR_COLORS[1]);           /* default: Undercut, cokelat */
+scene.add(player);
+/* ekspor agar bisa diambil & diport ke game */
+window.NewPlayerModel={build:buildNewPlayer,parts,mesh:player,setHair,buildHair,HAIRSTYLES,HAIR_COLORS};
+
+/* =====================================================================
+   ANIMASI PREVIEW (idle/walk/run/jump/swing) — pakai sendi yg sama
+   ===================================================================== */
+let anim='idle',swingT=-1,autoRot=true,speed=1;
+const clock=new THREE.Clock();
+function resetPose(){
+  for(const g of [parts.legL,parts.legR,parts.armL,parts.armR]){
+    g.rotation.set(0,0,0);
+    if(g.userData.shin)g.userData.shin.rotation.set(0,0,0);
+    if(g.userData.fore)g.userData.fore.rotation.set(0,0,0);
+  }
+  parts.head.rotation.set(0,0,0);parts.torso.rotation.set(0,0,0);
+  parts.body.position.set(0,0,0);parts.body.rotation.set(0,0,0);
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05)*speed,t=clock.elapsedTime*speed;
+  resetPose();
+  if(anim==='idle'){
+    const br=Math.sin(t*2.2)*0.012;
+    parts.body.position.y=br;
+    parts.torso.rotation.x=br*0.5;parts.torso.rotation.y=Math.sin(t*1.1)*0.03;
+    parts.armL.rotation.x=Math.sin(t*2.2)*0.06;parts.armL.rotation.z=0.08+Math.sin(t*1.8)*0.02;
+    parts.armR.rotation.x=-Math.sin(t*2.2)*0.06;parts.armR.rotation.z=-0.08-Math.sin(t*1.8)*0.02;
+    parts.armL.userData.fore.rotation.x=-0.15;parts.armR.userData.fore.rotation.x=-0.15;
+    parts.head.rotation.y=Math.sin(t*0.8)*0.12;parts.head.rotation.x=Math.sin(t*1.3)*0.03;
+  }else if(anim==='walk'||anim==='run'){
+    const run=anim==='run',f=run?10:6,s=Math.sin(t*f),c=Math.cos(t*f);
+    const la=run?0.9:0.55,aa=run?0.8:0.45;
+    parts.legL.rotation.x=s*la;parts.legR.rotation.x=-s*la;
+    parts.legL.userData.shin.rotation.x=Math.max(0,-c)*(run?1.1:0.6);
+    parts.legR.userData.shin.rotation.x=Math.max(0,c)*(run?1.1:0.6);
+    parts.armL.rotation.x=-s*aa;parts.armR.rotation.x=s*aa;
+    parts.armL.userData.fore.rotation.x=run?-1.2:-0.3;parts.armR.userData.fore.rotation.x=run?-1.2:-0.3;
+    parts.torso.rotation.y=s*0.08;parts.torso.rotation.x=run?0.3:0.05;
+    parts.head.rotation.y=-s*0.05;
+    parts.body.position.y=Math.abs(Math.sin(t*f))*(run?0.09:0.05);
+  }else if(anim==='jump'){
+    const cyc=(t*1.4)%1,arc=Math.sin(cyc*Math.PI);
+    parts.body.position.y=arc*0.85;
+    const k=1-arc;
+    parts.legL.rotation.x=0.45*k;parts.legL.userData.shin.rotation.x=0.5*k;
+    parts.legR.rotation.x=-0.25*k;parts.legR.userData.shin.rotation.x=0.35*k;
+    parts.armL.rotation.x=-0.6*k;parts.armR.rotation.x=-0.3*k;
+    parts.armL.userData.fore.rotation.x=-0.4*k;parts.armR.userData.fore.rotation.x=-0.4*k;
+    parts.torso.rotation.x=0.15*k;parts.head.rotation.x=0.05;
+  }
+  /* ayun serang (one-shot menimpa pose) */
+  if(swingT>=0){
+    swingT+=dt*2.4;const k=Math.min(1,swingT);
+    const sw=Math.sin(k*Math.PI);
+    parts.armR.rotation.x=-2.2*sw;parts.armR.userData.fore.rotation.x=-0.4*sw;
+    parts.torso.rotation.y=0.5*sw;parts.torso.rotation.x=0.15*sw;
+    parts.body.rotation.y=0.3*sw;
+    if(k>=1)swingT=-1;
+  }
+  if(autoRot)player.rotation.y+=dt*0.4;
+  renderer.render(scene,camera);
+}
+animate();
+
+/* ---------------- orbit kontrol sederhana ---------------- */
+let dragging=false,px=0,py=0,theta=Math.atan2(2.6,3.4),phi=1.05,dist=4.6;
+function updCam(){
+  camera.position.set(
+    dist*Math.sin(phi)*Math.sin(theta),
+    dist*Math.cos(phi)+0.6,
+    dist*Math.sin(phi)*Math.cos(theta));
+  camera.lookAt(0,0.9,0);
+}
+updCam();
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  theta-=(e.clientX-px)*0.005;phi=Math.max(0.2,Math.min(2.6,phi-(e.clientY-py)*0.005));
+  px=e.clientX;py=e.clientY;updCam();
+});
+addEventListener('pointerup',()=>dragging=false);
+renderer.domElement.addEventListener('wheel',e=>{
+  dist=Math.max(2,Math.min(12,dist+e.deltaY*0.005));updCam();
+});
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+/* ---------------- UI ---------------- */
+document.querySelectorAll('[data-anim]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const a=b.dataset.anim;
+    if(a==='swing'){swingT=0;return;}
+    anim=a;
+    document.querySelectorAll('[data-anim]').forEach(x=>{if(x.dataset.anim!=='swing')x.classList.remove('active');});
+    b.classList.add('active');
+  });
+});
+document.getElementById('rotBtn').addEventListener('click',e=>{
+  autoRot=!autoRot;e.target.classList.toggle('active',autoRot);
+});
+document.getElementById('spd').addEventListener('input',e=>speed=parseFloat(e.target.value));
+
+/* ---------------- DROPDOWN RAMBUT (30 model) & WARNA ---------------- */
+let curHair=4,curHairCol=HAIR_COLORS[1];
+const hairSel=document.getElementById('hairSel'),hairCol=document.getElementById('hairCol');
+HAIRSTYLES.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(i+1)+'. '+n;hairSel.appendChild(o);});
+HAIR_COLORS.forEach((c,i)=>{
+  const o=document.createElement('option');o.value=c;
+  o.textContent='Warna '+(i+1);
+  o.style.background='#'+c.toString(16).padStart(6,'0');
+  hairCol.appendChild(o);
+});
+hairSel.value=curHair;hairCol.value=curHairCol;
+function applyHair(){setHair(parts,curHair,curHairCol);}
+hairSel.addEventListener('change',e=>{curHair=parseInt(e.target.value);applyHair();});
+hairCol.addEventListener('change',e=>{curHairCol=parseInt(e.target.value);applyHair();});
+</script>
+</body>
+</html>
