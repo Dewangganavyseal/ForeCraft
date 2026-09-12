@@ -604,64 +604,80 @@ const WGEN={
      campuran di bongkahan batu. oreFor tetap dipakai pickOre. */
   oreFor(wx,wz){return BIOME_INFO[this.biomeAt(wx,wz)].ore;},
   /* ---------- DISTRIBUSI JENIS ORE (port NEW MODEL/ore.html) ----------
-     Sesuai aturan:
-     - 1 buah ore di permukaan per node
-     - Ore batu (B.ORE_STONE) mudah ditemukan di biome level rendah bersama batu bara & tembaga
-     - Ore rarity tinggi (Kristal, Tungsten, Tungstensteel, Emas) mudah ditemukan di biome Gunung
-     - Biome menengah (Gurun, Tundra, Redlands) memiliki sebaran sesuai tiernya */
+     Aturan distribusi:
+     - 1 buah ore di permukaan per node.
+     - ORE LEVEL RENDAH bersifat GLOBAL: Batu, Batu Bara & Tembaga SELALU
+       bermunculan di SEMUA biome (34% jatah tetap) — walaupun berada di
+       biome tier tinggi seperti Pegunungan / Tanah Merah, sehingga
+       Penambangan awal tetap bisa dilatih di mana pun.
+         Batu 13.6% · Batu Bara 11.9% · Tembaga 8.5%  (di setiap biome)
+     - Sisa 66% diisi ore KHAS biome (dinormalisasi):
+       Mountain  : Kristal 26.4 · Tungsten 16.5 · B.Tungsten 13.2 · Emas 5.3 · Baja 4.6
+       Redlands  : Tungsten 26.4 · B.Tungsten 19.8 · Baja 13.2 · Besi 6.6
+       Tundra    : Kristal 23.1 · Baja 16.5 · Besi 14.5 · Tungsten 11.9
+       Desert    : Emas 26.4 · Besi 21.1 · Baja 10.6 · Tembaga 7.9
+       Forest    : Besi 27.7 · Batu Bara 11.9 · Batu 9.9 · Tembaga 11.2 · Emas 9.3
+       Beach/dll : Batu 29.7 · Batu Bara 19.8 · Tembaga 16.5
+     - Kemunculan node dikendalikan ORE_NODE_CHANCE (lihat oreNodeAt). */
   pickOre(wx,wz,y,bi){
     const bio=(bi===undefined)?this.biomeAt(wx,wz):bi;
     const h=this.hash(wx,wz+y*97,55);
 
-    /* MOUNTAIN (Pegunungan, Lv 50-75): Rarity TINGGI sangat mudah ditemukan! */
+    /* ---------- BASE GLOBAL: ore rendah di SEMUA biome (34%) ---------- */
+    if(h<0.34){
+      if(h<0.136)return B.ORE_STONE;           // 13.6% Batu
+      if(h<0.255)return B.ORE_COAL;            // 11.9% Batu Bara
+      return B.ORE_COPPER;                     // 8.5% Tembaga
+    }
+    /* sisa 66% = ore khas biome (t = 0..1) */
+    const t=(h-0.34)/0.66;
+
+    /* MOUNTAIN (Pegunungan, Lv 50-75): Rarity TINGGI mendominasi */
     if(bio===BIOME.MOUNTAIN){
-      if(h<0.30)return B.ORE_CRYSTAL;          // 30% Kristal Beku (Diamond)
-      if(h<0.60)return B.ORE_TUNGSTEN;         // 30% Tungsten
-      if(h<0.84)return B.ORE_TUNGSTENSTEEL;    // 24% Baja Tungsten
-      if(h<0.94)return B.ORE_GOLD;             // 10% Emas
-      return B.ORE_STEEL;                      // 6% Baja
+      if(t<0.40)return B.ORE_CRYSTAL;          // 26.4% Kristal Beku
+      if(t<0.65)return B.ORE_TUNGSTEN;         // 16.5% Tungsten
+      if(t<0.85)return B.ORE_TUNGSTENSTEEL;    // 13.2% Baja Tungsten
+      if(t<0.93)return B.ORE_GOLD;             // 5.3% Emas
+      return B.ORE_STEEL;                      // 4.6% Baja
     }
 
     /* REDLANDS (Tanah Merah, Lv 30-50, Keras & Beracun): */
     if(bio===BIOME.REDLANDS){
-      if(h<0.35)return B.ORE_TUNGSTEN;         // 35% Tungsten
-      if(h<0.60)return B.ORE_TUNGSTENSTEEL;    // 25% Baja Tungsten
-      if(h<0.80)return B.ORE_STEEL;            // 20% Baja
-      if(h<0.92)return B.ORE_COPPER;           // 12% Tembaga
-      return B.ORE_IRON;                       // 8% Besi
+      if(t<0.40)return B.ORE_TUNGSTEN;         // 26.4% Tungsten
+      if(t<0.70)return B.ORE_TUNGSTENSTEEL;    // 19.8% Baja Tungsten
+      if(t<0.90)return B.ORE_STEEL;            // 13.2% Baja
+      return B.ORE_IRON;                       // 6.6% Besi
     }
 
-    /* TUNDRA (Tundra Salju, Lv 1-20 / Mid): */
+    /* TUNDRA (Tundra Salju): */
     if(bio===BIOME.TUNDRA){
-      if(h<0.28)return B.ORE_CRYSTAL;          // 28% Kristal Beku
-      if(h<0.53)return B.ORE_STEEL;            // 25% Baja
-      if(h<0.75)return B.ORE_IRON;             // 22% Besi
-      if(h<0.90)return B.ORE_TUNGSTEN;         // 15% Tungsten
-      return B.ORE_STONE;                      // 10% Batu
+      if(t<0.35)return B.ORE_CRYSTAL;          // 23.1% Kristal Beku
+      if(t<0.60)return B.ORE_STEEL;            // 16.5% Baja
+      if(t<0.82)return B.ORE_IRON;             // 14.5% Besi
+      return B.ORE_TUNGSTEN;                   // 11.9% Tungsten
     }
 
     /* DESERT (Gurun Pasir, Lv 20-30): */
     if(bio===BIOME.DESERT){
-      if(h<0.30)return B.ORE_GOLD;             // 30% Emas
-      if(h<0.58)return B.ORE_IRON;             // 28% Besi
-      if(h<0.80)return B.ORE_COPPER;           // 22% Tembaga
-      if(h<0.92)return B.ORE_STEEL;            // 12% Baja
-      return B.ORE_STONE;                      // 8% Batu
+      if(t<0.40)return B.ORE_GOLD;             // 26.4% Emas
+      if(t<0.72)return B.ORE_IRON;             // 21.1% Besi
+      if(t<0.88)return B.ORE_STEEL;            // 10.6% Baja
+      return B.ORE_COPPER;                     // 7.9% Tembaga
     }
 
-    /* FOREST (Hutan Rimba, Zona Awal, Lv 1-20): Rarity RENDAH mendominasi! */
+    /* FOREST (Hutan Rimba, Zona Awal): rendah + Besi mendominasi */
     if(bio===BIOME.FOREST){
-      if(h<0.38)return B.ORE_STONE;            // 38% Batu (sangat mudah terlihat!)
-      if(h<0.68)return B.ORE_COAL;             // 30% Batu Bara
-      if(h<0.86)return B.ORE_COPPER;           // 18% Tembaga
-      if(h<0.96)return B.ORE_IRON;             // 10% Besi
-      return B.ORE_GOLD;                       // 4% Emas
+      if(t<0.42)return B.ORE_IRON;             // 27.7% Besi
+      if(t<0.60)return B.ORE_COAL;             // 11.9% Batu Bara
+      if(t<0.75)return B.ORE_STONE;            // 9.9% Batu
+      if(t<0.92)return B.ORE_COPPER;           // 11.2% Tembaga
+      return B.ORE_GOLD;                       // 9.3% Emas
     }
 
     /* BEACH / LAINNYA: */
-    if(h<0.50)return B.ORE_STONE;              // 50% Batu
-    if(h<0.80)return B.ORE_COAL;               // 30% Batu Bara
-    return B.ORE_COPPER;                       // 20% Tembaga
+    if(t<0.45)return B.ORE_STONE;              // 29.7% Batu
+    if(t<0.75)return B.ORE_COAL;               // 19.8% Batu Bara
+    return B.ORE_COPPER;                       // 16.5% Tembaga
   },
   oreRoll(wx,wz,y){
     /* (tidak dipakai lagi — ore kini hanya node permukaan) */
@@ -715,7 +731,9 @@ const WGEN={
          bongkahan selalu menapak penuh + ore bisa spawn jauh lebih banyak.
        · DILARANG spawn di dalam bangunan (desa/dungeon) maupun menembus pohon.
      ======================================================================== */
-  ORE_NODE_CELL:11, ORE_NODE_CHANCE:0.95,
+  /* Kemunculan node dikurangi 30% dari 0.95 → 0.665 (permintaan balance:
+     ore tetap tersebar di semua biome, tetapi tidak lagi terlalu rapat). */
+  ORE_NODE_CELL:11, ORE_NODE_CHANCE:0.665,
   /* Pusat node ore untuk sel grid (nx,nz), atau null. Deterministik per sel. */
   _oreCellCenter(cx,cz){
     const S=this.ORE_NODE_CELL;
@@ -760,7 +778,11 @@ const WGEN={
       if(this.treeAt(tx,tz,th))return null;
     }
     const ore=this.pickOre(nx,nz,1,bio);
-    return {baseY,ore};
+    /* UKURAN NODE: besar = peluang 20% (kurang 20% dari node normal).
+       Ore besar memakai mesh bongkahan raksasa (scale 1.5x) + collision
+       lebih lebar/tinggi + HASIL PANEN jauh lebih banyak (ORE_LOOT.b). */
+    const big=this.hash(nx,nz,409)<0.20;
+    return {baseY,ore,big};
   },
   /* Mengembalikan node ore yang FOOTPRINT 4x4-nya mencakup kolom (wx,wz),
      beserta baseY flattening-nya. Dipakai genChunk untuk meratakan tanah di
@@ -1201,7 +1223,8 @@ function genChunk(cx,cz){
           const ii=idx(x,y,z);
           if(data[ii]===B.AIR){
             data[ii]=node.ore;
-            ores.push({x,y,z,wx,wy:y,wz,ore:node.ore,seed:(wx*17+wz*31)});
+            ores.push({x,y,z,wx,wy:y,wz,ore:node.ore,seed:(wx*17+wz*31),
+              big:!!node.big});
           }
         }
       }

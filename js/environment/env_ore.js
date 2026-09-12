@@ -320,7 +320,46 @@ function buildOreChunkData(oreDef,seed){
   return {
     geos:[buildGeo_ore(allSet,vox,map,center),buildGeo_ore(s1,vox,map,center),buildGeo_ore(s2,vox,map,center)],
     shells:[buildShell_ore(allSet,vox,map,center),buildShell_ore(s1,vox,map,center),buildShell_ore(s2,vox,map,center)],
-    frags:[makeFrags(0),makeFrags(1),makeFrags(2)]
+    frags:[makeFrags(0),makeFrags(1),makeFrags(2)],
+    /* HEIGHTFIELD COLLISION: tinggi permukaan tertinggi per kolom voxel.
+       Kunci = "ix:iz" (koordinat voxel), nilai = tinggi puncak kolom
+       dalam satuan voxel. Dipakai topAt() agar pemain BISA MENAPAK DI
+       ATAS bongkahan (dan undakannya) lewat World.groundAt. */
+    topGrid:(()=>{
+      const g={};
+      for(const v of vox){
+        const k=v.x+':'+v.z;
+        if(g[k]===undefined||v.y+1>g[k])g[k]=v.y+1;
+      }
+      return g;
+    })(),
+    /* TANGGA COLLISION BERTINGKAT: untuk tiap tingkat tinggi (0.24 blok per
+       voxel), radius efektif = kolom terjauh yang mencapai tingkat itu.
+       Levels terurut NAIK (dasar lebar → puncak sempit) sehingga collision
+       mengikuti BENTUK bongkahan dan TIDAK PERNAH menjebak tubuh: solid
+       hanya di dalam radius level pada ketinggian DI BAWAH level itu. */
+    levels:(()=>{
+      const g={};
+      for(const v of vox){
+        const k=v.x+':'+v.z;
+        if(g[k]===undefined||v.y+1>g[k])g[k]=v.y+1;
+      }
+      let maxV=0;for(const k in g)if(g[k]>maxV)maxV=g[k];
+      const arr=[];
+      for(let lv=1;lv<=maxV;lv++){
+        let r=0;
+        for(const k in g){
+          if(g[k]<lv)continue;
+          const pr=k.split(':');
+          const px=(+pr[0]+0.5-center.x)*VOX_ORE,pz=(+pr[1]+0.5-center.z)*VOX_ORE;
+          const d=Math.hypot(px,pz)+VOX_ORE*0.75;
+          if(d>r)r=d;
+        }
+        if(r>0)arr.push({h:lv*VOX_ORE,r});
+      }
+      return arr;
+    })(),
+    voxSize:VOX_ORE,center
   };
 }
 
@@ -365,7 +404,7 @@ const Env_Ore={
     return tmpl;
   },
 
-  spawnNode(c,group,wx,wy,wz,blockId,seed){
+  spawnNode(c,group,wx,wy,wz,blockId,seed,big){
     this.init();
     const tmpl=this.getTemplate(blockId);
     if(!tmpl)return;
@@ -379,8 +418,18 @@ const Env_Ore={
     nodeGroup.position.set(wx+0.5,wy,wz+0.5);
     const rot=((hash3_ore(wx,wy,wz,91)*4)|0);
     nodeGroup.rotation.y=rot*(Math.PI*0.5);
+    /* NODE BESAR: mesh bongkahan raksasa (scale 1.5x) — lebih jarang spawn
+       (20% dari node) tetapi hasil panennya jauh lebih banyak, dan butuh
+       2x lebih lama dihancurkan */
+    const scale=big?1.5:1.0;
+    nodeGroup.scale.setScalar(scale);
 
-    const chunkMesh=new THREE.Mesh(tmpl.geos[stage],this._chunkMat);
+    /* MATERIAL PER-NODE: klon dari material bersama supaya efek GAGAL
+       (berdenyut MERAH ala ore.html) hanya mewarnai bongkahan ini,
+       bukan semua ore di dunia. */
+    const mat=this._chunkMat.clone();
+
+    const chunkMesh=new THREE.Mesh(tmpl.geos[stage],mat);
     chunkMesh.castShadow=!(typeof IS_MOBILE!=='undefined'&&IS_MOBILE);
     chunkMesh.receiveShadow=true;
     nodeGroup.add(chunkMesh);
@@ -390,35 +439,106 @@ const Env_Ore={
 
     group.add(nodeGroup);
     this.activeNodes.set(key,{
-      key,chunk:c,group:nodeGroup,chunkMesh,shellMesh,
-      template:tmpl,stage,wx,wy,wz,blockId,wobble:0
+      key,chunk:c,group:nodeGroup,chunkMesh,shellMesh,mat,
+      template:tmpl,stage,wx,wy,wz,blockId,wobble:0,big:!!big,scale,
+      rot:rot*(Math.PI*0.5),failPulse:0
     });
   },
 
   /* ========================================================================
-     COLLISION FOOTPRINT — seluruh bongkahan ore PADAT agar tidak ditembus.
-     Dipanggil dari World.blockedAt. Bongkahan lebar (~3.5 blok) jauh melebihi
-     1 kolom blok ore di data dunia, jadi tabrakannya diuji terhadap radius
-     horizontal bounding bongkahan, BUKAN hanya kolom pusatnya.
-     `x,y,z` = titik sampel tubuh pemain (dunia nyata).
+     COLLISION HEIGHTFIELD — collision MENGIKUTI BENTUK bongkahan.
+     topAt(x,z)  : tinggi permukaan bongkahan di kolom dunia (x,z), 0 bila
+                   di luar bongkahan. Dipakai World.groundAt agar pemain/
+                   mob BISA MENAPAK DI ATAS bongkahan (dan undakannya).
+     solidAt     : titik dianggap padat HANYA bila berada DI DALAM volume
+                   bongkahan (y di bawah topAt kolom itu) — berdiri di atas
+                   tidak dianggap menembus. Bentuknya mengikuti undakan
+                   bongkahan karena lookup per kolom voxel.
      ======================================================================== */
-  solidAt(x,y,z){
-    const FOOT_R=1.85;         // radius horizontal bongkahan (blok)
+  /* tinggi lokal template di titik lokal (sx,sz) — satuan voxel → blok */
+  _topLookup(tmpl,sx,sz){
+    const VOX=tmpl.voxSize;
+    const ix=Math.floor(sx/VOX+tmpl.center.x);
+    const iz=Math.floor(sz/VOX+tmpl.center.z);
+    const v=tmpl.topGrid[ix+':'+iz];
+    return v===undefined?0:v*VOX;
+  },
+  /* tinggi permukaan bongkahan di titik dunia (x,z) — return WORLD Y!
+     PENTING: harus mengembalikan ketinggian dunia absolut (node.wy + h),
+     bukan tinggi lokal (h). Tanpa node.wy, World.groundAt tidak pernah
+     menganggap permukaan bongkahan sebagai lantai (karena h < tanah dunia),
+     sehingga pemain tembus ke bawah dan jatuh ke dalam badan ore. */
+  topAt(x,z){
+    let best=0;
     for(const node of this.activeNodes.values()){
-      const cx=node.wx+0.5, cz=node.wz+0.5;
-      const dx=x-cx, dz=z-cz;
-      if(dx*dx+dz*dz>FOOT_R*FOOT_R)continue;
-      /* tinggi padat bongkahan kira-kira 2.2 blok dari dasar node */
-      if(y<node.wy+2.2)return true;
+      const maxHalf=2.4*node.scale;
+      const dx0=x-(node.wx+0.5),dz0=z-(node.wz+0.5);
+      if(Math.abs(dx0)>maxHalf||Math.abs(dz0)>maxHalf)continue;
+      /* dunia → lokal node (scale & rotasi dibalik) */
+      let lx=dx0/node.scale, lz=dz0/node.scale;
+      const cs=Math.cos(-node.rot),sn=Math.sin(-node.rot);
+      const sx=lx*cs+lz*sn, sz=-lx*sn+lz*cs;
+      const h=this._topLookup(node.template,sx,sz)*node.scale;
+      if(h>0){
+        const wy=node.wy+h;
+        if(wy>best)best=wy;
+      }
+    }
+    return best;
+  },
+
+  /* MESH COLLIDER PRESISI: mengikuti tiap lekukan voxel 3D model ore.
+     Titik (x,y,z) dianggap padat HANYA jika berada di dalam kontur voxel
+     nyata dari ore pada ketinggian di bawah permukaan kolom tersebut.
+     Berdiri di atas bongkahan atau berjalan di undakan tidak dianggap
+     padat sehingga pemain BISA BERJALAN & MENAPAK BEBAS DI ATAS ORE
+     TANPA STUCK. */
+  solidAt(x,y,z){
+    for(const node of this.activeNodes.values()){
+      const maxHalf=2.4*node.scale;
+      const dx0=x-(node.wx+0.5),dz0=z-(node.wz+0.5);
+      if(Math.abs(dx0)>maxHalf||Math.abs(dz0)>maxHalf)continue;
+      let lx=dx0/node.scale, lz=dz0/node.scale;
+      const cs=Math.cos(-node.rot),sn=Math.sin(-node.rot);
+      const sx=lx*cs+lz*sn, sz=-lx*sn+lz*cs;
+
+      const h=this._topLookup(node.template,sx,sz)*node.scale;
+      if(h<=0)continue;                      // di luar kontur voxel 3D ore
+
+      const oreTop=node.wy+h;
+      /* Padat HANYA bila titik berada di dalam volume vertikal ore
+         (di bawah permukaan kolom voxel, di atas dasar) */
+      if(y>=node.wy-0.1&&y<oreTop-0.08){
+        return true;
+      }
     }
     return false;
+  },
+
+  /* NODE tempat blok (bx,by,bz) berada & masih dalam JANGKAUAN AYUNAN
+     tubuh pemain (px,py,pz) — mendeteksi dari SISI MANA PUN, sudut mana pun,
+     maupun dari ATAS model 3D ore. */
+  hitNode(bx,by,bz,px,py,pz){
+    for(const node of this.activeNodes.values()){
+      if(Math.abs(bx-node.wx)>3||Math.abs(bz-node.wz)>3||
+         by<node.wy-2||by>node.wy+5)continue;
+      const hx=2.2*node.scale, hz=hx;
+      const dx=Math.max(0,Math.abs(px-(node.wx+0.5))-hx);
+      const dz=Math.max(0,Math.abs(pz-(node.wz+0.5))-hz);
+      const nodeTop=node.wy+2.6*node.scale;
+      let dy=0;
+      if(py>nodeTop)dy=py-nodeTop;
+      else if(py+1.6<node.wy)dy=node.wy-(py+1.6);
+      if(Math.hypot(dx,dz,dy)<=1.8)return node;
+    }
+    return null;
   },
 
   buildChunkOres(c,group){
     if(c.ores&&c.ores.length){
       for(const o of c.ores){
         if(c.data[World.idx(o.x,o.y,o.z)]===o.ore){
-          this.spawnNode(c,group,o.wx,o.wy,o.wz,o.ore,o.seed);
+          this.spawnNode(c,group,o.wx,o.wy,o.wz,o.ore,o.seed,o.big);
         }
       }
     }
@@ -427,6 +547,8 @@ const Env_Ore={
   disposeChunkOres(c){
     if(c.ores){
       for(const o of c.ores){
+        const node=this.activeNodes.get(`${o.wx},${o.wy},${o.wz}`);
+        if(node&&node.mat)node.mat.dispose();
         this.activeNodes.delete(`${o.wx},${o.wy},${o.wz}`);
       }
     }
@@ -441,14 +563,21 @@ const Env_Ore={
     if(node)node.wobble=Math.max(node.wobble,amount||0.25);
   },
 
+  /* ---------- EFEK GAGAL (port doFail ore.html) ----------
+     Getaran + DENYUT MERAH pada bongkahan: emissive merah berdenyut cepat
+     (osc 42Hz) + tubuh dimerahkan, meluruh 2.1/detik — persis rumus
+     failPulse prototipe. Material per-node sehingga hanya ore ini yang
+     berubah merah. */
   onFail(wx,wy,wz){
-    this.wobble(wx,wy,wz,0.36);
+    this.wobble(wx,wy,wz,0.55);
+    const node=this.getNode(wx,wy,wz);
+    if(node)node.failPulse=1;
   },
 
-  onHit(wx,wy,wz,blockId,hp,maxHp,newStage){
+  onHit(wx,wy,wz,blockId,newStage){
     const node=this.getNode(wx,wy,wz);
     if(node){
-      node.wobble=0.25;
+      node.wobble=0.55;                      // getaran KUAT tiap pukulan
       if(newStage>node.stage){
         const prevStage=node.stage;
         node.stage=Math.min(2,newStage);
@@ -465,22 +594,44 @@ const Env_Ore={
     if(node){
       OreFX.spawnFrags(node.template.frags[2],node.group.position,1.4);
       if(node.group.parent)node.group.parent.remove(node.group);
+      if(node.mat)node.mat.dispose();
       this.activeNodes.delete(key);
     }
   },
 
   update(dt){
+    const t=performance.now()*0.001;
     for(const node of this.activeNodes.values()){
+      /* GETARAN ala ore.html: jitter ACAK per frame (bukan sin halus) dengan
+         decay lambat — bongkahan jelas terlihat bergetar saat dipukul/gagal,
+         lalu kembali TEPAT ke posisi semula saat getaran habis. */
       if(node.wobble>0){
-        node.wobble=Math.max(0,node.wobble-dt*4.5);
-        const j=Math.sin(node.wobble*38)*node.wobble*0.12;
-        node.group.position.x=node.wx+0.5+j;
-        node.group.position.z=node.wz+0.5+j;
+        node.wobble=Math.max(0,node.wobble-dt*1.8);
+        const j=node.wobble*node.wobble*0.55;
+        node.group.position.x=node.wx+0.5+(Math.random()-0.5)*j;
+        node.group.position.z=node.wz+0.5+(Math.random()-0.5)*j;
+        if(node.wobble<=0){
+          node.group.position.x=node.wx+0.5;
+          node.group.position.z=node.wz+0.5;
+        }
+      }
+      /* denyut MERAH saat gagal (port failPulse ore.html) */
+      if(node.failPulse>0){
+        const osc=0.6+0.4*Math.sin(t*42);
+        node.mat.emissive.setRGB(node.failPulse*0.55*osc,node.failPulse*0.04,0);
+        node.mat.color.setRGB(1,1-node.failPulse*0.45,1-node.failPulse*0.5);
+        node.failPulse-=dt*2.1;
+        if(node.failPulse<=0){
+          node.mat.emissive.setRGB(0,0,0);
+          node.mat.color.setRGB(1,1,1);
+        }
       }
     }
   },
 
   clear(){
+    for(const node of this.activeNodes.values())
+      if(node.mat)node.mat.dispose();
     this.activeNodes.clear();
   }
 };

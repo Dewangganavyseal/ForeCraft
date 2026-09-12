@@ -1028,31 +1028,49 @@ const Player={
     };
     const pcx=Math.floor(this.pos.x),pcz=Math.floor(this.pos.z);
     let blkHit=null,bestScore=Infinity;
+
+    /* 1. ORE 3D MESH COLLIDER: prioritas utama bila pemain menempel atau berdiri
+       di atas bongkahan Env_Ore dari SISI MANA PUN (North, South, East, West, atas,
+       atau sudut diagonal) — mendeteksi node ore langsung dari 3D modelnya. */
+    if(typeof Env_Ore!=='undefined'&&Env_Ore.activeNodes){
+      for(const node of Env_Ore.activeNodes.values()){
+        if(Env_Ore.hitNode(node.wx,node.wy,node.wz,this.pos.x,this.pos.y,this.pos.z)){
+          const dx=node.wx+0.5-this.pos.x, dz=node.wz+0.5-this.pos.z;
+          const distToCenter=Math.hypot(dx,dz);
+          const ang=Math.atan2(dx,dz);
+          let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
+          /* berdiri di atas bongkahan atau menghadap ke arah bongkahan */
+          if(distToCenter<=1.2||diff<=1.8){
+            const prio=PRIO[node.blockId]!==undefined?PRIO[node.blockId]:-0.85;
+            const score=0.2+diff*0.2+prio;
+            if(score<bestScore){
+              bestScore=score;
+              blkHit={x:node.wx,y:node.wy,z:node.wz};
+            }
+          }
+        }
+      }
+    }
+
+    /* 2. Pemindaian kisi standar untuk semua blok lain (pohon, tanah, batu biasa, dll) */
     for(let z=Math.floor(this.pos.z-2.4);z<=Math.floor(this.pos.z+2.4);z++)
       for(let x=Math.floor(this.pos.x-2.4);x<=Math.floor(this.pos.x+2.4);x++){
-        /* kolom tempat pemain berdiri dilewati supaya menyerang tidak
-           menggali lantai di bawah kaki sendiri */
         if(x===pcx&&z===pcz)continue;
-        /* Hanya setinggi kaki & kepala — sama seperti sebelumnya. Lapisan di
-           bawah kaki sengaja TIDAK disertakan agar lantai tetap utuh. */
         for(const y of[fy,fy+1]){
           const id=World.getBlock(x,y,z);
           if(id===B.AIR||id===B.WATER||id===B.LEAF)continue;
           const prio=PRIO[id];
           if(prio===undefined)continue;
-          /* Jarak diukur ke sisi terdekat kubus, bukan ke titik tengahnya.
-             Inilah inti perbaikannya: bijih yang menempel di samping pemain
-             dulu dianggap "jauh" karena pusat bloknya >1 blok dari badan. */
+
           const nx2=clamp(this.pos.x,x,x+1),nz2=clamp(this.pos.z,z,z+1);
           const edge=Math.hypot(nx2-this.pos.x,nz2-this.pos.z);
           if(edge>1.8)continue;
-          /* arah dinilai dari titik tengah blok supaya stabil saat menempel */
+
           const dx=x+0.5-this.pos.x,dz=z+0.5-this.pos.z;
           const ang=Math.atan2(dx,dz);
           let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
-          /* blok yang benar-benar menempel diberi toleransi sudut lebih lebar
-             supaya menambang sambil merapat ke dinding tetap responsif */
           if(diff>(edge<0.25?1.7:1.2))continue;
+
           const score=edge+diff*0.3+prio+(y===fy?0:0.1);
           if(score<bestScore){bestScore=score;blkHit={x,y,z};}
         }
@@ -1437,7 +1455,9 @@ const Player={
           resolusi biasa. */
     const refY=Math.max(py0,this.pos.y)+1.8;
     let g=World.groundAt(this.pos.x,this.pos.z,refY);
-    if(g>py0+1.05){
+    /* Batalkan gerak bila permukaan terlalu tinggi untuk dilangkahi, KECUALI
+       bila pemain sedang melompat/mendarat di atas permukaan (kaki sudah dekat g) */
+    if(g>Math.max(py0,this.pos.y)+1.05&&this.pos.y<g-0.25){
       this.pos.x=px0;this.pos.z=pz0;
       this.vel.x=0;this.vel.z=0;
       g=World.groundAt(px0,pz0,refY);

@@ -180,14 +180,21 @@ const RPG={
   gatherBonus(dropId){
     let b=0.05*this.skillVal('groot')+0.25*this.skillVal('mgather');
     if(dropId==='wood')b+=0.05*this.skillVal('logm');
-    else if(dropId==='stone'||dropId==='iron_ore'||dropId==='gold_ore'||dropId==='crystal')
-      b+=0.05*this.skillVal('minm');
+    /* Penambang Terampil (minm) TIDAK lewat peluang +1 di sini — ia adalah
+       PENGALI HASIL langsung untuk rentang drop ore (lihat minerMult() &
+       World.breakBlock), sehingga efeknya jauh lebih terasa per rank. */
     else if(dropId==='fiber'||dropId==='berry'||dropId==='mush'||dropId==='resin')
       b+=0.05*this.skillVal('wildm');
     else if(dropId==='wheat'||dropId==='carrot'||dropId==='cabbage'||dropId==='tomato'||dropId==='watermelon')
       b+=0.06*this.skillVal('greenthumb');
     return b;
   },
+  /* ---------- SKILL PENAMBANG TERAMPIL (minm — "Skilled Miners") ----------
+     Pengali HASIL PANEN ore: +5% per rank (rank 6 = +30%) yang berlaku pada
+     rentang drop acak semua jenis ore (ORE_LOOT) — batu, batu bara,
+     tembaga, besi, baja, emas, tungsten, kristal & baja tungsten.
+     Dipakai World.breakBlock setelah rentang kecil/besar diundi. */
+  minerMult(){return 1+0.05*this.skillVal('minm');},
   /* 'cook' rank 1 sudah membuka Salad; bonus hunger mulai rank 2 (tak berubah) */
   cookBonus(){return this.skillVal('cook')>=2?1.25:1;},
 

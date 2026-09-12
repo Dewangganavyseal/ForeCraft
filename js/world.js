@@ -113,6 +113,17 @@ const World={
         const at=Altar.topAt(x+ox,z+oz);
         if(at>gy&&at<=yTop+1)gy=at;
       }
+      /* BONGKAHAN ORE: kini collision-nya HEIGHTFIELD yang mengikuti bentuk
+         bongkahan, dan pemain BISA MENAPAK di atasnya — topAt melaporkan
+         tinggi permukaan bongkahan di titik ini sebagai lantai tambahan.
+         Batas yTop+1.5: pemain yang berdiri di tanah di samping bongkahan
+         tinggi tidak ikut terangkat, tapi yang melompat/menapak undakan
+         bongkahan mendapat pijakan yang benar. */
+      if(typeof Env_Ore!=='undefined'&&Env_Ore.topAt&&
+         Env_Ore.activeNodes&&Env_Ore.activeNodes.size){
+        const ot=Env_Ore.topAt(x+ox,z+oz);
+        if(ot>gy&&ot<=yTop+1.5)gy=ot;
+      }
       if(gy>g)g=gy;
     }
     return g;
@@ -921,12 +932,56 @@ const World={
       }
     }
     const k=`${wx},${wy},${wz}`;
-    /* HP efektif ore menurun sesuai kelebihan level Penambangan */
-    let maxHp=BLOCK_INFO[id].hp||1;
+    /* ---------- ORE: PROGRES PUKULAN (bukan HP-fraksi) ----------
+       Aturan (permintaan desain):
+         · SAAT level Penambangan == syarat ore → butuh TEPAT 7 pukulan
+           (ore besar 14 pukulan = 2x lebih lama dari ore kecil).
+         · TIAP level proficiency DI ATAS syarat → 10% lebih cepat
+           (pangkat 0.90 per level; dibatasi minimal 2 pukulan).
+         · Pukulan yang GAGAL roll tidak menambah progres (sia-sia).
+       Progres kontinu 0..1; tahapan pecahan di 34% (tahap-1) & 67% (tahap-2)
+       — tetap tiga animasi pecahan bongkahan seperti prototipe. */
     if(oreDef){
-      const mLv=(typeof Prof!=='undefined')?Prof.level('mining'):1;
-      maxHp*=clamp(1-(mLv-oreDef.req)*0.03,0.45,1);
+      if(!this.oreStg)this.oreStg={};
+      let st=this.oreStg[k];
+      if(!st)st=this.oreStg[k]={stage:0,prog:0};
+      const big=this.oreNodeBig(wx,wy,wz);
+      const mLv2=(typeof Prof!=='undefined')?Prof.level('mining'):1;
+      const hitsNeeded=Math.max(2,7*(big?2:1)*Math.pow(0.90,mLv2-oreDef.req));
+      st.prog+=1/hitsNeeded;
+      FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),BLOCK_INFO[id].color,2,1.5);
+      FX.blockShake(wx,wy,wz,BLOCK_INFO[id].color,1+0.8*st.prog);
+      Sfx.rock();
+      /* FEEDBACK DI PERMUKAAN BONGKAHAN: percikan + serpihan di titik antara
+         pemain dan pusat node — FX.blockShake (kubus voxel) tertutup model
+         bongkahan, jadi feedback yang TERLIHAT harus di depan model ini. */
+      if(typeof Player!=='undefined'){
+        const dxp=Player.pos.x-(wx+0.5),dzp=Player.pos.z-(wz+0.5);
+        const dl=Math.hypot(dxp,dzp)||1;
+        const ix2=wx+0.5+dxp/dl*1.4,iz2=wz+0.5+dzp/dl*1.4;
+        if(typeof PortFX!=='undefined'&&PortFX.spark)
+          PortFX.spark(ix2,wy+1.1,iz2,6,0xffe066,6);
+        FX.debris(new THREE.Vector3(ix2,wy+0.9,iz2),BLOCK_INFO[id].color,3,2.2);
+      }
+      let newStage=st.stage;
+      if(st.stage<1&&st.prog>=0.34)newStage=1;
+      else if(st.stage<2&&st.prog>=0.67)newStage=2;
+      st.stage=newStage;
+      if(typeof Env_Ore!=='undefined'&&Env_Ore.onHit)
+        Env_Ore.onHit(wx,wy,wz,id,newStage);
+      else if(newStage>st.stage&&newStage>0)
+        OreFX.burst(wx+0.5,wy,wz+0.5,id,newStage===1?4:5,1.0);
+      if(newStage===1)FX.addShake(0.12);
+      else if(newStage===2)FX.addShake(0.18);
+      if(st.prog>=1){
+        delete this.oreStg[k];
+        FX.clearBlockShake(wx,wy,wz);
+        this.breakBlock(wx,wy,wz);
+        return true;
+      }
+      return false;
     }
+    let maxHp=BLOCK_INFO[id].hp||1;
     let hp=this.blockHP.has(k)?this.blockHP.get(k):maxHp;
     hp-=dmg;
     FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),BLOCK_INFO[id].color,2,1.5);
@@ -934,26 +989,7 @@ const World={
        getarannya sehingga pemain punya umpan balik "hampir hancur" */
     FX.blockShake(wx,wy,wz,BLOCK_INFO[id].color,
       1+0.8*(1-clamp(hp/maxHp,0,1)));
-    if(id===B.STONE||oreDef)Sfx.rock();else Sfx.chop();
-    /* ---------- TAHAPAN PECAHAN BONGKAHAN (3 animasi) ----------
-       66% → tahap 1 (bongkahan luar rontok), 33% → tahap 2 (retak berat),
-       0   → hancur total (di breakBlock). Pecahan MENGELINDING ke tanah. */
-    if(oreDef){
-      if(!this.oreStg)this.oreStg={};
-      let st=this.oreStg[k];
-      if(!st)st=this.oreStg[k]={stage:0};
-      const frac=hp/maxHp;
-      let newStage=st.stage;
-      if(st.stage<1&&frac<=0.66&&hp>0)newStage=1;
-      else if(st.stage<2&&frac<=0.33&&hp>0)newStage=2;
-      st.stage=newStage;
-      if(typeof Env_Ore!=='undefined'&&Env_Ore.onHit)
-        Env_Ore.onHit(wx,wy,wz,id,hp,maxHp,newStage);
-      else if(newStage>0)
-        OreFX.burst(wx+0.5,wy,wz+0.5,id,newStage===1?4:5,1.0);
-      if(newStage===1)FX.addShake(0.12);
-      else if(newStage===2)FX.addShake(0.18);
-    }
+    if(id===B.STONE)Sfx.rock();else Sfx.chop();
     if(hp<=0){
       this.blockHP.delete(k);
       FX.clearBlockShake(wx,wy,wz);
@@ -961,6 +997,16 @@ const World={
       return true;
     }
     this.blockHP.set(k,hp);
+    return false;
+  },
+  /* ---------- UKURAN NODE ORE ----------
+     Node besar/kecil ditentukan worldgen (flag `big` di chunk.ores).
+     Dipakai breakBlock untuk memilih rentang hasil panen (ORE_LOOT). */
+  oreNodeBig(wx,wy,wz){
+    const c=this.chunks.get(Math.floor(wx/CFG.CHUNK)+','+Math.floor(wz/CFG.CHUNK));
+    if(!c||!c.ores)return false;
+    for(const o of c.ores)
+      if(o.wx===wx&&o.wy===wy&&o.wz===wz)return !!o.big;
     return false;
   },
   breakBlock(wx,wy,wz){
@@ -1000,7 +1046,24 @@ const World={
     /* SKILL PENEBANG (axe): peluang kayu ekstra, di atas cabang GATHER.
        Lihat RPG.woodBonus() — skill ini sebelumnya tidak berefek apa pun. */
     if(id===B.WOOD&&RPG.woodBonus)bonus+=RPG.woodBonus();
-    if(info.drop)FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,1+(Math.random()<bonus?1:0));
+    if(info.drop){
+      /* ---------- HASIL PANEN ORE BERDASARKAN CHANCE (rentang acak) ----------
+         Ore KECIL memakai rentang `s`, ore BESAR rentang `b` (lihat ORE_LOOT):
+           Batu 3-7 / besar 7-13 · Tungsten & B.Tungsten 1-3 / besar 3-6 · dst.
+         Peluang hasil ekstra dari skill "Penambang Terampil" (minm) +
+         proficiency + Pemanen menambahkan +1 drop DI ATAS roll rentang. */
+      let n=1;
+      const loot=isOre&&(typeof ORE_LOOT!=='undefined')?ORE_LOOT[id]:null;
+      if(loot){
+        const r=this.oreNodeBig(wx,wy,wz)?loot.b:loot.s;
+        n=r[0]+Math.floor(Math.random()*(r[1]-r[0]+1));
+        /* SKILL PENAMBANG TERAMPIL (minm): pengali hasil +5%/rank —
+           membuat investasi skill tree terasa jelas pada hasil panen ore */
+        if(RPG.minerMult)n=Math.max(1,Math.round(n*RPG.minerMult()));
+      }
+      if(bonus>0&&Math.random()<bonus)n++;
+      FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,n);
+    }
     else if((id===B.GRASS||id===B.DIRT)&&Math.random()<0.3+bonus)
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),'fiber',1);
     Player.addXP(1);

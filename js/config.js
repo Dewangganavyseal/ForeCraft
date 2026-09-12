@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.9',
+  VERSION:'0.2.10',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -322,6 +322,28 @@ const ORE_INFO={
   [B.ORE_TUNGSTEN]     :{req:26,chance:0.44},
   [B.ORE_CRYSTAL]      :{req:32,chance:0.50},
   [B.ORE_TUNGSTENSTEEL]:{req:38,chance:0.38},
+};
+
+/* ================= HASIL PANEN ORE (rentang acak kecil/besar) ================
+   Saat bongkahan hancur, jumlah drop diundi dari rentang ini:
+     `s` = ore KECIL (node normal),  `b` = ore BESAR (node langka).
+   Node besar lebih jarang (peluang spawn 20% dari node) & memberi jauh
+   lebih banyak. Rentang diseimbangkan terhadap nilai jual:
+     murah → banyak, langka → sedikit.
+   Bonus hasil (Peluang hasil ekstra) dari skill tree "Penambang Terampil"
+   (minm, +5%/rank — mencakup SEMUA jenis ore) & proficiency menambah +1
+   drop berdasarkan peluang, DI ATAS roll rentang ini (lihat World.breakBlock).
+   ============================================================================ */
+const ORE_LOOT={
+  [B.ORE_STONE]        :{s:[3,7],b:[7,13]},
+  [B.ORE_COAL]         :{s:[2,5],b:[5,9]},
+  [B.ORE_COPPER]       :{s:[2,4],b:[4,8]},
+  [B.ORE_IRON]         :{s:[1,4],b:[3,7]},
+  [B.ORE_STEEL]        :{s:[1,3],b:[3,6]},
+  [B.ORE_GOLD]         :{s:[1,3],b:[3,6]},
+  [B.ORE_TUNGSTEN]     :{s:[1,3],b:[3,6]},
+  [B.ORE_CRYSTAL]      :{s:[1,3],b:[2,5]},
+  [B.ORE_TUNGSTENSTEEL]:{s:[1,3],b:[3,6]},
 };
 
 /* ================= biome ================= */
@@ -1016,7 +1038,7 @@ const SKILLS=[
   {id:'logm',br:'gather',icon:'🪓',name:'Penebang Terampil',
     desc:'+5% peluang kayu ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{logging:5}},
   {id:'minm',br:'gather',icon:'⛏️',name:'Penambang Terampil',
-    desc:'+5% peluang batu & bijih ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{mining:5}},
+    desc:'+5% hasil batu & bijih / rank (semua jenis ore)',max:6,cost:1,req:'groot',lvl:20,prof:{mining:5}},
   {id:'wildm',br:'gather',icon:'🌿',name:'Pemanen Terampil',
     desc:'+5% peluang serat, berry & jamur ekstra / rank',max:6,cost:1,req:'groot',lvl:20,prof:{harvesting:5}},
   {id:'greenthumb',br:'gather',icon:'🌾',name:'Tangan Hijau',
