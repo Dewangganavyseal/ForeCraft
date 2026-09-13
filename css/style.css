@@ -2120,6 +2120,87 @@ body.touch .qbar{height:3px}
 .anvil-detail .ad-cost .no{color:#ff7b6b}
 .anvil-go{font-size:14px;padding:8px 18px}
 
+/* ================= PANEL SMELTER INDUSTRI ================= */
+#smelter-body{display:flex;flex-direction:column;gap:12px}
+.smelter-container{display:flex;flex-direction:column;gap:12px}
+.smelter-status-card{
+  background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.14);
+  border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;
+  transition:border-color .2s,background .2s;
+}
+.smelter-status-card.active{
+  border-color:#ff841a;background:rgba(255,132,26,.12);
+  box-shadow:0 0 14px rgba(255,132,26,.25);
+}
+.ssc-left{display:flex;align-items:center;gap:12px}
+.ssc-fire-ico{font-size:26px;filter:drop-shadow(0 0 8px rgba(255,140,40,.6))}
+.ssc-info{display:flex;flex-direction:column;gap:2px}
+.ssc-info b{font-size:13px;color:#fff;letter-spacing:.3px}
+.smelter-status-card.active .ssc-info b{color:#ffb02e}
+.ssc-info span{font-size:11px;color:#9aa4b0}
+.ssc-fuel-bar{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden}
+#sm-fuel-fill{height:100%;background:linear-gradient(90deg,#ff4d3d,#ffd23e);transition:width .2s}
+
+.smelter-work-grid{
+  display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:10px;
+}
+@media(max-width:520px){
+  .smelter-work-grid{grid-template-columns:1fr;}
+}
+.sm-card{
+  background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;
+}
+.sm-card-title{font-size:11px;font-weight:700;color:#9fd77f;letter-spacing:.5px;text-align:center}
+.sm-slot{
+  background:rgba(0,0,0,.45);border:2px dashed rgba(255,255,255,.18);
+  border-radius:8px;padding:10px 6px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;min-height:90px;text-align:center;
+}
+.sm-slot.has-item{border-style:solid;border-color:#ffd24d;background:rgba(255,210,77,.08)}
+.sm-slot-ico{font-size:32px;line-height:1}
+.sm-slot-ico.empty{opacity:.35}
+.sm-slot-qty{font-size:14px;font-weight:800;color:#fff;margin-top:4px}
+.sm-slot-sub{font-size:11px;color:#9aa4b0;margin-top:2px}
+.sm-slot-sub.empty{opacity:.5}
+
+.sm-progress-wrap{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.sm-progress-label{font-size:10.5px;color:#ffd23e;text-align:center;font-weight:600}
+.sm-progress-track{height:8px;background:rgba(255,255,255,.12);border-radius:4px;overflow:hidden}
+#sm-prog-fill{height:100%;background:linear-gradient(90deg,#ff7b24,#ffd23e);box-shadow:0 0 8px #ff7b24;transition:width .1s linear}
+
+.sm-btn-group{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.sm-btn{
+  background:#26303c;border:1px solid rgba(255,255,255,.16);color:#fff;
+  border-radius:6px;padding:6px 8px;font-size:11.5px;font-weight:600;
+  cursor:pointer;transition:.12s;text-align:center;
+}
+.sm-btn:hover:not(:disabled){background:#364354;border-color:#9fd77f;transform:translateY(-1px)}
+.sm-btn:disabled{opacity:.4;cursor:default}
+.sm-btn-all{background:#2e4432;border-color:#4a7a54;color:#a8e6b0}
+.sm-btn-warn{background:#442828;border-color:#7a3e3e;color:#e6a8a8}
+.sm-btn-take{
+  background:linear-gradient(135deg,#367a3e,#265e30);border:1px solid #54a860;
+  color:#fff;font-size:12.5px;font-weight:700;border-radius:8px;padding:9px 12px;
+  cursor:pointer;margin-top:auto;box-shadow:0 4px 12px rgba(40,120,50,.3);
+}
+.sm-btn-take:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-1px)}
+.sm-btn-take:disabled{opacity:.4;filter:none;box-shadow:none;cursor:default}
+
+.sm-empty-ore-hint{font-size:11px;color:#8fe0ff;text-align:center;margin:4px 0}
+.sm-ore-pick-list{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;padding-right:4px}
+.sm-ore-pick-item{
+  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:5px 8px;
+}
+.opi-ico{font-size:18px}
+.opi-info{display:flex;flex-direction:column;flex:1;line-height:1.2}
+.opi-info b{font-size:11px;color:#fff}
+.opi-info span{font-size:10px;color:#9aa4b0}
+.opi-btns{display:flex;gap:4px}
+.sm-btn.mini{padding:3px 7px;font-size:10.5px}
+.sm-no-ore{font-size:11px;color:#8a939e;text-align:center;padding:12px 6px;line-height:1.4}
+
 /* ================= PANEL PARTY (daftar rekan tim) =================
    Grid responsif: auto-fill kartu min 190px → 1 kolom di HP kecil, banyak
    kolom di layar lebar. Tidak ada lebar tetap yang memecah di layar sempit. */

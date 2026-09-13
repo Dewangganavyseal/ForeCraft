@@ -159,6 +159,15 @@
   <div id="anvil-body"></div>
 </div>
 
+<!-- ================= PANEL SMELTER INDUSTRI =================
+     Peleburan Ore menjadi Ingot dengan bahan bakar Batu Bara (Coal).
+     1 Ingot = 2 Ore (5 detik). 1 Coal = 60 detik. -->
+<div class="panel hidden" id="panel-smelter">
+  <h2><img class="ph-ico" src="buttons/f_smelter.png" alt="" onerror="this.outerHTML='🏭'"> Smelter Industri <button class="x" data-close="smelter">✕</button></h2>
+  <div class="sub">Lebur 2 Bijih Ore menjadi 1 Batang Ingot (durasi 5s). Gunakan 🖤 Batu Bara sebagai bahan bakar (bertahan 60s).</div>
+  <div id="smelter-body"></div>
+</div>
+
 <!-- ================= ALTAR RITUAL =================
      Isi ingredient lalu mulai ritual untuk memanggil boss. Dibuka lewat
      interaksi bagian tengah altar di dunia. -->
@@ -366,6 +375,8 @@
 <!-- Model voxel stasiun kerja (port NEW MODEL/Workstation.html): anvil,
      meja kerja, tungku, api unggun. Dimuat sebelum furni.js yang memakainya. -->
 <script src="js/furni_workstation.js"></script>
+<!-- Smelter Industri (port NEW MODEL/Smelter, Rod.html): peleburan ore & ingot -->
+<script src="js/smelter.js"></script>
 <script src="js/furni.js"></script>
 <!-- Landasan Tempa: panel enchant equipment (butuh UI/RPG/ITEMS di atas). -->
 <script src="js/anvil.js"></script>

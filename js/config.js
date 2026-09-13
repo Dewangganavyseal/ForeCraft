@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.18',
+  VERSION:'0.2.19',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -672,6 +672,10 @@ const ITEMS={
   tungstensteel_ore:{n:'Bijih Baja Tungsten',e:'🔷',rarity:'rare'},
   iron_ingot:{n:'Batang Besi',e:'🔩',rarity:'common'},
   gold_ingot:{n:'Batang Emas',e:'🥇',rarity:'uncommon'},
+  copper_ingot:{n:'Batang Tembaga',e:'🥉',rarity:'common'},
+  steel_ingot:{n:'Batang Baja',e:'⚙️',rarity:'uncommon'},
+  tungsten_ingot:{n:'Batang Tungsten',e:'⚫',rarity:'rare'},
+  tungstensteel_ingot:{n:'Batang Baja Tungsten',e:'🔷',rarity:'epic'},
   /* drop mob baru */
   pelt:{n:'Bulu Serigala',e:'🐺',rarity:'uncommon'},
   venom:{n:'Racun Kalajengking',e:'🧪',rarity:'uncommon'},
@@ -1583,6 +1587,7 @@ Object.assign(ITEMS,{
   f_anvil:    {n:'Landasan Tempa', e:'⚒️', place:'anvil', rarity:'rare'},
   f_stove:    {n:'Tungku Masak', e:'🍲', place:'stove', rarity:'uncommon'},
   f_campfire: {n:'Api Unggun', e:'🔥', place:'campfire', rarity:'common'},
+  f_smelter:  {n:'Smelter Industri', e:'🏭', place:'smelter', rarity:'uncommon'},
   /* Rumah modular 5×5: diletakkan seperti perabot, bisa disusun & digabung
      satu sama lain menjadi bangunan besar berbentuk bebas. */
   f_house:    {n:'Rumah Kayu', e:'🏠', place:'house', rarity:'uncommon'},
@@ -1591,6 +1596,7 @@ Object.assign(ITEMS,{
 Object.assign(DROP_COLOR,{f_table:0x8a5a2b,f_chair:0x8a5a2b,f_bed:0xc23b3b,
   f_chest:0x9a6b3c,f_boat:0xb07c46,f_board:0x8a5a2b,
   f_workbench:0xb8894f,f_anvil:0x474c52,f_stove:0x8f4a38,f_campfire:0x5a4128,
+  f_smelter:0x3b3e46,
   f_house:0x9d6a35});
 
 
@@ -1611,6 +1617,7 @@ RECIPES.push(
   {out:'f_stove',need:{stone:10,wood:4,coal:2},name:'Tungku Masak'},
   {out:'f_campfire',need:{wood:5,fiber:2,coal:1},name:'Api Unggun'},
   {out:'f_anvil',need:{iron_ingot:6,stone:6,wood:2},skill:'smith',prof:{mining:8},name:'Landasan Tempa'},
+  {out:'f_smelter',need:{stone:12,iron_ore:4,coal:4},skill:'smith',prof:{mining:4},name:'Smelter Industri'},
   /* Rumah modular 5×5: satu modul per craft; disusun bebas & digabung di dunia */
   {out:'f_house',need:{wood:20,fiber:8,stone:6},name:'Rumah Kayu'}
 );

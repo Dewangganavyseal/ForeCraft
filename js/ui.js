@@ -1840,7 +1840,7 @@ const UI={
     }
   },
   /* ---------- panel ---------- */
-  PANELS:['bag','skills','craft','help','npc','party','chest','shop','term','anvil','altar','settings','char'],
+  PANELS:['bag','skills','craft','help','npc','party','chest','shop','term','anvil','altar','settings','char','smelter'],
   toggle(name){
     if(this.open===name)this.open=null;
     else{
@@ -1862,6 +1862,7 @@ const UI={
         if(name==='altar'&&typeof Altar!=='undefined')Altar.render();
         if(name==='settings'&&typeof Settings!=='undefined')Settings.render();
         if(name==='char'&&typeof CharView!=='undefined')CharView.openPanel();
+        if(name==='smelter'&&typeof Smelter!=='undefined')Smelter.render();
         /* terminal rahasia: isinya dibangun dinamis oleh modul chat */
         if(name==='term'&&typeof Chat!=='undefined')Chat.renderTerm();
       }catch(err){
@@ -1871,6 +1872,7 @@ const UI={
     }
     /* menutup panel peti = melepas peti yang sedang dibuka */
     if(this.open!=='chest')Furni.chest=null;
+    if(this.open!=='smelter'&&typeof Smelter!=='undefined')Smelter.currentFurni=null;
     this.syncPanels();
   },
 

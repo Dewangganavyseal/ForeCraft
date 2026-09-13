@@ -141,6 +141,10 @@ const Furni={
     campfire:{n:'Api Unggun',e:'🔥',item:'f_campfire',r:2.1,label:'🔥 Hangatkan Diri',
       build(){return WSModels.make('campfire',0.30);},
       use(f){Furni.warm(f);}},
+    /* Smelter Industri: melebur 2 Ore menjadi 1 Ingot dengan bahan bakar Coal */
+    smelter:{n:'Smelter Industri',e:'🏭',item:'f_smelter',r:2.4,label:'🏭 Buka Smelter',
+      build(){return (typeof Smelter!=='undefined'&&Smelter.buildModel)?Smelter.buildModel():new THREE.Group();},
+      use(f){if(typeof Smelter!=='undefined'&&Smelter.openUI)Smelter.openUI(f);}},
 
     /* ---------- RUMAH MODULAR 5×5 ----------
        Saat dipasang, rumah DITULIS sebagai blok dunia sungguhan
@@ -1925,6 +1929,15 @@ const Furni={
         }
       }
     }
+
+    /* --- Smelter Industri: proses peleburan latar belakang & animasi --- */
+    for(const f of this.list){
+      if(f.def==='smelter'&&typeof Smelter!=='undefined'&&Smelter.update)
+        Smelter.update(f,dt);
+    }
+    if(typeof Smelter!=='undefined'&&Smelter.updatePools)
+      Smelter.updatePools(dt);
+
     this.populate();
   },
 
@@ -2058,7 +2071,7 @@ const Furni={
      menjatuhkan kembali itemnya, sehingga isi rumah desa bisa dipanen.
      ========================================================================= */
   HP:{table:14,chair:10,bed:18,chest:24,boat:20,board:14,
-    workbench:16,anvil:30,stove:24,campfire:10},
+    workbench:16,anvil:30,stove:24,campfire:10,smelter:30},
   hitNearest(pos,facing){
     let best=null,bd=1e9;
     for(const f of this.list){
@@ -2107,6 +2120,8 @@ const Furni={
           const o={d:f.def,x:f.x,y:f.y,z:f.z,r:f.yaw};
           /* isi peti ikut disimpan (slot kosong tetap null agar posisinya tetap) */
           if(f.inv)o.inv=f.inv.map(s=>s?this._vaultSlot(s):null);
+          /* status tungku & peleburan smelter */
+          if(f.smelter)o.smelter=Object.assign({},f.smelter);
           return o;
         });
       /* RUMAH modular (blok dunia): simpan daftar modul + pintu + ketinggian.
@@ -2196,6 +2211,8 @@ const Furni={
     if(!Array.isArray(data))return;
     for(const f of data){
       const o=this.place(f.d,f.x,f.y,f.z,f.r,false);
+      /* pulihkan data smelter */
+      if(o&&f.smelter)o.smelter=Object.assign({},f.smelter);
       /* pulihkan isi peti pada slot aslinya (l = level tempa, m = tanda Log Pass) */
       if(o&&o.inv&&Array.isArray(f.inv))
         for(let i=0;i<o.inv.length&&i<f.inv.length;i++){

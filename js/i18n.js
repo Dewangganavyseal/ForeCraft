@@ -59,6 +59,10 @@ const I18N_ITEMS={
   crystal:{en:'Frozen Crystal',zh:'冰晶',ja:'氷結クリスタル'},
   iron_ingot:{en:'Iron Ingot',zh:'铁锭',ja:'鉄インゴット'},
   gold_ingot:{en:'Gold Ingot',zh:'金锭',ja:'金インゴット'},
+  copper_ingot:{en:'Copper Ingot',zh:'铜锭',ja:'銅インゴット'},
+  steel_ingot:{en:'Steel Ingot',zh:'钢锭',ja:'鋼インゴット'},
+  tungsten_ingot:{en:'Tungsten Ingot',zh:'钨锭',ja:'タングステンインゴット'},
+  tungstensteel_ingot:{en:'Tungsten Steel Ingot',zh:'钨钢锭',ja:'タングステン鋼インゴット'},
   pelt:{en:'Wolf Pelt',zh:'狼毛皮',ja:'狼の毛皮'},
   venom:{en:'Scorpion Venom',zh:'蝎毒',ja:'サソリの毒'},
   centipede_shell:{en:'Centipede Shell',zh:'蜈蚣壳',ja:'ムカデの殻'},
@@ -187,6 +191,7 @@ const I18N_ITEMS={
   f_anvil:{en:'Anvil',zh:'铁砧',ja:'金床'},
   f_stove:{en:'Cooking Stove',zh:'炉灶',ja:'かまど'},
   f_campfire:{en:'Campfire',zh:'营火',ja:'焚き火'},
+  f_smelter:{en:'Industrial Smelter',zh:'工业熔炼炉',ja:'工業用製錬炉'},
   f_house:{en:'Wooden House',zh:'木屋',ja:'木の家'},
 };
 

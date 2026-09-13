@@ -52,18 +52,15 @@ const Monsters={
     /* KUMBANG TANDUK: mob darat biome TANAH MERAH (REDLANDS). Bertanduk,
        menyeruduk (jarak dekat) & melempar balok batu (jarak jauh). Cukup
        tangguh tapi bukan boss. */
-    kumbang:{hp:120,dmg:16,xp:46,speed:3.0,r:0.6,aggro:16},
+    kumbang:{hp:120,dmg:16,xp:46,speed:3.0,r:0.6,aggro:16,bossScale:1.225},
     /* YETI: mob besar biome TUNDRA SALJU. Kuat & lambat, dengan 4 aksi tempur
        (lompat+hantam, sapuan cakar, hantaman ganda, pusaran salju 360°).
        Sebanding lizard-plus: lebih tangguh dari serigala, di bawah golem. */
     yeti:{hp:210,dmg:22,xp:78,speed:2.9,r:0.85,aggro:18},
     /* SEMUT RAKSASA: mob biome TANAH MERAH, berdampingan dengan kumbang.
        Cepat & agresif tapi tidak terlalu tebal; dua serangan (gigit & terjang).
-       `bossScale` 0.583 = 0.20 × (1.75/0.6), yaitu skala bawaan semut dikali
-       rasio pembesaran boss milik kumbang (2.92×). Tanpa ini, skala boss
-       absolut 1.75 akan membuat semut 8.75× ukuran normalnya (skala bawaannya
-       cuma 0.20) — jauh lebih besar dari mini boss kumbang di biome sama. */
-    semut:{hp:95,dmg:14,xp:42,speed:4.2,r:0.55,aggro:17,bossScale:0.583},
+       `bossScale` proporsional dengan skala boss kumbang yang dikecilkan 30%. */
+    semut:{hp:95,dmg:14,xp:42,speed:4.2,r:0.55,aggro:17,bossScale:0.408},
     /* REAPER: hantu hitam bersabit, KHUSUS PENJAGA DUNGEON. Tidak pernah ikut
        undian mob biome (namanya tidak ada di BIOME_INFO.mobs) — hanya dipanggil
        Dungeon.update. Menggantikan wujud "Wraith" lama yang cuma skin.
@@ -583,7 +580,7 @@ const Monsters={
           boss bertubuh 4.3× tapi hitbox-nya cuma 1.75×. */
     if(boss){
       if(!T.noBossScale){
-        if(opts.scaleMul)g.scale.setScalar(natScale*opts.scaleMul);
+        if(opts.scaleMul)g.scale.setScalar(natScale*opts.scaleMul*(type==='kumbang'?0.70:1));
         else g.scale.setScalar(T.bossScale!==undefined?T.bossScale:1.75);
       }
       if(opts.mark!==false){
@@ -627,7 +624,7 @@ const Monsters={
       speed:T.speed*(boss?0.85:1),
       dmg:Math.round(T.dmg*(boss?2.2:1)),
       xp:Math.round(T.xp*(boss?2:1)),
-      r:T.r*(boss?(T.noBossScale?1.25:1.75):1),
+      r:T.r*(boss?(T.noBossScale?1.25:(type==='kumbang'?1.22:1.75)):1),
       dead:false,deathT:0,flash:0,hopT:rand(0.5,1.5),onGround:false,inWater:false,
       windup:0,smashTarget:null,poisonHit:0,
       /* status dari efek senjata: pendarahan, racun bilah, perlambatan */
