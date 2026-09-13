@@ -1648,6 +1648,9 @@ const UI={
     shield_yeti:'buttons/shield_yeti.png',
     shield_samurai:'buttons/shield_samurai.png',
     shield_dragon:'buttons/shield_dragon.png',
+    shield_leviathan:'buttons/shield_leviathan.png',
+    fish_scale:'buttons/fish_scale.png',
+    golden_fish_scale:'buttons/golden_fish_scale.png',
     /* Kompatibilitas alias tameng lama */
     shield_wood:'buttons/shield_wood.png',
     shield_flame:'buttons/shield_flame.png',

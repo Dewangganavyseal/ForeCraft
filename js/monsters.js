@@ -1300,7 +1300,7 @@ const Monsters={
          monster liar. Dulu titik api & damagenya dipaku ke Player sehingga naga
          tidak pernah menyemburkan api ketika lawannya NPC, dan naga peliharaan
          tidak pernah membakar musuhnya. */
-      if(m.type==='dragon'&&m.flyT>0&&!m.catchActive){
+      if(m.type==='dragon'&&m.flyT>0&&!m.catchActive&&!m.noFire){
         const stT=m.drag&&m.drag.stateT||0;
         const fb=(typeof Mob_Dragon!=='undefined')?Mob_Dragon.flyFireActive(stT):0;
         const ft=this.battleTarget(m,26);
@@ -3107,6 +3107,12 @@ const Monsters={
   },
 
   physics(m,dt){
+    /* bila naga sedang terbang, lewati gravitasi & ground clamp agar melayang bebas */
+    if(m.type==='dragon' && (m.flyT||0)>0){
+      m.pos.x+=m.vel.x*dt;
+      m.pos.z+=m.vel.z*dt;
+      return;
+    }
     m._stepCd=Math.max(0,(m._stepCd||0)-dt);
     m.detourT=Math.max(0,(m.detourT||0)-dt);
     m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);

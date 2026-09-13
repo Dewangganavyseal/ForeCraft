@@ -300,6 +300,13 @@ const Game={
       }
       Monsters.list=[];
     }
+    if(typeof FishSys!=='undefined'&&FishSys.list){
+      for(let i=FishSys.list.length-1;i>=0;i--){
+        const f=FishSys.list[i];
+        if(f&&f.root&&f.root.parent)f.root.parent.remove(f.root);
+      }
+      FishSys.list=[];
+    }
 
     if(typeof MainMenu!=='undefined'&&MainMenu.showMain)MainMenu.showMain();
     this.startMenuBackground();
@@ -564,7 +571,7 @@ const MainMenu={
     this.el.innerHTML=`
       <div class="menu-wrap">
         <h1 class="menu-title">FORECRAFT</h1>
-        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.14'}</div>
+        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.15'}</div>
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>

@@ -289,6 +289,66 @@ const Mob_Dragon={
       P['t'+i+'x']=0.06+0.04*Math.sin(ph*0.4-i*0.4);
     }
   },
+  /* ANIMASI LOMPAT & MENDARAT MULUS */
+  poseJump(P,t,vy,landT){
+    if((landT||0)>0){
+      /* fase mendarat mulus (shock absorption & kompresi sendi) */
+      const k=clamp(landT/0.45,0,1);
+      const compress=Math.sin(k*Math.PI);
+      P.torsoY=-0.32*compress;
+      P.torsoPitch=-0.14*compress;
+      P.neckPitch=0.18*compress;
+      P.headPitch=-0.15*compress;
+      P.jaw=0.08*compress;
+      /* kaki depan & belakang menekuk menyerap hentakan pendaratan */
+      P.legLX=0.25*compress; P.legRX=0.25*compress;
+      P.legLoX=0.75*compress; P.legRoX=0.75*compress;
+      P.armLX=0.35*compress; P.armRX=0.35*compress;
+      P.armLoX=0.65*compress; P.armLoX=0.65*compress;
+      /* sayap membentang menahan angin lalu terlipat anggun */
+      P.wingRZ=0.75-0.3*compress; P.wingLZ=-(0.75-0.3*compress);
+      P.wingRoZ=0.85; P.wingLoZ=-0.85;
+      for(let i=0;i<5;i++){
+        P['t'+i+'y']=0.08*Math.sin(t*3-i*0.4);
+        P['t'+i+'x']=0.12*compress;
+      }
+      return;
+    }
+
+    /* fase di udara (ascend saat vy > 0.5, descend saat turun) */
+    const rising=(vy>0.5);
+    const TAU=Math.PI*2,wph=t*TAU*1.8;
+    const flap=Math.sin(wph);
+    P.wingRZ=0.45+0.65*flap;
+    P.wingLZ=-(0.45+0.65*flap);
+    P.wingRoZ=0.6+0.4*flap;
+    P.wingLoZ=-(0.6+0.4*flap);
+    P.wingRY=0.25; P.wingLY=-0.25;
+
+    if(rising){
+      /* melesat naik: badan mendongak, kaki ditarik ke atas */
+      P.torsoPitch=0.24;
+      P.neckPitch=-0.16;
+      P.headPitch=0.12;
+      P.jaw=0.18;
+      P.legLX=0.45; P.legRX=0.45; P.legLoX=1.1; P.legRoX=1.1;
+      P.armLX=0.4; P.armRX=0.4; P.armLoX=0.8; P.armRoX=0.8;
+      P.rootZ=0.2;
+    }else{
+      /* melayang turun: kaki menjulur bersiap menyentuh tanah */
+      P.torsoPitch=-0.10;
+      P.neckPitch=0.08;
+      P.headPitch=0.05;
+      P.jaw=0.06;
+      P.legLX=0.15; P.legRX=0.15; P.legLoX=0.35; P.legRoX=0.35;
+      P.armLX=0.15; P.armRX=0.15; P.armLoX=0.25; P.armRoX=0.25;
+      P.rootZ=-0.1;
+    }
+    for(let i=0;i<5;i++){
+      P['t'+i+'y']=0.15*Math.sin(t*2.5-i*0.5);
+      P['t'+i+'x']=(rising?-0.12:0.08);
+    }
+  },
   poseClaw(P,t){
     const wind=this.sstep(0,0.26,t),strike=this.sstep(0.30,0.40,t),rec=this.sstep(0.55,0.95,t);
     P.armRX=this.lerp(this.lerp(this.lerp(0.08,2.05,wind),-1.35,strike),0.1,rec);
@@ -332,13 +392,14 @@ const Mob_Dragon={
   },
   /* TERBANG + SEMBURAN API (persis poseFly asli).
      lift 0-0.75 = lepas landas, b 1.25-2.95 = jendela sembur api,
-     land 3.05-3.85 = mendarat. rootY naik sampai ~2.25. */
-  poseFly(P,t){
-    const lift=this.sstep(0,0.75,t),land=this.sstep(3.05,3.85,t),flight=lift*(1-land);
-    const b=this.sstep(1.25,1.5,t)*(1-this.sstep(2.6,2.95,t));
-    const TAU=Math.PI*2,wph=t*TAU*2.3,slow=1-0.55*this.sstep(2.7,3.5,t);
+     land = mendarat. rootY naik sampai ~2.25. */
+  poseFly(P,t,dur){
+    const dTot=dur||3.85;
+    const lift=this.sstep(0,0.75,t),land=this.sstep(dTot-0.8,dTot,t),flight=lift*(1-land);
+    const b=dur?(flight*0.85):(this.sstep(1.25,1.5,t)*(1-this.sstep(2.6,2.95,t)));
+    const TAU=Math.PI*2,wph=t*TAU*2.3,slow=1-0.55*this.sstep(dTot-1.15,dTot-0.35,t);
     P.rootY=flight*(2.25+0.16*Math.sin((t-0.75)*4.2));
-    P.rootZ=(1-land)*1.0*Math.sin(clamp((t-0.5)/2.5,0,1)*Math.PI);
+    P.rootZ=(1-land)*1.0*Math.sin(clamp((t-0.5)/Math.max(1,dTot-1.3),0,1)*Math.PI);
     P.torsoPitch=flight*(0.15+0.12*b);
     P.torsoRoll=flight*0.03*Math.sin(wph*0.5);
     const fz=0.95*(1-flight)+(0.3+0.85*Math.sin(wph)*slow)*flight;
@@ -346,7 +407,7 @@ const Mob_Dragon={
     const fy=0.22*(1-flight)+(0.12+0.12*Math.sin(wph-0.5))*flight;
     P.wingRZ=fz;P.wingLZ=-fz;P.wingRoZ=fo;P.wingLoZ=-fo;P.wingRY=fy;P.wingLY=-fy;
     P.legLX=0.5*flight;P.legRX=0.5*flight;P.legLoX=1.15*flight;P.legRoX=1.15*flight;
-    P.armLX=0.35*flight;P.armRX=0.35*flight;P.armLoX=0.8*flight;P.armRoX=0.8*flight;
+    P.armLX=0.35*flight;P.armRX=0.35*flight;P.armLoX=0.8*flight;P.armLoX=0.8*flight;
     P.neckPitch=-0.12*flight+0.2*b;
     P.headPitch=0.1*flight+0.3*b;
     P.headYaw=0.03*Math.sin(t*30)*b;
@@ -468,14 +529,22 @@ const Mob_Dragon={
     const em=m.flash>0?0xaa2222:0x000000;
     m.mesh.traverse(o=>{if(o.material&&o.material.emissive)o.material.emissive.setHex(em);});
 
+    /* Update deteksi pendaratan mulus */
+    if(m._wasInAir && m.onGround && (m.flyT||0)<=0){
+      m.landT = 0.45; // 0.45 detik animasi pendaratan mulus
+    }
+    m._wasInAir = !m.onGround && (m.flyT||0)<=0;
+    if((m.landT||0) > 0){
+      m.landT = Math.max(0, m.landT - dt);
+    }
+
     /* tentukan state dari kondisi naga */
     const sp=Math.hypot(m.vel.x,m.vel.z);
     let state;
     if((m.clawT||0)>0)state='claw';
     else if((m.tailT||0)>0)state='tail';
     else if((m.flyT||0)>0)state='fly';
-    /* lari: naga harus benar-benar terlihat lari saat mengejar (ambang
-       sedikit diturunkan; burst kecepatan lari diberikan monsters.js) */
+    else if(!m.onGround || (m.landT||0)>0)state='jump';
     else if(sp>2.9)state='run';
     else if(sp>0.4)state='walk';
     else state='idle';
@@ -504,15 +573,18 @@ const Mob_Dragon={
     if(state==='idle')this.poseIdle(drag.P,drag.stateT);
     else if(state==='walk')this.poseWalk(drag.P,drag.stateT,m.gaitPh||0);
     else if(state==='run')this.poseRun(drag.P,drag.stateT,m.gaitPh||0);
+    else if(state==='jump')this.poseJump(drag.P,drag.stateT,(m.vel?m.vel.y:0),m.landT);
     else if(state==='claw')this.poseClaw(drag.P,drag.stateT);
     else if(state==='tail')this.poseTail(drag.P,drag.stateT);
     else if(state==='fly'){
-      this.poseFly(drag.P,drag.stateT);
-      /* semburan api selama jendela terbang */
-      const fb=this.flyFireActive(drag.stateT);
-      if(fb>0){
-        m._fireAcc=(m._fireAcc||0)+dt*(70+40*fb);
-        while(m._fireAcc>=1){m._fireAcc-=1;this.spawnFire(m);}
+      this.poseFly(drag.P,drag.stateT,m.flyDur);
+      /* semburan api selama jendela terbang (kecuali pet terbang tanpa api) */
+      if(!m.noFire){
+        const fb=this.flyFireActive(drag.stateT);
+        if(fb>0){
+          m._fireAcc=(m._fireAcc||0)+dt*(70+40*fb);
+          while(m._fireAcc>=1){m._fireAcc-=1;this.spawnFire(m);}
+        }
       }
     }
 

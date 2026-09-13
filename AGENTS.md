@@ -1,5 +1,8 @@
 # Project Forecraft — Agent Instructions
 
+## Workspace & Synchronization Rules
+- Maintain and update **only** in `Project Forecraft v0.2.4`. Do not update or sync to `v0.2.3`.
+
 ## Git & Versioning Rules
 Whenever pushing changes or updating the GitHub repository (`https://github.com/Dewangganavyseal/ForeCraft`):
 1. **Always increment the project version**:

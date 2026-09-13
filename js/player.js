@@ -303,6 +303,10 @@ const Player={
     if(this.dead)return;
     /* sedang Hantam Bumi: lompatannya digerakkan mesin fase slamQuick */
     if(this.slamQuick)return;
+    /* double-space cek untuk kemampuan terbang pet naga */
+    if(typeof Capture!=='undefined'&&Capture.onJumpInput&&Capture.onJumpInput()){
+      return;
+    }
     /* lompat saat menunggangi diteruskan ke mount */
     if(typeof Capture!=='undefined'&&Capture.riding){Capture.jumpQ=true;return;}
     if(this.onGround){this.vel.y=CFG.PLAYER.jump;this.onGround=false;this.airJumped=false;

@@ -18,7 +18,7 @@ const Anvil={
   MAX_LV:10,
   DMG_PER_LV:0.08,
   DEF_PER_LV:0.06,
-  COIN_BASE:{common:15,uncommon:30,rare:60,epic:120,legendary:250},
+  COIN_BASE:{common:15,uncommon:30,rare:60,epic:120,legendary:250,mythic:400},
   /* bahan tempa per pedang */
   SWORD_MAT:{
     sword_berserker:'pelt', sword_elven:'wood', sword_wood:'wood',
@@ -46,7 +46,10 @@ const Anvil={
     const it=ITEMS[id];
     if(!it)return null;
     if(it.weapon)return this.SWORD_MAT[id]||'iron_ingot';
-    if(it.armor)return this.TIER_MAT[it.armor.tier]||'iron_ingot';
+    if(it.armor){
+      if(it.armor.enchantMat)return it.armor.enchantMat;
+      return this.TIER_MAT[it.armor.tier]||'iron_ingot';
+    }
     return null;
   },
 

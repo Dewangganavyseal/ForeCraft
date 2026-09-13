@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.14',
+  VERSION:'0.2.15',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -685,6 +685,9 @@ const ITEMS={
   hard_shell:{n:'Kulit Keras',e:'🛡',rarity:'mythic'},
   green_blood:{n:'Darah Hijau',e:'🧪',rarity:'mythic'},
   toxic_venom:{n:'Racun Berbisa',e:'☠',rarity:'mythic'},
+  /* bahan laut & sisik ikan */
+  fish_scale:{n:'Sisik Ikan',e:'🐟',rarity:'uncommon'},
+  golden_fish_scale:{n:'Sisik Ikan Emas',e:'✨',rarity:'mythic'},
   /* pecahan jiwa: drop khas REAPER, penjaga reruntuhan/dungeon */
   soul_shard:{n:'Pecahan Jiwa',e:'👻',rarity:'rare'},
   /* ---------- DUNGEON CHANGER: dijual NPC Dungeon Master ----------
@@ -862,6 +865,10 @@ const ITEMS={
   shield_dragon:    {n:'Dragonscale Greatshield', e:'🔥',rarity:'mythic',
     armor:{slot:'shield',def:0.24,tier:'tungstensteel',blk:0.32,bkp:0.75}},
 
+  /* Rarity Biru (Rare) Tier Lv 4 (Ocean Leviathan) */
+  shield_leviathan: {n:'Leviathan Goldscale Aegis', e:'🛡️',rarity:'rare',
+    armor:{slot:'shield',def:0.23,tier:'crystal',blk:0.31,bkp:0.74,enchantMat:'fish_scale'}},
+
   /* Slot placeholder untuk alias mundur */
   shield_wood: null, shield_flame: null, shield_venom: null,
   shield_storm: null, shield_frost: null, shield_dark: null,
@@ -949,11 +956,13 @@ const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mus
   sword_venom:0xa8e86a,sword_frost:0xd6f4ff,sword_titan:0xffb066,
   cloak_swift:0x8fe0ff,helm_guard:0xc9d2dc,boots_greed:0xffd24d,
   plate_regen:0x7dffb0,helm_thorns:0xff6bd6,
-  /* 12 tameng otentik */
+  /* 13 tameng otentik & sisik */
+  fish_scale:0x8fd8ff,golden_fish_scale:0xffd700,
   shield_berserker:0x7a6a5a,shield_elven:0x3a7a48,shield_steampunk:0xc86a3b,
   shield_iron:0x9aa6b4,shield_paladin:0xf5c842,shield_shadow:0x2e343e,
   shield_juggernaut:0x586474,shield_crystal:0x60a5fa,shield_reaper:0xa855f7,
   shield_yeti:0x8aa6be,shield_samurai:0xba1e2b,shield_dragon:0xb52216,
+  shield_leviathan:0x38e1ff,
   /* alias tameng lama */
   shield_wood:0x9c6b35,shield_flame:0xff7a1f,shield_venom:0x2bcc4f,
   shield_storm:0xffd75e,shield_frost:0x9fd6ff,shield_dark:0xa633ff};
@@ -1086,6 +1095,7 @@ const RECIPES=[
   {out:'shield_yeti',need:{crystal:6,pelt:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Yeti Glacier Barricade'},
   {out:'shield_samurai',need:{tungstensteel_ore:8,gold_ingot:4,centipede_shell:2},skill:'smith',prof:{mining:22},name:'Samurai O-Tate'},
   {out:'shield_dragon',need:{tungstensteel_ore:10,boss_core:2,pelt:4},skill:'smith',prof:{mining:25},name:'Dragonscale Greatshield'},
+  {out:'shield_leviathan',need:{golden_fish_scale:1,fish_scale:8,crystal:4},skill:'smith',prof:{mining:18},name:'Leviathan Goldscale Aegis'},
 
   /* Kompatibilitas resep lama */
   {out:'shield_wood',need:{wood:6,fiber:2},name:'Tameng Kayu'},
@@ -1404,6 +1414,7 @@ const SHOP_VALUE={
   iron_ore:5,gold_ore:8,crystal:12,iron_ingot:9,gold_ingot:15,pelt:4,venom:7,
   copper_ore:4,steel_ore:11,tungsten_ore:15,tungstensteel_ore:22,
   centipede_shell:14,
+  fish_scale:8,golden_fish_scale:180,
   insect_leg:35,hard_shell:40,green_blood:45,toxic_venom:50,
   boss_core:40,
 };

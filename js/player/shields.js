@@ -404,9 +404,57 @@ const ShieldModels = {
     return g;
   },
 
+  /* ---------- 13. LEVIATHAN GOLDSCALE AEGIS (Tier Lv 4 / Mythic) ---------- */
+  buildLeviathan() {
+    const g = new THREE.Group(); g.name = 'Shield_leviathan';
+    const C = {
+      abyss: 0x0e1730,
+      deepBlue: 0x16233f,
+      seaBlue: 0x1f2c4d,
+      goldScale: 0xf5c842,
+      goldBright: 0xffe07a,
+      goldDark: 0xb3781a,
+      aquaGlow: 0x38e1ff,
+      horn: 0x0a1124
+    };
+    const plate = this._pl(0.52, 0.62, 0.05, C.deepBlue, 0.06, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.42, 0.72, 0.05, C.seaBlue, 0.04, 0.005));
+
+    // Barisan sisik ikan emas bertumpuk (golden fish scales)
+    for (const [x, y] of [
+      [0, 0.28], [-0.14, 0.18], [0.14, 0.18],
+      [0, 0.08], [-0.12, -0.02], [0.12, -0.02],
+      [0, -0.12], [-0.10, -0.22], [0.10, -0.22],
+      [0, -0.32]
+    ]) {
+      g.add(this._pl(0.13, 0.11, 0.065, C.goldScale, y, 0.02, x));
+      g.add(this._pl(0.09, 0.07, 0.072, C.goldBright, y + 0.01, 0.025, x));
+      g.add(this._pl(0.14, 0.02, 0.07, C.goldDark, y - 0.045, 0.022, x));
+    }
+
+    // Bilah sirip / duri serpent laut (leviathan spines) di kiri-kanan
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.08, 0.24, 0.06, C.horn, 0.32, 0.015, 0.26 * s));
+      g.add(this._pl(0.06, 0.20, 0.05, C.seaBlue, 0.44, 0.012, 0.29 * s));
+      g.add(this._pl(0.04, 0.16, 0.045, C.aquaGlow, 0.54, 0.01, 0.32 * s, C.aquaGlow));
+      // Taring sirip bawah
+      g.add(this._pl(0.06, 0.16, 0.05, C.deepBlue, -0.24, 0.015, 0.24 * s));
+      g.add(this._pl(0.04, 0.12, 0.04, C.aquaGlow, -0.32, 0.018, 0.22 * s, C.aquaGlow));
+    }
+
+    // Inti mutiara laut bercahaya (Bioluminescent Leviathan Core)
+    g.add(this._pl(0.18, 0.18, 0.075, C.abyss, 0.08, 0.028));
+    g.add(this._pl(0.10, 0.10, 0.095, C.aquaGlow, 0.08, 0.045, 0, C.aquaGlow));
+
+    this._addBackGrip(g, C.deepBlue, C.goldScale);
+    g.userData.rawH = 1.14;
+    return g;
+  },
+
   /* Peta id item -> builder */
   MAP: {
-    // 12 Tameng Otentik Baru
+    // 13 Tameng Otentik Baru
     shield_berserker:  'buildBerserker',
     shield_elven:      'buildElven',
     shield_steampunk:  'buildSteampunk',
@@ -419,6 +467,7 @@ const ShieldModels = {
     shield_yeti:       'buildYeti',
     shield_samurai:    'buildSamurai',
     shield_dragon:     'buildDragon',
+    shield_leviathan:  'buildLeviathan',
 
     // Alias kompatibilitas mundur untuk save/drop/inventory lama
     shield_wood:       'buildBerserker',

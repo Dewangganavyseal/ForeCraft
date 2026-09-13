@@ -162,6 +162,9 @@ const I18N_ITEMS={
   shield_yeti:{en:'Yeti Glacier Barricade',zh:'雪怪冰川路障盾',ja:'イエティ氷河の防壁'},
   shield_samurai:{en:'Samurai O-Tate',zh:'武士大盾',ja:'サムライ大盾'},
   shield_dragon:{en:'Dragonscale Greatshield',zh:'龙鳞巨盾',ja:'竜鱗のグレートシールド'},
+  shield_leviathan:{en:'Leviathan Goldscale Aegis',zh:'利维坦金鳞圣盾',ja:'リヴァイアサン金鱗の盾'},
+  fish_scale:{en:'Fish Scale',zh:'鱼鳞',ja:'魚の鱗'},
+  golden_fish_scale:{en:'Golden Fish Scale',zh:'金鱼鳞',ja:'黄金の魚鱗'},
   /* Kompatibilitas tameng lama */
   shield_wood:{en:'Wooden Shield',zh:'木盾',ja:'木の盾'},
   shield_flame:{en:'Ember Shield',zh:'炭火之盾',ja:'燠火の盾'},
