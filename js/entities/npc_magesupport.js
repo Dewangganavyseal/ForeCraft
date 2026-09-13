@@ -314,19 +314,22 @@ const NPC_Magesupport={
        HEAL: dirapal begitu ADA anggota tim yang HP-nya berkurang (tanpa
        ambang persen HP lagi). Buffnya menyasar seluruh tim, bukan target,
        jadi jarak ke musuh tidak lagi jadi syarat. Masing-masing butuh stamina. */
-    if(S.healCd<=0&&this.teamHurt()&&((n.stamina||0)>=35)){
-      n.stamina=(n.stamina||0)-35; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-35 STAM','#ffd24d');
+    const hCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,35):Math.max(46,Math.round((n.maxStamina||100)*0.30));
+    if(S.healCd<=0&&this.teamHurt()&&((n.stamina||0)>=hCost)){
+      n.stamina=(n.stamina||0)-hCost; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${hCost} STAM`,'#ffd24d');
       this.startCast(n,'heal');return true;
     }
-    if(S.shCd<=0&&d<13&&((n.stamina||0)>=30)){
-      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
+    const shCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,30):Math.max(39,Math.round((n.maxStamina||100)*0.30));
+    if(S.shCd<=0&&d<13&&((n.stamina||0)>=shCost)){
+      n.stamina=(n.stamina||0)-shCost; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${shCost} STAM`,'#ffd24d');
       this.startCast(n,'shield');return true;
     }
-    if(S.starCd<=0&&d<13&&((n.stamina||0)>=40)){
-      n.stamina=(n.stamina||0)-40; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-40 STAM','#ffd24d');
+    const starCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,40):Math.max(52,Math.round((n.maxStamina||100)*0.30));
+    if(S.starCd<=0&&d<13&&((n.stamina||0)>=starCost)){
+      n.stamina=(n.stamina||0)-starCost; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${starCost} STAM`,'#ffd24d');
       this.startCast(n,'star',tgt);return true;
     }
 
@@ -880,10 +883,11 @@ const NPC_Magesupport={
        dirapal begitu ada anggota tim yang HP-nya berkurang & cooldown siap.
        Dibatasi ke mage yang SUDAH jadi rekan (NPCS.isTeam) supaya pengembara
        langka yang cuma melintas tidak menghujani pemain dengan heal gratis. */
+    const hCostOoc=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,35):Math.max(46,Math.round((n.maxStamina||100)*0.30));
     if(!S.cast&&S.healCd<=0&&!n.retreat&&(!n.target||n.target.dead)&&
-       typeof NPCS!=='undefined'&&NPCS.isTeam&&NPCS.isTeam(n)&&this.teamHurt()&&((n.stamina||0)>=35)){
-      n.stamina=(n.stamina||0)-35; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-35 STAM','#ffd24d');
+       typeof NPCS!=='undefined'&&NPCS.isTeam&&NPCS.isTeam(n)&&this.teamHurt()&&((n.stamina||0)>=hCostOoc)){
+      n.stamina=(n.stamina||0)-hCostOoc; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${hCostOoc} STAM`,'#ffd24d');
       this.startCast(n,'heal');
     }
     /* bola bintang & aura perisai yang sudah tampil di-tick FX.update sendiri

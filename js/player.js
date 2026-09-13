@@ -19,6 +19,7 @@ const Player={
   pos:new THREE.Vector3(),vel:new THREE.Vector3(),
   facing:0,onGround:false,inWater:false,dead:false,airJumped:false,
   hp:100,stamina:100,hunger:100,level:1,xp:0,kills:0,
+  name:'Ranger',hairStyle:4,hairColor:0x2c1f14,
   /* ---------- stat maksimum ikut level ----------
      Level 1 tetap 100 supaya keseimbangan awal tidak berubah; tiap level
      menambah kapasitas sesuai CFG. UI membaca fungsi ini untuk skala bar. */
@@ -59,6 +60,7 @@ const Player={
       this.rollG=PlayerModelBuilder.rollG;
       this.parts=PlayerModelBuilder.parts;
       this.armorG=this.parts.armorG;
+      this.setHair(this.hairStyle, this.hairColor);
     }else{
       this.mesh=new THREE.Group();
       this.rollG=new THREE.Group();this.mesh.add(this.rollG);
@@ -68,6 +70,15 @@ const Player={
     }
     Game.scene.add(this.mesh);
     this.refreshArmor();
+  },
+
+  /* ---------- atur model & warna rambut karakter ---------- */
+  setHair(style, color){
+    if(style!==undefined)this.hairStyle=style;
+    if(color!==undefined)this.hairColor=color;
+    if(typeof PlayerModelBuilder!=='undefined'&&PlayerModelBuilder.setHair){
+      PlayerModelBuilder.setHair(this.hairStyle,this.hairColor,this.parts);
+    }
   },
 
   /* ---------- toggle visibilitas layer pakaian adaptif ---------- */

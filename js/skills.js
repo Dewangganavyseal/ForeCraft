@@ -46,16 +46,16 @@ const BLOCK_PROF={};
 BLOCK_PROF[B.WOOD]        ={sk:'logging',    xp:5,  lvl:1};
 BLOCK_PROF[B.PLANK]       ={sk:'logging',    xp:3,  lvl:1};
 BLOCK_PROF[B.ROOF]        ={sk:'logging',    xp:3,  lvl:1};
-BLOCK_PROF[B.STONE]       ={sk:'mining',     xp:8,  lvl:1};
-BLOCK_PROF[B.ORE_STONE]   ={sk:'mining',     xp:8,  lvl:1};
-BLOCK_PROF[B.ORE_COAL]    ={sk:'mining',     xp:10, lvl:4};
-BLOCK_PROF[B.ORE_COPPER]  ={sk:'mining',     xp:12, lvl:7};
-BLOCK_PROF[B.ORE_IRON]    ={sk:'mining',     xp:15, lvl:12};
-BLOCK_PROF[B.ORE_STEEL]   ={sk:'mining',     xp:24, lvl:18};
-BLOCK_PROF[B.ORE_GOLD]    ={sk:'mining',     xp:22, lvl:22};
-BLOCK_PROF[B.ORE_TUNGSTEN]={sk:'mining',     xp:26, lvl:26};
-BLOCK_PROF[B.ORE_CRYSTAL] ={sk:'mining',     xp:30, lvl:32};
-BLOCK_PROF[B.ORE_TUNGSTENSTEEL]={sk:'mining',xp:34, lvl:38};
+BLOCK_PROF[B.STONE]       ={sk:'mining',     xp:10, lvl:1};
+BLOCK_PROF[B.ORE_STONE]   ={sk:'mining',     xp:10, lvl:1};
+BLOCK_PROF[B.ORE_COAL]    ={sk:'mining',     xp:12, lvl:4};
+BLOCK_PROF[B.ORE_COPPER]  ={sk:'mining',     xp:15, lvl:7};
+BLOCK_PROF[B.ORE_IRON]    ={sk:'mining',     xp:18, lvl:12};
+BLOCK_PROF[B.ORE_STEEL]   ={sk:'mining',     xp:29, lvl:18};
+BLOCK_PROF[B.ORE_GOLD]    ={sk:'mining',     xp:27, lvl:22};
+BLOCK_PROF[B.ORE_TUNGSTEN]={sk:'mining',     xp:32, lvl:26};
+BLOCK_PROF[B.ORE_CRYSTAL] ={sk:'mining',     xp:36, lvl:32};
+BLOCK_PROF[B.ORE_TUNGSTENSTEEL]={sk:'mining',xp:41, lvl:38};
 BLOCK_PROF[B.LEAF]        ={sk:'harvesting', xp:2,  lvl:1};
 
 /* =========================================================================
@@ -103,7 +103,9 @@ const Prof={
   gain(id, baseXP, actionLevel){
     if(!SUBSKILLS[id]||baseXP<=0)return false;
     const s=SUBSKILLS[id];
-    const amount=baseXP*this.gray(id, actionLevel)*this.XP_MULT;
+    /* Penyesuaian patch: proficiency mining dinaikkan +20% lagi (total +44%) agar progres tidak seret */
+    const profMult=(id==='mining')?1.44:1.0;
+    const amount=baseXP*this.gray(id, actionLevel)*this.XP_MULT*profMult;
     if(amount<=0)return false;
     this.xp[id]=(this.xp[id]||0)+amount;
     let leveled=false;

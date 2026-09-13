@@ -214,14 +214,15 @@ const NPC_Stonegiant={
       return true;
     }
     if(!n.target)return false;
-    /* picu EARTHQUAKE: cooldown habis & ≥2 monster dekat & butuh stamina (40) */
-    if(n.quakeCd<=0&&this.countNear(n,8)>=2&&n.target.pos.distanceTo(n.pos)<10&&((n.stamina||0)>=40)){
-      n.stamina=(n.stamina||0)-40; n.stamRegenT=1.8;
+    /* picu EARTHQUAKE: cooldown habis & ≥2 monster dekat & butuh stamina (30% konsumsi) */
+    const qCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,40):Math.max(52,Math.round((n.maxStamina||100)*0.30));
+    if(n.quakeCd<=0&&this.countNear(n,8)>=2&&n.target.pos.distanceTo(n.pos)<10&&((n.stamina||0)>=qCost)){
+      n.stamina=(n.stamina||0)-qCost; n.stamRegenT=1.8;
       n.quake={t:0,hitDone:[false,false,false],target:n.target};
       n.quakeCd=14;
       UI.toast(`🗿 ${n.name} mengguncang bumi!`);
       NPCS.say(n,'HANCUR!!',2);
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-40 STAM','#ffd24d');
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${qCost} STAM`,'#ffd24d');
       return true;
     }
     return false;   // serangan biasa ditangani aiFight (dgn visual combo)

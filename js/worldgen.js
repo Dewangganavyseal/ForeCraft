@@ -757,14 +757,20 @@ const WGEN={
     const bio=this.biomeAt(nx,nz);
     if(bio===BIOME.OCEAN||bio===BIOME.BEACH)return null;
     const hP=this.height(nx,nz);
-    if(hP<CFG.SEA)return null;                    // tidak di air/pantai basah
-    /* tinggi dasar = MINIMUM area 4x4 (tanpa batas toleransi — flattening
-       akan meratakan sisanya). Bongkahan berdiri di titik terendah supaya
-       tidak ada sisi yang menggantung. */
+    if(hP<CFG.SEA)return null; // Titik pusat harus di atas permukaan air
+
+    /* Pastikan seluruh footprint 4x4 berada di daratan kering (bukan air / sungai / danau / laut / pantai) */
     let baseY=hP;
     for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++){
-      const hh=this.height(nx+dx,nz+dz);if(hh<baseY)baseY=hh;
+      const colX=nx+dx,colZ=nz+dz;
+      const b=this.biomeAt(colX,colZ);
+      if(b===BIOME.OCEAN||b===BIOME.BEACH)return null;
+      const hh=this.height(colX,colZ);
+      if(hh<CFG.SEA)return null; // Di bawah permukaan air (palung sungai / danau) -> tolak!
+      if(hh<baseY)baseY=hh;
     }
+    if(baseY<CFG.SEA)return null;
+
     /* JANGAN di dalam bangunan: desa & dungeon (radius +margin footprint 3) */
     for(const v of this.villagesNear(nx,nz))
       if(Math.max(Math.abs(nx-v.x),Math.abs(nz-v.z))<=v.r+3)return null;

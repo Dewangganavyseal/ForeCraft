@@ -184,16 +184,17 @@ const NPC_Rabbitwarrior={
     }
     if(!n.target)return false;
     const d=n.target.pos.distanceTo(n.pos);
-    /* picu RAPID CLAW (butuh stamina 30) */
-    if(n.rapidCd<=0&&d<3.2&&((n.stamina||0)>=30)){
-      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
+    /* picu RAPID CLAW (butuh stamina 30% konsumsi) */
+    const rCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,30):Math.max(39,Math.round((n.maxStamina||100)*0.30));
+    if(n.rapidCd<=0&&d<3.2&&((n.stamina||0)>=rCost)){
+      n.stamina=(n.stamina||0)-rCost; n.stamRegenT=1.8;
       rb.action={name:'skill',t:0,lastStrike:-1};
       rb.skillYaw=n.mesh.rotation.y;
       rb.skillPos=n.pos.clone();
       n.rapidCd=12;
       NPCS.say(n,'RAPID CLAW!',1.6);
       UI.toast(`🐰 ${n.name}: RAPID CLAW!`);
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${rCost} STAM`,'#ffd24d');
       return true;
     }
     /* serangan biasa: combo 1→2→3 bergilir */

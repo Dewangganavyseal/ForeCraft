@@ -268,6 +268,43 @@ const Game={
     }
   },
 
+  /* ---------- kembali ke main menu dari in-game ---------- */
+  returnToMenu(){
+    if(this.menuMode)return;
+    /* simpan data permainan saat ini agar progres pemain aman */
+    if(typeof SaveGame!=='undefined'&&SaveGame.now)SaveGame.now();
+    else if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
+
+    /* tutup UI / chat / panel aktif */
+    if(typeof UI!=='undefined'&&UI.open)UI.toggle(UI.open);
+    if(typeof Chat!=='undefined'&&Chat.close)Chat.close();
+
+    const startEl=document.getElementById('start');
+    if(startEl)startEl.classList.remove('hidden');
+
+    const loadEl=document.getElementById('loading');
+    if(loadEl)loadEl.style.display='none';
+
+    /* bersihkan entitas in-game */
+    if(typeof NPCS!=='undefined'&&NPCS.list){
+      for(let i=NPCS.list.length-1;i>=0;i--){
+        const n=NPCS.list[i];
+        if(n&&n.mesh&&n.mesh.parent)n.mesh.parent.remove(n.mesh);
+      }
+      NPCS.list=[];
+    }
+    if(typeof Monsters!=='undefined'&&Monsters.list){
+      for(let i=Monsters.list.length-1;i>=0;i--){
+        const m=Monsters.list[i];
+        if(m&&m.mesh&&m.mesh.parent)m.mesh.parent.remove(m.mesh);
+      }
+      Monsters.list=[];
+    }
+
+    if(typeof MainMenu!=='undefined'&&MainMenu.showMain)MainMenu.showMain();
+    this.startMenuBackground();
+  },
+
   /* ---------- mulai game ---------- */
   begin(save,slot){
     this.menuMode=false;
@@ -297,6 +334,9 @@ const Game={
     Player.pos.copy(Player.spawnP);
 
     if(save){
+      Player.name=save.name||'Ranger';
+      Player.hairStyle=(save.hairStyle!==undefined)?save.hairStyle:4;
+      Player.hairColor=(save.hairColor!==undefined)?save.hairColor:0x2c1f14;
       Player.hp=save.hp;Player.hunger=save.hunger;
       Player.level=save.level;Player.xp=save.xp;Player.kills=save.kills||0;
       RPG.sp=save.sp||0;RPG.skills=save.skills||{};
@@ -318,6 +358,9 @@ const Game={
       if(save.pos)Player.pos.set(save.pos[0],save.pos[1],save.pos[2]);
       if(save.team&&NPCS.restoreTeam)NPCS.restoreTeam(save.team);
     }else{
+      Player.name=(RPG.customPlayer&&RPG.customPlayer.name)||'Ranger';
+      Player.hairStyle=(RPG.customPlayer&&RPG.customPlayer.hairStyle!==undefined)?RPG.customPlayer.hairStyle:4;
+      Player.hairColor=(RPG.customPlayer&&RPG.customPlayer.hairColor!==undefined)?RPG.customPlayer.hairColor:0x2c1f14;
       RPG.addItem('bread',2);
       RPG.addItem(RPG.START_WEAPON,1);
       RPG.mobSlots=new Array(4).fill(null);
@@ -327,6 +370,7 @@ const Game={
     /* proficiency: muat dari save, atau reset untuk permainan baru */
     if(typeof Prof!=='undefined')Prof.load(save?save.prof:null);
 
+    Player.setHair(Player.hairStyle,Player.hairColor);
     Player.refreshArmor();
 
     /* pre-generate data sekitar spawn */
@@ -505,7 +549,8 @@ const MainMenu={
     const occupied=!!info;
     let desc='Slot kosong';
     if(occupied){
-      desc=`Lv ${info.level||1} · Hari ${info.day||1} · ${this.fmtTime(info.time)}`;
+      const pName=info.name?`${info.name} · `:'';
+      desc=`${pName}Lv ${info.level||1} · Hari ${info.day||1} · ${this.fmtTime(info.time)}`;
     }
     const dis=(mode==='load'&&!occupied)?'disabled':'';
     return `<button class="slot-btn ${occupied?'':'empty'}" data-slot="${i}" ${dis}>
@@ -519,7 +564,7 @@ const MainMenu={
     this.el.innerHTML=`
       <div class="menu-wrap">
         <h1 class="menu-title">FORECRAFT</h1>
-        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.3'}</div>
+        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.13'}</div>
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>
@@ -607,13 +652,16 @@ const MainMenu={
   startNew(i){
     RPG.slot=i;
     RPG.clearSlot(i);
-    /* Cutscene intro "Mimpi yang Terbakar": diputar SEKALI (disimpan di
-       localStorage) saat New Game pertama; New Game berikutnya langsung mulai. */
-    if(typeof CutsceneIntro!=='undefined'&&!CutsceneIntro.done()){
-      CutsceneIntro.play(()=>Game.begin(null,i));
-    }else{
-      Game.begin(null,i);
-    }
+    /* Buka UI Kustomisasi Karakter (nama, gaya rambut, warna rambut)
+       sebelum masuk ke cutscene */
+    CharacterCustomizer.open(i,(customData)=>{
+      /* Selalu putar cutscene cerita sebelum masuk ke permainan baru */
+      if(typeof CutsceneIntro!=='undefined'){
+        CutsceneIntro.play(()=>Game.begin(null,i));
+      }else{
+        Game.begin(null,i);
+      }
+    });
   },
 
   confirm(msg,onOk){
@@ -632,6 +680,236 @@ const MainMenu={
     ov.querySelector('.mm-no').addEventListener('click',()=>ov.remove());
     ov.querySelector('.mm-yes').addEventListener('click',()=>{ov.remove();onOk();});
   },
+};
+
+/* =============================================================================
+   CHARACTER CUSTOMIZER — UI Kustomisasi Karakter (New Game)
+   -----------------------------------------------------------------------------
+   Muncul saat New Game sebelum cutscene. Menampilkan FULL BODY model karakter
+   utama (ala panel karakter in-game) dengan pratinjau 3D rotasi 360 derajat.
+   ============================================================================= */
+const CharacterCustomizer={
+  HAIR_STYLES:[
+    {id:4, name:'Undercut (Default)'},
+    {id:1, name:'Cepak'},
+    {id:2, name:'Cepak Tinggi'},
+    {id:3, name:'Belah Samping'},
+    {id:5, name:'Poni Lurus'},
+    {id:6, name:'Poni Miring'},
+    {id:7, name:'Jambul'},
+    {id:8, name:'Spiky'},
+    {id:11,name:'Mohawk'},
+    {id:14,name:'Gondrong'},
+    {id:17,name:'Ekor Kuda'},
+    {id:27,name:'Man Bun'},
+    {id:0, name:'Plontos'},
+  ],
+  HAIR_COLORS:[
+    {hex:0x2c1f14,css:'#2c1f14',name:'Cokelat Tua'},
+    {hex:0x141210,css:'#141210',name:'Hitam Pekat'},
+    {hex:0x6e4528,css:'#6e4528',name:'Cokelat Terang'},
+    {hex:0xc89842,css:'#c89842',name:'Pirang Emas'},
+    {hex:0x8a2416,css:'#8a2416',name:'Merah Tembaga'},
+    {hex:0x96a2b0,css:'#96a2b0',name:'Abu Perak'},
+    {hex:0x3d7090,css:'#3d7090',name:'Biru Es'},
+    {hex:0xe0e8f0,css:'#e0e8f0',name:'Putih Salju'},
+  ],
+
+  open(slotIndex,onComplete){
+    let curStyleIdx=0;
+    let curColorHex=0x2c1f14;
+
+    const ov=document.createElement('div');
+    ov.className='char-custom-ov';
+    ov.innerHTML=`
+      <div class="char-custom-box">
+        <h2>KUSTOMISASI KARAKTER</h2>
+        <div class="char-custom-sub">Tentukan identitas dan penampilan pahlawanmu.</div>
+        <div class="char-custom-body">
+          <div class="char-preview-col">
+            <canvas class="char-preview-canvas" width="160" height="240"></canvas>
+            <div class="char-preview-hint">🖱️ Geser untuk memutar 360°</div>
+          </div>
+          <div class="char-controls-col">
+            <div class="char-field-row">
+              <label>NAMA KARAKTER</label>
+              <input type="text" class="char-name-input" maxlength="14" placeholder="Ranger" value="Ranger">
+            </div>
+            <div class="char-field-row">
+              <label>GAYA RAMBUT</label>
+              <div class="char-hair-nav">
+                <button class="char-nav-btn char-hair-prev" type="button">&#9664;</button>
+                <div class="char-style-name">Undercut (Default)</div>
+                <button class="char-nav-btn char-hair-next" type="button">&#9654;</button>
+              </div>
+            </div>
+            <div class="char-field-row">
+              <label>WARNA RAMBUT</label>
+              <div class="char-color-swatches"></div>
+            </div>
+            <div class="char-action-btns">
+              <button class="char-btn-start" type="button">&#9658; MULAI PETUALANGAN</button>
+              <button class="char-btn-cancel" type="button">&#10006; Batal</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+
+    const nameInput=ov.querySelector('.char-name-input');
+    nameInput.addEventListener('keydown',e=>e.stopPropagation());
+    nameInput.addEventListener('keyup',e=>e.stopPropagation());
+
+    const canvas=ov.querySelector('.char-preview-canvas');
+    let renderer=null,animId=null;
+    let charMesh=null,charParts=null;
+    let isDragging=false,prevX=0;
+    let charYaw=Math.PI*0.16; // tampak 3/4 depan awal
+
+    if(typeof THREE!=='undefined'){
+      try{
+        renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+        renderer.setSize(160,240);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+
+        const scene=new THREE.Scene();
+        // Kamera ortografik persis seperti CharView di charpanel.js (full body)
+        const aspect=160/240;
+        const hh=1.15; // tinggi setengah bingkai (-0.15 .. 2.15)
+        const cy=0.98; // pusat vertikal badan karakter
+        const camera=new THREE.OrthographicCamera(-hh*aspect,hh*aspect,hh,-hh,0.1,50);
+        camera.position.set(0,cy,8);
+        camera.lookAt(0,cy,0);
+
+        // Pencahayaan netral studio cerah
+        scene.add(new THREE.AmbientLight(0xffffff,0.85));
+        const dirLight=new THREE.DirectionalLight(0xfff8ea,1.1);
+        dirLight.position.set(2.5,4.5,3.5);
+        scene.add(dirLight);
+        const rimLight=new THREE.DirectionalLight(0x82b4ff,0.45);
+        rimLight.position.set(-2.5,2.0,-2.5);
+        scene.add(rimLight);
+
+        // Pedestal kecil di bawah kaki
+        const ped=new THREE.Mesh(
+          new THREE.CylinderGeometry(0.55,0.58,0.04,24),
+          new THREE.MeshLambertMaterial({color:0x1a202c})
+        );
+        ped.position.y=-0.02;
+        scene.add(ped);
+
+        // Bangun model Full Body Main Character lewat PlayerModelBuilder
+        if(typeof PlayerModelBuilder!=='undefined'){
+          charMesh=PlayerModelBuilder.build();
+          charParts=PlayerModelBuilder.parts;
+          scene.add(charMesh);
+        }
+
+        let lastT=performance.now();
+        const renderLoop=(time)=>{
+          animId=requestAnimationFrame(renderLoop);
+          const dt=Math.min(0.05,(time-lastT)*0.001);
+          lastT=time;
+          if(!isDragging){
+            charYaw+=dt*0.45; // rotasi otomatis perlahan saat tidak di-drag
+          }
+          if(charMesh)charMesh.rotation.y=charYaw;
+          renderer.render(scene,camera);
+        };
+        animId=requestAnimationFrame(renderLoop);
+      }catch(e){
+        console.warn('3D preview failed in customizer:',e);
+      }
+    }
+
+    // Interaksi drag memutar karakter 360 derajat
+    canvas.addEventListener('pointerdown',e=>{
+      isDragging=true;
+      prevX=e.clientX;
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!isDragging)return;
+      const dx=e.clientX-prevX;
+      prevX=e.clientX;
+      charYaw-=dx*0.022;
+    });
+    window.addEventListener('pointerup',e=>{
+      isDragging=false;
+      try{canvas.releasePointerCapture(e.pointerId);}catch(err){}
+    });
+    window.addEventListener('pointercancel',()=>{isDragging=false;});
+
+    const updateHairPreview=()=>{
+      const curStyle=this.HAIR_STYLES[curStyleIdx];
+      ov.querySelector('.char-style-name').textContent=curStyle.name;
+      if(charParts&&typeof PlayerModelBuilder!=='undefined'){
+        PlayerModelBuilder.setHair(curStyle.id,curColorHex,charParts);
+      }
+    };
+
+    updateHairPreview();
+
+    const swatchesContainer=ov.querySelector('.char-color-swatches');
+    this.HAIR_COLORS.forEach((col)=>{
+      const sw=document.createElement('button');
+      sw.type='button';
+      sw.className='char-swatch'+(col.hex===curColorHex?' active':'');
+      sw.style.background=col.css;
+      sw.title=col.name;
+      sw.addEventListener('click',()=>{
+        curColorHex=col.hex;
+        swatchesContainer.querySelectorAll('.char-swatch').forEach(s=>s.classList.remove('active'));
+        sw.classList.add('active');
+        updateHairPreview();
+      });
+      swatchesContainer.appendChild(sw);
+    });
+
+    ov.querySelector('.char-hair-prev').addEventListener('click',()=>{
+      curStyleIdx=(curStyleIdx-1+this.HAIR_STYLES.length)%this.HAIR_STYLES.length;
+      updateHairPreview();
+    });
+    ov.querySelector('.char-hair-next').addEventListener('click',()=>{
+      curStyleIdx=(curStyleIdx+1)%this.HAIR_STYLES.length;
+      updateHairPreview();
+    });
+
+    const closeOverlay=()=>{
+      if(animId)cancelAnimationFrame(animId);
+      if(renderer)renderer.dispose();
+      if(charMesh){
+        charMesh.traverse(o=>{
+          if(o.geometry)o.geometry.dispose();
+          if(o.material)o.material.dispose();
+        });
+      }
+      ov.remove();
+    };
+
+    ov.querySelector('.char-btn-cancel').addEventListener('click',()=>{
+      closeOverlay();
+      if(typeof MainMenu!=='undefined'&&MainMenu.showNew)MainMenu.showNew();
+    });
+
+    ov.querySelector('.char-btn-start').addEventListener('click',()=>{
+      const playerName=(nameInput.value.trim()||'Ranger').slice(0,16);
+      const chosenStyle=this.HAIR_STYLES[curStyleIdx].id;
+      const chosenColor=curColorHex;
+
+      Player.name=playerName;
+      Player.hairStyle=chosenStyle;
+      Player.hairColor=chosenColor;
+      RPG.customPlayer={
+        name:playerName,
+        hairStyle:chosenStyle,
+        hairColor:chosenColor
+      };
+
+      closeOverlay();
+      if(onComplete)onComplete(RPG.customPlayer);
+    });
+  }
 };
 
 /* =============================================================================

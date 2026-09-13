@@ -13,22 +13,22 @@
    ============================================================================= */
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
-  scorpion:'🦂',lizard:'🦎',dragon:'🐉',cow:'🐄',horse:'🐎',
-  kumbang:'🪲',yeti:'❄️',semut:'🐜'};
+  scorpion:'🦂',lizard:'🦎',dragon:'🐉',trex:'🦖',cow:'🐄',horse:'🐎',
+  kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
   rabbit:'carrot',scorpion:'meat',lizard:'meat',cow:'wheat',horse:'wheat',
-  dragon:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard'};
+  dragon:'cmeat',trex:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard'};
 
 /* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
    reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
-  scorpion:180,lizard:220,golem:320,dragon:520,
+  scorpion:180,lizard:220,golem:320,dragon:520,trex:480,
   kumbang:240,yeti:300,semut:150,reaper:360};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
-  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,
+  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,trex:2.1,
   kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45};
 
 /* panjang maksimum tali saat tarik-tarikan.
@@ -53,6 +53,25 @@ const Capture={
      modelnya. 1.18 = sedikit lebih besar dari mob biasa (1.0) tapi jauh di
      bawah skala boss (1.75+). Lihat catatan di deploy(). */
   PET_BOSS_SCALE:1.18,
+
+  /* Keseimbangan stat dasar pet (seimbang & adil antar tier) */
+  PET_BASE_STATS:{
+    rabbit:   { baseHp:45,   baseDmg:10 },
+    slime:    { baseHp:70,   baseDmg:14 },
+    boar:     { baseHp:110,  baseDmg:18 },
+    cow:      { baseHp:140,  baseDmg:14 },
+    horse:    { baseHp:160,  baseDmg:16 },
+    wolf:     { baseHp:150,  baseDmg:24 },
+    scorpion: { baseHp:180,  baseDmg:26 },
+    lizard:   { baseHp:220,  baseDmg:28 },
+    semut:    { baseHp:200,  baseDmg:26 },
+    kumbang:  { baseHp:320,  baseDmg:34 },
+    golem:    { baseHp:420,  baseDmg:38 },
+    reaper:   { baseHp:380,  baseDmg:42 },
+    yeti:     { baseHp:450,  baseDmg:44 },
+    dragon:   { baseHp:580,  baseDmg:52 },
+    trex:     { baseHp:550,  baseDmg:54 }
+  },
 
   /* ---------- init DOM & rope ---------- */
   init(){
@@ -419,15 +438,10 @@ const Capture={
     /* ---------- generasi bintang & kesulitan acak ----------
        Semakin tinggi bintang, semakin tinggi stat pet. */
     let stars=this.rollStars(!!m.boss);
-    const power=1+(stars-1)*0.22+rand(0,0.08)+(m.boss?0.25:0);
-    /* Damage dasar mengikuti LEVEL mob yang ditangkap, sama seperti HP-nya
-       (pet.maxhp diturunkan dari m.maxhp yang sudah berlevel). Tanpa pengali
-       ini, menangkap kumbang Lv 50 di Tanah Merah menghasilkan pet ber-HP 800+
-       tapi damage-nya masih 16 seperti kumbang Lv 1 — tebal tapi tak berguna.
-       Yang dipakai tetap dmg DASAR tipe (bukan m.dmg) supaya pet dari mini boss
-       tidak ikut membawa pengali boss 2.2x; bonus boss sudah ada di `power`. */
-    const lm=(typeof Monsters.lvlStatMul==='function')?Monsters.lvlStatMul(m.lvl||1):1;
-    const baseDmg=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].dmg:8)*lm;
+    const starMult = 1 + (stars - 1) * 0.15 + (m.boss ? 0.15 : 0);
+    const statDef = this.PET_BASE_STATS[m.type] || { baseHp: 100, baseDmg: 20 };
+    const maxhp = Math.round(statDef.baseHp * starMult);
+    const dmg = Math.round(statDef.baseDmg * starMult);
 
     const pet={
       type:m.type,
@@ -435,10 +449,10 @@ const Capture={
       stars,
       lvl:1,
       xp:0,
-      power,
-      hp:Math.max(1,Math.round(m.maxhp*0.25*power)),
-      maxhp:Math.round(m.maxhp*power),
-      dmg:Math.max(3,Math.round(baseDmg*power)),
+      power:starMult,
+      hp:maxhp,
+      maxhp,
+      dmg,
       saddle:false,
       name:this.mobName(m.type),
     };
@@ -507,23 +521,21 @@ const Capture={
     this._pendingT=this._pendingDeploy>=0?1.2:-1;
   },
 
-  /* pet lama dari save lama tetap bisa dipakai; field baru diisi sekali saja */
+  /* pet lama dari save lama tetap bisa dipakai; diseimbangkan dengan kurva stat baru */
   migratePet(p){
     if(!p)return p;
     if(!p.stars){
       p.stars=this.rollStars(!!p.boss);
-      p.power=1+(p.stars-1)*0.22+rand(0,0.08)+(p.boss?0.25:0);
-      const baseHp=p.maxhp||20;
-      p.maxhp=Math.max(10,Math.round(baseHp*p.power));
-      p.hp=clamp(p.hp||1,1,p.maxhp);
     }
-    p.lvl=p.lvl||1;
-    p.xp=p.xp||0;
-    p.power=p.power||1;
-    if(!p.dmg){
-      const base=(Monsters.TYPES[p.type]?Monsters.TYPES[p.type].dmg:8);
-      p.dmg=Math.max(3,Math.round(base*p.power));
-    }
+    const statDef = this.PET_BASE_STATS[p.type] || { baseHp: 100, baseDmg: 20 };
+    const starMult = 1 + ((p.stars || 1) - 1) * 0.15 + (p.boss ? 0.15 : 0);
+    p.power = starMult;
+    p.lvl = Math.max(1, p.lvl || 1);
+    p.xp = p.xp || 0;
+    const curLvl = p.lvl;
+    p.maxhp = Math.round(statDef.baseHp * starMult + statDef.baseHp * 0.08 * starMult * (curLvl - 1));
+    p.hp = Math.min(p.hp || p.maxhp, p.maxhp);
+    p.dmg = Math.round(statDef.baseDmg * starMult + statDef.baseDmg * 0.05 * starMult * (curLvl - 1));
     if(!p.name)p.name=this.mobName(p.type);
     return p;
   },
@@ -731,7 +743,14 @@ const Capture={
                   (m.type==='golem')?3.0:
                   (m.type==='lizard')?2.6:1.8;
       if(bd>holdR){
-        const spd=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+        let spd=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+        // Saat target serangan jauh, pet berlari kencang mendekat
+        if(bd > holdR + 1.2 && !m.inWater){
+          if(m.type==='dragon'||m.type==='trex') spd *= 2.3;
+          else if(m.type==='wolf'||m.type==='boar') spd *= 1.45;
+          else if(m.type==='kumbang'||m.type==='yeti') spd *= 1.4;
+          else spd *= 1.35;
+        }
         m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(7*dt,0,1));
         m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(7*dt,0,1));
       }else{
@@ -763,9 +782,15 @@ const Capture={
       const to=new THREE.Vector3().subVectors(targetPos,m.pos).setY(0);
       const ang=Math.atan2(to.x,to.z);
       m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ang,dt*5);
-      const spd=Math.min(m.speed*1.05,CFG.PLAYER.sprint);
-      m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(5*dt,0,1));
-      m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(5*dt,0,1));
+      const pSpeed = (typeof Player !== 'undefined' && Player.vel) ? Math.hypot(Player.vel.x, Player.vel.z) : 0;
+      const playerRunning = pSpeed > 3.4 || distTarget > 5.5;
+      let spd = m.speed * 1.05;
+      if(playerRunning && !m.inWater){
+        if(m.type==='dragon'||m.type==='trex') spd = Math.max(m.speed * 2.3, (typeof CFG !== 'undefined' ? CFG.PLAYER.sprint : 7.4) * 1.05);
+        else spd = Math.max(m.speed * 1.5, (typeof CFG !== 'undefined' ? CFG.PLAYER.sprint : 7.4) * 0.95);
+      }
+      m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(6*dt,0,1));
+      m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(6*dt,0,1));
     }else{
       m.vel.x*=Math.exp(-5*dt);
       m.vel.z*=Math.exp(-5*dt);
@@ -1094,16 +1119,18 @@ const Capture={
     if(Math.random()*100<rate){
       pet.lvl=(pet.lvl||1)+1;
       pet.xp=0;
-      pet.power=(pet.power||1)*1.12;
-      pet.maxhp=Math.round(pet.maxhp*1.12);
-      pet.dmg=Math.max(3,Math.round((pet.dmg||8)*1.12));
+      const statDef = this.PET_BASE_STATS[pet.type] || { baseHp: 100, baseDmg: 20 };
+      const starMult = 1 + ((pet.stars || 1) - 1) * 0.15 + (pet.boss ? 0.15 : 0);
+      pet.power = starMult;
+      pet.maxhp += Math.round(statDef.baseHp * 0.08 * starMult);
+      pet.dmg += Math.max(1, Math.round(statDef.baseDmg * 0.05 * starMult));
       pet.hp=pet.maxhp;
       if(this.pet&&this.deployedSlot===i){
         this.pet.maxhp=pet.maxhp;
         this.pet.hp=pet.hp;
         this.pet.dmg=pet.dmg;
       }
-      UI.toast(`🎉 ${pet.name} naik ke Lv ${pet.lvl}! (+12% stat)`);
+      UI.toast(`🎉 ${pet.name} naik ke Lv ${pet.lvl}! (+stat naik)`);
       if(typeof Sfx!=='undefined'&&Sfx.levelup)Sfx.levelup();
     }else{
       /* Penalti kegagalan diringankan: XP hanya berkurang 15% (dulu 50%) */

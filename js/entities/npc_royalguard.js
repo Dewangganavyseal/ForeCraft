@@ -46,7 +46,7 @@ const NPC_RoyalGuard={
     bashStun100:6,        // durasi stun Lv 100 (prototipe SKILL.max)
     bashKnock1:4.2,
     bashKnock100:6.0,
-    bashCd:12,            // cooldown bash
+    bashCd:14.4,          // cooldown bash (+20% lebih lama, sebelumnya 12)
     bashDmgMul:1.6,       // damage bash terhadap npcDmgSafe
     bashWind:0.34,        // animasi ancang-ancang (detik) â€” file asli
     bashHit:0.16,         // jendela impact
@@ -296,9 +296,12 @@ const NPC_RoyalGuard={
         m.scale.multiplyScalar(2.41*1.06);
         sh.add(m);
         /* pelat depan disimpan untuk efek menyala saat PROVOKE */
-        m.traverse(o=>{if(o.isMesh&&!P.shieldPlate&&o.material&&o.material.color){
-          P.shieldPlate=o;
-        }});
+        P.shieldPlate=m.userData.plate||null;
+        if(!P.shieldPlate){
+          m.traverse(o=>{if(o.isMesh&&!P.shieldPlate&&o.material&&o.material.color){
+            P.shieldPlate=o;
+          }});
+        }
       }
     }
   },
@@ -637,25 +640,27 @@ const NPC_RoyalGuard={
         if(typeof Monsters.isAnimal==='function'&&Monsters.isAnimal(m))continue;
         if(m.pos.distanceTo(n.pos)<=4.5)inRange++;
       }
-      if(inRange>=1){
-        n.stamina=(n.stamina||0)-35; n.stamRegenT=1.8;
+      const provCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,35):Math.max(46,Math.round((n.maxStamina||100)*0.30));
+      if(inRange>=1&&((n.stamina||0)>=provCost)){
+        n.stamina=(n.stamina||0)-provCost; n.stamRegenT=1.8;
         n.rgAct={type:'provoke',t:0,fired:false};
         this._doProvoke(n);
-        FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-35 STAM','#ffd24d');
+        FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${provCost} STAM`,'#ffd24d');
         return true;
       }
     }
-    /* BASH: target di depan dalam jangkauan & butuh stamina (30) */
-    if(st.bashCd<=0&&d<=RG.bashRange*0.8&&((n.stamina||0)>=30)){
+    /* BASH: target di depan dalam jangkauan & butuh stamina (30% konsumsi) */
+    const bashCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,30):Math.max(39,Math.round((n.maxStamina||100)*0.30));
+    if(st.bashCd<=0&&d<=RG.bashRange*0.8&&((n.stamina||0)>=bashCost)){
       const fx=Math.sin(n.mesh.rotation.y),fz=Math.cos(n.mesh.rotation.y);
       const dx=n.target.pos.x-n.pos.x,dz=n.target.pos.z-n.pos.z;
       const dot=(dx*fx+dz*fz)/(d||0.001);
       if(dot>=RG.bashDot){
-        n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
+        n.stamina=(n.stamina||0)-bashCost; n.stamRegenT=1.8;
         n.rgAct={type:'bash',t:0,fired:false};
         st.bashCd=RG.bashCd;
         if(typeof NPCS!=='undefined')NPCS.say(n,'BASH!',1.2);
-        FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
+        FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${bashCost} STAM`,'#ffd24d');
         return true;
       }
     }

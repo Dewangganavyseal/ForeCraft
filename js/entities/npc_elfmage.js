@@ -163,14 +163,16 @@ const NPC_Elfmage={
     const d=tgt.pos.distanceTo(n.pos);
     /* pilih skill: meteor bila gerombolan, es bila target tunggal dekat (masing-masing butuh stamina) */
     const near=this.countNear(n,6);
-    if(n.elfMetCd<=0&&near>=2&&d<11&&((n.stamina||0)>=45)){
-      n.stamina=(n.stamina||0)-45; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-45 STAM','#ffd24d');
+    const metCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,45):Math.max(59,Math.round((n.maxStamina||100)*0.30));
+    if(n.elfMetCd<=0&&near>=2&&d<11&&((n.stamina||0)>=metCost)){
+      n.stamina=(n.stamina||0)-metCost; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${metCost} STAM`,'#ffd24d');
       this.startElfCast(n,'meteor',tgt);return true;
     }
-    if(n.elfIceCd<=0&&d<10&&((n.stamina||0)>=30)){
-      n.stamina=(n.stamina||0)-30; n.stamRegenT=1.8;
-      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),'-30 STAM','#ffd24d');
+    const iceCost=(typeof NPCS!=='undefined'&&NPCS.skillStamCost)?NPCS.skillStamCost(n,30):Math.max(39,Math.round((n.maxStamina||100)*0.30));
+    if(n.elfIceCd<=0&&d<10&&((n.stamina||0)>=iceCost)){
+      n.stamina=(n.stamina||0)-iceCost; n.stamRegenT=1.8;
+      FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${iceCost} STAM`,'#ffd24d');
       this.startElfCast(n,'ice',tgt);return true;
     }
     /* serangan dasar = proyektil aura (jaga jarak seperti prototipe cast) */

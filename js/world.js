@@ -815,6 +815,7 @@ const World={
         this.pending.splice(i,1);
         const id=this.getBlock(p.x,p.y,p.z);
         if(id===B.AIR||id===B.WATER)continue;
+        if(this.hasOreAboveOrSelf(p.x,p.y,p.z))continue; // Kebal bila di atasnya ada ore!
         this.setBlock(p.x,p.y,p.z,B.AIR);
         const col=(BLOCK_INFO[id]||{}).color||0x888888;
         FX.debris(new THREE.Vector3(p.x+0.5,p.y+0.5,p.z+0.5),col,p.leaf?3:6,p.leaf?1.6:3);
@@ -875,6 +876,42 @@ const World={
       }
     }
   },
+  /* Anti-eksploit: perlindungan blok yang memuat ore di atasnya atau dirinya sendiri */
+  hasOreAboveOrSelf(wx, wy, wz){
+    const id = this.getBlock(wx, wy, wz);
+    // 1. Blok itu sendiri adalah ore
+    if (typeof ORE_INFO !== 'undefined' && ORE_INFO[id]) return true;
+
+    // 2. Ada blok ore di atas blok ini dalam kolom (sampai ketinggian dunia)
+    for (let y = wy + 1; y < wy + 8 && y < (typeof CFG !== 'undefined' ? CFG.WORLD_H : 16); y++) {
+      const bid = this.getBlock(wx, y, wz);
+      if (typeof ORE_INFO !== 'undefined' && ORE_INFO[bid]) return true;
+    }
+
+    // 3. Ada model 3D ore node (Env_Ore) yang berdiri di atas atau di sekitar blok ini
+    if (typeof Env_Ore !== 'undefined' && Env_Ore.activeNodes) {
+      for (const node of Env_Ore.activeNodes.values()) {
+        const rad = 2.2 * (node.scale || 1);
+        if (Math.abs(wx - (node.wx + 0.5)) <= rad && Math.abs(wz - (node.wz + 0.5)) <= rad) {
+          if (wy <= node.wy + 2) return true;
+        }
+      }
+    }
+
+    // 4. Ada ore di chunk.ores pada kolom ini
+    const cx = Math.floor(wx / 16), cz = Math.floor(wz / 16);
+    const c = this.chunks.get(cx + ',' + cz);
+    if (c && c.ores) {
+      for (const o of c.ores) {
+        if (Math.abs(wx - o.wx) <= 2 && Math.abs(wz - o.wz) <= 2 && wy <= o.wy + 2) {
+          if (c.data[this.idx(o.x, o.y, o.z)] === o.ore) return true;
+        }
+      }
+    }
+
+    return false;
+  },
+
   destroyArea(cx,cz,r){
     const bx=Math.floor(cx),bz=Math.floor(cz);
     for(let dz=-Math.ceil(r);dz<=Math.ceil(r);dz++)for(let dx=-Math.ceil(r);dx<=Math.ceil(r);dx++){
@@ -885,6 +922,7 @@ const World={
       for(let k=0;k<depth;k++){
         const y=top-k;
         if(y<1)break;
+        if(this.hasOreAboveOrSelf(wx,y,wz))continue; // Kebal dari kehancuran mob bila memuat ore!
         this.pending.push({x:wx,y,z:wz,t:d*0.09+k*0.06+Math.random()*0.04});
       }
     }

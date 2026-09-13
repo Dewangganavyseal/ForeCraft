@@ -165,6 +165,18 @@ const Settings={
       }
     });
 
+    /* ===== TOMBOL MAIN MENU ===== */
+    const mm=document.createElement('div');
+    mm.className='set-sec';
+    mm.innerHTML=`
+      <div class="set-h">🏠 ${L('settings_main_menu')}</div>
+      <button class="big" id="set-to-menu" style="background:#4a2824;border:1px solid #9e463a;color:#ffd4cc;font-weight:700">🏠 ${L('settings_to_main_menu')}</button>`;
+    el.appendChild(mm);
+    mm.querySelector('#set-to-menu').addEventListener('click',()=>{
+      if(typeof UI!=='undefined'&&UI.open==='settings')UI.toggle('settings');
+      if(typeof Game!=='undefined'&&Game.returnToMenu)Game.returnToMenu();
+    });
+
     /* ===== GRAFIS (Low / Medium / High / Ultra) =====
        Mengubah preset langsung menerapkan pixel ratio, bayangan, radius render,
        kepadatan rumput, subdivisi air, & jumlah hujan — lalu membangun ulang

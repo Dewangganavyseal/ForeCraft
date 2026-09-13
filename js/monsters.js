@@ -2,7 +2,7 @@
 /* Monster: slime, babi hutan, golem perusak tanah, serigala, kalajengking */
 /* nama tampilan untuk notifikasi & teks UI */
 const MOB_NAME={slime:'Slime',boar:'Babi Hutan',golem:'Golem',
-  wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',
+  wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',
   lizard:'Lizard Rawa',cow:'Sapi',horse:'Kuda',
   kelabang:'Kelabang',kelabang_part:'Ruas Kelabang',kumbang:'Kumbang Tanduk',
   yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper'};
@@ -22,12 +22,13 @@ const Monsters={
        dulu kelinci lebih cepat dari lari pemain (CFG.PLAYER.sprint 7.4 hanya
        saat sprint) sehingga nyaris mustahil ditangkap. */
     rabbit:{hp:16,dmg:0,xp:8,speed:5.2,r:0.35,aggro:0,passive:true,animal:true},
-    /* NAGA: boss terbesar. Selalu boss (alwaysBoss) tapi TIDAK diberi skala
-       visual boss tambahan (noBossScale) karena modelnya sudah besar dari
-       sananya. HP dasar 420 → dikali multiplier boss (×6) = 2520 HP, jadi
-       naga sangat sulit dibunuh (setingkat raid boss). dmg dasar 18 ×2.2 ≈ 40.
-       Hanya muncul di biome PEGUNUNGAN dengan peluang 10%. */
-    dragon:{hp:420,dmg:18,xp:60,speed:2.0,r:0.9,aggro:26,alwaysBoss:true,noBossScale:true},
+    /* NAGA: predator puncak pegunungan. Normalnya monster liar biasa (HP 420, Lv 50-75),
+       dengan peluang menjadi mini boss raksasa (HP x6). */
+    dragon:{hp:420,dmg:18,xp:60,speed:2.0,r:0.9,aggro:26,noBossScale:true},
+    /* T-REX (🦖): Predator purba puncak pegunungan dari NEW MODEL/T-rex.html.
+       Ukuran masif (sedikit di bawah naga), normalnya monster liar biasa (HP 360, Lv 50-75)
+       dengan peluang menjadi mini boss raksasa (HP x6). */
+    trex:{hp:360,dmg:22,xp:55,speed:2.4,r:0.85,aggro:24,noBossScale:true},
     /* LIZARD RAWA: predator tepi sungai. Serangannya gigitan (jarak dekat),
        sapuan ekor (AoE), dan semburan asam (proyektil jarak jauh). Hanya
        muncul di tepi sungai/danau (lihat spawnLizard). Radius tabrakan kecil
@@ -715,8 +716,24 @@ const Monsters={
       return true;
     }
     /* pet = monster milik pemain; NPC = rekan/penduduk */
-    if(tgt.pet&&typeof Capture!=='undefined'&&Capture.hurtPet){Capture.hurtPet(tgt,dmg);return true;}
-    if(tgt.role&&typeof NPCS!=='undefined'&&NPCS.hurt){NPCS.hurt(tgt,dmg);return true;}
+    if(tgt.pet&&typeof Capture!=='undefined'&&Capture.hurtPet){
+      Capture.hurtPet(tgt,dmg);
+      if(kb&&tgt.vel){
+        const a=Math.atan2(tgt.pos.x-px,tgt.pos.z-pz);
+        tgt.vel.x+=Math.sin(a)*kb;tgt.vel.z+=Math.cos(a)*kb;
+        tgt.vel.y=Math.max(tgt.vel.y||0,kb*0.45);
+      }
+      return true;
+    }
+    if(tgt.role&&typeof NPCS!=='undefined'&&NPCS.hurt){
+      NPCS.hurt(tgt,dmg);
+      if(kb&&tgt.vel&&!tgt.shopSpot){
+        const a=Math.atan2(tgt.pos.x-px,tgt.pos.z-pz);
+        tgt.vel.x+=Math.sin(a)*kb;tgt.vel.z+=Math.cos(a)*kb;
+        tgt.vel.y=Math.max(tgt.vel.y||0,kb*0.45);
+      }
+      return true;
+    }
     /* monster lain (mis. pet tanpa flag) */
     if(this.hurt&&tgt.hp!==undefined){
       const a=Math.atan2(tgt.pos.x-px,tgt.pos.z-pz);
@@ -1022,6 +1039,8 @@ const Monsters={
           `soul_shard` adalah bahan langka khas reruntuhan. */
        m.type==='reaper'?[['soul_shard',1+(Math.random()<0.45?1:0)],
                           ['crystal',Math.random()<0.35?1:0]]:
+       /* T-REX: daging melimpah + kulit keras purba */
+       m.type==='trex'?[['meat',4],['hard_shell',2],['boss_core',1]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
     /* boss selalu menjatuhkan inti boss (bahan set kristal) + drop ganda */
     if(m.boss){
@@ -1068,7 +1087,7 @@ const Monsters={
       m.type==='wolf'?0x6f7480:m.type==='scorpion'?0x8a5a2b:
       m.type==='lizard'?0x4e8f3a:m.type==='kumbang'?0x7a4f24:
       m.type==='yeti'?0xcfe0f2:m.type==='semut'?0x8a3b1f:
-      m.type==='reaper'?0x2a2140:0x8a8f98;
+      m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:0x8a8f98;
     FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.8,0)),
       m.boss?0xff6bd6:dustColor,m.boss?32:16,m.boss?5:3.5);
     /* GORE: bagian tubuh (kepala/kaki/daging) terlepas terhambur. Hanya untuk
@@ -1086,6 +1105,7 @@ const Monsters={
       kelabang:[0x96332c,0x5f1d1a,0xd9a066],
       kelabang_part:[0x96332c,0x5f1d1a,0xa13a30],
       kumbang:[0x7a4f24,0x5a3a1a,0x96682f],
+      trex:[0x5f7f4c,0x3f5a37,0xd9c9a2],
       yeti:[0xeaf1f8,0xcfe0f2,0xa6c0db],
       semut:[0x8a3b1f,0x5e2412,0xa5502a],
       /* reaper: serpihan jubah hitam + kilau ungu rune */
@@ -1313,6 +1333,76 @@ const Monsters={
           }
         }
       }
+      /* SERANGAN SERBU + CABIK T-REX: lari kencang sambil mencabik,
+         jalur lari kanan & kiri memicu efek tanah terangkat halus (smooth ground wave) */
+      if(m.type==='trex'&&!m.catchActive&&(m.chargeT||0)>0){
+        const u=1-m.chargeT/3.00;
+        if(u>=0.14&&u<=0.78){
+          const dashSp=m.speed*2.35;
+          const yaw=m.mesh.rotation.y;
+          m.vel.x=Math.sin(yaw)*dashSp;
+          m.vel.z=Math.cos(yaw)*dashSp;
+
+          const step=Math.floor(u/0.14);
+          if(step>(m._lastWaveStep||0)){
+            m._lastWaveStep=step;
+            const rightX=Math.cos(yaw),rightZ=-Math.sin(yaw);
+            const lat=2.2;
+            const leftX=m.pos.x-rightX*lat, leftZ=m.pos.z-rightZ*lat;
+            const rightSideX=m.pos.x+rightX*lat, rightSideZ=m.pos.z+rightZ*lat;
+            const groundY=(typeof World!=='undefined'&&World.groundAt)
+              ?(World.groundAt(m.pos.x,m.pos.z,m.pos.y+3)||m.pos.y):m.pos.y;
+
+            if(typeof FX!=='undefined'&&FX.groundWave){
+              // Jalur kiri terangkat smooth
+              FX.groundWave(leftX,groundY,leftZ,{
+                mode:'line',dir:yaw,radius:3.4,amp:0.85,width:1.2,speed:7.0,smooth:true
+              });
+              // Jalur kanan terangkat smooth
+              FX.groundWave(rightSideX,groundY,rightSideZ,{
+                mode:'line',dir:yaw,radius:3.4,amp:0.85,width:1.2,speed:7.0,smooth:true
+              });
+
+              // Hamburan tanah & batu di kedua sisi
+              const bL=(typeof World!=='undefined'&&World.getBlock)
+                ?World.getBlock(Math.floor(leftX),Math.floor(groundY)-1,Math.floor(leftZ)):null;
+              const cL=(typeof BLOCK_INFO!=='undefined'&&BLOCK_INFO[bL])?BLOCK_INFO[bL].color:0x5a422e;
+              FX.debris(new THREE.Vector3(leftX,groundY+0.3,leftZ),cL,6,2.2);
+
+              const bR=(typeof World!=='undefined'&&World.getBlock)
+                ?World.getBlock(Math.floor(rightSideX),Math.floor(groundY)-1,Math.floor(rightSideZ)):null;
+              const cR=(typeof BLOCK_INFO!=='undefined'&&BLOCK_INFO[bR])?BLOCK_INFO[bR].color:0x5a422e;
+              FX.debris(new THREE.Vector3(rightSideX,groundY+0.3,rightSideZ),cR,6,2.2);
+
+              FX.addShake(0.25);
+              if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'rock');
+            }
+
+            // Damage cabik-cabik bagi yang terserempet jalur lari
+            const targets=this.areaTargets(m,m.pos.x,m.pos.z,3.6);
+            for(const t of targets){
+              if(this.hitTarget(m,t,m.dmg*0.45,3.6,m.pos.x,m.pos.z,1.2)){
+                FX.debris(t.pos.clone().add(new THREE.Vector3(0,1,0)),0xff3d14,5,2.0);
+              }
+            }
+          }
+        }else if(u>0.78){
+          m.vel.x*=0.6;m.vel.z*=0.6;
+        }
+      }else if(m.type==='trex'&&!m.chargeT){
+        m._lastWaveStep=0;
+      }
+      /* KIBASAN EKOR T-REX: AoE 360 derajat + KNOCKBACK ~2 BLOK (kb=12) ke SEMUA korban (pemain, rekan NPC, pet) */
+      if(m.type==='trex'&&!m.catchActive&&(m.spinT||0)>0&&!m._spinHit&&m.spinT<1.2){
+        m._spinHit=true;
+        if(typeof Sfx!=='undefined'&&Sfx.at) Sfx.at(m.pos,'swing');
+        if(typeof FX!=='undefined'&&FX.ring) {
+          FX.ring(m.pos.x,m.pos.y+0.1,m.pos.z,0x19d3ff,1.4,6.5);
+        }
+        this.areaHit(m, m.pos.x, m.pos.z, 4.8, Math.round(m.dmg*1.25), 12.0);
+      }else if(m.type==='trex'&&!m.spinT){
+        m._spinHit=false;
+      }
       /* SAPUAN EKOR LIZARD: damage AoE di frame hit (tengah spin ~0.55-0.7).
          Radius diperkecil 3.2→2.5 mengikuti model yang kini seukuran babi.
          AoE-nya kini menyapu semua korban sah, bukan hanya pemain. */
@@ -1497,13 +1587,23 @@ const Monsters={
       if(dp>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*6);
       /* slowMul: perlambatan dari efek beku senjata pemain */
       let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
-      /* NAGA LARI: saat target masih jauh, naga berlari mengejar (burst speed)
-         supaya animasi poseRun terpakai, bukan terus berjalan pelan. */
-      if(m.type==='dragon'&&dp>5.0)sp*=2.3;
+      /* SPRINT / LARI: saat pemain menjauh/berlari atau jarak target jauh,
+         seluruh mob yang memiliki animasi lari ikut berlari kencang mendekat */
+      const pSpeed = (typeof Player !== 'undefined' && Player.vel) ? Math.hypot(Player.vel.x, Player.vel.z) : 0;
+      const targetRunning = pSpeed > 3.4;
+      const mReach=(m.type==='dragon'?3.4:m.type==='trex'?3.2:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
+      const distFar = dp > (mReach * 1.25);
 
-      /* DIAM SAAT DALAM JANGKAUAN SERANG: mob berhenti merangsek agar tidak
-         memicu saling dorong fisika & glitch geleng kepala */
-      const mReach=(m.type==='dragon'?3.4:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
+      if((targetRunning || distFar) && !m.inWater){
+        if(m.type==='dragon') sp *= 2.3;
+        else if(m.type==='trex') sp *= 2.2;
+        else if(m.type==='wolf') sp *= 1.45;
+        else if(m.type==='boar') sp *= 1.45;
+        else if(m.type==='lizard') sp *= 1.4;
+        else if(m.type==='kumbang') sp *= 1.5;
+        else if(m.type==='yeti') sp *= 1.4;
+        else sp *= 1.35;
+      }
       if(dp>mReach*0.85){
         const moveAng=((m.detourT||0)>0&&m.altDir!==undefined)?m.altDir:angP;
         if(m.type==='slime'){
@@ -2528,6 +2628,37 @@ const Monsters={
         }
         return true;
 
+      case 'trex':
+        /* 4 serangan otentik dari T-rex.html:
+           - Gigit (bite): serangan dasar katup rahang (dekat, ~3.4 blok)
+           - Cabik-cabik (shred): serangan cabik beruntun multi-hit (dekat, 30%)
+           - Kibas Ekor (spin): sapuan ekor berputar 360 derajat AoE (25%)
+           - Serbu + Cabik (charge): serbuan lari ganas dari jarak sedang (35%) */
+        if(d<3.4){
+          const r=Math.random();
+          if(r<0.30&&!m.shredT&&!m.spinT&&!m.chargeT){
+            m.shredT=2.05;m.atkCd=2.6;m._shredStep=0;
+            strike(m.dmg*0.4);
+            return true;
+          }
+          if(r<0.55&&!m.shredT&&!m.spinT&&!m.chargeT){
+            m.spinT=2.15;m.atkCd=2.8;m._spinHit=false;
+            return true;
+          }
+          if(!m.biteT&&!m.shredT&&!m.spinT&&!m.chargeT){
+            strike(m.dmg);m.atkCd=1.4;
+            m.biteT=0.88;
+            burst(0x5f7f4c,6,2.2);
+            Sfx.at(m.pos,'hurt');
+            return true;
+          }
+        }else if(d<10.0&&Math.random()<0.40&&!m.chargeT&&!m.shredT&&!m.spinT&&!m.biteT){
+          m.chargeT=3.00;m.atkCd=4.2;m._chargeHit=false;
+          strike(m.dmg*1.3);
+          return true;
+        }
+        return false;
+
       case 'lizard':
         /* tiga serangan: gigit (dekat), sapuan ekor (AoE), semburan asam (jauh) */
         if(d<1.8){
@@ -2570,11 +2701,17 @@ const Monsters={
     m.state='chase';
     if(d>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ang,dt*6);
     let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
-    /* naga juga berlari saat mengejar NPC yang masih jauh */
-    if(m.type==='dragon'&&d>5.0)sp*=2.3;
-    /* jarak berhenti mengikuti jangkauan jurus tiap mob */
-    const hold=m.type==='golem'?3.0:m.type==='dragon'?3.4:
+    /* Mob berlari saat mengejar musuh yang masih jauh */
+    const fSpeed = (f && f.vel) ? Math.hypot(f.vel.x, f.vel.z) : 0;
+    const hold=m.type==='golem'?3.0:m.type==='dragon'?3.4:m.type==='trex'?3.2:
                m.type==='lizard'?2.4:1.6;
+    if((d > hold * 1.25 || fSpeed > 3.4) && !m.inWater){
+      if(m.type==='dragon') sp *= 2.3;
+      else if(m.type==='trex') sp *= 2.2;
+      else if(m.type==='wolf'||m.type==='boar') sp *= 1.45;
+      else if(m.type==='kumbang'||m.type==='yeti') sp *= 1.45;
+      else sp *= 1.35;
+    }
     if(d>hold*0.85){
       const moveAng=((m.detourT||0)>0&&m.altDir!==undefined)?m.altDir:ang;
       m.vel.x=lerp(m.vel.x,Math.sin(moveAng)*sp,clamp(6*dt,0,1));
@@ -2642,7 +2779,7 @@ const Monsters={
     }
   },
 
-  PREDATORS:['wolf','boar','scorpion','lizard','dragon'],
+  PREDATORS:['wolf','boar','scorpion','lizard','dragon','trex'],
 
   /* kategori animal: sapi/kuda. NPC tidak boleh memburu/menyerang animal. */
   isAnimal(m){
@@ -2738,7 +2875,7 @@ const Monsters={
       const damp=Math.exp(-8*dt);
       m.vel.x*=damp;m.vel.z*=damp;
     }
-    const reach=m.type==='dragon'?3.6:m.type==='lizard'?1.8:1.7;
+    const reach=m.type==='dragon'?3.6:m.type==='trex'?3.4:m.type==='lizard'?1.8:1.7;
     if(m.atkCd<=0&&d<reach){
       m.atkCd=m.type==='wolf'?0.9:1.3;
       const dir=d>0.001?to.clone().divideScalar(d):new THREE.Vector3(0,0,1);
@@ -2780,9 +2917,8 @@ const Monsters={
        milik pemain saat bertarung dengan monster. */
     if(!m.pet)World.destroyArea(c.x,c.z,2.4);
     /* AoE ke SEMUA korban sah di radius (pemain, rekan NPC, pet — atau monster
-       liar bila si golem adalah pet). Dulu hanya pemain yang bisa terkena,
-       sehingga hantaman golem tidak berarti apa-apa saat melawan NPC. */
-    this.areaHit(m,c.x,c.z,3.0,m.dmg,9);
+       liar bila si golem adalah pet) + KNOCKBACK KUAT (~2 blok) */
+    this.areaHit(m,c.x,c.z,3.4,m.dmg,12.0);
     if(m.parts.armL)m.parts.armL.rotation.x=0.7;
     if(m.parts.armR)m.parts.armR.rotation.x=0.7;
   },
@@ -3068,7 +3204,7 @@ const Monsters={
 };
 /* tinggi kira-kira model, dipakai untuk posisi teks damage & aura boss */
 function meshHeight(type){
-  return type==='golem'?3:type==='dragon'?4.2:type==='cow'?1.8:type==='horse'?2.1:
+  return type==='golem'?3:type==='dragon'?4.2:type==='trex'?3.8:type==='cow'?1.8:type==='horse'?2.1:
     type==='lizard'?1.2:type==='boar'?1.1:
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:

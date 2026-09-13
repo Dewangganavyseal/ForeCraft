@@ -1780,6 +1780,58 @@ body.in-menu #btn-uistudio{display:none !important}
 #tutorial-ok:active{transform:scale(.98)}
 
 /* =========================================================================
+   CHARACTER CUSTOMIZER (New Game)
+   ========================================================================= */
+.char-custom-ov{position:fixed;inset:0;z-index:9990;display:flex;
+  align-items:center;justify-content:center;background:rgba(8,11,16,.85);
+  backdrop-filter:blur(6px);padding:14px}
+.char-custom-box{background:rgba(18,22,30,.97);border:1px solid rgba(220,170,70,.45);
+  border-radius:18px;padding:22px 24px;width:min(520px,95vw);max-height:calc(100vh - 28px);
+  overflow-y:auto;box-shadow:0 16px 50px rgba(0,0,0,.85);color:#e8dcc2;text-align:center}
+.char-custom-box h2{font-family:'Press Start 2P',monospace;font-size:13px;
+  color:#f0c060;letter-spacing:1px;margin-bottom:6px}
+.char-custom-sub{font-size:10px;color:#a89c82;margin-bottom:8px;line-height:1.4}
+.char-custom-body{display:flex;gap:18px;align-items:center;justify-content:center;
+  margin-top:8px;flex-wrap:wrap}
+.char-preview-col{display:flex;flex-direction:column;align-items:center;gap:6px}
+.char-preview-canvas{width:160px;height:240px;border-radius:14px;
+  background:radial-gradient(circle at 50% 30%, #283749 0%, #10141b 100%);
+  border:1px solid rgba(212,168,56,.4);box-shadow:0 6px 24px rgba(0,0,0,.6);
+  cursor:grab;touch-action:none}
+.char-preview-canvas:active{cursor:grabbing}
+.char-preview-hint{font-size:9px;color:#a89c82;letter-spacing:.3px}
+.char-controls-col{flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;text-align:left}
+.char-field-row{width:100%;margin-bottom:4px;text-align:left}
+.char-field-row label{font-size:10px;font-weight:700;color:#f0c060;letter-spacing:.5px;
+  display:block;margin-bottom:4px}
+.char-name-input{width:100%;padding:9px 12px;box-sizing:border-box;
+  font-family:'Press Start 2P',monospace;font-size:11px;background:#12151b;
+  border:1px solid #4a4438;border-radius:8px;color:#fff;text-align:center;
+  outline:none;transition:border-color .15s}
+.char-name-input:focus{border-color:#f0c060}
+.char-hair-nav{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;background:#141820;border:1px solid #4a4438;border-radius:8px;padding:4px}
+.char-nav-btn{width:34px;height:32px;background:#2a2620;border:1px solid #c89a40;
+  border-radius:6px;color:#f0c060;font-size:14px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.12s}
+.char-nav-btn:hover{background:#3d3628}
+.char-nav-btn:active{transform:scale(.94)}
+.char-style-name{flex:1;font-size:11px;font-weight:600;color:#e8dcc2;text-align:center}
+.char-color-swatches{display:flex;gap:7px;justify-content:flex-start;flex-wrap:wrap;margin-top:4px}
+.char-swatch{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.2);
+  cursor:pointer;transition:.15s;padding:0;outline:none}
+.char-swatch.active{border:2px solid #f0c060;box-shadow:0 0 8px #f0c060;transform:scale(1.18)}
+.char-action-btns{width:100%;margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.char-btn-start{width:100%;padding:11px;font-family:'Press Start 2P',monospace;font-size:11px;
+  background:#c89a40;color:#1a1204;border:1px solid #f0c060;border-radius:9px;
+  cursor:pointer;font-weight:700;letter-spacing:.5px;transition:.15s}
+.char-btn-start:hover{background:#dbab4d;transform:translateY(-1px)}
+.char-btn-start:active{transform:scale(.98)}
+.char-btn-cancel{width:100%;padding:8px;font-size:11px;background:#22262e;color:#a89c82;
+  border:1px solid #3d434d;border-radius:8px;cursor:pointer;transition:.15s}
+.char-btn-cancel:hover{background:#2c323c;color:#e8dcc2}
+
+/* =========================================================================
    FINAL MOBILE LAYOUT — hotbar benar-benar tengah bawah, tombol responsif,
    tidak ada elemen HUD yang saling menutupi.
    -----------------------------------------------------------------------

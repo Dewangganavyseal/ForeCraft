@@ -536,7 +536,9 @@ const Env_Ore={
 
   buildChunkOres(c,group){
     if(c.ores&&c.ores.length){
+      const seaLevel=(typeof CFG!=='undefined'&&CFG.SEA!==undefined)?CFG.SEA:5;
       for(const o of c.ores){
+        if(o.wy<seaLevel)continue; // Garansi anti-tenggelam di air/sungai
         if(c.data[World.idx(o.x,o.y,o.z)]===o.ore){
           this.spawnNode(c,group,o.wx,o.wy,o.wz,o.ore,o.seed,o.big);
         }

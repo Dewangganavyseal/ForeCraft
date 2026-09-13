@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.12',
+  VERSION:'0.2.13',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -378,8 +378,8 @@ const BIOME_INFO={
      (bobot 0.3 dari total ~9.3 ≈ 3% kemunculan) agar tidak sering muncul.
      Permukaan batu, sedikit pohon, bijih kristal. */
   [BIOME.MOUNTAIN]:{name:'Pegunungan',e:'⛰️',surface:B.STONE,sub:B.STONE,
-    fog:0xc4d2e0,tree:0.15,ore:B.ORE_CRYSTAL,mobs:['dragon','wolf','golem'],
-    mobW:{dragon:0.3,wolf:1.5,golem:7.5}},
+    fog:0xc4d2e0,tree:0.15,ore:B.ORE_CRYSTAL,mobs:['dragon','trex','wolf','golem'],
+    mobW:{dragon:0.3,trex:0.6,wolf:1.5,golem:7.0}},
   /* ---------- LAUT & PANTAI ----------
      OCEAN: dasar berpasir di bawah permukaan air; tidak ada pohon dan tidak
      pernah dipakai untuk desa. Monster darat tidak spawn di sini karena
@@ -459,7 +459,7 @@ const LANG_KEYS=['mm_new','mm_load','mm_music','mm_slot','mm_empty','mm_info',
   'settings_title','settings_tip','settings_on','settings_off','settings_volume',
   'settings_music','settings_music_play','settings_sfx','settings_sfx_play',
   'settings_custom','settings_custom_tip','settings_custom_open',
-  'settings_save','settings_save_now','settings_saved','settings_lang','settings_lang_set',
+  'settings_save','settings_save_now','settings_saved','settings_main_menu','settings_to_main_menu','settings_lang','settings_lang_set',
   'settings_gfx','settings_gfx_tip','settings_gfx_set','settings_gfx_reload',
   'gfx_low','gfx_medium','gfx_high','gfx_ultra'];
 
@@ -490,6 +490,7 @@ const locales={
     settings_custom_open:'Buka UI Studio',
     settings_save:'Simpan Manual',settings_save_now:'Simpan Sekarang',
     settings_saved:'Permainan disimpan!',
+    settings_main_menu:'Main Menu',settings_to_main_menu:'Kembali ke Main Menu',
     settings_lang:'Bahasa',settings_lang_set:'Bahasa: $name',
     settings_gfx:'Grafis',
     settings_gfx_tip:'Turunkan bila permainan terasa berat.',
@@ -515,6 +516,7 @@ const locales={
     settings_custom_open:'Open UI Studio',
     settings_save:'Manual Save',settings_save_now:'Save Now',
     settings_saved:'Game saved!',
+    settings_main_menu:'Main Menu',settings_to_main_menu:'Return to Main Menu',
     settings_lang:'Language',settings_lang_set:'Language: $name',
     settings_gfx:'Graphics',
     settings_gfx_tip:'Lower this if the game feels heavy.',
@@ -540,6 +542,7 @@ const locales={
     settings_custom_open:'打开 UI 工作室',
     settings_save:'手动保存',settings_save_now:'立即保存',
     settings_saved:'游戏已保存！',
+    settings_main_menu:'主菜单',settings_to_main_menu:'返回主菜单',
     settings_lang:'语言',settings_lang_set:'语言：$name',
     settings_gfx:'画质',
     settings_gfx_tip:'如果游戏卡顿请降低画质。',
@@ -565,6 +568,7 @@ const locales={
     settings_custom_open:'UI スタジオを開く',
     settings_save:'手動セーブ',settings_save_now:'今すぐセーブ',
     settings_saved:'ゲームを保存しました！',
+    settings_main_menu:'メインメニュー',settings_to_main_menu:'メインメニューに戻る',
     settings_lang:'言語',settings_lang_set:'言語：$name',
     settings_gfx:'グラフィック',
     settings_gfx_tip:'重いと感じたら下げてください。',
@@ -814,31 +818,52 @@ const ITEMS={
   helm_thorns:{n:'Mahkota Duri Titan',e:'😈',rarity:'legendary',
     armor:{slot:'helm',def:0.24,tier:'crystal',fx:'thorns'}},
 
-  /* ================= TAMENG (slot shield — khusus karakter utama) =================
-     Tujuh tameng dari NEW MODEL/Tameng.html. `tier` menentukan bahan
-     enchant di Landasan Tempa (anvil), bukan warna model — tiap tameng
-     punya model voxel unik sendiri di js/player/shields.js.
-
-     STAT BLOCK (baru):
+  /* ================= 12 TAMENG OTENTIK FORECRAFT =================
+     Mengikuti 12 Set Armor & Jenjang Material:
+     Stat block:
+       def = reduksi armor pasif (0..1)
        blk = peluang dasar MENANGKIS serangan (0..1)
        bkp = porsi damage yang ditahan saat tangkisan berhasil (0..1)
-     Keduanya dinaikkan rarity item, level tempa, skill pasif cabang perisai,
-     dan proficiency 'blocking'. Total akhir dibatasi RPG.blockChance() ke 55%
-     dan RPG.blockPower() ke 85%. */
-  shield_wood:  {n:'Tameng Kayu',      e:'🛡️',rarity:'common',
+  */
+  /* Common (Lv 1) */
+  shield_berserker: {n:'Berserker Pelt Shield',   e:'🛡️',rarity:'common',
     armor:{slot:'shield',def:0.05,tier:'leather',blk:0.12,bkp:0.35}},
-  shield_iron:  {n:'Tameng Ksatria Besi',e:'🛡️',rarity:'uncommon',
-    armor:{slot:'shield',def:0.10,tier:'iron',blk:0.16,bkp:0.45}},
-  shield_flame: {n:'Tameng Bara',      e:'🛡️',rarity:'rare',
-    armor:{slot:'shield',def:0.13,tier:'gold',blk:0.19,bkp:0.50}},
-  shield_venom: {n:'Tameng Bisa',      e:'🛡️',rarity:'rare',
-    armor:{slot:'shield',def:0.12,tier:'iron',blk:0.18,bkp:0.48}},
-  shield_storm: {n:'Tameng Badai',     e:'🛡️',rarity:'epic',
-    armor:{slot:'shield',def:0.15,tier:'gold',blk:0.22,bkp:0.55}},
-  shield_frost: {n:'Tameng Fajar Beku',e:'🛡️',rarity:'epic',
-    armor:{slot:'shield',def:0.17,tier:'crystal',blk:0.24,bkp:0.60}},
-  shield_dark:  {n:'Tameng Bayangan',  e:'🛡️',rarity:'legendary',
-    armor:{slot:'shield',def:0.20,tier:'crystal',blk:0.28,bkp:0.68}},
+  shield_elven:     {n:'Elven Leaf Shield',       e:'🍃',rarity:'common',
+    armor:{slot:'shield',def:0.06,tier:'leather',blk:0.14,bkp:0.36}},
+
+  /* Uncommon (Lv 7 - 12) */
+  shield_steampunk: {n:'Steam Cog Shield',        e:'⚙️',rarity:'uncommon',
+    armor:{slot:'shield',def:0.08,tier:'copper',blk:0.15,bkp:0.40}},
+  shield_iron:      {n:"Knight's Iron Pavise",    e:'🛡️',rarity:'uncommon',
+    armor:{slot:'shield',def:0.10,tier:'iron',blk:0.17,bkp:0.45}},
+
+  /* Rare (Lv 22) */
+  shield_paladin:   {n:'Paladin Sunshield',       e:'✨',rarity:'rare',
+    armor:{slot:'shield',def:0.13,tier:'gold',blk:0.20,bkp:0.50}},
+
+  /* Epic (Lv 26) */
+  shield_shadow:    {n:'Shadow Tungsten Buckler', e:'🗡️',rarity:'epic',
+    armor:{slot:'shield',def:0.14,tier:'tungsten',blk:0.22,bkp:0.52}},
+  shield_juggernaut:{n:'Colossus Tower Bulwark',  e:'🏰',rarity:'epic',
+    armor:{slot:'shield',def:0.16,tier:'tungsten',blk:0.24,bkp:0.58}},
+
+  /* Legendary (Lv 32 - 38) */
+  shield_crystal:   {n:'Glacial Spellshield',     e:'💎',rarity:'legendary',
+    armor:{slot:'shield',def:0.17,tier:'crystal',blk:0.25,bkp:0.60}},
+  shield_reaper:    {n:'Soul Harvester Gate',     e:'💀',rarity:'legendary',
+    armor:{slot:'shield',def:0.18,tier:'crystal',blk:0.26,bkp:0.62}},
+  shield_yeti:      {n:'Yeti Glacier Barricade',  e:'❄️',rarity:'legendary',
+    armor:{slot:'shield',def:0.19,tier:'crystal',blk:0.27,bkp:0.65}},
+  shield_samurai:   {n:'Samurai O-Tate',           e:'🛡️',rarity:'legendary',
+    armor:{slot:'shield',def:0.21,tier:'tungstensteel',blk:0.29,bkp:0.70}},
+
+  /* Mythic (Lv 38) */
+  shield_dragon:    {n:'Dragonscale Greatshield', e:'🔥',rarity:'mythic',
+    armor:{slot:'shield',def:0.24,tier:'tungstensteel',blk:0.32,bkp:0.75}},
+
+  /* Slot placeholder untuk alias mundur */
+  shield_wood: null, shield_flame: null, shield_venom: null,
+  shield_storm: null, shield_frost: null, shield_dark: null,
 };
 /* Hubungkan alias item lama ke item otentik baru */
 (function(){
@@ -853,6 +878,15 @@ const ITEMS={
   ITEMS.sword_tungsten= ITEMS.sword_juggernaut;
   ITEMS.sword_frost   = ITEMS.sword_yeti;
   ITEMS.sword_titan   = ITEMS.sword_dragon;
+
+  /* Alias tameng lama ke 12 tameng otentik */
+  ITEMS.shield_wood     = ITEMS.shield_berserker;
+  ITEMS.shield_flame    = ITEMS.shield_paladin;
+  ITEMS.shield_venom    = ITEMS.shield_shadow;
+  ITEMS.shield_storm    = ITEMS.shield_juggernaut;
+  ITEMS.shield_frost    = ITEMS.shield_crystal;
+  ITEMS.shield_dark     = ITEMS.shield_reaper;
+  ITEMS.shield_carapace = ITEMS.shield_dragon;
 })();
 
 /* palet warna material armor untuk model 3D */
@@ -914,10 +948,14 @@ const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mus
   sword_venom:0xa8e86a,sword_frost:0xd6f4ff,sword_titan:0xffb066,
   cloak_swift:0x8fe0ff,helm_guard:0xc9d2dc,boots_greed:0xffd24d,
   plate_regen:0x7dffb0,helm_thorns:0xff6bd6,
-  /* tameng */
-  shield_wood:0x9c6b35,shield_iron:0xa8b2bd,shield_flame:0xff7a1f,
-  shield_venom:0x2bcc4f,shield_storm:0xffd75e,shield_frost:0x9fd6ff,
-  shield_dark:0xa633ff};
+  /* 12 tameng otentik */
+  shield_berserker:0x7a6a5a,shield_elven:0x3a7a48,shield_steampunk:0xc86a3b,
+  shield_iron:0x9aa6b4,shield_paladin:0xf5c842,shield_shadow:0x2e343e,
+  shield_juggernaut:0x586474,shield_crystal:0x60a5fa,shield_reaper:0xa855f7,
+  shield_yeti:0x8aa6be,shield_samurai:0xba1e2b,shield_dragon:0xb52216,
+  /* alias tameng lama */
+  shield_wood:0x9c6b35,shield_flame:0xff7a1f,shield_venom:0x2bcc4f,
+  shield_storm:0xffd75e,shield_frost:0x9fd6ff,shield_dark:0xa633ff};
 
 
 
@@ -1034,22 +1072,27 @@ const RECIPES=[
   {out:'plate_regen',need:{crystal:4,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Zirah Nadi Kristal'},
   {out:'helm_thorns',need:{crystal:3,venom:5,boss_core:2},skill:'smith',prof:{mining:18},name:'Mahkota Duri Titan'},
 
-  /* ================= TEMPA TAMENG =================
-     Rantai upgrade: kayu → besi → (bara/bisa) → badai → beku → bayangan.
-     Tier bahan mengikuti rarity logamnya. */
-  {out:'shield_wood',need:{wood:6,fiber:2},name:'Tameng Kayu'},
-  {out:'shield_iron',need:{shield_wood:1,iron_ingot:4,leather:1},skill:'smith',prof:{mining:5},name:'Tameng Ksatria Besi'},
-  {out:'shield_flame',need:{shield_iron:1,gold_ingot:3,coal:4},skill:'smith',prof:{mining:10},name:'Tameng Bara'},
-  {out:'shield_venom',need:{shield_iron:1,venom:5,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Tameng Bisa'},
-  {out:'shield_storm',need:{shield_flame:1,gold_ingot:4,crystal:2},skill:'smith',prof:{mining:15},name:'Tameng Badai'},
-  {out:'shield_frost',need:{shield_storm:1,crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Tameng Fajar Beku'},
-  {out:'shield_dark',need:{shield_frost:1,boss_core:2,crystal:4},skill:'smith',prof:{mining:22},name:'Tameng Bayangan'},
+  /* ================= TEMPA TAMENG (12 TAMENG OTENTIK FORECRAFT) ================= */
+  {out:'shield_berserker',need:{wood:6,pelt:4,fiber:2},name:'Berserker Pelt Shield'},
+  {out:'shield_elven',need:{wood:6,fiber:4,resin:2},name:'Elven Leaf Shield'},
+  {out:'shield_steampunk',need:{copper_ore:6,sand:2,iron_ingot:2},skill:'smith',prof:{mining:3},name:'Steam Cog Shield'},
+  {out:'shield_iron',need:{iron_ingot:5,iron_ore:4,leather:1},skill:'smith',prof:{mining:5},name:"Knight's Iron Pavise"},
+  {out:'shield_paladin',need:{gold_ingot:6,boss_core:1,iron_ingot:2},skill:'smith',prof:{mining:10},name:'Paladin Sunshield'},
+  {out:'shield_shadow',need:{tungsten_ore:6,soul_shard:2,steel_ore:3},skill:'smith',prof:{mining:14},name:'Shadow Tungsten Buckler'},
+  {out:'shield_juggernaut',need:{tungsten_ore:8,iron_ingot:4,coal:4},skill:'smith',prof:{mining:14},name:'Colossus Tower Bulwark'},
+  {out:'shield_crystal',need:{crystal:6,gold_ingot:2,boss_core:1},skill:'smith',prof:{mining:18},name:'Glacial Spellshield'},
+  {out:'shield_reaper',need:{soul_shard:6,crystal:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Soul Harvester Gate'},
+  {out:'shield_yeti',need:{crystal:6,pelt:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Yeti Glacier Barricade'},
+  {out:'shield_samurai',need:{tungstensteel_ore:8,gold_ingot:4,centipede_shell:2},skill:'smith',prof:{mining:22},name:'Samurai O-Tate'},
+  {out:'shield_dragon',need:{tungstensteel_ore:10,boss_core:2,pelt:4},skill:'smith',prof:{mining:25},name:'Dragonscale Greatshield'},
 
-  /* ================= TEMPA BAHAN KELABANG =================
-     Kulit kelabang (dari boss Kelabang Raksasa) membuka armor karapas berat:
-     zirah kokoh setara set emas tanpa perlu inti boss. */
-  {out:'plate_carapace',need:{centipede_shell:6,iron_ingot:2,leather:2},skill:'smith',prof:{mining:12},name:'Zirah Karapas Kelabang'},
-  {out:'helm_carapace',need:{centipede_shell:4,iron_ingot:1},skill:'smith',prof:{mining:12},name:'Helm Karapas Kelabang'},
+  /* Kompatibilitas resep lama */
+  {out:'shield_wood',need:{wood:6,fiber:2},name:'Tameng Kayu'},
+  {out:'shield_flame',need:{iron_ingot:2,gold_ingot:3,coal:4},skill:'smith',prof:{mining:10},name:'Tameng Bara'},
+  {out:'shield_venom',need:{iron_ingot:2,venom:5},skill:'smith',prof:{mining:12},name:'Tameng Bisa'},
+  {out:'shield_storm',need:{gold_ingot:4,crystal:2},skill:'smith',prof:{mining:15},name:'Tameng Badai'},
+  {out:'shield_frost',need:{crystal:6,boss_core:1},skill:'smith',prof:{mining:18},name:'Tameng Fajar Beku'},
+  {out:'shield_dark',need:{boss_core:2,crystal:4},skill:'smith',prof:{mining:22},name:'Tameng Bayangan'},
   {out:'shield_carapace',need:{centipede_shell:5,iron_ingot:2},skill:'smith',prof:{mining:12},name:'Tameng Karapas Kelabang'},
 ];
 

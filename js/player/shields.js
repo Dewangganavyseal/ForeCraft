@@ -1,252 +1,446 @@
 'use strict';
 /* =============================================================================
-   SHIELD MODELS  (port dari NEW MODEL/Tameng.html)
+   SHIELD MODELS v2 (12 Tameng Otentik Sesuai 12 Set Armor & Pedang Forecraft)
    -----------------------------------------------------------------------------
-   Tujuh tameng voxel ala Minecraft: wood, iron, flame, frost (ice),
-   venom (poison), storm (lightning), dark (shadow).
+   12 Tameng Voxel 3D Otentik:
+     1. Berserker Pelt Shield      (shield_berserker / shield_wood)    — Set Berserker Fur (Leather Lv 1)
+     2. Elven Leaf Shield          (shield_elven)                      — Set Elven Ranger (Leather Lv 1)
+     3. Steam Cog Shield           (shield_steampunk)                  — Set Steampunk Engineer (Copper Lv 7)
+     4. Knight's Iron Pavise       (shield_iron)                       — Set Iron Knight (Iron Lv 12)
+     5. Paladin Sunshield          (shield_paladin / shield_flame)     — Set Gold Paladin (Gold Lv 22)
+     6. Shadow Tungsten Buckler    (shield_shadow / shield_venom)      — Set Shadow Assassin (Tungsten Lv 26)
+     7. Colossus Tower Bulwark     (shield_juggernaut / shield_storm)  — Set Tungsten Juggernaut (Tungsten Lv 26)
+     8. Glacial Spellshield        (shield_crystal / shield_frost)     — Set Crystal Mage (Crystal Lv 32)
+     9. Soul Harvester Gate        (shield_reaper / shield_dark)       — Set Reaper Cult (Soul/Crystal Lv 32)
+    10. Yeti Glacier Barricade     (shield_yeti)                       — Set Frost Yeti (Ice/Crystal Lv 32)
+    11. Samurai O-Tate             (shield_samurai)                    — Set Samurai (Tungsten Steel Lv 38)
+    12. Dragonscale Greatshield    (shield_dragon / shield_carapace)   — Set Dragonscale (Mythic Lv 38)
 
-   Sel piksel digabung menjadi SATU InstancedMesh berwarna per-instance
-   (hemat draw call saat dipakai in-game); gagang & ornamen tetap mesh biasa.
-   ShieldModels.buildFor(itemId) mengembalikan Group yang sudah diskalakan
-   ke tinggi ~0.85 blok, siap ditempel ke lengan kiri pemain.
+   Tiap tameng memiliki siluet voxel 3D unik, lapisan material bertekstur,
+   pelat inti (plate) untuk highlight blok/aura Royal Guard, dan gagang penahan
+   lengan kiri di sisi belakang (-Z).
    ============================================================================= */
-const ShieldModels={
-  /* tinggi akhir tameng saat dipakai pemain (dalam blok dunia) */
-  TARGET_H:0.85,
 
-  _mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};},
+const ShieldModels = {
+  /* tinggi akhir tameng saat dipakai pemain & NPC (diperbesar +30% dari 0.85 ke 1.105) */
+  TARGET_H: 1.105,
 
-  /* generator tameng piksel: sel dikumpulkan jadi InstancedMesh */
-  buildPixelShield(cfg){
-    const g=new THREE.Group();
-    const s=cfg.cell||0.17;
-    const rnd=this._mulberry32(cfg.seed||1);
-    const minY=(cfg.minY!==undefined?cfg.minY:0);
-    const maxY=(cfg.maxY!==undefined?cfg.maxY:cfg.H-1);
-    const cx=(cfg.W-1)/2, cy=(minY+maxY)/2;
-
-    const cells=[]; // {x,y,c}
-    for(let gy=minY;gy<=maxY;gy++){
-      for(let gx=0;gx<cfg.W;gx++){
-        if(!cfg.mask(gx,gy))continue;
-        const border=!cfg.mask(gx+1,gy)||!cfg.mask(gx-1,gy)||!cfg.mask(gx,gy+1)||!cfg.mask(gx,gy-1);
-        const color=cfg.color(gx,gy,border,rnd);
-        if(color==null)continue;
-        cells.push({x:(gx-cx)*s,y:(gy-cy)*s,c:color});
-      }
+  /* Helper pembangun voxel */
+  _box(w, h, d, color, emissive, yOff = 0) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    if (yOff) g.translate(0, yOff, 0);
+    const mat = new THREE.MeshLambertMaterial({ color });
+    if (emissive) {
+      mat.emissive = new THREE.Color(emissive);
+      mat.emissiveIntensity = 0.65;
     }
-    const geo=new THREE.BoxGeometry(s,s,s);
-    const mat=new THREE.MeshLambertMaterial();
-    const inst=new THREE.InstancedMesh(geo,mat,cells.length);
-    const d=new THREE.Object3D(),col=new THREE.Color();
-    cells.forEach((p,i)=>{
-      d.position.set(p.x,p.y,0);
-      d.updateMatrix();
-      inst.setMatrixAt(i,d.matrix);
-      col.setHex(p.c);
-      inst.setColorAt(i,col);
-    });
-    if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
-    inst.frustumCulled=false;
-    g.add(inst);
+    const m = new THREE.Mesh(g, mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    return m;
+  },
 
-    /* gagang khas minecraft di belakang */
-    if(cfg.handle){
-      const cache={};
-      const hm=c=>cache[c]||(cache[c]=new THREE.MeshLambertMaterial({color:c}));
-      const h1=new THREE.Mesh(new THREE.BoxGeometry(s*1.4,s*4.5,s*0.9),hm(cfg.handle[0]));
-      h1.position.set(0,0,-s*0.9); g.add(h1);
-      const grip=new THREE.Mesh(new THREE.BoxGeometry(s*0.9,s*2.8,s*0.9),hm(cfg.handle[1]));
-      grip.position.set(0,0,-s*1.6); g.add(grip);
+  _pl(w, h, d, color, y = 0, z = 0, x = 0, arg8, arg9) {
+    const emissive = arg9 !== undefined ? arg9 : (typeof arg8 === 'number' && arg8 > 1 ? arg8 : undefined);
+    const yOff = (typeof arg8 === 'number' && Math.abs(arg8) < 1) ? arg8 : 0;
+    const m = this._box(w, h, d, color, emissive, yOff);
+    m.position.set(x, y, z);
+    return m;
+  },
+
+  /* Helper gagang di belakang perisai (sisi penahan lengan kiri) */
+  _addBackGrip(g, primaryColor = 0x3a2e24, metalColor = 0x666e78) {
+    g.add(this._pl(0.18, 0.04, 0.08, primaryColor, 0.08, -0.06));
+    g.add(this._pl(0.18, 0.04, 0.08, primaryColor, -0.08, -0.06));
+    g.add(this._pl(0.04, 0.18, 0.04, primaryColor, 0.0, -0.08, 0.06));
+    g.add(this._pl(0.03, 0.03, 0.02, metalColor, 0.08, -0.04, 0.09));
+    g.add(this._pl(0.03, 0.03, 0.02, metalColor, 0.08, -0.04, -0.09));
+    g.add(this._pl(0.03, 0.03, 0.02, metalColor, -0.08, -0.04, 0.09));
+    g.add(this._pl(0.03, 0.03, 0.02, metalColor, -0.08, -0.04, -0.09));
+  },
+
+  /* ---------- 1. BERSERKER PELT SHIELD (Tier Leather, Lv 1) ---------- */
+  buildBerserker() {
+    const g = new THREE.Group(); g.name = 'Shield_berserker';
+    const C = { wood: 0x5a3c22, woodLight: 0x6e4a2c, fur: 0x7a6a5a, furLight: 0x9a8a7a, bone: 0xe8e0d0, iron: 0x4a4f56 };
+    const plate = this._pl(0.48, 0.52, 0.04, C.wood, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.54, 0.44, 0.04, C.wood, 0, 0));
+    g.add(this._pl(0.44, 0.56, 0.04, C.woodLight, 0, 0));
+    // Lapisan bulu serigala lebat di lingkar luar
+    g.add(this._pl(0.58, 0.48, 0.05, C.fur, 0, 0.01));
+    g.add(this._pl(0.48, 0.60, 0.05, C.fur, 0, 0.01));
+    g.add(this._pl(0.54, 0.54, 0.045, C.furLight, 0, 0.01));
+    // Palang silang besi tempa kasar
+    g.add(this._pl(0.08, 0.50, 0.05, C.iron, 0, 0.025));
+    g.add(this._pl(0.50, 0.08, 0.05, C.iron, 0, 0.025));
+    // Bos tengah tulang pemangsa bundar menonjol
+    g.add(this._pl(0.16, 0.16, 0.07, C.bone, 0, 0.04));
+    g.add(this._pl(0.08, 0.08, 0.10, C.bone, 0, 0.06));
+    // Paku-paku taring di lingkar tengah
+    for (const [x, y] of [[-0.18, 0.18], [0.18, 0.18], [-0.18, -0.18], [0.18, -0.18]]) {
+      g.add(this._pl(0.04, 0.04, 0.06, C.bone, y, 0.03, x));
     }
-    if(cfg.extras){
-      const cache={};
-      const em=c=>cache[c]||(cache[c]=new THREE.MeshLambertMaterial({color:c}));
-      cfg.extras(g,s,em);
+    // Sepasang tanduk binatang purba melengkung di sisi kiri-kanan atas
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.06, 0.10, 0.06, C.bone, 0.28, 0.01, 0.24 * s));
+      g.add(this._pl(0.05, 0.10, 0.05, C.bone, 0.36, -0.02, 0.28 * s));
+      g.add(this._pl(0.04, 0.08, 0.04, C.bone, 0.42, -0.05, 0.31 * s));
     }
-    g.scale.setScalar(cfg.scale||1);
-    /* tinggi asli (sebelum diskalakan ulang ke TARGET_H) */
-    g.userData.rawH=(maxY-minY+1)*s*(cfg.scale||1);
+    this._addBackGrip(g, C.wood, C.iron);
+    g.userData.rawH = 0.88;
     return g;
   },
 
-  /* ---------- 1. WOODEN SHIELD ---------- */
-  buildWood(){
-    const W=10,H=12;
-    const inShape=(gx,gy)=>{
-      if(gx<0||gx>=W||gy<0||gy>=H)return false;
-      if(gy>=10&&(gx<=1||gx>=8))return false;
-      if(gy===0&&(gx===0||gx===9))return false;
-      return true;
-    };
-    return this.buildPixelShield({
-      W,H,seed:7,scale:1.25,
-      handle:[0x3c2413,0x5a3a1e],
-      mask:inShape,
-      color:(gx,gy,border,rnd)=>{
-        if(gx>=4&&gx<=5&&gy>=5&&gy<=6)return 0x8d9299;
-        if(border)return 0x4a2f1b;
-        const plank=Math.floor(gy/3);
-        if(gy%3===2)return 0x6e4522;
-        const r=rnd();
-        if((plank%2===0&&gx===2)||(plank%2===1&&gx===7))return 0x6e4522;
-        if(r<0.14)return 0x6e4522;
-        if(r>0.9)return 0xb5844a;
-        return [0x9c6b35,0x8a5c2c,0xa17038,0x8f6030][plank%4];
-      },
-      extras:(g,s,mat)=>{
-        const b=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.36,0.18),mat(0x6f757c));
-        b.position.set(0,0,s*0.9); g.add(b);
-      }
-    });
-  },
-
-  /* ---------- 2. IRON KNIGHT SHIELD ---------- */
-  buildIron(){
-    const hw=[0,1,2,2,3,3,4,4,5,5,5,5,5];
-    return this.buildPixelShield({
-      W:11,H:13,seed:21,scale:1.2,
-      handle:[0x2f353c,0x454c55],
-      mask:(gx,gy)=>gy<hw.length&&Math.abs(gx-5)<=hw[gy],
-      color:(gx,gy,border,rnd)=>{
-        const cross=(gx===5&&gy>=2&&gy<=11)||(gy===9&&gx>=2&&gx<=8);
-        if(cross)return rnd()<0.25?0xc2932f:0xe0b244;
-        if(border)return rnd()<0.3?0x313840:0x394048;
-        const r=rnd();
-        return r<0.25?0x8d98a5:r<0.5?0xa8b2bd:r<0.75?0x98a2ae:0x9aa4b0;
-      },
-      extras:(g,s,mat)=>{
-        const b=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.16),mat(0x565b61));
-        b.position.set(0,3*s,s*0.9); g.add(b);
-      }
-    });
-  },
-
-  /* ---------- 3. FLAME SHIELD ---------- */
-  buildFlame(){
-    return this.buildPixelShield({
-      W:13,H:13,seed:33,scale:1.2,
-      handle:[0x2e1a18,0x452520],
-      mask:(gx,gy)=>(gx-6)*(gx-6)+(gy-6)*(gy-6)<=40,
-      color:(gx,gy,border,rnd)=>{
-        if(border)return rnd()<0.4?0x2e1614:0x241210;
-        const fx=Math.abs(gx-6),d=Math.abs(gy-6);
-        if(fx+d<=3)return fx===0?0xffe066:fx===1?0xffb42a:fx===2?0xff7a1f:0xd9531e;
-        const p=Math.max(0.05,0.18+(10-gy)*0.05+(3-fx)*0.07);
-        if(rnd()<p){
-          const heat=Math.min(1,(11-gy)/9+(3-fx)*0.12+rnd()*0.2);
-          if(heat<0.3)return 0x8a2c12; if(heat<0.55)return 0xd9531e;
-          if(heat<0.75)return 0xff7a1f; if(heat<0.9)return 0xffb42a; return 0xffe066;
-        }
-        const r=rnd(); return r<0.33?0x2e1a18:r<0.66?0x3a2020:0x452520;
-      }
-    });
-  },
-
-  /* ---------- 4. FROST SHIELD ---------- */
-  buildIce(){
-    const hw=[0,2,3,4,5,6,6,6,6,6,5,4,3,2,0];
-    return this.buildPixelShield({
-      W:13,H:15,seed:45,scale:1.05,
-      handle:[0x2a4a63,0x3a6284],
-      mask:(gx,gy)=>gy<hw.length&&Math.abs(gx-6)<=hw[gy],
-      color:(gx,gy,border,rnd)=>{
-        if(border)return rnd()<0.3?0x35628a:0x3d6f96;
-        const dx=gx-6,dy=gy-7;
-        const spoke=(dy===0&&Math.abs(dx)<=4)||(dx===0&&Math.abs(dy)<=4)||(dx!==0&&Math.abs(dx)===Math.abs(dy)&&Math.abs(dx)<=3);
-        if(spoke)return rnd()<0.3?0xdceeff:0xf0fbff;
-        if(rnd()<0.06)return 0xffffff;
-        const r=rnd(); return r<0.25?0x9fd6ff:r<0.5?0x8ac8f5:r<0.75?0xb4e2ff:0x7ab8e0;
-      }
-    });
-  },
-
-  /* ---------- 5. VENOM SHIELD ---------- */
-  buildPoison(){
-    return this.buildPixelShield({
-      W:13,H:16,minY:1,seed:57,scale:1.0,
-      handle:[0x1d2a1c,0x2b3d2a],
-      mask:(gx,gy)=>{
-        if(gx===3&&gy>=3&&gy<=4)return true;
-        if(gx===6&&gy>=1&&gy<=4)return true;
-        if(gx===9&&gy>=3&&gy<=4)return true;
-        return gy>=5&&(gx-6)*(gx-6)+(gy-10)*(gy-10)<=34;
-      },
-      color:(gx,gy,border,rnd)=>{
-        if(gy<5)return rnd()<0.4?0x2bcc4f:0x52e878;
-        if(border)return rnd()<0.3?0x1a2a14:0x14200f;
-        const d2=(gx-6)*(gx-6)+(gy-10)*(gy-10);
-        if(d2<=4)return rnd()<0.5?0x52e878:0x6cf292;
-        if(d2<=10&&rnd()<0.6)return 0x2bcc4f;
-        const p=0.15+Math.max(0,9-gy)*0.06;
-        if(rnd()<p)return rnd()<0.5?0x1f9e3d:0x2bcc4f;
-        const r=rnd(); return r<0.33?0x22301f:r<0.66?0x2b3d2a:0x1d2a1c;
-      }
-    });
-  },
-
-  /* ---------- 6. STORM SHIELD ---------- */
-  buildLightning(){
-    const bolt=new Set([[5,9],[6,9],[4,8],[5,8],[3,7],[4,7],[3,6],[4,6],[5,6],[6,6],[7,6],[6,5],[7,5],[5,4],[6,4],[4,3],[5,3],[3,2],[4,2],[4,1]].map(p=>p[0]+','+p[1]));
-    return this.buildPixelShield({
-      W:11,H:11,seed:69,scale:1.3,
-      handle:[0x4a3410,0x5c421a],
-      mask:(gx,gy)=>Math.abs(gx-5)+Math.abs(gy-5)<=5,
-      color:(gx,gy,border,rnd)=>{
-        if(bolt.has(gx+','+gy))return rnd()<0.2?0x22242e:0x15161c;
-        if(border)return rnd()<0.3?0x59400c:0x6b4a0e;
-        const r=rnd(); return r<0.25?0xe8b62c:r<0.5?0xd19f1f:r<0.75?0xf5c531:0xffd75e;
-      }
-    });
-  },
-
-  /* ---------- 7. SHADOW SHIELD ---------- */
-  buildDark(){
-    return this.buildPixelShield({
-      W:11,H:15,maxY:16,seed:81,scale:0.95,
-      handle:[0x14101f,0x1f1930],
-      mask:(gx,gy)=>{
-        if(gy===15&&(gx===2||gx===5||gx===8))return true;
-        if(gy===16&&gx===5)return true;
-        if(gy>14)return false;
-        if(gx<=1&&gy>=13)return false;
-        if(gx>=9&&gy>=13)return false;
-        if(gx<=1&&gy<=1)return false;
-        if(gx>=9&&gy<=1)return false;
-        return true;
-      },
-      color:(gx,gy,border,rnd)=>{
-        if(gy>=15)return 0x14101f;
-        if(gx===5&&gy>=7&&gy<=9)return 0x0a0a10;
-        if(gy===8&&gx>=2&&gx<=8)return rnd()<0.3?0x8a2be0:0xa633ff;
-        if((gy===7||gy===9)&&gx>=3&&gx<=7)return rnd()<0.3?0x641da8:0x7a24cc;
-        if(border)return rnd()<0.3?0x271c3a:0x2e2144;
-        if(rnd()<0.08)return 0x3a2a55;
-        const r=rnd(); return r<0.33?0x1a1622:r<0.66?0x221c2e:0x171320;
-      }
-    });
-  },
-
-  /* id item -> builder */
-  MAP:{
-    shield_wood:'buildWood',shield_iron:'buildIron',shield_flame:'buildFlame',
-    shield_frost:'buildIce',shield_venom:'buildPoison',
-    shield_storm:'buildLightning',shield_dark:'buildDark',
-    /* Tameng Karapas Kelabang: dulu tidak ada di peta ini sehingga buildFor
-       mengembalikan null — pemain yang memakainya tampak TANPA tameng, dan
-       Royal Guard yang diberi item ini juga bergenggam kosong. Fallback ke
-       builder besi dengan rona karapas diterapkan lewat warna di bawah. */
-    shield_carapace:'buildIron',
-  },
-
-  /* bangun tameng untuk item id; diskalakan ke TARGET_H agar cocok
-     dengan proporsi pemain (~1.9 blok) */
-  buildFor(itemId){
-    const fn=this.MAP[itemId];
-    if(!fn)return null;
-    const g=this[fn]();
-    const raw=g.userData.rawH||2.5;
-    g.scale.multiplyScalar(this.TARGET_H/raw);
+  /* ---------- 2. ELVEN LEAF SHIELD (Tier Leather / Wood, Lv 1) ---------- */
+  buildElven() {
+    const g = new THREE.Group(); g.name = 'Shield_elven';
+    const C = { wood: 0x1f3c24, leaf: 0x2e6138, leafLight: 0x489454, gold: 0xd9c26a, gem: 0x38e878, trim: 0x4a321a };
+    const plate = this._pl(0.44, 0.36, 0.04, C.leaf, 0.08, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.38, 0.24, 0.04, C.leaf, -0.16, 0));
+    g.add(this._pl(0.24, 0.22, 0.04, C.leaf, -0.32, 0));
+    g.add(this._pl(0.12, 0.14, 0.04, C.leaf, -0.44, 0));
+    g.add(this._pl(0.40, 0.58, 0.03, C.wood, -0.04, -0.015));
+    // Ujung atas bertakik daun
+    g.add(this._pl(0.16, 0.12, 0.04, C.leaf, 0.30, 0, 0.14));
+    g.add(this._pl(0.16, 0.12, 0.04, C.leaf, 0.30, 0, -0.14));
+    // Bingkai emas & urat daun
+    g.add(this._pl(0.04, 0.64, 0.045, C.gold, 0, 0.015));
+    g.add(this._pl(0.18, 0.03, 0.042, C.gold, 0.14, 0.015, 0.10));
+    g.add(this._pl(0.18, 0.03, 0.042, C.gold, 0.14, 0.015, -0.10));
+    g.add(this._pl(0.14, 0.03, 0.042, C.gold, -0.06, 0.015, 0.08));
+    g.add(this._pl(0.14, 0.03, 0.042, C.gold, -0.06, 0.015, -0.08));
+    // Inti zamrud bercahaya
+    g.add(this._pl(0.12, 0.16, 0.06, C.gold, 0.04, 0.025));
+    g.add(this._pl(0.08, 0.10, 0.08, C.gem, 0.04, 0.035, 0, C.gem));
+    this._addBackGrip(g, C.trim, C.gold);
+    g.userData.rawH = 0.94;
     return g;
   },
+
+  /* ---------- 3. STEAM COG SHIELD (Tier Copper, Lv 7) ---------- */
+  buildSteampunk() {
+    const g = new THREE.Group(); g.name = 'Shield_steampunk';
+    const C = { dark: 0x242830, copper: 0xc86a3b, copperLight: 0xdb8454, brass: 0xd4a038, meter: 0xf4f0e6, needle: 0xd9382a, pipe: 0xa8782a };
+    const plate = this._pl(0.50, 0.50, 0.04, C.dark, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.58, 0.36, 0.04, C.copper, 0, 0.01));
+    g.add(this._pl(0.36, 0.58, 0.04, C.copper, 0, 0.01));
+    g.add(this._pl(0.48, 0.48, 0.045, C.copperLight, 0, 0.015));
+    // Roda gigi kuningan di 4 sudut
+    for (const [x, y] of [[-0.20, 0.20], [0.20, 0.20], [-0.20, -0.20], [0.20, -0.20]]) {
+      g.add(this._pl(0.12, 0.12, 0.05, C.brass, y, 0.025, x));
+      g.add(this._pl(0.14, 0.04, 0.055, C.dark, y, 0.026, x));
+      g.add(this._pl(0.04, 0.14, 0.055, C.dark, y, 0.026, x));
+    }
+    // Pipa uap kuningan & katup
+    g.add(this._pl(0.04, 0.46, 0.05, C.pipe, 0, 0.025, 0.14));
+    g.add(this._pl(0.04, 0.46, 0.05, C.pipe, 0, 0.025, -0.14));
+    g.add(this._pl(0.10, 0.06, 0.06, C.brass, 0.28, 0.028));
+    g.add(this._pl(0.10, 0.06, 0.06, C.brass, -0.28, 0.028));
+    // Manometer tekanan uap
+    g.add(this._pl(0.22, 0.22, 0.06, C.brass, 0, 0.03));
+    g.add(this._pl(0.16, 0.16, 0.07, C.meter, 0, 0.04));
+    const needle = this._pl(0.02, 0.08, 0.075, C.needle, 0.02, 0.045);
+    needle.rotation.z = 0.6; g.add(needle);
+    this._addBackGrip(g, C.dark, C.brass);
+    g.userData.rawH = 0.86;
+    return g;
+  },
+
+  /* ---------- 4. KNIGHT'S IRON PAVISE (Tier Iron, Lv 12) ---------- */
+  buildIron() {
+    const g = new THREE.Group(); g.name = 'Shield_iron';
+    const C = { iron: 0x9aa6b4, ironLight: 0xc8d2de, darkIron: 0x383e46, gold: 0xd4a438, boss: 0x4e5762 };
+    const plate = this._pl(0.50, 0.40, 0.04, C.iron, 0.10, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.44, 0.30, 0.04, C.iron, -0.12, 0));
+    g.add(this._pl(0.28, 0.22, 0.04, C.iron, -0.30, 0));
+    g.add(this._pl(0.12, 0.12, 0.04, C.iron, -0.42, 0));
+    g.add(this._pl(0.52, 0.10, 0.042, C.darkIron, 0.26, 0.005));
+    g.add(this._pl(0.22, 0.56, 0.042, C.ironLight, -0.04, 0.005, -0.10));
+    // Salib heraldis emas ksatria
+    g.add(this._pl(0.09, 0.54, 0.05, C.gold, -0.02, 0.02));
+    g.add(this._pl(0.38, 0.09, 0.05, C.gold, 0.12, 0.02));
+    // Bos pelindung hantaman piramidal
+    g.add(this._pl(0.15, 0.15, 0.07, C.boss, 0.12, 0.035));
+    g.add(this._pl(0.07, 0.07, 0.09, C.ironLight, 0.12, 0.05));
+    // Rivet tempa
+    for (const y of [0.24, 0.08, -0.08, -0.22, -0.34]) {
+      g.add(this._pl(0.03, 0.03, 0.045, C.darkIron, y, 0.022, 0.21 - (0.24 - y) * 0.25));
+      g.add(this._pl(0.03, 0.03, 0.045, C.darkIron, y, 0.022, -(0.21 - (0.24 - y) * 0.25)));
+    }
+    this._addBackGrip(g, C.darkIron, C.iron);
+    g.userData.rawH = 0.96;
+    return g;
+  },
+
+  /* ---------- 5. PALADIN SUNSHIELD (Tier Gold, Lv 22) ---------- */
+  buildPaladin() {
+    const g = new THREE.Group(); g.name = 'Shield_paladin';
+    const C = { gold: 0xd4a028, goldBright: 0xf5c842, white: 0xfffae6, gem: 0xffa020, ruby: 0xd93824, dark: 0x5a3e14 };
+    const plate = this._pl(0.52, 0.36, 0.04, C.gold, 0.14, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.44, 0.30, 0.04, C.gold, -0.12, 0));
+    g.add(this._pl(0.30, 0.26, 0.04, C.gold, -0.32, 0));
+    g.add(this._pl(0.14, 0.16, 0.04, C.gold, -0.48, 0));
+    // Sayap emas pelindung
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.10, 0.26, 0.045, C.goldBright, 0.22, 0.01, 0.24 * s));
+      g.add(this._pl(0.08, 0.18, 0.045, C.white, 0.26, 0.012, 0.28 * s));
+      g.add(this._pl(0.06, 0.12, 0.045, C.goldBright, 0.34, 0.014, 0.30 * s));
+    }
+    // Piringan matahari fajar & 8 berkas sinar
+    g.add(this._pl(0.28, 0.28, 0.05, C.goldBright, 0.06, 0.02));
+    g.add(this._pl(0.06, 0.44, 0.055, C.white, 0.06, 0.025));
+    g.add(this._pl(0.44, 0.06, 0.055, C.white, 0.06, 0.025));
+    const r1 = this._pl(0.32, 0.05, 0.052, C.goldBright, 0.06, 0.024); r1.rotation.z = 0.785; g.add(r1);
+    const r2 = this._pl(0.32, 0.05, 0.052, C.goldBright, 0.06, 0.024); r2.rotation.z = -0.785; g.add(r2);
+    // Inti surya bercahaya
+    g.add(this._pl(0.14, 0.14, 0.07, C.ruby, 0.06, 0.035));
+    g.add(this._pl(0.08, 0.08, 0.09, C.gem, 0.06, 0.048, 0, C.gem));
+    this._addBackGrip(g, C.dark, C.gold);
+    g.userData.rawH = 1.02;
+    return g;
+  },
+
+  /* ---------- 6. SHADOW TUNGSTEN BUCKLER (Tier Tungsten, Lv 26) ---------- */
+  buildShadow() {
+    const g = new THREE.Group(); g.name = 'Shield_shadow';
+    const C = { dark: 0x1a1e24, tungsten: 0x2e343e, blade: 0x5a6674, bladeEdge: 0xa0b0c2, crimson: 0xb52233, redGlow: 0xe8283a };
+    const plate = this._pl(0.44, 0.44, 0.04, C.dark, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.52, 0.30, 0.04, C.tungsten, 0, 0.01));
+    g.add(this._pl(0.30, 0.52, 0.04, C.tungsten, 0, 0.01));
+    // Bilah parry tajam di tepi kiri-kanan
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.08, 0.36, 0.03, C.blade, 0, 0.012, 0.28 * s));
+      g.add(this._pl(0.04, 0.44, 0.025, C.bladeEdge, 0, 0.015, 0.32 * s));
+      g.add(this._pl(0.05, 0.12, 0.03, C.bladeEdge, 0.26, 0.015, 0.22 * s));
+      g.add(this._pl(0.05, 0.12, 0.03, C.bladeEdge, -0.26, 0.015, 0.22 * s));
+    }
+    // Garis pola runik merah darah
+    g.add(this._pl(0.24, 0.03, 0.045, C.crimson, 0.12, 0.02));
+    g.add(this._pl(0.24, 0.03, 0.045, C.crimson, -0.12, 0.02));
+    g.add(this._pl(0.03, 0.24, 0.045, C.crimson, 0, 0.02, 0.12));
+    g.add(this._pl(0.03, 0.24, 0.045, C.crimson, 0, 0.02, -0.12));
+    // Inti bayangan bersinar merah
+    g.add(this._pl(0.14, 0.14, 0.06, C.dark, 0, 0.03));
+    g.add(this._pl(0.08, 0.08, 0.075, C.redGlow, 0, 0.04, 0, C.redGlow));
+    this._addBackGrip(g, C.dark, C.tungsten);
+    g.userData.rawH = 0.84;
+    return g;
+  },
+
+  /* ---------- 7. COLOSSUS TOWER BULWARK (Tier Tungsten, Lv 26) ---------- */
+  buildJuggernaut() {
+    const g = new THREE.Group(); g.name = 'Shield_juggernaut';
+    const C = { dark: 0x22262c, tungsten: 0x3e4650, tungstenLight: 0x586474, iron: 0x728090, rivet: 0x9aa8b8 };
+    const plate = this._pl(0.54, 0.76, 0.06, C.tungsten, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.60, 0.56, 0.06, C.tungsten, 0, 0));
+    // 3 Balok melintang penahan benturan
+    g.add(this._pl(0.58, 0.10, 0.075, C.tungstenLight, 0.26, 0.015));
+    g.add(this._pl(0.58, 0.10, 0.075, C.tungstenLight, 0.0, 0.015));
+    g.add(this._pl(0.58, 0.10, 0.075, C.tungstenLight, -0.26, 0.015));
+    // Celah pengintai (vision slit)
+    g.add(this._pl(0.24, 0.05, 0.08, C.dark, 0.14, 0.02));
+    g.add(this._pl(0.02, 0.05, 0.085, C.rivet, 0.14, 0.022, -0.06));
+    g.add(this._pl(0.02, 0.05, 0.085, C.rivet, 0.14, 0.022, 0.06));
+    // Paku benteng raksasa
+    for (const y of [0.26, 0.0, -0.26]) {
+      for (const x of [-0.25, -0.12, 0.12, 0.25]) {
+        if (y === 0.0 && Math.abs(x) < 0.15) continue;
+        g.add(this._pl(0.04, 0.04, 0.085, C.rivet, y, 0.025, x));
+      }
+    }
+    // Duri penancap tanah bawah
+    g.add(this._pl(0.12, 0.08, 0.06, C.dark, -0.42, 0, 0.16));
+    g.add(this._pl(0.12, 0.08, 0.06, C.dark, -0.42, 0, -0.16));
+    this._addBackGrip(g, C.dark, C.tungstenLight);
+    g.userData.rawH = 1.05;
+    return g;
+  },
+
+  /* ---------- 8. GLACIAL SPELLSHIELD (Tier Crystal, Lv 32) ---------- */
+  buildCrystal() {
+    const g = new THREE.Group(); g.name = 'Shield_crystal';
+    const C = { iceDeep: 0x3b82f6, ice: 0x60a5fa, iceLight: 0xbfdbfe, rune: 0x38bdf8, core: 0x00f0ff, silver: 0xdbeafe };
+    const plate = this._pl(0.48, 0.48, 0.04, C.iceDeep, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.56, 0.32, 0.04, C.ice, 0, 0.01));
+    g.add(this._pl(0.32, 0.56, 0.04, C.ice, 0, 0.01));
+    // Prisma kristal es di 6 sudut
+    for (const [x, y, rz] of [
+      [0, 0.36, 0], [0, -0.36, Math.PI], [0.32, 0.18, -0.52], [-0.32, 0.18, 0.52], [0.32, -0.18, -2.62], [-0.32, -0.18, 2.62]
+    ]) {
+      const spike = this._pl(0.09, 0.16, 0.045, C.iceLight, y, 0.015, x, C.core);
+      spike.rotation.z = rz; g.add(spike);
+    }
+    // Garis rune es perak
+    g.add(this._pl(0.04, 0.48, 0.048, C.silver, 0, 0.02));
+    g.add(this._pl(0.48, 0.04, 0.048, C.silver, 0, 0.02));
+    const rx1 = this._pl(0.34, 0.035, 0.048, C.rune, 0, 0.022); rx1.rotation.z = 0.785; g.add(rx1);
+    const rx2 = this._pl(0.34, 0.035, 0.048, C.rune, 0, 0.022); rx2.rotation.z = -0.785; g.add(rx2);
+    // Inti oktahedron mana es
+    g.add(this._pl(0.16, 0.16, 0.065, C.iceDeep, 0, 0.035));
+    g.add(this._pl(0.10, 0.10, 0.09, C.core, 0, 0.05, 0, C.core));
+    this._addBackGrip(g, C.iceDeep, C.silver);
+    g.userData.rawH = 0.96;
+    return g;
+  },
+
+  /* ---------- 9. SOUL HARVESTER GATE (Tier Crystal / Soul, Lv 32) ---------- */
+  buildReaper() {
+    const g = new THREE.Group(); g.name = 'Shield_reaper';
+    const C = { dark: 0x14101b, obsidian: 0x22182e, purple: 0x4a2a68, bone: 0xd8cfe2, soulGlow: 0xa855f7, eyeGlow: 0xd946ef };
+    const plate = this._pl(0.50, 0.64, 0.04, C.dark, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.44, 0.72, 0.04, C.obsidian, 0.04, 0.005));
+    g.add(this._pl(0.32, 0.14, 0.045, C.purple, 0.40, 0.01));
+    // Cakar jiwa samping
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.08, 0.22, 0.04, C.bone, 0.24, 0.012, 0.26 * s));
+      g.add(this._pl(0.06, 0.22, 0.04, C.bone, -0.06, 0.012, 0.26 * s));
+      g.add(this._pl(0.06, 0.18, 0.04, C.bone, -0.30, 0.012, 0.22 * s));
+    }
+    // Tengkorak maut timbul
+    g.add(this._pl(0.24, 0.26, 0.055, C.bone, 0.08, 0.025));
+    g.add(this._pl(0.18, 0.10, 0.06, C.bone, -0.08, 0.025));
+    g.add(this._pl(0.04, 0.05, 0.065, C.dark, 0.05, 0.035));
+    // Mata api jiwa ungu
+    g.add(this._pl(0.05, 0.06, 0.065, C.eyeGlow, 0.12, 0.035, 0.055, C.eyeGlow));
+    g.add(this._pl(0.05, 0.06, 0.065, C.eyeGlow, 0.12, 0.035, -0.055, C.eyeGlow));
+    g.add(this._pl(0.04, 0.10, 0.05, C.soulGlow, 0.24, 0.02, 0, C.soulGlow));
+    this._addBackGrip(g, C.dark, C.purple);
+    g.userData.rawH = 0.98;
+    return g;
+  },
+
+  /* ---------- 10. YETI GLACIER BARRICADE (Tier Crystal / Ice, Lv 32) ---------- */
+  buildYeti() {
+    const g = new THREE.Group(); g.name = 'Shield_yeti';
+    const C = { iceDeep: 0x476a8a, ice: 0x769ebc, snow: 0xf0f6fc, fur: 0xccd9e6, horn: 0x8aa6be, hornDark: 0x5a768e };
+    const plate = this._pl(0.52, 0.58, 0.05, C.iceDeep, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.46, 0.52, 0.06, C.ice, 0, 0.01));
+    g.add(this._pl(0.56, 0.14, 0.07, C.snow, 0.30, 0.015));
+    g.add(this._pl(0.48, 0.08, 0.075, C.snow, 0.22, 0.02));
+    g.add(this._pl(0.54, 0.12, 0.065, C.fur, -0.30, 0.015));
+    // Sepasang tanduk domba beku raksasa di kiri-kanan
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.12, 0.18, 0.09, C.hornDark, 0.18, 0.02, 0.26 * s));
+      g.add(this._pl(0.10, 0.18, 0.08, C.horn, 0.04, 0.025, 0.30 * s));
+      g.add(this._pl(0.08, 0.16, 0.07, C.horn, -0.10, 0.03, 0.26 * s));
+      g.add(this._pl(0.06, 0.12, 0.06, C.snow, -0.18, 0.035, 0.18 * s));
+    }
+    g.add(this._pl(0.08, 0.14, 0.05, C.ice, -0.36, 0.01, -0.12));
+    g.add(this._pl(0.08, 0.14, 0.05, C.ice, -0.36, 0.01, 0.12));
+    this._addBackGrip(g, C.iceDeep, C.snow);
+    g.userData.rawH = 0.94;
+    return g;
+  },
+
+  /* ---------- 11. SAMURAI O-TATE (Tier Tungstensteel, Lv 38) ---------- */
+  buildSamurai() {
+    const g = new THREE.Group(); g.name = 'Shield_samurai';
+    const C = { urushi: 0x181a1e, lamelar: 0x242830, cordRed: 0xba1e2b, cordLight: 0xd92e3c, gold: 0xdfa832, brass: 0xb58424 };
+    const plate = this._pl(0.48, 0.80, 0.04, C.urushi, 0, 0);
+    g.add(plate); g.userData.plate = plate;
+    // Lamelar horizontal
+    for (let i = -3; i <= 3; i++) {
+      g.add(this._pl(0.44, 0.09, 0.045, C.lamelar, i * 0.105, 0.005));
+    }
+    // Anyaman tali sutra merah kirmizi (odoshi)
+    for (const x of [-0.14, -0.05, 0.05, 0.14]) {
+      g.add(this._pl(0.025, 0.74, 0.05, C.cordRed, 0, 0.012, x));
+      for (let i = -3; i <= 3; i++) {
+        g.add(this._pl(0.035, 0.03, 0.055, C.cordLight, i * 0.105, 0.015, x));
+      }
+    }
+    // Mahkota emas Kuwagata
+    g.add(this._pl(0.12, 0.08, 0.05, C.gold, 0.44, 0.015));
+    const k1 = this._pl(0.04, 0.16, 0.045, C.gold, 0.50, 0.015, 0.08); k1.rotation.z = -0.4; g.add(k1);
+    const k2 = this._pl(0.04, 0.16, 0.045, C.gold, 0.50, 0.015, -0.08); k2.rotation.z = 0.4; g.add(k2);
+    // Mon klan bunga krisan emas
+    g.add(this._pl(0.16, 0.16, 0.06, C.gold, 0.05, 0.022));
+    g.add(this._pl(0.12, 0.12, 0.07, C.cordRed, 0.05, 0.026));
+    g.add(this._pl(0.06, 0.06, 0.08, C.gold, 0.05, 0.032));
+    this._addBackGrip(g, C.urushi, C.brass);
+    g.userData.rawH = 1.08;
+    return g;
+  },
+
+  /* ---------- 12. DRAGONSCALE GREATSHIELD (Tier Tungstensteel, Lv 38) ---------- */
+  buildDragon() {
+    const g = new THREE.Group(); g.name = 'Shield_dragon';
+    const C = { scaleDark: 0x3d1210, scaleRed: 0x8a1c14, scaleBright: 0xb52216, lava: 0xff4500, horn: 0x2a0c0a, bone: 0xe5dac0, ember: 0xff7a18 };
+    const plate = this._pl(0.54, 0.50, 0.05, C.scaleDark, 0.10, 0);
+    g.add(plate); g.userData.plate = plate;
+    g.add(this._pl(0.44, 0.38, 0.05, C.scaleRed, -0.12, 0));
+    g.add(this._pl(0.26, 0.22, 0.05, C.scaleDark, -0.32, 0));
+    // Urat lava pijar membara
+    g.add(this._pl(0.04, 0.64, 0.055, C.lava, -0.02, 0.015, 0, C.lava));
+    g.add(this._pl(0.36, 0.04, 0.055, C.lava, 0.14, 0.015, 0, C.lava));
+    for (const [x, y] of [[-0.16, 0.22], [0.16, 0.22], [-0.14, -0.04], [0.14, -0.04], [0, 0.08]]) {
+      g.add(this._pl(0.12, 0.12, 0.06, C.scaleBright, y, 0.018, x));
+    }
+    // Tanduk naga merah
+    for (const s of [1, -1]) {
+      g.add(this._pl(0.08, 0.20, 0.07, C.horn, 0.36, 0.01, 0.26 * s));
+      g.add(this._pl(0.06, 0.18, 0.06, C.scaleRed, 0.48, -0.02, 0.30 * s));
+      g.add(this._pl(0.04, 0.14, 0.05, C.lava, 0.58, -0.06, 0.33 * s, C.lava));
+    }
+    // Taring naga
+    g.add(this._pl(0.05, 0.10, 0.05, C.bone, -0.40, 0.02, 0.10));
+    g.add(this._pl(0.05, 0.10, 0.05, C.bone, -0.40, 0.02, -0.10));
+    g.add(this._pl(0.06, 0.08, 0.05, C.bone, -0.42, 0.02, 0));
+    // Inti bara naga menyala
+    g.add(this._pl(0.18, 0.18, 0.07, C.scaleDark, 0.20, 0.025));
+    g.add(this._pl(0.10, 0.10, 0.09, C.ember, 0.20, 0.045, 0, C.ember));
+    this._addBackGrip(g, C.scaleDark, C.scaleBright);
+    g.userData.rawH = 1.15;
+    return g;
+  },
+
+  /* Peta id item -> builder */
+  MAP: {
+    // 12 Tameng Otentik Baru
+    shield_berserker:  'buildBerserker',
+    shield_elven:      'buildElven',
+    shield_steampunk:  'buildSteampunk',
+    shield_iron:       'buildIron',
+    shield_paladin:    'buildPaladin',
+    shield_shadow:     'buildShadow',
+    shield_juggernaut: 'buildJuggernaut',
+    shield_crystal:    'buildCrystal',
+    shield_reaper:     'buildReaper',
+    shield_yeti:       'buildYeti',
+    shield_samurai:    'buildSamurai',
+    shield_dragon:     'buildDragon',
+
+    // Alias kompatibilitas mundur untuk save/drop/inventory lama
+    shield_wood:       'buildBerserker',
+    shield_flame:      'buildPaladin',
+    shield_venom:      'buildShadow',
+    shield_storm:      'buildJuggernaut',
+    shield_frost:      'buildCrystal',
+    shield_dark:       'buildReaper',
+    shield_carapace:   'buildDragon'
+  },
+
+  /* Bangun tameng untuk itemId dan skalakan ke TARGET_H */
+  buildFor(itemId) {
+    const fn = this.MAP[itemId];
+    if (!fn || typeof this[fn] !== 'function') return null;
+    const g = this[fn]();
+    const raw = g.userData.rawH || 1.0;
+    g.scale.multiplyScalar(this.TARGET_H / raw);
+    return g;
+  }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ShieldModels;
+}

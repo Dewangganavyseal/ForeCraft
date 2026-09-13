@@ -55,25 +55,35 @@ const NPCS={
   teamFull(){return this.team.length>=CFG.NPC.TEAM_MAX;},
 
   /* ---------- PERLENGKAPAN ACAK ROYAL GUARD ----------
-     Setiap RG yang lahir mengundi pedang & tamengnya sendiri. Bobot menentukan
-     kelangkaan: common paling sering, legendaris paling jarang
-     (pedang: legendaris ±8% · tameng: legendaris ±3%, epik ±14%). */
+     Setiap RG yang lahir mengundi pedang & tamengnya sendiri dari 12 pedang otentik.
+     Bobot menentukan kelangkaan: common paling sering, mythic paling langka. */
   RG_WEAPON_POOL:[
-    {id:'sword_wood',  w:24},   // common
-    {id:'sword_iron',  w:18},   // uncommon
-    {id:'sword_storm', w:10},   // rare
-    {id:'sword_venom', w:6},    // epic
-    {id:'sword_frost', w:3},    // legendary
-    {id:'sword_titan', w:2},    // legendary
+    {id:'sword_elven',     w:16},   // common
+    {id:'sword_berserker', w:14},   // common
+    {id:'sword_steampunk', w:12},   // uncommon
+    {id:'sword_iron',      w:10},   // uncommon
+    {id:'sword_paladin',   w:8},    // rare
+    {id:'sword_shadow',    w:6},    // epic
+    {id:'sword_juggernaut',w:5},    // epic
+    {id:'sword_crystal',   w:4},    // legendary
+    {id:'sword_reaper',    w:3},    // legendary
+    {id:'sword_yeti',      w:3},    // legendary
+    {id:'sword_samurai',   w:2},    // legendary
+    {id:'sword_dragon',    w:1},    // mythic
   ],
   RG_SHIELD_POOL:[
-    {id:'shield_wood',  w:24},  // common
-    {id:'shield_iron',  w:18},  // uncommon
-    {id:'shield_flame', w:10},  // rare
-    {id:'shield_venom', w:8},   // rare
-    {id:'shield_storm', w:6},   // epic
-    {id:'shield_frost', w:4},   // epic
-    {id:'shield_dark',  w:2},   // legendary
+    {id:'shield_berserker',  w:20},  // common
+    {id:'shield_elven',      w:18},  // common
+    {id:'shield_steampunk',  w:15},  // uncommon
+    {id:'shield_iron',       w:14},  // uncommon
+    {id:'shield_paladin',    w:10},  // rare
+    {id:'shield_shadow',     w:8},   // epic
+    {id:'shield_juggernaut', w:7},   // epic
+    {id:'shield_crystal',    w:5},   // legendary
+    {id:'shield_reaper',     w:4},   // legendary
+    {id:'shield_yeti',       w:3},   // legendary
+    {id:'shield_samurai',    w:2},   // legendary
+    {id:'shield_dragon',     w:1},   // mythic
   ],
   rollWeighted(pool){
     let total=0;
@@ -88,6 +98,12 @@ const NPCS={
     if(!n.gear.shield)n.gear.shield=this.rollWeighted(this.RG_SHIELD_POOL);
     if(typeof NPC_Royalguard!=='undefined'&&NPC_Royalguard.refreshGear)
       NPC_Royalguard.refreshGear(n);
+  },
+
+  /* Hitung konsumsi stamina skill NPC: dinaikkan 30% dan minimal 30% dari max stamina */
+  skillStamCost(n, baseCost = 30){
+    const maxS = n.maxStamina || 100;
+    return Math.max(Math.round(baseCost * 1.30), Math.round(maxS * 0.30));
   },
 
   /* Permintaan rekrut: jumlah & variasi bahan SCALING dengan level NPC.
@@ -1032,19 +1048,11 @@ const NPCS={
   gatherTable:null,
   buildGatherTable(){
     const t={};
-    /* dasar dari config, saring hanya kayu & bahan tambang */
+    /* HANYA kayu pohon (rekan tim tidak bisa lagi gather ore/batu tambang) */
     for(const e of NPC_GATHER){
-      if(!/ore|crystal|wood|coal/.test(e.item))continue;
-      const pri=/ore|crystal/.test(e.item)?5:e.item==='wood'?4:3;
-      t[e.block]={item:e.item,pri};
-    }
-    /* tambahan: hanya dipakai bila blok & item-nya memang ada */
-    const extra=[
-      [B.COAL,'coal',4],
-    ];
-    for(const[bl,it,pri]of extra){
-      if(bl===undefined||t[bl]||!ITEMS[it])continue;
-      t[bl]={item:it,pri};
+      if(e.item==='wood'){
+        t[e.block]={item:'wood',pri:4};
+      }
     }
     this.gatherTable=t;
   },
@@ -2160,7 +2168,9 @@ const NPCS={
       if(bid===B.STONE)Sfx.at(spos,'rock');else Sfx.at(spos,'chop');
 
     }
-    if(n.mineT<CFG.NPC.MINE_TIME)return;
+    /* Durasi menebang pohon: 2x lipat lebih lama dari pemain (pemain ~1.8s -> rekan 3.6s) */
+    const reqTime=(t.item==='wood'||World.getBlock(t.x,t.y,t.z)===B.WOOD)?3.6:(CFG.NPC.MINE_TIME||1.5);
+    if(n.mineT<reqTime)return;
     n.mineT=0;n.minePulse=0;
     FX.clearBlockShake(t.x,t.y,t.z);
     const mined=World.getBlock(t.x,t.y,t.z);

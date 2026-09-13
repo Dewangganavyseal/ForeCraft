@@ -76,6 +76,23 @@ const PlayerModelBuilder = {
     return g;
   },
 
+  /* ---------- GANTI MODEL & WARNA RAMBUT DINAMIS ---------- */
+  setHair(style = 4, color = 0x2c1f14, parts = null) {
+    const p = parts || this.parts;
+    if (!p || !p.hairG) return;
+    while (p.hairG.children.length) {
+      const c = p.hairG.children.pop();
+      c.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+    }
+    const h = this.buildHair(style, color);
+    p.hairG.add(h);
+    p.hairStyle = style;
+    p.hairColor = color;
+  },
+
   /* ---------- BUILD KARAKTER UTAMA LENGKAP ---------- */
   build() {
     const SKIN = 0xe8bd92, SKIN_D = 0xd2a279, SKIN_L = 0xf0cda2,

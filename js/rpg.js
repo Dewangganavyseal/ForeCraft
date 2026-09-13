@@ -81,7 +81,7 @@ const RPG={
     try{
       const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
       if(!d)return null;
-      return{level:d.level||1,day:d.day||1,time:d.time||0.32};
+      return{name:d.name||'Ranger',level:d.level||1,day:d.day||1,time:d.time||0.32};
     }catch(e){return null;}
   },
 
@@ -912,6 +912,9 @@ const RPG={
     try{
       const data={
         slot:this.slot,
+        name:(typeof Player!=='undefined'&&Player.name)||(this.customPlayer&&this.customPlayer.name)||'Ranger',
+        hairStyle:(typeof Player!=='undefined'&&Player.hairStyle!==undefined)?Player.hairStyle:((this.customPlayer&&this.customPlayer.hairStyle!==undefined)?this.customPlayer.hairStyle:4),
+        hairColor:(typeof Player!=='undefined'&&Player.hairColor!==undefined)?Player.hairColor:((this.customPlayer&&this.customPlayer.hairColor!==undefined)?this.customPlayer.hairColor:0x2c1f14),
         seed:Game.seed,time:Weather.time,day:Weather.day,
         hp:Player.hp,hunger:Player.hunger,level:Player.level,xp:Player.xp,kills:Player.kills,
         pos:[Player.pos.x,Player.pos.y,Player.pos.z],
@@ -929,6 +932,7 @@ const RPG={
       /* update info slot untuk main menu */
       const meta=this.slotsMeta();
       meta[this.slot-1]={
+        name:Player.name||'Ranger',
         level:Player.level,
         day:Weather.day,
         time:Weather.time,

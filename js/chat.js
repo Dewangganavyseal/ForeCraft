@@ -105,16 +105,24 @@ const Chat={
     }
 
     /* ---- pesan biasa: log + gelembung teks di atas kepala pemain ---- */
+    const pName = (typeof Player!=='undefined'&&Player.name) ||
+                  (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
+                  'Kamu';
     this.pushLog(text,'me');
-    if(typeof FX!=='undefined'&&FX.text)
+    if(typeof FX!=='undefined'&&FX.text){
+      const bubble = `[${pName}] ${text}`;
       FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.4,0)),
-        text.length>42?text.slice(0,42)+'…':text,'#eaffea');
+        bubble.length>45?bubble.slice(0,45)+'…':bubble,'#eaffea');
+    }
   },
   pushLog(text,cls){
     const d=document.createElement('div');
     d.className='chat-line '+(cls||'');
     if(cls==='me'){
-      const b=document.createElement('b');b.textContent='Kamu: ';
+      const pName = (typeof Player!=='undefined'&&Player.name) ||
+                    (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
+                    'Kamu';
+      const b=document.createElement('b');b.textContent=pName+': ';
       d.appendChild(b);d.appendChild(document.createTextNode(text));
     }else d.innerHTML=text;              // baris sistem (aman: kita yang buat)
     this.logEl.appendChild(d);
@@ -148,7 +156,7 @@ const Chat={
   },
   /* emoji untuk monster (Mob tidak punya ikon sendiri di tabel) */
   MOB_E:{slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',scorpion:'🦂',rabbit:'🐇',
-         cow:'🐄',horse:'🐎',dragon:'🐲',lizard:'🦎',
+         cow:'🐄',horse:'🐎',dragon:'🐲',trex:'🦖',lizard:'🦎',
          kelabang:'🐛',kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️'},
 
   /* dipanggil UI.toggle('term'); isi cukup dibangun sekali */
