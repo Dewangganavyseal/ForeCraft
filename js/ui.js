@@ -1472,7 +1472,7 @@ const UI={
       /* warna & bingkai rarity di slot hotbar */
       const it=s?ITEMS[s.id]:null;
       const rar=(it&&it.rarity)||'common';
-      ['r-common','r-uncommon','r-rare','r-epic','r-legendary'].forEach(c=>el.classList.remove(c));
+      ['r-common','r-uncommon','r-rare','r-epic','r-legendary','r-mythic'].forEach(c=>el.classList.remove(c));
       if(s&&RARITY[rar]){
         el.classList.add('r-'+rar);
         el.style.borderColor=RARITY[rar].css;

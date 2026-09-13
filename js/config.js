@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.13',
+  VERSION:'0.2.14',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -679,11 +679,12 @@ const ITEMS={
   centipede_shell:{n:'Kulit Kelabang',e:'🐛',rarity:'uncommon'},
   /* ---------- 4 BAHAN RITUAL ALTAR (khusus biome Tanah Merah) ----------
      Masing-masing hanya 1% drop dari mob biasa (Kumbang Tanduk) yang mati di
-     dalam biome REDLANDS. Keempatnya wajib untuk ritual pemanggilan kelabang. */
-  insect_leg:{n:'Kaki Serangga',e:'🦵',rarity:'rare'},
-  hard_shell:{n:'Kulit Keras',e:'🛡',rarity:'rare'},
-  green_blood:{n:'Darah Hijau',e:'🧪',rarity:'rare'},
-  toxic_venom:{n:'Racun Berbisa',e:'☠',rarity:'rare'},
+     dalam biome REDLANDS. Keempatnya wajib untuk ritual pemanggilan kelabang.
+     Rarity diatur ke 'mythic' (merah menyala di hotbar, tas, dan tooltip). */
+  insect_leg:{n:'Kaki Serangga',e:'🦵',rarity:'mythic'},
+  hard_shell:{n:'Kulit Keras',e:'🛡',rarity:'mythic'},
+  green_blood:{n:'Darah Hijau',e:'🧪',rarity:'mythic'},
+  toxic_venom:{n:'Racun Berbisa',e:'☠',rarity:'mythic'},
   /* pecahan jiwa: drop khas REAPER, penjaga reruntuhan/dungeon */
   soul_shard:{n:'Pecahan Jiwa',e:'👻',rarity:'rare'},
   /* ---------- DUNGEON CHANGER: dijual NPC Dungeon Master ----------

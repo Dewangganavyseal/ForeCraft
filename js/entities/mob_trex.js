@@ -407,7 +407,10 @@ const Mob_Trex = (function() {
 
       const model = new THREE.Group();
       model.name = 'TrexModel';
-      model.scale.setScalar(SCALE);
+      /* T-Rex biasa lebih kecil sedikit (0.84x) dari mini boss (1.08x) */
+      const s = boss ? SCALE * 1.08 : SCALE * 0.84;
+      model.scale.setScalar(s);
+      model.userData.scale = s;
       pivot.add(model);
 
       const bones = {};
@@ -793,8 +796,9 @@ const Mob_Trex = (function() {
 
       const model = m.parts.model;
       if (model) {
-        model.position.y = curRP.py * SCALE;
-        model.position.z = -curRP.pf * SCALE;
+        const sc = (model.userData && model.userData.scale) || SCALE;
+        model.position.y = curRP.py * sc;
+        model.position.z = -curRP.pf * sc;
         model.rotation.set(curRP.rx, (RP.ry || 0), curRP.rz);
       }
 

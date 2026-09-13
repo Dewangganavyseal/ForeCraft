@@ -353,10 +353,10 @@ const Altar={
       const need=this.REQ[id],have=RPG.countItem(id);
       const it=ITEMS[id]||{e:'❔',n:id};
       const ok=have>=need;
-      rows+=`<div class="altar-ing ${ok?'ok':'no'}">
+      rows+=`<div class="altar-ing ${ok?'ok':'no'}" style="border-color:${ok?'#ff3838':'#7a2020'};background:${ok?'rgba(255,56,56,0.18)':'rgba(40,10,10,0.35)'}">
         <span class="ai-ico">${(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(id):it.e}</span>
-        <span class="ai-nm">${it.n}</span>
-        <span class="ai-ct" style="color:${ok?'#63d471':'#ff6b6b'}">${have}/${need}</span>
+        <span class="ai-nm" style="color:#ff8585;font-weight:700">${it.n}</span>
+        <span class="ai-ct" style="color:${ok?'#ff5252':'#ff9999'}">${have}/${need}</span>
       </div>`;
     }
     const ready=this.reqOK();

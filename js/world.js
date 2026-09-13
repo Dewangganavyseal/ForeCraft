@@ -817,7 +817,16 @@ const World={
         if(id===B.AIR||id===B.WATER)continue;
         if(this.hasOreAboveOrSelf(p.x,p.y,p.z))continue; // Kebal bila di atasnya ada ore!
         this.setBlock(p.x,p.y,p.z,B.AIR);
-        const col=(BLOCK_INFO[id]||{}).color||0x888888;
+        let col=(BLOCK_INFO[id]||{}).color||0x888888;
+        if(typeof WGEN!=='undefined'&&WGEN.biomeAt){
+          const bio=WGEN.biomeAt(p.x,p.z);
+          if(id===B.LEAF){
+            if(bio===BIOME.TUNDRA)col=0xf6fafd;
+            else if(bio===BIOME.REDLANDS)col=0xe03828;
+          }else if(id===B.WOOD&&bio===BIOME.REDLANDS){
+            col=0xf4f0e6;
+          }
+        }
         FX.debris(new THREE.Vector3(p.x+0.5,p.y+0.5,p.z+0.5),col,p.leaf?3:6,p.leaf?1.6:3);
         /* CATATAN: daun TIDAK lagi menjatuhkan beri. Beri sekarang hanya
            didapat dari SEMAK BERI (tanaman voxel tipe 7) yang tumbuh di hutan
@@ -1083,7 +1092,17 @@ const World={
     }
     this.setBlock(wx,wy,wz,B.AIR);
     const info=BLOCK_INFO[id];
-    FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),info.color,10,3.2);
+    let dCol=info.color;
+    if(typeof WGEN!=='undefined'&&WGEN.biomeAt){
+      const bio=WGEN.biomeAt(wx,wz);
+      if(id===B.LEAF){
+        if(bio===BIOME.TUNDRA)dCol=0xf6fafd;
+        else if(bio===BIOME.REDLANDS)dCol=0xe03828;
+      }else if(id===B.WOOD&&bio===BIOME.REDLANDS){
+        dCol=0xf4f0e6;
+      }
+    }
+    FX.debris(new THREE.Vector3(wx+0.5,wy+0.5,wz+0.5),dCol,10,3.2);
     /* ---------- ORE HANCUR: burst penuh pecahan bongkahan ----------
        Tahap ke-3 dari tiga animasi pecahan (66% → 33% → hancur). Pecahan
        jatuh, memantul, lalu MENGELINDING di tanah sebelum memudar. */

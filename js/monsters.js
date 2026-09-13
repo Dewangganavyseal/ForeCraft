@@ -627,7 +627,7 @@ const Monsters={
       speed:T.speed*(boss?0.85:1),
       dmg:Math.round(T.dmg*(boss?2.2:1)),
       xp:Math.round(T.xp*(boss?2:1)),
-      r:T.r*(boss?1.75:1),
+      r:T.r*(boss?(T.noBossScale?1.25:1.75):1),
       dead:false,deathT:0,flash:0,hopT:rand(0.5,1.5),onGround:false,inWater:false,
       windup:0,smashTarget:null,poisonHit:0,
       /* status dari efek senjata: pendarahan, racun bilah, perlambatan */

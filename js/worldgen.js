@@ -362,8 +362,8 @@ const WGEN={
     const m=Noise.fbm(nM,wx*0.02,wz*0.02,2)*0.5+0.5;
     /* ---- PANTAI: selalu rata di permukaan air supaya jadi pita pasir ---- */
     if(b===BIOME.BEACH)return CFG.SEA;
-    /* ---- sungai/danau: kedalaman TEPAT 3-4 blok dari permukaan air ---- */
-    if(m<0.30){
+    /* ---- sungai/danau: kedalaman TEPAT 3-4 blok dari permukaan air (kecuali pegunungan agar bukit utuh) ---- */
+    if(m<0.30 && b!==BIOME.MOUNTAIN){
       const deep=m<0.18;
       return deep?CFG.SEA-4:CFG.SEA-3;           // y=1 (dalam 4) atau y=2 (dalam 3)
     }
@@ -372,13 +372,36 @@ const WGEN={
     if(m>0.75)h=Math.max(h,6);                   // dataran tinggi
     if(b===BIOME.DESERT)h=clamp(h-(this.hash(wx,wz,21)<0.5?1:0),CFG.SEA,6);
     if(b===BIOME.TUNDRA&&m>0.55)h=Math.min(7,h+1);
-    if(b===BIOME.MOUNTAIN)h=clamp(h+2,6,7);      // pegunungan paling tinggi
+    /* ---- PEGUNUNGAN: gundukan seperti bukit secara smooth (rentang 6..12) ---- */
+    if(b===BIOME.MOUNTAIN){
+      const mVal=this.mnt(wx,wz);
+      const mBorder=clamp((mVal-0.72)/0.08,0,1);
+      const mSmooth=mBorder*mBorder*(3-2*mBorder);
+      const hillRaw=Noise.fbm(nMnt,wx*0.016+120.5,wz*0.016-80.3,2)*0.5+0.5;
+      const hillDome=Math.pow(clamp(hillRaw,0,1),1.25);
+      const hillAdd=mSmooth*(1.0+hillDome*5.2);
+      h=Math.round(6+hillAdd);
+      return clamp(h,CFG.SEA,13);
+    }
     return clamp(h,CFG.SEA,7);
+  },
+  /* Deteksi bagian atas bukit pegunungan yang berumput (area dibuat kecil & terfokus di puncak gundukan) */
+  mountainHillDome(wx,wz){
+    const hillRaw=Noise.fbm(nMnt,wx*0.016+120.5,wz*0.016-80.3,2)*0.5+0.5;
+    return Math.pow(clamp(hillRaw,0,1),1.25);
+  },
+  isMountainHillTop(wx,wz,h){
+    if(this.biomeAt(wx,wz)!==BIOME.MOUNTAIN)return false;
+    const ch=(h!==undefined)?h:this.height(wx,wz);
+    return ch>=11 || (ch>=10 && this.mountainHillDome(wx,wz)>0.65);
   },
   treeAt(wx,wz,h){
     if(h<CFG.SEA)return false;                      // tidak tumbuh di air
     if(Math.abs(wx)<2&&Math.abs(wz)<2)return false; // area spawn bersih
-    const dens=BIOME_INFO[this.biomeAt(wx,wz)].tree;
+    const bio=this.biomeAt(wx,wz);
+    /* Pohon di biome gunung HANYA tumbuh di area rumput saja (di bukit paling tinggi) */
+    if(bio===BIOME.MOUNTAIN && !this.isMountainHillTop(wx,wz,h))return false;
+    const dens=(bio===BIOME.MOUNTAIN)?0.35:BIOME_INFO[bio].tree;
     const m=Noise.fbm(nM,wx*0.05,wz*0.05,2)*0.5+0.5;
     return this.hash(wx,wz,1)<(m>0.45?0.055:0.013)*dens;
   },
@@ -494,6 +517,15 @@ const WGEN={
     if(b===BIOME.TUNDRA){
       if(underTree&&this.hash(wx,wz,7)<this.MUSH_CHANCE)return 5;
       if(r<0.05)return 1;
+      return 0;
+    }
+    /* pegunungan: di puncak bukit berumput ada rumpun rumput & bunga alpine langka */
+    if(b===BIOME.MOUNTAIN){
+      if(this.isMountainHillTop(wx,wz)){
+        if(underTree&&this.hash(wx,wz,7)<this.MUSH_CHANCE)return 5;
+        if(r<0.035)return 2; // bunga alpine langka
+        if(this.grassAt(wx,wz))return 1; // rumpun rumput
+      }
       return 0;
     }
     /* ---- HUTAN ----
@@ -1101,11 +1133,19 @@ function genChunk(cx,cz){
        supaya lantainya selalu di atas air apa pun terrain aslinya. */
     const h=(village||dung)?CFG.SEA:WGEN.height(wx,wz);
 
+    /* Di puncak bukit pegunungan, permukaan memakai blok rumput (B.GRASS)
+       dan tanah (B.DIRT) di bawahnya, namun klasifikasi biome tetap BIOME.MOUNTAIN */
+    const isMntHill = WGEN.isMountainHillTop(wx,wz,h);
+    const colSurf = isMntHill ? B.GRASS : (h>=CFG.SEA ? BI.surface : BI.sub);
+    const colSub  = isMntHill ? B.DIRT : BI.sub;
+
     for(let y=0;y<h;y++){
       let id;
       if(y===0)id=B.STONE;
-      else if(y===h-1)id=(h>=CFG.SEA?BI.surface:BI.sub);
-      else id=BI.sub;
+      else if(y===h-1)id=colSurf;
+      else if(isMntHill && y>=h-3)id=colSub; // 2 lapis tanah subur di bawah rumput
+      else if(isMntHill)id=B.STONE;          // dasar bukit tetap batu pegunungan kokoh
+      else id=colSub;
       /* Ore TIDAK lagi tersebar sebagai urat bawah tanah — kini hanya
          node permukaan (lihat oreNodeAt). Lapisan bawah = batu polos. */
       data[idx(x,y,z)]=id;
@@ -1140,11 +1180,8 @@ function genChunk(cx,cz){
     let tree=false;
     if(!occupied&&safe&&WGEN.treeAt(wx,wz,h)){
       tree=true;
-      /* Batang 6-10 blok. Dulu hanya 3-6 sehingga kanopinya nyaris menyentuh
-         tanah dan pohon terasa kerdil. Batas atas 10 aman: puncak kanopi ada
-         di h+th+1, dan dengan h maksimum 7 hasilnya 18 — masih di bawah
-         CFG.WORLD_H (24). */
-      const th=6+Math.floor(WGEN.hash(wx,wz,4)*5);
+      /* Batang 6-10 blok (disesuaikan di bukit tinggi agar tidak menembus batas langit) */
+      const th=(h>=10)?Math.max(4,Math.min(5+Math.floor(WGEN.hash(wx,wz,4)*3),H-3-h)):(6+Math.floor(WGEN.hash(wx,wz,4)*5));
       for(let t=0;t<th;t++){const y=h+t;if(y<H)data[idx(x,y,z)]=B.WOOD;}
       const topY=h+th;
       /* kanopi lebih rimbun & berlapis */
@@ -1198,7 +1235,9 @@ function genChunk(cx,cz){
       /* RATAKAN kolom ini ke baseY: tambah/kurang blok sampai permukaan pas di
          baseY, memakai blok biome yang benar. (h = tinggi kolom lokal saat ini,
          blok permukaan ada di h-1.) */
-      const surf=BI.surface, sub=BI.sub;
+      const isMntNear = WGEN.isMountainHillTop(wx,wz,by);
+      const surf = isMntNear ? B.GRASS : BI.surface;
+      const sub  = isMntNear ? B.DIRT : BI.sub;
       if(by>h){
         /* tanjakan lebih rendah dari baseY → TAMBAH blok sampai baseY */
         for(let y=h;y<by;y++)data[idx(x,y,z)]=(y===by-1)?surf:sub;

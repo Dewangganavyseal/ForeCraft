@@ -826,9 +826,14 @@ const Mesher=(()=>{
   /* DAUN: tiap pohon dapat satu dari 4 tingkat hijau (dari tintC) */
   P_TOP [B.LEAF ]=pal('leaf' ,[0x5e9c3f,0x4a8d36,0x3a7c2d,0x2d6a26]);
   P_SIDE[B.LEAF ]=P_TOP[B.LEAF];
+  /* DAUN BIOME KHUSUS: salju putih (Tundra) & merah merona (Redlands) */
+  const P_LEAF_SNOW =pal('leaf' ,[0xf8fbfe,0xedf4fa,0xe2ecf5,0xd6e4ee]);
+  const P_LEAF_RED  =pal('leaf' ,[0xe03828,0xcb281c,0xb21e14,0x98160e]);
   /* KAYU: variasi tipis saja supaya pohon tetap terlihat sejenis */
   P_TOP [B.WOOD ]=pal('wood' ,[0x7a5636,0x6e4c2f,0x624329,0x573b24]);
   P_SIDE[B.WOOD ]=P_TOP[B.WOOD];
+  /* KAYU BIOME KHUSUS: batang putih seperti pohon birch (Redlands) */
+  const P_WOOD_BIRCH=pal('wood' ,[0xf4f0e6,0xeae6dc,0xdfdad0,0xd4cfc4]);
 
   /* ---------- GRADASI RUMPUT KONTINU 6 STOP (grass & tanah merah) ----------
      Permintaan user: gradasi tidak berhenti di tepi rumpun. Dari PUSAT rumpun
@@ -1014,7 +1019,13 @@ const Mesher=(()=>{
       rampSample(GRA[g],gpos,_rs);tr=_rs[0];tg=_rs[1];tb=_rs[2];
       rampSample(GRAMP_SIDE[id][g],gpos,_rs);sr=_rs[0];sg=_rs[1];sb=_rs[2];
     }else{
-      const PT=P_TOP[id],PS=P_SIDE[id];
+      let PT=P_TOP[id],PS=P_SIDE[id];
+      if(id===B.LEAF){
+        if(bio===BIOME.TUNDRA){ PT=P_LEAF_SNOW; PS=P_LEAF_SNOW; }
+        else if(bio===BIOME.REDLANDS){ PT=P_LEAF_RED; PS=P_LEAF_RED; }
+      }else if(id===B.WOOD){
+        if(bio===BIOME.REDLANDS){ PT=P_WOOD_BIRCH; PS=P_WOOD_BIRCH; }
+      }
       /* blok tanpa palet (papan, atap, bijih) → tanpa gradasi */
       if(!PT){TMT[0]=TMT[1]=TMT[2]=1;TMS[0]=TMS[1]=TMS[2]=1;return;}
       const t=(tier<0?0:(tier>TIER_N-1?TIER_N-1:tier))*3;
@@ -1042,11 +1053,11 @@ const Mesher=(()=>{
     tr*=1+a+b; tg*=1+a; tb*=1+a-b;
     sr*=1+a*0.7+b*0.5; sg*=1+a*0.7; sb*=1+a*0.7-b*0.5;
     /* bias biome: hanya blok ALAM (bangunan pemain tetap konsisten di mana pun).
-       Hasilnya dibatasi PAL_CAP supaya bias yang menaikkan satu kanal tidak
-       mendorong bagian terang tile melewati 255 — tanpa batas ini salju di
-       tundra & pasir di gurun kembali tersorot rata. */
-    const bb=BIOME_BIAS[bio];
-    if(bb&&id!==B.PLANK&&id!==B.ROOF&&id!==B.FARM){
+       Untuk rumput/tanah di pegunungan, tiru bias Forest agar tekstur & warnanya hijau segar */
+    const isSpecialTree=(id===B.LEAF&&(bio===BIOME.TUNDRA||bio===BIOME.REDLANDS))||
+                        (id===B.WOOD&&bio===BIOME.REDLANDS);
+    const bb=(bio===BIOME.MOUNTAIN&&(id===B.GRASS||id===B.DIRT))?BIOME_BIAS[BIOME.FOREST]:BIOME_BIAS[bio];
+    if(bb&&id!==B.PLANK&&id!==B.ROOF&&id!==B.FARM&&!isSpecialTree){
       tr*=bb[0];tg*=bb[1];tb*=bb[2];
       sr*=bb[0];sg*=bb[1];sb*=bb[2];
       const cp=PAL_CAP[id];
@@ -1216,7 +1227,7 @@ const Mesher=(()=>{
          supaya pasir/salju/batu tetap bergradasi. cGpos = NaN → blockTint jatuh
          ke jalur palet 4-tingkat. */
       let tier, gpos=NaN;
-      if((WGEN.grassField||WGEN.grassHeat)&&(bio===BIOME.FOREST||bio===BIOME.REDLANDS)){
+      if((WGEN.grassField||WGEN.grassHeat)&&(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN)){
         /* posisi ramp DI-DITHER & dikuantisasi per blok (lihat grassPosBlock):
            tetap bergradasi tapi tiap blok punya nada sendiri seperti prototipe
            yang memakai material diskret. */
@@ -1261,7 +1272,7 @@ const Mesher=(()=>{
       if(id===B.LEAF)return qtier(cTC[ci]);
       if(id===B.GRASS||id===B.RED_SOIL){
         const bio=cBio[ci];
-        return (bio===BIOME.FOREST||bio===BIOME.REDLANDS)?cTier[ci]:qtier(cTA[ci]);
+        return (bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN)?cTier[ci]:qtier(cTA[ci]);
       }
       return cTier[ci];
     }
@@ -1279,7 +1290,7 @@ const Mesher=(()=>{
       let v=0;
       if(typeof WGEN!=='undefined'&&WGEN.grassField&&WGEN.biomeAt){
         const bio=WGEN.biomeAt(wx,wz);
-        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS)
+        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS||(bio===BIOME.MOUNTAIN&&WGEN.isMountainHillTop&&WGEN.isMountainHillTop(wx,wz)))
           v=raiseOf(grassPosBlock(WGEN.grassField(wx,wz),WGEN.hash(wx,wz,83)));
       }
       rzCache.set(k,v);
@@ -1487,7 +1498,8 @@ const Mesher=(()=>{
          getB(wx,y+1,wz)===B.AIR&&
          typeof WGEN!=='undefined'&&WGEN.biomeAt&&WGEN.grassHeat){
         const bio=cBio[ci];
-        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS){
+        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN){
+          /* World grass memakai sistem heat sama dengan biome jungle/forest */
           const heat=WGEN.grassHeat(wx,wz);
           /* ambang gundul: dari preset grafis (default High) */
           const hMin=HMIN;
