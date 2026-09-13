@@ -529,21 +529,29 @@ const Mob_Dragon={
     const em=m.flash>0?0xaa2222:0x000000;
     m.mesh.traverse(o=>{if(o.material&&o.material.emissive)o.material.emissive.setHex(em);});
 
-    /* Update deteksi pendaratan mulus */
-    if(m._wasInAir && m.onGround && (m.flyT||0)<=0){
+    /* Deteksi apakah naga berada di air (pet maupun mob liar) */
+    const inWater = !!(m.inWater || (typeof World!=='undefined' && World.inWaterAt && World.inWaterAt(m.pos.x, m.pos.y + 0.3, m.pos.z)));
+
+    /* Update deteksi pendaratan mulus (hanya berlaku di darat, bukan saat di air) */
+    if(m._wasInAir && m.onGround && (m.flyT||0)<=0 && !inWater){
       m.landT = 0.45; // 0.45 detik animasi pendaratan mulus
     }
-    m._wasInAir = !m.onGround && (m.flyT||0)<=0;
+    m._wasInAir = !m.onGround && (m.flyT||0)<=0 && !inWater;
     if((m.landT||0) > 0){
       m.landT = Math.max(0, m.landT - dt);
     }
 
     /* tentukan state dari kondisi naga */
-    const sp=Math.hypot(m.vel.x,m.vel.z);
+    const sp=(m.vel?Math.hypot(m.vel.x,m.vel.z):0);
     let state;
     if((m.clawT||0)>0)state='claw';
     else if((m.tailT||0)>0)state='tail';
     else if((m.flyT||0)>0)state='fly';
+    else if(inWater){
+      /* DI AIR: Berjalan perlahan mengayunkan kaki, sayap tetap terlipat tenang (tidak mengepakkan sayap / jump) */
+      if(sp>0.15) state='walk';
+      else state='idle';
+    }
     else if(!m.onGround || (m.landT||0)>0)state='jump';
     else if(sp>2.9)state='run';
     else if(sp>0.4)state='walk';
@@ -571,7 +579,14 @@ const Mob_Dragon={
     /* setel pose target sesuai state */
     this.resetPose(drag.P);
     if(state==='idle')this.poseIdle(drag.P,drag.stateT);
-    else if(state==='walk')this.poseWalk(drag.P,drag.stateT,m.gaitPh||0);
+    else if(state==='walk'){
+      this.poseWalk(drag.P,drag.stateT,m.gaitPh||0);
+      if(inWater){
+        /* Sayap tetap terlipat rapi di punggung saat mengarungi air, kaki tetap mengayun melangkah */
+        drag.P.wingRZ=0.95;drag.P.wingLZ=-0.95;
+        drag.P.wingRoZ=1.15;drag.P.wingLoZ=-1.15;
+      }
+    }
     else if(state==='run')this.poseRun(drag.P,drag.stateT,m.gaitPh||0);
     else if(state==='jump')this.poseJump(drag.P,drag.stateT,(m.vel?m.vel.y:0),m.landT);
     else if(state==='claw')this.poseClaw(drag.P,drag.stateT);

@@ -851,12 +851,18 @@ const Monsters={
     else if(this.isAllySrc(src))m.aDmg=(m.aDmg||0)+Math.min(dmg,Math.max(0,m.hp));
     /* dipukul = otomatis waspada walau pemain di luar kerucut pandang */
     m.hp-=dmg;m.flash=0.18;m.state='chase';
+    if(m.isFish&&m.fishRef){
+      m.fishRef.hp=m.hp;m.fishRef.flash=0.28;
+      if(src){m.fishRef.foe=src;m.fishRef.state='chase';m.fishRef.inHitbox=false;}
+    }
     m.alert=Math.max(m.alert||0,6);m.seeT=CFG.MOB.MEM;
     m.hpT=6; /* durasi tampil HP bar setelah terkena serangan */
     /* catat siapa yang memukul — dasar pemilihan sasaran */
     this.addThreat(m,src,dmg,
       src&&src!==Player&&src.role&&(src.role.skill.id==='taunt'||src.role.skill.id==='lionclaw')?2.2:1);
-    m.vel.addScaledVector(dir,knock);m.vel.y=Math.max(m.vel.y,2.5);
+    if(!m.isFish){
+      m.vel.addScaledVector(dir,knock);m.vel.y=Math.max(m.vel.y,2.5);
+    }
     FX.text(m.pos.clone().add(new THREE.Vector3(0,meshHeight(m.type)+0.6,0)),
       String(Math.round(dmg)),'#ffd24d');
     FX.debris(m.pos.clone().add(new THREE.Vector3(0,1,0)),0xff5544,4,2);
@@ -866,7 +872,29 @@ const Monsters={
       this.splitKelabang(m);
     }
     if(m.hp<=0){
-      if(m.pet&&typeof Capture!=='undefined')Capture.petDown(m);
+      if(m.isFish&&typeof FishSys!=='undefined'){
+        if(m.dead)return;
+        m.dead=true;
+        this.shareKillXp(m);
+        const pShare=(m.pDmg>0&&m.maxhp>0)?clamp(m.pDmg/m.maxhp,0,1):0;
+        const aShare=(m.aDmg>0&&m.maxhp>0)?clamp(m.aDmg/m.maxhp,0,1):0;
+        const xpShare=clamp(pShare+aShare*this.ALLY_XP_SHARE,0,1);
+        if(xpShare>0){
+          const xp=Math.max(1,Math.round(m.xp*xpShare*0.80*(RPG.xpMult?RPG.xpMult():1)));
+          Player.addXP(xp);Player.kills++;
+          FX.text(m.pos.clone().add(new THREE.Vector3(0,2.2,0)),'+'+xp+' XP','#8fd4ff');
+        }
+        const fRef=m.fishRef||m;
+        if(fRef&&!fRef.dead){
+          fRef.dead=true;
+          FishSys.onFishKilled(fRef);
+          const idx=FishSys.list.indexOf(fRef);
+          if(idx>=0)FishSys.despawn(idx);
+        }
+        const mi=this.list.indexOf(m);
+        if(mi>=0)this.list.splice(mi,1);
+      }
+      else if(m.pet&&typeof Capture!=='undefined')Capture.petDown(m);
       else this.kill(m);
     }
   },
@@ -1171,6 +1199,20 @@ const Monsters={
     if(this.liveT<=0){this.liveT=9;this.spawnLivestock();}
     for(let i=this.list.length-1;i>=0;i--){
       const m=this.list[i];
+      if(!m)continue;
+
+      /* Ikan laut predator dikendalikan sepenuhnya oleh FishSys (renang 3D & fisika air) */
+      if(m.isFish){
+        if(m.dead){
+          this.list.splice(i,1);
+          continue;
+        }
+        if(m.hpT>0)m.hpT-=dt;
+        if(m.flash>0)m.flash-=dt;
+        if(m.atkCd>0)m.atkCd-=dt;
+        continue;
+      }
+
       if(m.dead){
         m.deathT+=dt;
         m.mesh.scale.setScalar(Math.max(0.001,(m.baseScale||1)*(1-m.deathT*2)));
@@ -1256,7 +1298,7 @@ const Monsters={
         }
       }
       /* penanda boss: titik kuning melayang naik-turun & berdenyut lembut */
-      if(m.boss&&m.parts.bossDot){
+      if(m.boss&&m.parts&&m.parts.bossDot){
         const t=performance.now()*0.001;
         const d=m.parts.bossDot;
         if(d.userData.baseY===undefined)d.userData.baseY=d.position.y;
@@ -3216,5 +3258,5 @@ function meshHeight(type){
     type==='kumbang'?1.8:
     type==='yeti'?2.6:type==='semut'?1.5:
     type==='reaper'?2.9:
-    type==='wolf'?1.35:type==='scorpion'?0.85:type==='rabbit'?0.7:0.9;
+    type==='wolf'?1.35:type==='scorpion'?0.85:type==='rabbit'?0.7:type==='fish'?1.8:0.9;
 }

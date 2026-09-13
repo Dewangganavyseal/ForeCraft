@@ -300,12 +300,15 @@ const Game={
       }
       Monsters.list=[];
     }
-    if(typeof FishSys!=='undefined'&&FishSys.list){
-      for(let i=FishSys.list.length-1;i>=0;i--){
-        const f=FishSys.list[i];
-        if(f&&f.root&&f.root.parent)f.root.parent.remove(f.root);
+    if(typeof FishSys!=='undefined'){
+      if(FishSys.clear)FishSys.clear();
+      else if(FishSys.list){
+        for(let i=FishSys.list.length-1;i>=0;i--){
+          const f=FishSys.list[i];
+          if(f&&f.root&&f.root.parent)f.root.parent.remove(f.root);
+        }
+        FishSys.list=[];
       }
-      FishSys.list=[];
     }
 
     if(typeof MainMenu!=='undefined'&&MainMenu.showMain)MainMenu.showMain();
@@ -469,20 +472,20 @@ const Game={
         else SlamAim.cancel();
       }
       Player.update(dt);
-      Monsters.update(dt);
-      NPCS.update(dt);
-      if(typeof RareNPC!=='undefined')RareNPC.update(dt);
-      if(typeof FishSys!=='undefined')FishSys.update(dt);
-      if(typeof PortFX!=='undefined')PortFX.update(dt);
-      Furni.update(dt);
-      if(typeof Altar!=='undefined')Altar.update(dt);
-      Dungeon.update(dt);
-      if(UI.hudExtra)UI.hudExtra(dt);
-      World.update(dt,Player.pos);
-      FX.update(dt);
-      Weather.update(dt);
-      if(typeof HPBars!=='undefined')HPBars.update(dt);
-      if(typeof Capture!=='undefined')Capture.update(dt);
+      try{Monsters.update(dt);}catch(e){console.error('[Monsters error]',e);}
+      try{NPCS.update(dt);}catch(e){console.error('[NPCS error]',e);}
+      if(typeof RareNPC!=='undefined'){try{RareNPC.update(dt);}catch(e){console.error('[RareNPC error]',e);}}
+      if(typeof FishSys!=='undefined'){try{FishSys.update(dt);}catch(e){console.error('[FishSys error]',e);}}
+      if(typeof PortFX!=='undefined'){try{PortFX.update(dt);}catch(e){console.error('[PortFX error]',e);}}
+      try{Furni.update(dt);}catch(e){console.error('[Furni error]',e);}
+      if(typeof Altar!=='undefined'){try{Altar.update(dt);}catch(e){console.error('[Altar error]',e);}}
+      try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
+      if(UI.hudExtra){try{UI.hudExtra(dt);}catch(e){console.error('[hudExtra error]',e);}}
+      try{World.update(dt,Player.pos);}catch(e){console.error('[World error]',e);}
+      try{FX.update(dt);}catch(e){console.error('[FX error]',e);}
+      try{Weather.update(dt);}catch(e){console.error('[Weather error]',e);}
+      if(typeof HPBars!=='undefined'){try{HPBars.update(dt);}catch(e){console.error('[HPBars error]',e);}}
+      if(typeof Capture!=='undefined'){try{Capture.update(dt);}catch(e){console.error('[Capture error]',e);}}
     }catch(err){
       /* Error dicatat SEKALI ke toast (agar tidak membanjiri layar), tapi
          SELALU ke console — tanpa ini, bug yang muncul berulang tiap frame
@@ -571,7 +574,7 @@ const MainMenu={
     this.el.innerHTML=`
       <div class="menu-wrap">
         <h1 class="menu-title">FORECRAFT</h1>
-        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.15'}</div>
+        <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.16'}</div>
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>

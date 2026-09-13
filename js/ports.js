@@ -777,15 +777,45 @@ const FishSys={
     return{root,inner,parts,k:this.V*def.scale};
   },
 
-  /* ---------- cek apakah perairan adalah laut dengan kedalaman minimal 4 blok ---------- */
+  /* ---------- cek apakah perairan adalah laut dengan kedalaman minimal 4 blok untuk spawn ---------- */
   isDeepOcean(x,z){
     const bx=Math.floor(x),bz=Math.floor(z);
     if(typeof WGEN!=='undefined'&&WGEN.biomeAt){
       if(WGEN.biomeAt(bx,bz)!==BIOME.OCEAN)return false;
       const gh=WGEN.height(bx,bz);
-      if(CFG.SEA-gh<4)return false; // kedalaman air minimal 4 blok
+      if(CFG.SEA-gh<4)return false; // spawn di perairan berkedalaman minimal 4 blok
     }
-    return World.inWaterAt(x,CFG.WATER_Y-0.5,z);
+    return (typeof World!=='undefined'&&World.inWaterAt)?World.inWaterAt(x,CFG.WATER_Y-0.5,z):true;
+  },
+
+  /* ---------- cek apakah posisi aman & bebas untuk berenang ikan ---------- */
+  canSwim(x,y,z){
+    const bx=Math.floor(x),bz=Math.floor(z);
+    // 1. Pastikan perairan terbuka (di air)
+    if(typeof World!=='undefined'&&World.inWaterAt){
+      if(!World.inWaterAt(x,CFG.WATER_Y-0.3,z))return false;
+    }
+    // 2. Hindari daratan atau pantai pasir kering (kedalaman minimal 1.1 blok agar tidak terdampar)
+    if(typeof WGEN!=='undefined'&&WGEN.height){
+      const gh=WGEN.height(bx,bz);
+      if(CFG.SEA-gh<1.1)return false;
+    }
+    // 3. Pastikan tidak menembus blok padat (batu/karang bawah air)
+    if(typeof World!=='undefined'&&World.blockedAt){
+      const checkY=(y!==undefined)?y:(CFG.WATER_Y-0.8);
+      if(World.blockedAt(x,checkY,z,0.2))return false;
+    }
+    return true;
+  },
+
+  /* ---------- cek apakah target (pemain / NPC / pet) benar-benar berada di air ---------- */
+  isTargetInWater(tgt){
+    if(!tgt||tgt.dead)return false;
+    if(tgt===Player){
+      // Pemain harus berada di air (bukan berdiri di daratan/pantai kering setinggi permukaan air)
+      return !!(Player.inWater || (typeof World!=='undefined'&&World.inWaterAt&&World.inWaterAt(Player.pos.x,Player.pos.y+0.2,Player.pos.z)));
+    }
+    return !!(tgt.inWater || (typeof World!=='undefined'&&World.inWaterAt&&World.inWaterAt(tgt.pos.x,tgt.pos.y+0.2,tgt.pos.z)));
   },
 
   /* ---------- spawn di perairan laut dalam sekitar pemain ---------- */
@@ -822,7 +852,7 @@ const FishSys={
     const minY=gh+0.5;
     const maxY=CFG.WATER_Y-0.25;
 
-    this.list.push({
+    const fObj={
       def,root:b.root,inner:b.inner,parts:b.parts,k:b.k,
       pos:anchor.clone(),dir:Math.random()*Math.PI*2,visDir:0,
       speed:(def.swimSpeed||0.95)*1.1,turnT:0,
@@ -834,17 +864,73 @@ const FishSys={
       jumpTimer:rand(10,25),inAir:false,jumpVx:0,jumpVz:0,
       // tempur & kecerdasan buatan
       hp:def.hp||20,maxhp:def.hp||20,flash:0,
-      state:'swim',fleeTimer:0,attackCd:rand(1.0,2.5),repositionT:0
-    });
+      state:'swim',fleeTimer:0,attackCd:rand(1.0,2.5),repositionT:0,
+      inHitbox:false
+    };
+
+    /* Daftarkan ikan predator buas ke Monsters.list agar diperlakukan sama seperti mob biasa:
+       bisa dideteksi & diserang oleh NPC / pet, serta bisa membalas / menyerang NPC */
+    if(def.hostile&&typeof Monsters!=='undefined'&&Monsters.list){
+      const mobFish={
+        isFish:true,
+        fishRef:fObj,
+        type:'fish',
+        fishId:def.id,
+        name:def.name,
+        pos:fObj.pos,
+        vel:new THREE.Vector3(),
+        mesh:fObj.root,
+        parts:{},
+        baseScale:1,
+        sizeMul:1,
+        hp:fObj.hp,
+        maxhp:fObj.maxhp,
+        r:(def.id==='leviathan')?2.8:((def.id==='todak')?1.5:1.2),
+        dmg:def.dmg||15,
+        speed:fObj.speed,
+        xp:def.xp||50,
+        lvl:(def.id==='leviathan')?50:((def.id==='todak')?28:22),
+        boss:def.id==='leviathan',
+        dead:false,
+        deathT:0,
+        flash:0,
+        threat:{},
+        onGround:false,
+        inWater:true,
+        state:'chase',
+        t:1,
+        atkCd:0,
+        hpT:0,
+        bleedHit:0,bleedT:0,bleedDmg:0,
+        venomHit:0,venomT:0,venomDmg:0,
+        slowT:0,slowMul:1,
+        stunT:0,windup:0,poisonHit:0
+      };
+      fObj.mobRef=mobFish;
+      Monsters.list.push(mobFish);
+    }
+
+    this.list.push(fObj);
   },
   despawn(i){
     const f=this.list[i];
+    if(!f)return;
+    if(f.mobRef&&typeof Monsters!=='undefined'&&Monsters.list){
+      const mi=Monsters.list.indexOf(f.mobRef);
+      if(mi>=0)Monsters.list.splice(mi,1);
+    }
     Game.scene.remove(f.root);
     f.root.traverse(o=>{
       if(o.geometry&&o.geometry!==this._boxGeo)o.geometry.dispose();
       if(o.material&&o.material!==this._matVox)o.material.dispose();
     });
     this.list.splice(i,1);
+  },
+  clear(){
+    for(let i=this.list.length-1;i>=0;i--){
+      this.despawn(i);
+    }
+    this.list=[];
   },
 
   /* ---------- update: AI ikan hidup (boids, 3D diving, jump splash, predator attack) ---------- */
@@ -875,55 +961,131 @@ const FishSys={
         root.traverse(o=>{if(o.material&&o.material.emissive)o.material.emissive.setHex(0x000000);});
       }
 
-      /* 1. KECERDASAN BUATAN PREDATOR (Leviathan, Todak, Lentera) */
-      const pDist=Math.hypot(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
-      const pInOcean=(Player.inWater||Player.pos.y<=CFG.WATER_Y+0.6)&&
-                     (typeof WGEN!=='undefined'&&WGEN.biomeAt&&WGEN.biomeAt(Math.floor(Player.pos.x),Math.floor(Player.pos.z))===BIOME.OCEAN);
+      /* sinkronkan status HP & flash dengan entitas mob predator */
+      if(f.mobRef){
+        f.hp=f.mobRef.hp;
+        if(f.mobRef.flash>0)f.flash=f.mobRef.flash;
+        if((f.hp<=0||f.mobRef.dead)&&!f.dead){
+          f.dead=true;
+          this.onFishKilled(f);
+          this.despawn(i);
+          continue;
+        }
+      }
 
-      // Hitbox mulut ikan di depan badan searah visDir
-      const mouthDist=(d.id==='leviathan')?3.0:((d.id==='todak')?1.8:1.2);
+      /* 1. KECERDASAN BUATAN PREDATOR (Leviathan, Todak, Lentera) */
+      let target=null, targetDist=999;
+      if(d.hostile&&!f.inAir){
+        // 1. Cek foe dari threat (pemain/NPC/pet yang menyerang ikan dan berada di air)
+        if(f.mobRef&&typeof Monsters!=='undefined'&&Monsters.pickFoe){
+          Monsters.pickFoe(f.mobRef,dt);
+        }
+        const foe=(f.mobRef&&f.mobRef.foe)?f.mobRef.foe:(f.foe||null);
+        if(foe&&!foe.dead&&this.isTargetInWater(foe)){
+          const fd=Math.hypot(f.pos.x-foe.pos.x,f.pos.z-foe.pos.z);
+          if(fd<=d.aggroR*1.4){
+            target=foe;targetDist=fd;
+          }
+        }
+
+        // 2. Jika tidak ada threat khusus, cari target terdekat: Player, rekan/penduduk NPC, atau Pet yang benar-benar di air
+        if(!target){
+          // Cek Player: Hanya jika pemain benar-benar di air laut
+          const pInWater=this.isTargetInWater(Player)&&
+                         (typeof WGEN!=='undefined'&&WGEN.biomeAt&&WGEN.biomeAt(Math.floor(Player.pos.x),Math.floor(Player.pos.z))===BIOME.OCEAN);
+          const pDist=Math.hypot(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
+          if(pInWater&&pDist<=d.aggroR&&!Player.dead){
+            target=Player;targetDist=pDist;
+          }
+
+          // Cek NPC di air
+          if(typeof NPCS!=='undefined'&&NPCS.list){
+            for(const n of NPCS.list){
+              if(n.dead||!this.isTargetInWater(n))continue;
+              const nd=Math.hypot(f.pos.x-n.pos.x,f.pos.z-n.pos.z);
+              if(nd<=d.aggroR&&nd<targetDist){
+                target=n;targetDist=nd;
+              }
+            }
+          }
+
+          // Cek Pet di air
+          if(typeof Capture!=='undefined'&&Capture.pet&&!Capture.pet.dead&&this.isTargetInWater(Capture.pet)){
+            const pet=Capture.pet;
+            const petD=Math.hypot(f.pos.x-pet.pos.x,f.pos.z-pet.pos.z);
+            if(petD<=d.aggroR&&petD<targetDist){
+              target=pet;targetDist=petD;
+            }
+          }
+        }
+      }
+
+      // Hitbox moncong/mulut ikan di depan badan searah visDir
+      const mouthDist=(d.id==='leviathan')?4.2:((d.id==='todak')?2.2:1.4);
       const mouthX=f.pos.x+Math.sin(f.visDir)*mouthDist;
       const mouthZ=f.pos.z+Math.cos(f.visDir)*mouthDist;
-      const mouthDistToP=Math.hypot(Player.pos.x-mouthX,Player.pos.z-mouthZ);
+      const mouthDistToTgt=target?Math.hypot(target.pos.x-mouthX,target.pos.z-mouthZ):999;
+      const reachHitbox=(d.id==='leviathan')?2.8:((d.id==='todak')?1.8:1.5);
+      const vertDist=target?Math.abs(f.pos.y-target.pos.y):999;
+      const inHitbox=(mouthDistToTgt<=reachHitbox)&&(vertDist<=(d.id==='leviathan'?3.5:2.0));
 
-      if(d.hostile&&pInOcean&&pDist<=d.aggroR&&!f.inAir){
+      if(d.hostile&&target&&!f.inAir){
         if(f.state==='glide_pass'){
-          // Meluncur kencang lurus melewati pemain setelah menyerang — mencegah berputar-putar bingung
+          // Meluncur kencang lurus melewati target setelah menyerang
           f.glideT=(f.glideT||0)-dt;
-          f.burstBoost=(d.id==='todak')?3.0:(d.id==='leviathan'?2.6:2.2);
+          f.burstBoost=(d.id==='todak')?2.8:(d.id==='leviathan'?2.4:2.0);
+          f.inHitbox=false;
           if(f.glideT<=0)f.state='chase';
         }else{
           f.state='chase';
-          // Kecepatan renang saat memburu target dinaikkan 2x lipat (todak 3.8x, leviathan 3.2x, lentera 2.8x)
-          f.burstBoost=(d.id==='todak')?3.8:(d.id==='leviathan'?3.2:2.8);
-          f.targetY=clamp(Player.pos.y-0.35,f.minY,f.maxY);
+          f.targetY=clamp(target.pos.y-0.35,f.minY,f.maxY);
 
-          // Kemudi hanya berbelok jika belum terlalu dekat; saat tepat di depan target meluncur lurus anti-pusing
-          if(mouthDistToP>1.2){
-            const toTarget=Math.atan2(Player.pos.x-f.pos.x,Player.pos.z-f.pos.z);
-            f.dir=angLerp(f.dir,toTarget,dt*6.0);
+          if(inHitbox){
+            /* TARGET SUDAH MASUK AREA HITBOX:
+               Kunci haluan lurus ke arah target tanpa berputar-putar bingung,
+               dan kecepatan disesuaikan menjadi gerak hover/ancang-ancang di depan target */
+            f.inHitbox=true;
+            f.burstBoost=0.4;
+          }else{
+            /* TARGET MASIH DI LUAR HITBOX: Berenang mendekat & kemudi halus jika jalur air bebas */
+            f.inHitbox=false;
+            f.burstBoost=(d.id==='todak')?3.6:(d.id==='leviathan'?3.0:2.6);
+            if(f.turnT<=0){
+              const toTarget=Math.atan2(target.pos.x-f.pos.x,target.pos.z-f.pos.z);
+              f.dir=angLerp(f.dir,toTarget,dt*4.0);
+            }
           }
 
-          // Hitbox serangan tepat di mulut ikan
-          const reachMouth=(d.id==='leviathan')?2.4:(d.id==='todak'?1.6:1.4);
-          if(mouthDistToP<=reachMouth){
+          // Serangan tepat saat target berada di area hitbox depan mulut
+          if(inHitbox){
             f.attackCd=(f.attackCd||0)-dt;
+            if(p.jaw&&d.id!=='todak'&&f.attackCd<0.4){
+              p.jaw.rotation.z=(d.id==='leviathan'?0.45:0.35); // ancang-ancang gigitan
+            }
             if(f.attackCd<=0){
               f.state='attack';
-              Player.takeDamage(d.dmg,new THREE.Vector3(mouthX,f.pos.y,mouthZ));
+              if(target===Player){
+                Player.takeDamage(d.dmg,new THREE.Vector3(mouthX,f.pos.y,mouthZ));
+              }else if(target.role&&typeof NPCS!=='undefined'&&NPCS.hurt){
+                NPCS.hurt(target,d.dmg,f.mobRef||null);
+              }else if(target.pet&&typeof Capture!=='undefined'&&Capture.hurtPet){
+                Capture.hurtPet(target,d.dmg);
+              }
+
               if(d.id==='todak'){
                 if(typeof FX!=='undefined'&&FX.impact)
-                  FX.impact(Player.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x33507e,1.2);
+                  FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x33507e,1.2);
                 if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
               }else if(d.id==='lentera'){
                 if(p.jaw)p.jaw.rotation.z=0.65;
                 if(typeof FX!=='undefined'&&FX.impact)
-                  FX.impact(Player.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x3ff2d7,1.4);
+                  FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x3ff2d7,1.4);
                 if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
               }else if(d.id==='leviathan'){
                 if(p.jaw)p.jaw.rotation.z=0.85;
-                const kb=new THREE.Vector3(Player.pos.x-mouthX,0.45,Player.pos.z-mouthZ).normalize().multiplyScalar(7.5);
-                Player.vel.add(kb);
+                const kb=new THREE.Vector3(target.pos.x-mouthX,0.45,target.pos.z-mouthZ).normalize().multiplyScalar(7.5);
+                if(target===Player)Player.vel.add(kb);
+                else if(target.vel)target.vel.add(kb);
                 if(typeof FX!=='undefined'){
                   if(FX.shockwave)FX.shockwave(mouthX,CFG.WATER_Y,mouthZ,0x38e1ff,5.0);
                   if(FX.addShake)FX.addShake(0.6);
@@ -932,21 +1094,24 @@ const FishSys={
                 if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
               }
               f.attackCd=rand(2.2,3.4);
-              // Setelah menyerang, langsung meluncur lurus melewati pemain (glide-pass) 1.5 detik
+              f.inHitbox=false;
+              // Setelah menyerang, meluncur lurus melewati target (glide-pass) 1.6 detik
               f.state='glide_pass';
-              f.glideT=1.5;
+              f.glideT=1.6;
             }
           }
         }
       }else if(f.state==='chase'||f.state==='attack'||f.state==='glide_pass'){
         f.state='swim';
         f.burstBoost=1.0;
+        f.inHitbox=false;
       }
 
       /* 2. KECERDASAN IKAN DAMAI: SCHOOLING (BOIDS) & KABUR DARI PEMANGSA/PEMAIN */
       if(!d.hostile&&!f.inAir){
-        // Hindari pemain yang berenang
-        const pNear=(Player.inWater||Player.pos.y<=CFG.WATER_Y+0.4)&&pDist<3.8;
+        // Hindari pemain yang benar-benar berenang di air
+        const pDist=Math.hypot(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
+        const pNear=this.isTargetInWater(Player)&&pDist<3.8;
         if(pNear){
           f.fleeTimer=2.8;
           f.dir=Math.atan2(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
@@ -996,6 +1161,7 @@ const FishSys={
           if(f.pos.y>=CFG.WATER_Y-0.55){
             // Mulai melompat keluar air!
             f.inAir=true;
+            f.jumpPrep=0;
             f.vy=rand(5.5,7.6);
             f.jumpVx=Math.sin(f.visDir)*f.speed*1.8;
             f.jumpVz=Math.cos(f.visDir)*f.speed*1.8;
@@ -1008,6 +1174,11 @@ const FishSys={
           }else{
             // Berenang cepat menuju permukaan air untuk bersiap melompat
             f.targetY=CFG.WATER_Y-0.2;
+            f.jumpPrep=(f.jumpPrep||0)+dt;
+            if(f.jumpPrep>3.5){
+              f.jumpTimer=rand(15,30);
+              f.jumpPrep=0;
+            }
           }
         }
       }
@@ -1036,6 +1207,12 @@ const FishSys={
 
       /* 4. RENANG 3D DI DALAM AIR (RENTANG HINGGA 4 BLOK) & KEMUDI HALUS */
       if(!f.inAir){
+        // Update kontur dasar laut setempat agar tidak tenggelam di pasir saat dasar laut naik
+        const curGh=(typeof WGEN!=='undefined'&&WGEN.height)?WGEN.height(Math.floor(f.pos.x),Math.floor(f.pos.z)):1;
+        f.groundY=curGh;
+        f.minY=curGh+0.45;
+        f.maxY=CFG.WATER_Y-0.25;
+
         // Pergantian kedalaman renang acak berkala (3D cruise)
         f.depthTimer-=dt;
         if(f.depthTimer<=0){
@@ -1050,33 +1227,58 @@ const FishSys={
         f.pos.y=clamp(f.pos.y,f.minY,f.maxY);
         inner.rotation.x=clamp(-f.vy*0.18,-0.4,0.4);
 
-        // Kemudi haluan & deteksi batas laut dalam
+        // Kemudi haluan & deteksi batas perairan bebas
         f.turnT-=dt;
-        const look=1.4;
+        const look=1.5;
         const fx=f.pos.x+Math.sin(f.dir)*look,fz=f.pos.z+Math.cos(f.dir)*look;
-        if(!this.isDeepOcean(fx,fz)){
+        if(!this.canSwim(fx,f.pos.y,fz)){
           let turned=false;
-          for(const off of[0.7,-0.7,1.4,-1.4,2.2,-2.2,Math.PI]){
+          for(const off of[0.6,-0.6,1.2,-1.2,1.8,-1.8,Math.PI]){
             const a=f.dir+off;
             const ax=f.pos.x+Math.sin(a)*look,az=f.pos.z+Math.cos(a)*look;
-            if(this.isDeepOcean(ax,az)){f.dir=a;turned=true;break;}
+            if(this.canSwim(ax,f.pos.y,az)){f.dir=a;turned=true;break;}
           }
           if(!turned)f.dir+=Math.PI;
-          f.turnT=0.5;
+          f.turnT=0.6;
         }else if(f.turnT<=0&&f.state!=='chase'){
-          f.turnT=rand(1.2,2.8);
-          f.dir+=rand(-0.45,0.45);
+          f.turnT=rand(1.8,3.5);
+          f.dir+=rand(-0.4,0.4);
         }
 
-        f.visDir=angLerp(f.visDir,f.dir,Math.min(1,dt*5.0));
+        f.visDir=angLerp(f.visDir,f.dir,Math.min(1,dt*4.5));
 
-        // Kecepatan renang berdenyut (burst-and-glide) seperti ikan nyata
-        const burst=(f.state==='chase'||f.fleeTimer>0)
-          ?(f.burstBoost||1.8)
-          :(0.75+0.45*Math.sin(t*1.2+f.phase*2.3));
-        const moveSpd=f.speed*Math.max(0.25,burst)*dt;
-        const nx=f.pos.x+Math.sin(f.visDir)*moveSpd,nz=f.pos.z+Math.cos(f.visDir)*moveSpd;
-        if(this.isDeepOcean(nx,nz)){f.pos.x=nx;f.pos.z=nz;}
+        // Kecepatan renang: Saat target masuk area hitbox, berenang perlahan menjaga jarak moncong tanpa berhenti membeku
+        let moveSpd=0;
+        if(f.state==='chase'&&f.inHitbox){
+          moveSpd=f.speed*0.35*dt; // Hovering combat di depan target
+        }else{
+          const burst=(f.state==='chase'||f.fleeTimer>0||f.state==='glide_pass')
+            ?(f.burstBoost||1.8)
+            :(0.75+0.45*Math.sin(t*1.2+f.phase*2.3));
+          moveSpd=f.speed*Math.max(0.35,burst)*dt;
+        }
+
+        const stepX=Math.sin(f.visDir)*moveSpd;
+        const stepZ=Math.cos(f.visDir)*moveSpd;
+        const nx=f.pos.x+stepX;
+        const nz=f.pos.z+stepZ;
+
+        if(moveSpd>0.0001){
+          if(this.canSwim(nx,f.pos.y,nz)){
+            f.pos.x=nx;
+            f.pos.z=nz;
+          }else{
+            // Axis sliding navigasi jika salah satu sumbu bebas di perairan
+            if(this.canSwim(nx,f.pos.y,f.pos.z)) f.pos.x=nx;
+            else if(this.canSwim(f.pos.x,f.pos.y,nz)) f.pos.z=nz;
+            else f.dir+=Math.PI*0.5; // belok jika benar-benar terperangkap sudut
+          }
+        }
+
+        if(f.mobRef){
+          f.mobRef.pos.copy(f.pos);
+          f.mobRef.state=f.state;
+        }
 
         root.position.copy(f.pos);
         root.rotation.y=f.visDir-Math.PI/2;
@@ -1103,7 +1305,9 @@ const FishSys={
     let caught=false;
     for(let i=this.list.length-1;i>=0;i--){
       const f=this.list[i],d=f.def;
-      const mouthDist=(d.id==='leviathan')?3.0:((d.id==='todak')?1.8:1.2);
+      /* Ikan predator yang hostile diproses lewat sistem Monsters.list dan Monsters.hurt */
+      if(d.hostile)continue;
+      const mouthDist=(d.id==='leviathan')?4.2:((d.id==='todak')?2.2:1.4);
       const mx=f.pos.x+Math.sin(f.visDir)*mouthDist;
       const mz=f.pos.z+Math.cos(f.visDir)*mouthDist;
 
