@@ -3077,13 +3077,18 @@ const Monsters={
     /* Target musuh / pemain yang sedang dikejar */
     const target = m.foe || (m.pet ? null : ((typeof Player!=='undefined'&&!Player.dead)?Player:null));
 
-    /* 2. AIR: jika titik depan ada air dan mob saat ini di daratan (bukan ikan & tidak sedang ditunggangi),
-       repath / hindari air KECUALI targetnya memang ada di dalam air */
+    /* 2. AIR:
+       - PET peliharaan pemain BEBAS MASUK KE AIR kapan saja saat mengikuti pemain maupun ditunggangi!
+       - Mob yang sedang ditunggangi bebas bergerak di air.
+       - Ikan bebas berenang di air.
+       - Hanya MONSTER LIAR biasa yang di daratan yang menghindari tercebur ke air,
+         kecuali monster liar tersebut sedang mengejar musuh yang ada di air. */
     const beingRidden = (typeof Capture!=='undefined')&&Capture.riding&&(Capture.pet===m);
-    if(!beingRidden){
-      const inWater = (typeof World.inWaterAt==='function') && World.inWaterAt(x,gy+0.2,z);
-      if(inWater && !m.inWater && m.type!=='fish'){
-        const targetInWater = target && (target.inWater || (target.pos && target.pos.y <= CFG.WATER_Y + 0.3));
+    if(!m.pet && !beingRidden && m.type!=='fish'){
+      const inWater = (typeof World.inWaterAt==='function') && 
+                      (World.inWaterAt(x,gy+0.2,z) || World.inWaterAt(x,CFG.WATER_Y-0.2,z));
+      if(inWater && !m.inWater){
+        const targetInWater = target && (target.inWater || ((typeof World!=='undefined'&&World.inWaterAt)?World.inWaterAt(target.pos.x,target.pos.y+0.2,target.pos.z):(target.pos&&target.pos.y<CFG.WATER_Y)));
         if(!targetInWater) return false;
       }
     }

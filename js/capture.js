@@ -744,7 +744,7 @@ const Capture={
                   (m.type==='lizard')?2.6:1.8;
       if(bd>holdR){
         m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
-        let spd=m.speed*(m.inWater?0.55:1)*(m.slowMul||1);
+        let spd=m.speed*(m.slowMul||1);
         // Saat target serangan jauh, pet berlari kencang mendekat
         if(bd > holdR + 1.2 && !m.inWater){
           if(m.type==='dragon'||m.type==='trex') spd *= 2.3;
