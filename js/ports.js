@@ -864,8 +864,8 @@ const FishSys={
       jumpTimer:rand(10,25),inAir:false,jumpVx:0,jumpVz:0,
       // tempur & kecerdasan buatan
       hp:def.hp||20,maxhp:def.hp||20,flash:0,
-      state:'swim',fleeTimer:0,attackCd:rand(1.0,2.5),repositionT:0,
-      inHitbox:false
+      state:'swim',fleeTimer:0,attackCd:rand(0.5,1.5),repositionT:0,
+      glideT:0,turnReengageT:0,jawOpen:0,jawBiteT:0
     };
 
     /* Daftarkan ikan predator buas ke Monsters.list agar diperlakukan sama seperti mob biasa:
@@ -1030,81 +1030,92 @@ const FishSys={
       const inHitbox=(mouthDistToTgt<=reachHitbox)&&(vertDist<=(d.id==='leviathan'?3.5:2.0));
 
       if(d.hostile&&target&&!f.inAir){
-        if(f.state==='glide_pass'){
-          // Meluncur kencang lurus melewati target setelah menyerang
-          f.glideT=(f.glideT||0)-dt;
-          f.burstBoost=(d.id==='todak')?2.8:(d.id==='leviathan'?2.4:2.0);
-          f.inHitbox=false;
-          if(f.glideT<=0)f.state='chase';
-        }else{
-          f.state='chase';
-          f.targetY=clamp(target.pos.y-0.35,f.minY,f.maxY);
+        const toTarget=Math.atan2(target.pos.x-f.pos.x,target.pos.z-f.pos.z);
+        f.targetY=clamp(target.pos.y-0.25,f.minY,f.maxY);
 
-          if(inHitbox){
-            /* TARGET SUDAH MASUK AREA HITBOX:
-               Kunci haluan lurus ke arah target tanpa berputar-putar bingung,
-               dan kecepatan disesuaikan menjadi gerak hover/ancang-ancang di depan target */
-            f.inHitbox=true;
-            f.burstBoost=0.4;
-          }else{
-            /* TARGET MASIH DI LUAR HITBOX: Berenang mendekat & kemudi halus jika jalur air bebas */
-            f.inHitbox=false;
-            f.burstBoost=(d.id==='todak')?3.6:(d.id==='leviathan'?3.0:2.6);
-            if(f.turnT<=0){
-              const toTarget=Math.atan2(target.pos.x-f.pos.x,target.pos.z-f.pos.z);
-              f.dir=angLerp(f.dir,toTarget,dt*4.0);
-            }
+        if(f.state==='glide_pass'){
+          /* FASE 2: BERENANG SANGAT CEPAT MENEROBOS MELEWATI TARGET SETELAH MENGGIGIT */
+          f.glideT=(f.glideT||0)-dt;
+          f.burstBoost=(d.id==='todak')?4.6:(d.id==='leviathan'?3.8:3.2);
+          // Haluan lurus mempertahankan garis luncur menerobos target
+          if(f.glideT<=0){
+            f.state='turn_reengage';
+            f.turnReengageT=rand(0.9,1.4); // waktu berenang meliuk berputar
+          }
+        }else if(f.state==='turn_reengage'){
+          /* FASE 3: BERENANG MELIUK BERPUTAR KEMBALI MENGARAH KE TARGET */
+          f.turnReengageT=(f.turnReengageT||0)-dt;
+          f.burstBoost=(d.id==='todak')?2.6:(d.id==='leviathan'?2.2:1.9);
+          // Berputar meliuk mengitari air untuk mengunci target di belakang
+          if(f.turnT<=0){
+            f.dir=angLerp(f.dir,toTarget,dt*5.5);
+          }
+          let diffAng=Math.abs(f.dir-toTarget);
+          if(diffAng>Math.PI)diffAng=Math.PI*2-diffAng;
+          // Begitu haluan sudah berputar mengarah ke target (atau waktu habis), langsung tancap gas menyerang lagi!
+          if(f.turnReengageT<=0||diffAng<0.45){
+            f.state='chase';
+          }
+        }else{
+          /* FASE 1: MENERJANG CEPAT KE ARAH TARGET & BERSIAP MENGGIGIT */
+          f.state='chase';
+          f.burstBoost=(d.id==='todak')?4.2:(d.id==='leviathan'?3.5:3.0);
+          if(f.turnT<=0){
+            f.dir=angLerp(f.dir,toTarget,dt*4.5);
           }
 
-          // Serangan tepat saat target berada di area hitbox depan mulut
-          if(inHitbox){
-            f.attackCd=(f.attackCd||0)-dt;
-            if(p.jaw&&d.id!=='todak'&&f.attackCd<0.4){
-              p.jaw.rotation.z=(d.id==='leviathan'?0.45:0.35); // ancang-ancang gigitan
-            }
-            if(f.attackCd<=0){
-              f.state='attack';
-              if(target===Player){
-                Player.takeDamage(d.dmg,new THREE.Vector3(mouthX,f.pos.y,mouthZ));
-              }else if(target.role&&typeof NPCS!=='undefined'&&NPCS.hurt){
-                NPCS.hurt(target,d.dmg,f.mobRef||null);
-              }else if(target.pet&&typeof Capture!=='undefined'&&Capture.hurtPet){
-                Capture.hurtPet(target,d.dmg);
-              }
+          // Animasi ancang-ancang rahang membuka saat mendekati target
+          if(mouthDistToTgt<3.5){
+            f.jawOpen=lerp(f.jawOpen||0,d.id==='leviathan'?0.85:0.65,clamp(dt*8,0,1));
+          }else{
+            f.jawOpen=lerp(f.jawOpen||0,0,clamp(dt*4,0,1));
+          }
 
-              if(d.id==='todak'){
-                if(typeof FX!=='undefined'&&FX.impact)
-                  FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x33507e,1.2);
-                if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
-              }else if(d.id==='lentera'){
-                if(p.jaw)p.jaw.rotation.z=0.65;
-                if(typeof FX!=='undefined'&&FX.impact)
-                  FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x3ff2d7,1.4);
-                if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
-              }else if(d.id==='leviathan'){
-                if(p.jaw)p.jaw.rotation.z=0.85;
-                const kb=new THREE.Vector3(target.pos.x-mouthX,0.45,target.pos.z-mouthZ).normalize().multiplyScalar(7.5);
-                if(target===Player)Player.vel.add(kb);
-                else if(target.vel)target.vel.add(kb);
-                if(typeof FX!=='undefined'){
-                  if(FX.shockwave)FX.shockwave(mouthX,CFG.WATER_Y,mouthZ,0x38e1ff,5.0);
-                  if(FX.addShake)FX.addShake(0.6);
-                }
-                if(typeof Sfx!=='undefined'&&Sfx.splash)Sfx.splash(true);
-                if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
-              }
-              f.attackCd=rand(2.2,3.4);
-              f.inHitbox=false;
-              // Setelah menyerang, meluncur lurus melewati target (glide-pass) 1.6 detik
-              f.state='glide_pass';
-              f.glideT=1.6;
+          // KETIKA MASUK JANGKAUAN GIGITAN: GIGIT SAMBIL BERENANG KENCANG MELEWATI TARGET!
+          if(inHitbox){
+            // 1. Serangan / Gigitan mengenai target
+            if(target===Player){
+              Player.takeDamage(d.dmg,new THREE.Vector3(mouthX,f.pos.y,mouthZ));
+            }else if(target.role&&typeof NPCS!=='undefined'&&NPCS.hurt){
+              NPCS.hurt(target,d.dmg,f.mobRef||null);
+            }else if(target.pet&&typeof Capture!=='undefined'&&Capture.hurtPet){
+              Capture.hurtPet(target,d.dmg);
             }
+
+            // 2. Animasi gigitan mengatup tajam & efek partikel
+            f.jawBiteT=0.35; // hentakan gigitan
+            if(p.jaw)p.jaw.rotation.z=0.08;
+
+            if(d.id==='todak'){
+              if(typeof FX!=='undefined'&&FX.impact)
+                FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x33507e,1.4);
+              if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
+            }else if(d.id==='lentera'){
+              if(typeof FX!=='undefined'&&FX.impact)
+                FX.impact(target.pos.clone().add(new THREE.Vector3(0,0.8,0)),0x3ff2d7,1.5);
+              if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
+            }else if(d.id==='leviathan'){
+              const kb=new THREE.Vector3(target.pos.x-mouthX,0.45,target.pos.z-mouthZ).normalize().multiplyScalar(7.5);
+              if(target===Player)Player.vel.add(kb);
+              else if(target.vel)target.vel.add(kb);
+              if(typeof FX!=='undefined'){
+                if(FX.shockwave)FX.shockwave(mouthX,CFG.WATER_Y,mouthZ,0x38e1ff,5.0);
+                if(FX.addShake)FX.addShake(0.6);
+              }
+              if(typeof Sfx!=='undefined'&&Sfx.splash)Sfx.splash(true);
+              if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
+            }
+
+            // 3. Ikan TIDAK BERHENTI! Langsung melesat kencang meluncur melewati target (glide-pass)!
+            f.state='glide_pass';
+            f.glideT=1.35; // meluncur tembus melewati target
+            f.burstBoost=(d.id==='todak')?4.8:(d.id==='leviathan'?4.0:3.4);
           }
         }
-      }else if(f.state==='chase'||f.state==='attack'||f.state==='glide_pass'){
+      }else if(f.state==='chase'||f.state==='glide_pass'||f.state==='turn_reengage'){
         f.state='swim';
         f.burstBoost=1.0;
-        f.inHitbox=false;
+        f.jawOpen=0;
       }
 
       /* 2. KECERDASAN IKAN DAMAI: SCHOOLING (BOIDS) & KABUR DARI PEMANGSA/PEMAIN */
@@ -1247,16 +1258,12 @@ const FishSys={
 
         f.visDir=angLerp(f.visDir,f.dir,Math.min(1,dt*4.5));
 
-        // Kecepatan renang: Saat target masuk area hitbox, berenang perlahan menjaga jarak moncong tanpa berhenti membeku
-        let moveSpd=0;
-        if(f.state==='chase'&&f.inHitbox){
-          moveSpd=f.speed*0.35*dt; // Hovering combat di depan target
-        }else{
-          const burst=(f.state==='chase'||f.fleeTimer>0||f.state==='glide_pass')
-            ?(f.burstBoost||1.8)
-            :(0.75+0.45*Math.sin(t*1.2+f.phase*2.3));
-          moveSpd=f.speed*Math.max(0.35,burst)*dt;
-        }
+        // Kecepatan renang: Saat menyerang atau kabur berenang sangat kencang
+        const isFastSwim=(f.state==='chase'||f.state==='glide_pass'||f.state==='turn_reengage'||f.fleeTimer>0);
+        const burst=isFastSwim
+          ?(f.burstBoost||2.6)
+          :(0.75+0.45*Math.sin(t*1.2+f.phase*2.3));
+        const moveSpd=f.speed*Math.max(0.4,burst)*dt;
 
         const stepX=Math.sin(f.visDir)*moveSpd;
         const stepZ=Math.cos(f.visDir)*moveSpd;
@@ -1285,7 +1292,8 @@ const FishSys={
       }
 
       /* 5. ANIMASI ORGAN & SIRIP IKAN */
-      const wagSpd=d.wagSpd*((f.state==='chase'||f.fleeTimer>0)?2.6:1.0);
+      const isFastSwim=(f.state==='chase'||f.state==='glide_pass'||f.state==='turn_reengage'||f.fleeTimer>0);
+      const wagSpd=d.wagSpd*(isFastSwim?2.8:1.0);
       const wig=Math.sin(t*wagSpd+f.phase);
       const wigTail=Math.sin(t*wagSpd+f.phase-0.9);
       inner.rotation.y=wig*0.12;
@@ -1293,10 +1301,21 @@ const FishSys={
 
       if(p.tail)p.tail.rotation.y=wigTail*(d.wagAmp||0.45);
       if(p.tail2)p.tail2.rotation.y=Math.sin(t*wagSpd*0.9-1.8)*(d.wagAmp||0.45)*1.5; // ekor serpent Leviathan!
-      const fl=Math.sin(t*(d.finSpd||10)*((f.state==='chase'||f.fleeTimer>0)?2.0:1.0)+f.phase)*0.45+0.12;
+      const fl=Math.sin(t*(d.finSpd||10)*(isFastSwim?2.2:1.0)+f.phase)*0.45+0.12;
       if(p.finR)p.finR.rotation.x=fl;
       if(p.finL)p.finL.rotation.x=-fl;
-      if(p.jaw&&f.state!=='attack')p.jaw.rotation.z=f.jawBase+Math.sin(t*1.8)*0.04;
+
+      // Animasi gerak rahang (membuka saat mengincar mangsa, mengatup kuat saat menggigit, bernapas saat santai)
+      if(p.jaw){
+        if(f.jawBiteT>0){
+          f.jawBiteT-=dt;
+          p.jaw.rotation.z=0.08+Math.sin(f.jawBiteT*20)*0.05; // mengatup kuat saat gigitan mengenai target
+        }else if(f.jawOpen>0.05){
+          p.jaw.rotation.z=f.jawOpen; // membuka lebar saat hendak melahap mangsa
+        }else{
+          p.jaw.rotation.z=f.jawBase+Math.sin(t*1.8)*0.04; // bernapas santai
+        }
+      }
     }
   },
 

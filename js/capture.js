@@ -783,17 +783,18 @@ const Capture={
     if(m.type==='dragon'){
       if((m.flyCd||0)>0) m.flyCd=Math.max(0,m.flyCd-dt);
       if((m.flyT||0)>0){
-        const elapsed=(m.flyDur||5.0)-m.flyT;
+        const dur=m.flyDur||10.0;
+        const elapsed=dur-m.flyT;
         m.flyT=Math.max(0,m.flyT-dt);
         const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
         const flightAlt=4.0;
-        if(elapsed<0.8){
-          const k=clamp(elapsed/0.8,0,1);
+        if(elapsed<1.0){
+          const k=clamp(elapsed/1.0,0,1);
           m.pos.y=lerp(m.takeoffY||gy,gy+flightAlt,k*k*(3-2*k));
-        }else if(elapsed<4.2){
+        }else if(elapsed<dur-1.2){
           m.pos.y=gy+flightAlt+Math.sin(elapsed*4.0)*0.12;
         }else{
-          const k=clamp((elapsed-4.2)/0.8,0,1);
+          const k=clamp((elapsed-(dur-1.2))/1.2,0,1);
           m.pos.y=lerp(gy+flightAlt,gy,k*k*(3-2*k));
         }
         if(m.flyT<=0){
@@ -868,27 +869,28 @@ const Capture={
 
   /* ---------- saddle / ride ---------- */
   onJumpInput(){
+    // Hanya picu terbang bila pemain SEDANG MENUNGGANGI pet naga miliknya
+    if(!this.riding||!this.pet||this.pet.type!=='dragon'||this.pet.dead)return false;
+
     const now=performance.now();
     const dt=now-(this._lastJumpTime||0);
     this._lastJumpTime=now;
 
-    if(dt<400){ // Double space!
+    if(dt<400){ // Double space saat menunggangi pet naga!
       const m=this.pet;
-      if(m&&m.type==='dragon'&&!m.dead){
-        if((m.flyCd||0)<=0&&(m.flyT||0)<=0){
-          m.flyT=5.0;
-          m.flyDur=5.0;
-          m.noFire=true;
-          m.flyCd=0;
-          m.takeoffY=m.pos.y;
-          if(typeof UI!=='undefined'&&UI.toast)
-            UI.toast('🐉 Naga terbang ke angkasa! (5 detik)');
-          if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
-          return true;
-        }else if((m.flyCd||0)>0){
-          if(typeof UI!=='undefined'&&UI.toast)
-            UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(m.flyCd)}s)`);
-        }
+      if((m.flyCd||0)<=0&&(m.flyT||0)<=0){
+        m.flyT=10.0;
+        m.flyDur=10.0;
+        m.noFire=true;
+        m.flyCd=0;
+        m.takeoffY=m.pos.y;
+        if(typeof UI!=='undefined'&&UI.toast)
+          UI.toast('🐉 Naga terbang ke angkasa! (10 detik)');
+        if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+        return true;
+      }else if((m.flyCd||0)>0){
+        if(typeof UI!=='undefined'&&UI.toast)
+          UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(m.flyCd)}s)`);
       }
     }
     return false;
@@ -1001,17 +1003,18 @@ const Capture={
     if(m.type==='dragon'){
       if((m.flyCd||0)>0) m.flyCd=Math.max(0,m.flyCd-dt);
       if((m.flyT||0)>0){
-        const elapsed=(m.flyDur||5.0)-m.flyT;
+        const dur=m.flyDur||10.0;
+        const elapsed=dur-m.flyT;
         m.flyT=Math.max(0,m.flyT-dt);
         const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
         const flightAlt=4.0;
-        if(elapsed<0.8){
-          const k=clamp(elapsed/0.8,0,1);
+        if(elapsed<1.0){
+          const k=clamp(elapsed/1.0,0,1);
           m.pos.y=lerp(m.takeoffY||gy,gy+flightAlt,k*k*(3-2*k));
-        }else if(elapsed<4.2){
+        }else if(elapsed<dur-1.2){
           m.pos.y=gy+flightAlt+Math.sin(elapsed*4.0)*0.12;
         }else{
-          const k=clamp((elapsed-4.2)/0.8,0,1);
+          const k=clamp((elapsed-(dur-1.2))/1.2,0,1);
           m.pos.y=lerp(gy+flightAlt,gy,k*k*(3-2*k));
         }
         if(m.flyT<=0){
