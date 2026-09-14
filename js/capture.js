@@ -504,6 +504,7 @@ const Capture={
       maxhp:m.maxhp,
       saddle:!!(m.saddle||old.saddle),
       name:old.name||this.mobName(m.type),
+      flyCd:m.flyCd!==undefined?m.flyCd:(old.flyCd||0),
     };
   },
 
@@ -617,6 +618,7 @@ const Capture={
       m.mesh.scale.multiplyScalar(0.5);
       m.baseScale=(m.baseScale||1)*0.5;
       m.sizeMul=(m.sizeMul||1)*0.5;
+      m.flyCd=pet.flyCd||0;
     }
     Monsters.list.push(m);
     this.pet=m;
@@ -629,11 +631,12 @@ const Capture={
   storeActive(silent){
     if(!this.pet)return;
     if(this.riding)this.stopRide(true);
+    const m=this.pet;
     const i=this.deployedSlot;
     if(i>=0&&RPG.mobSlots[i]){
       RPG.mobSlots[i]=this.petData();
+      if((m.flyCd||0)>0) RPG.mobSlots[i].flyCd=m.flyCd;
     }
-    const m=this.pet;
     const idx=Monsters.list.indexOf(m);
     if(idx>=0)Monsters.list.splice(idx,1);
     if(m.mesh){
@@ -685,6 +688,58 @@ const Capture={
 
     if(this.riding&&this.pet===m)return;
     if(m.flash>0)m.flash=Math.max(0,m.flash); // flash diurus Monsters.update
+
+    /* ---- TERBANG & COOLDOWN PET NAGA (MENGIKUTI PEMAIN / BERTARUNG) ---- */
+    if(m.type==='dragon'){
+      if((m.flyCd||0)>0){
+        m.flyCd=Math.max(0,m.flyCd-dt);
+        if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
+          RPG.mobSlots[m.petSlot].flyCd=m.flyCd;
+        }
+      }
+      if(m.flying||(m.flyT||0)>0){
+        const dur=m.flyDur||10.0;
+        m.flyT=Math.max(0,m.flyT-dt);
+        const elapsed=dur-m.flyT;
+        if(m.takeoffY===undefined)m.takeoffY=m.pos.y;
+        if(m.flyAlt===undefined)m.flyAlt=m.takeoffY+4.5;
+
+        const groundUnder=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
+
+        if(elapsed<1.2){
+          const k=clamp(elapsed/1.2,0,1);
+          const smoothK=k*k*(3-2*k);
+          m.pos.y=lerp(m.takeoffY,m.flyAlt,smoothK);
+        }else if(elapsed<dur-1.5){
+          if(groundUnder+1.2>m.flyAlt){
+            m.flyAlt=lerp(m.flyAlt,groundUnder+1.2,clamp(5*dt,0,1));
+          }
+          m.pos.y=m.flyAlt+Math.sin(elapsed*2.2)*0.08;
+        }else{
+          if(m.landStartY===undefined)m.landStartY=m.pos.y;
+          const landK=clamp((elapsed-(dur-1.5))/1.5,0,1);
+          const smoothLandK=landK*landK*(3-2*landK);
+          m.pos.y=lerp(m.landStartY,groundUnder,smoothLandK);
+        }
+
+        if(m.flyT<=0||elapsed>=dur){
+          m.pos.y=groundUnder;
+          m.vel.y=0;
+          m.onGround=true;
+          m.flyT=0;
+          m.flying=false;
+          m.flyCd=6.0;
+          m.takeoffY=undefined;
+          m.flyAlt=undefined;
+          m.landStartY=undefined;
+          if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
+            RPG.mobSlots[m.petSlot].flyCd=6.0;
+          }
+          m.noFire=false;
+          if(typeof UI!=='undefined'&&UI.toast)UI.toast('🐉 Naga mendarat mulus.');
+        }
+      }
+    }
 
     /* cari musuh non-pet terdekat; mob yang sedang ditangkap tidak boleh diganggu */
     let target=null,bd=9.5;
@@ -779,35 +834,6 @@ const Capture={
       }
     }
 
-    /* ---- TERBANG PET NAGA SAAT MENGIKUTI PEMAIN ---- */
-    if(m.type==='dragon'){
-      if((m.flyCd||0)>0) m.flyCd=Math.max(0,m.flyCd-dt);
-      if((m.flyT||0)>0){
-        const dur=m.flyDur||10.0;
-        const elapsed=dur-m.flyT;
-        m.flyT=Math.max(0,m.flyT-dt);
-        const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
-        const flightAlt=4.0;
-        if(elapsed<1.0){
-          const k=clamp(elapsed/1.0,0,1);
-          m.pos.y=lerp(m.takeoffY||gy,gy+flightAlt,k*k*(3-2*k));
-        }else if(elapsed<dur-1.2){
-          m.pos.y=gy+flightAlt+Math.sin(elapsed*4.0)*0.12;
-        }else{
-          const k=clamp((elapsed-(dur-1.2))/1.2,0,1);
-          m.pos.y=lerp(gy+flightAlt,gy,k*k*(3-2*k));
-        }
-        if(m.flyT<=0){
-          m.pos.y=gy;
-          m.vel.y=0;
-          m.onGround=true;
-          m.flyCd=5.0; // cooldown 5 detik saat mendarat
-          m.noFire=false;
-          if(typeof UI!=='undefined'&&UI.toast)UI.toast('🐉 Naga mendarat mulus.');
-        }
-      }
-    }
-
     const distTarget=m.pos.distanceTo(targetPos);
     const stopDist=waitForPlayer?1.3:3.4;
 
@@ -872,25 +898,32 @@ const Capture={
     // Hanya picu terbang bila pemain SEDANG MENUNGGANGI pet naga miliknya
     if(!this.riding||!this.pet||this.pet.type!=='dragon'||this.pet.dead)return false;
 
+    const m=this.pet;
+    const petSlotData=(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot])?RPG.mobSlots[m.petSlot]:null;
+    const currentCd=Math.max(m.flyCd||0, petSlotData?petSlotData.flyCd||0:0);
+
     const now=performance.now();
     const dt=now-(this._lastJumpTime||0);
     this._lastJumpTime=now;
 
     if(dt<400){ // Double space saat menunggangi pet naga!
-      const m=this.pet;
-      if((m.flyCd||0)<=0&&(m.flyT||0)<=0){
+      if(currentCd<=0 && (m.flyT||0)<=0 && !m.flying){
         m.flyT=10.0;
         m.flyDur=10.0;
+        m.flying=true;
         m.noFire=true;
         m.flyCd=0;
         m.takeoffY=m.pos.y;
+        m.flyAlt=m.pos.y+4.5;
+        m.landStartY=undefined;
+        if(petSlotData)petSlotData.flyCd=0;
         if(typeof UI!=='undefined'&&UI.toast)
           UI.toast('🐉 Naga terbang ke angkasa! (10 detik)');
         if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
         return true;
-      }else if((m.flyCd||0)>0){
+      }else if(currentCd>0){
         if(typeof UI!=='undefined'&&UI.toast)
-          UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(m.flyCd)}s)`);
+          UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(currentCd)}s)`);
       }
     }
     return false;
@@ -945,6 +978,21 @@ const Capture={
     this.mounting=false;
     const m=this.pet;
     if(m){
+      if(m.type==='dragon' && (m.flying || (m.flyT||0)>0)){
+        m.flyT=0;
+        m.flying=false;
+        m.flyCd=6.0;
+        m.takeoffY=undefined;
+        m.flyAlt=undefined;
+        m.landStartY=undefined;
+        if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
+          RPG.mobSlots[m.petSlot].flyCd=6.0;
+        }
+        const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
+        m.pos.y=gy;
+        m.vel.y=0;
+        m.onGround=true;
+      }
       /* animasi turun: pemain melompat ke samping mount lalu mendarat. */
       this.dismounting=true;
       this.dismountT=0;
@@ -990,7 +1038,7 @@ const Capture={
     }
 
     /* lompat saat menunggangi: 2 blok, naga 3 blok (nonaktif saat naik/turun/terbang) */
-    if(this.jumpQ&&!this.mounting&&(m.type!=='dragon'||(m.flyT||0)<=0)){
+    if(this.jumpQ&&!this.mounting&&(m.type!=='dragon'||((m.flyT||0)<=0&&!m.flying))){
       this.jumpQ=false;
       if(m.onGround){
         m.vel.y=m.type==='dragon'?12.5:10.3;
@@ -1001,27 +1049,54 @@ const Capture={
 
     /* ---- TERBANG PET NAGA SAAT DITUNGGANGI ---- */
     if(m.type==='dragon'){
-      if((m.flyCd||0)>0) m.flyCd=Math.max(0,m.flyCd-dt);
-      if((m.flyT||0)>0){
-        const dur=m.flyDur||10.0;
-        const elapsed=dur-m.flyT;
-        m.flyT=Math.max(0,m.flyT-dt);
-        const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
-        const flightAlt=4.0;
-        if(elapsed<1.0){
-          const k=clamp(elapsed/1.0,0,1);
-          m.pos.y=lerp(m.takeoffY||gy,gy+flightAlt,k*k*(3-2*k));
-        }else if(elapsed<dur-1.2){
-          m.pos.y=gy+flightAlt+Math.sin(elapsed*4.0)*0.12;
-        }else{
-          const k=clamp((elapsed-(dur-1.2))/1.2,0,1);
-          m.pos.y=lerp(gy+flightAlt,gy,k*k*(3-2*k));
+      if((m.flyCd||0)>0){
+        m.flyCd=Math.max(0,m.flyCd-dt);
+        if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
+          RPG.mobSlots[m.petSlot].flyCd=m.flyCd;
         }
-        if(m.flyT<=0){
-          m.pos.y=gy;
+      }
+      if(m.flying||(m.flyT||0)>0){
+        const dur=m.flyDur||10.0;
+        m.flyT=Math.max(0,m.flyT-dt);
+        const elapsed=dur-m.flyT;
+        if(m.takeoffY===undefined)m.takeoffY=m.pos.y;
+        if(m.flyAlt===undefined)m.flyAlt=m.takeoffY+4.5;
+
+        const groundUnder=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
+
+        if(elapsed<1.2){
+          // Fase 1: Lepas landas mulus ke ketinggian jelajah flyAlt
+          const k=clamp(elapsed/1.2,0,1);
+          const smoothK=k*k*(3-2*k);
+          m.pos.y=lerp(m.takeoffY,m.flyAlt,smoothK);
+        }else if(elapsed<dur-1.5){
+          // Fase 2: Ketinggian terbang konstan tenang lurus tanpa terpengaruh naik-turun balok di bawah.
+          // Hanya jika tanah/tebing di depan lebih tinggi dari jalur terbang, naikkan perlahan agar aman
+          if(groundUnder+1.2>m.flyAlt){
+            m.flyAlt=lerp(m.flyAlt,groundUnder+1.2,clamp(5*dt,0,1));
+          }
+          m.pos.y=m.flyAlt+Math.sin(elapsed*2.2)*0.08;
+        }else{
+          // Fase 3: Mendarat tenang ke tanah di bawah
+          if(m.landStartY===undefined)m.landStartY=m.pos.y;
+          const landK=clamp((elapsed-(dur-1.5))/1.5,0,1);
+          const smoothLandK=landK*landK*(3-2*landK);
+          m.pos.y=lerp(m.landStartY,groundUnder,smoothLandK);
+        }
+
+        if(m.flyT<=0||elapsed>=dur){
+          m.pos.y=groundUnder;
           m.vel.y=0;
           m.onGround=true;
-          m.flyCd=5.0; // cooldown 5 detik saat mendarat
+          m.flyT=0;
+          m.flying=false;
+          m.flyCd=6.0; // cooldown 6 detik setelah mendarat
+          m.takeoffY=undefined;
+          m.flyAlt=undefined;
+          m.landStartY=undefined;
+          if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
+            RPG.mobSlots[m.petSlot].flyCd=6.0;
+          }
           m.noFire=false;
           if(typeof UI!=='undefined'&&UI.toast)UI.toast('🐉 Naga mendarat mulus.');
         }
@@ -1064,12 +1139,12 @@ const Capture={
     const sprint=Input.sprintHeld()?1.08:1;
     /* batas atas 1.5× lari pemain untuk tunggangan cepat; kecepatan naga terbang sama dengan lari naga */
     let spd=slowRide?base*sprint:Math.min(run*1.5,base*sprint);
-    if(m.type==='dragon'&&(m.flyT||0)>0){
+    if(m.type==='dragon'&&(m.flying||(m.flyT||0)>0)){
       spd=run*1.5; // Kecepatan terbang naga dibuat sama dengan lari naga
     }
     /* Semua pet pergerakannya melambat saat melintasi air */
     m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
-    if(m.inWater&&(m.type!=='dragon'||(m.flyT||0)<=0)){
+    if(m.inWater&&(m.type!=='dragon'||((m.flyT||0)<=0&&!m.flying))){
       spd*=0.55;
     }
 

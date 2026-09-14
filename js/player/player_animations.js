@@ -301,26 +301,37 @@ class PlayerAnimator {
 
   /* ================= IDLE & MOVEMENT ================= */
   animIdle(t, P) {
-    const breathe = Math.sin(t * 2.2) * 0.03;
-    const sway = Math.sin(t * 1.1) * 0.02;
-    if (P.body) P.body.position.y = breathe;
-    if (P.torso) { P.torso.rotation.x = breathe * 0.5; P.torso.rotation.y = sway; }
+    const breathe = Math.sin(t * 1.8) * 0.015;
+    const sway = Math.sin(t * 0.9) * 0.012;
+    /* Kaki dan bagian bawah tubuh diam di tanah, hanya badan pinggang ke atas bernapas perlahan */
+    if (P.body) P.body.position.y = 0;
+    if (P.torso) {
+      P.torso.position.y = 0.66 + breathe;
+      P.torso.rotation.x = breathe * 0.35;
+      P.torso.rotation.y = sway;
+    }
     if (P.armL) {
-      P.armL.rotation.x = Math.sin(t * 2.2) * 0.06;
-      P.armL.rotation.z = 0.08 + Math.sin(t * 1.8) * 0.02;
+      P.armL.rotation.x = Math.sin(t * 1.8) * 0.04;
+      P.armL.rotation.z = 0.08 + Math.sin(t * 1.4) * 0.015;
       if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = -0.15;
     }
     if (P.armR) {
-      P.armR.rotation.x = -Math.sin(t * 2.2) * 0.06;
-      P.armR.rotation.z = -0.08 - Math.sin(t * 1.8) * 0.02;
+      P.armR.rotation.x = -Math.sin(t * 1.8) * 0.04;
+      P.armR.rotation.z = -0.08 - Math.sin(t * 1.4) * 0.015;
       if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = -0.15;
     }
     if (P.head) {
-      P.head.rotation.y = Math.sin(t * 0.8) * 0.12;
-      P.head.rotation.x = Math.sin(t * 1.3) * 0.03;
+      P.head.rotation.y = Math.sin(t * 0.7) * 0.08;
+      P.head.rotation.x = Math.sin(t * 1.1) * 0.02;
     }
-    if (P.legL) P.legL.rotation.z = Math.sin(t * 1.5) * 0.02;
-    if (P.legR) P.legR.rotation.z = -Math.sin(t * 1.5) * 0.02;
+    if (P.legL) {
+      P.legL.rotation.set(0, 0, 0);
+      if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(0, 0, 0);
+    }
+    if (P.legR) {
+      P.legR.rotation.set(0, 0, 0);
+      if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(0, 0, 0);
+    }
   }
   animWalk(t, P) {
     const f = 7;

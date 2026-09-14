@@ -2,9 +2,10 @@
 /* =============================================================================
    ENTITAS NPC: GUARDIAN (🛡️)
    -----------------------------------------------------------------------------
-   File mandiri: MODEL 3D (build) + ANIMASI (animate). Guardian adalah
-   tank ber-aura pertahanan, memegang gada + perisai menara. Badan jubah & animasi sama persis dengan
-   in-game (dulu dibangun NPCS.makeMesh di js/npc.js).
+   Model 3D: Ksatria pelindung benteng berzirah baja penuh, helm pelat ksatria
+   berjambul biru, pelat pundak bertingkat (heavy pauldrons), perisai menara
+   (tower shield) raksasa berlapis baja di tangan kiri, dan gada tempur bergerigi
+   (flanged war mace) yang menghadap lurus ke depan.
    ============================================================================= */
 
 const NPC_Guardian={
@@ -19,142 +20,134 @@ const NPC_Guardian={
       m.castShadow=!IS_MOBILE;return m;
     };
     const at=(m,x,y,z)=>{m.position.set(x,y,z);return m;};
-    const ROT=(m,rx,ry,rz)=>{if(rx)m.rotation.x=rx;if(ry)m.rotation.y=ry;if(rz)m.rotation.z=rz;return m;};
-    const ROBE=0x37527a,HOOD=0x22314d,
-          ROBE_D=(ROBE&0xfefefe)>>1,ROBE_L=Math.min(0xffffff,ROBE+0x181818),
-          HOOD_D=(HOOD&0xfefefe)>>1,
-          SKIN=0xc98b5e,SKIN_D=0xb0764c,SKIN_L=0xdba273,BEARD=0xe4dcc8,BEARD_D=0xcfc4ae,
-          BOOT=0x3b2f22,BOOT_D=0x2a2116,
-          WOODC=0x6f4d2a,WOOD_D=0x57391d,METAL=0xc9d3de,METAL_D=0x9aa6b4,METAL_H=0xeef3f8,
-          GOLD=0xd9a531,LEATHER=0x5c3f24;
+    const ROBE=0x324666,ROBE_D=0x1f2e46,
+          METAL=0xa8b6c6,METAL_D=0x707e8e,METAL_H=0xdde6f2,
+          GOLD=0xdca832,GOLD_D=0xab7e1c,
+          BOOT=0x222a36,BOOT_D=0x141a22,
+          PLUME=0x2b528e;
     const BODY_Y=0.78;
 
-    /* --- kaki detail: paha, tulang kering, sepatu bersol --- */
+    /* --- kaki: zirah pelat kaki baja penuh (greaves & sabatons) --- */
     const legs=[];
     for(const side of[1,-1]){
-      const lg=new THREE.Group();lg.position.set(0.12*side,0.52,0);
-      lg.add(at(box(0.18,0.14,0.20,ROBE_D),0,-0.07,0));
-      lg.add(at(box(0.165,0.20,0.185,ROBE_D),0,-0.22,0));
-      lg.add(at(box(0.15,0.14,0.17,BOOT),0,-0.36,0.01));
-      lg.add(at(box(0.17,0.09,0.22,BOOT),0,-0.44,0.03));
-      lg.add(at(box(0.18,0.035,0.25,BOOT_D),0,-0.49,0.04));
-      lg.add(at(box(0.155,0.04,0.175,BOOT_D),0,-0.30,0.01));
+      const lg=new THREE.Group();lg.position.set(0.13*side,0.52,0);
+      lg.add(at(box(0.20,0.18,0.22,ROBE_D),0,-0.09,0));
+      // pelat paha baja
+      lg.add(at(box(0.18,0.18,0.20,METAL),0,-0.24,0));
+      // pelat pelindung lutut ksatria
+      lg.add(at(box(0.16,0.12,0.08,METAL_H),0,-0.18,0.11));
+      lg.add(at(box(0.08,0.06,0.04,GOLD),0,-0.18,0.15)); // ornamen emas lutut
+      // sepatu perang baja (sabatons)
+      lg.add(at(box(0.17,0.14,0.19,METAL_D),0,-0.35,0.01));
+      lg.add(at(box(0.185,0.10,0.24,METAL),0,-0.44,0.03));
+      lg.add(at(box(0.195,0.04,0.26,BOOT_D),0,-0.49,0.035));
       g.add(lg);legs.push(lg);
     }
 
-    /* --- torso berlapis: jubah, ikat pinggang, kerah, tali --- */
-    const body=box(0.50,0.44,0.34,ROBE);body.position.y=BODY_Y;g.add(body);
-    body.add(at(box(0.54,0.12,0.38,ROBE_D),0,-0.20,0));
-    body.add(at(box(0.46,0.10,0.35,ROBE_L),0,0.12,0));
-    body.add(at(box(0.42,0.08,0.36,LEATHER),0,0.02,0));
-    body.add(at(box(0.10,0.10,0.37,GOLD),0,0.02,0));
-    body.add(at(box(0.05,0.05,0.02,0xffe9a0),0,0.02,0.19));
-    body.add(at(box(0.56,0.10,0.40,HOOD_D),0,0.20,0));
-    const strap=box(0.46,0.06,0.02,LEATHER,0);strap.rotation.z=0.5;
-    strap.position.set(0,0.10,0.18);body.add(strap);
-    body.add(at(box(0.12,0.10,0.08,LEATHER),0.16,-0.06,0.17));
-    body.add(at(box(0.03,0.28,0.02,ROBE_D),0,0.02,0.175));
+    /* --- torso: zirah pelat dada baja tebal + sabuk ksatria bergesper emas --- */
+    const body=box(0.52,0.48,0.36,ROBE);body.position.y=BODY_Y;g.add(body);
+    // pelat dada baja cembung depan & belakang
+    body.add(at(box(0.48,0.38,0.16,METAL),0,0.04,0.13));
+    body.add(at(box(0.42,0.28,0.06,METAL_H),0,0.06,0.20)); // pelat dada utama berkilau
+    body.add(at(box(0.46,0.36,0.10,METAL_D),0,0.04,-0.15));
+    // paku keling & lambang salib ksatria emas di dada
+    body.add(at(box(0.08,0.20,0.02,GOLD),0,0.08,0.232));
+    body.add(at(box(0.20,0.08,0.02,GOLD),0,0.12,0.232));
+    // sabuk perang ksatria tebal
+    body.add(at(box(0.54,0.09,0.38,0x2a1c12),0,-0.12,0));
+    body.add(at(box(0.14,0.11,0.40,GOLD),0,-0.12,0)); // gesper emas singa
+    // pelat pelindung paha bawah (tassets baja)
+    body.add(at(box(0.18,0.14,0.04,METAL),-0.16,-0.24,0.18));
+    body.add(at(box(0.18,0.14,0.04,METAL),0.16,-0.24,0.18));
 
-    /* --- kepala detail: wajah, tudung, janggut, mata, alis --- */
-    const head=box(0.34,0.32,0.32,SKIN);head.position.y=1.16;g.add(head);
-    head.add(at(box(0.30,0.10,0.30,SKIN_D),0,-0.14,0));
-    head.add(at(box(0.40,0.16,0.38,HOOD),0,0.16,-0.02));
-    head.add(at(box(0.42,0.10,0.14,HOOD),0,0.06,-0.16));
-    head.add(at(box(0.36,0.06,0.10,HOOD_D),0,0.22,0.10));
-    head.add(at(box(0.10,0.14,0.10,SKIN_D),0,-0.02,0.18));
-    head.add(at(box(0.04,0.02,0.02,SKIN_L),0,-0.01,0.235));
-    head.add(at(box(0.26,0.18,0.10,BEARD),0,-0.20,0.10));
-    head.add(at(box(0.20,0.10,0.08,BEARD_D),0,-0.30,0.12));
-    head.add(at(box(0.24,0.06,0.24,BEARD),0,0.09,0.05));
-    head.add(at(box(0.06,0.10,0.06,BEARD_D),0.13,-0.08,0.14));
-    head.add(at(box(0.06,0.10,0.06,BEARD_D),-0.13,-0.08,0.14));
-    for(const side of[1,-1]){
-      head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.075,0.06,0.02),
-        new THREE.MeshLambertMaterial({color:0xf6f1e6})),0.08*side,0.0,0.165));
-      head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.045,0.06,0.02),
-        new THREE.MeshBasicMaterial({color:0x1b1f26})),0.08*side,0.0,0.175));
-      head.add(at(box(0.09,0.03,0.02,BEARD_D),0.08*side,0.06,0.17));
+    /* --- kepala: Helm Ksatria Agung (Great Helm) dengan visor celah & jambul biru --- */
+    const head=box(0.36,0.36,0.36,METAL);head.position.y=1.18;g.add(head);
+    // pelat penguat sudut helm
+    head.add(at(box(0.38,0.06,0.38,METAL_H),0,-0.10,0));
+    head.add(at(box(0.06,0.38,0.38,GOLD),0,0.01,0));    // pita salib emas vertikal
+    head.add(at(box(0.38,0.06,0.38,GOLD),0,0.03,0));    // pita salib emas horizontal
+    // celah mata ksatria (visor eye-slit hitam tajam)
+    head.add(at(box(0.26,0.04,0.04,0x10141a),0,0.03,0.185));
+    // lubang ventilasi nafas helm
+    for(const vx of[-0.08,-0.03,0.03,0.08]){
+      head.add(at(box(0.02,0.06,0.02,0x10141a),vx,-0.08,0.185));
     }
-    head.add(at(box(0.10,0.02,0.02,0xb07a6a),0,-0.09,0.17));
+    // Jambul bulu biru ksatria (Plume) megah di atas helm
+    const plume=new THREE.Group();plume.position.set(0,0.26,-0.04);
+    plume.add(at(box(0.06,0.16,0.30,PLUME),0,0,0));
+    plume.add(at(box(0.05,0.22,0.18,PLUME),0,0.04,-0.06));
+    head.add(plume);
 
-    /* --- lengan kiri: bahu + lengan + tangan + lentera --- */
-    const armL=new THREE.Group();armL.position.set(-0.31,0.94,0);
-    armL.add(at(box(0.17,0.09,0.18,HOOD_D),0,0.0,0));
-    armL.add(at(box(0.14,0.24,0.14,ROBE),0,-0.14,0));
-    armL.add(at(box(0.13,0.06,0.13,ROBE_D),0,-0.26,0));
-    armL.add(at(box(0.145,0.10,0.145,SKIN_D),0,-0.34,0));
-    armL.add(at(box(0.13,0.09,0.13,SKIN),0,-0.42,0));
-    const lantern=box(0.16,0.18,0.16,WOODC);
-    lantern.position.set(0,-0.56,0.04);armL.add(lantern);
-    lantern.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.11,0.12,0.11),
-      new THREE.MeshBasicMaterial({color:0xffcc55})),0,0,0));
-    lantern.add(at(box(0.18,0.03,0.18,WOOD_D),0,0.10,0));
-    lantern.add(at(box(0.18,0.03,0.18,WOOD_D),0,-0.10,0));
+    /* --- lengan kiri: pauldron pelat raksasa & perisai menara baja (tower shield) --- */
+    const armL=new THREE.Group();armL.position.set(-0.35,0.94,0);
+    // Pauldron baja bertingkat raksasa
+    armL.add(at(box(0.22,0.12,0.22,METAL),-0.03,0.05,0));
+    armL.add(at(box(0.20,0.08,0.20,METAL_H),-0.03,0.09,0));
+    armL.add(at(box(0.18,0.04,0.18,GOLD),-0.03,0.12,0)); // mahkota bahu emas
+    armL.add(at(box(0.15,0.22,0.15,ROBE),0,-0.12,0));
+    armL.add(at(box(0.17,0.14,0.17,METAL_D),0,-0.27,0)); // sarung tangan pelat baja
+    armL.add(at(box(0.15,0.10,0.15,METAL),0,-0.38,0));
+
+    // Perisai Menara Raksasa (Tower Shield) di tangan kiri (menghadap lurus ke depan +Z)
+    const shield=new THREE.Group();shield.position.set(-0.16,-0.20,0.14);
+    shield.add(at(box(0.54,0.82,0.06,ROBE),0,0,0));        // badan perisai biru navy
+    shield.add(at(box(0.58,0.86,0.03,METAL),0,0,0.025));   // bingkai baja pelindung
+    shield.add(at(box(0.08,0.84,0.04,GOLD),0,0,0.035));    // garis emas vertikal
+    shield.add(at(box(0.46,0.08,0.04,GOLD),0,0.12,0.035)); // palang emas horizontal
+    shield.add(at(box(0.14,0.14,0.06,METAL_H),0,0.12,0.065)); // boss baja perisai depan
+    armL.add(shield);
     g.add(armL);
 
-    /* --- lengan kanan: bahu + lengan + tangan --- */
-    const armR=new THREE.Group();armR.position.set(0.31,0.94,0);
-    armR.add(at(box(0.17,0.09,0.18,HOOD_D),0,0.0,0));
-    armR.add(at(box(0.14,0.24,0.14,ROBE),0,-0.14,0));
-    armR.add(at(box(0.13,0.06,0.13,ROBE_D),0,-0.26,0));
-    armR.add(at(box(0.145,0.10,0.145,SKIN_D),0,-0.34,0));
-    armR.add(at(box(0.13,0.09,0.13,SKIN),0,-0.42,0));
+    /* --- lengan kanan: pauldron & gada tempur bergerigi lurus ke depan --- */
+    const armR=new THREE.Group();armR.position.set(0.35,0.94,0);
+    armR.add(at(box(0.22,0.12,0.22,METAL),0.03,0.05,0));
+    armR.add(at(box(0.20,0.08,0.20,METAL_H),0.03,0.09,0));
+    armR.add(at(box(0.18,0.04,0.18,GOLD),0.03,0.12,0));
+    armR.add(at(box(0.15,0.22,0.15,ROBE),0,-0.12,0));
+    armR.add(at(box(0.17,0.14,0.17,METAL_D),0,-0.27,0));
+    armR.add(at(box(0.15,0.10,0.15,METAL),0,-0.38,0));
 
-    /* --- SENJATA: dipasang pada pivot grip di telapak tangan.
-       Semua senjata dibangun memanjang ke -Y lokal lalu diputar pada pivot
-       sehingga rotasi presisi di sekitar titik genggaman, bukan mengambang. --- */
-    const grip=new THREE.Group();
-    grip.position.set(0,-0.44,0.06);
+    // Grip gada tempur di tangan kanan (menghadap lurus ke depan +Z)
+    const grip=new THREE.Group();grip.position.set(0,-0.38,0.06);
+    grip.rotation.set(-0.25,0,0.04);
     armR.add(grip);
 
-    /* --- ALAT / SENJATA PERAN --- */
-
-    /* Guardian: gada di tangan kanan + perisai menara di lengan kiri */
-    grip.add(at(box(0.07,0.40,0.07,WOODC),0,-0.12,0));
-    grip.add(at(box(0.08,0.08,0.08,WOOD_D),0,0.06,0));
-    const mhead=new THREE.Group();mhead.position.set(0,-0.36,0);
-    mhead.add(at(box(0.20,0.20,0.20,METAL),0,0,0));
-    mhead.add(at(box(0.24,0.08,0.24,METAL_D),0,0,0));
-    for(const sx of[1,-1])for(const sz of[1,-1])
-      mhead.add(at(box(0.05,0.10,0.05,METAL_H),0.09*sx,0.12,0.09*sz));
-    grip.add(mhead);
-    ROT(grip,-0.10,0,-0.06);
-    const sh=new THREE.Group();sh.position.set(-0.16,-0.34,0.20);
-    sh.add(at(box(0.52,0.72,0.08,0x4b6da3),0,0,0));
-    sh.add(at(box(0.44,0.60,0.03,0x5b7db5),0,0,0.045));
-    sh.add(at(box(0.58,0.12,0.10,METAL),0,0.30,0.01));
-    sh.add(at(box(0.58,0.12,0.10,METAL),0,-0.30,0.01));
-    sh.add(at(box(0.10,0.60,0.10,METAL),0,-0.02,0.05));
-    sh.add(at(box(0.30,0.14,0.10,0xe8dfc4),0,0.06,0.07));
-    sh.add(at(box(0.08,0.08,0.06,GOLD),0,0.06,0.09));
-    armL.add(sh);
-
+    // Gagang gada baja berulir mengarah lurus ke depan (+Z)
+    grip.add(at(box(0.05,0.05,0.80,METAL_D),0,0,0.22));
+    grip.add(at(box(0.06,0.06,0.22,0x221810),0,0,0));  // lilitan pegangan tangan kulit
+    grip.add(at(box(0.08,0.08,0.06,GOLD),0,0,-0.12));  // pommel emas berat penyeimbang
+    grip.add(at(box(0.09,0.09,0.10,GOLD),0,0,0.58));   // kerah emas pengunci
+    // Kepala gada tempur bergerigi (Flanged War Mace Head) baja menghadap depan
+    grip.add(at(box(0.18,0.18,0.22,METAL),0,0,0.72));
+    // 4 sirip pemecah zirah baja runcing
+    grip.add(at(box(0.03,0.28,0.22,METAL_H),0,0,0.72));
+    grip.add(at(box(0.28,0.03,0.22,METAL_H),0,0,0.72));
+    // Ujung paku penembus zirah di puncak mace (+Z)
+    grip.add(at(box(0.05,0.05,0.14,METAL_H),0,0,0.88));
+    grip.add(at(box(0.02,0.02,0.06,0xffffff),0,0,0.96)); // mata paku tajam
     g.add(armR);
 
     return {mesh:g,parts:{body,head,armL,armR,legs,bodyY:BODY_Y}};
   },
 
-  /* ---------- ANIMASI ----------
-     Jalan (kaki & lengan mengayun), ayunan alat saat menyerang, kepala
-     menoleh santai, flash merah saat terluka. Sama persis dengan logika
-     NPCS.animate() in-game untuk NPC non-langka. */
+  /* ---------- ANIMASI ---------- */
   animate(n,dt){
     const t=performance.now()*0.001;
     const sp=Math.hypot(n.vel.x,n.vel.z);
     const em=n.flash>0?0xaa2222:0x000000;
     n.mesh.traverse(o=>{if(o.material&&o.material.emissive)
       o.material.emissive.setHex(em);});
-    const step=Math.sin(t*9)*0.5*Math.min(1,sp/2);
+    const step=Math.sin(t*8)*0.45*Math.min(1,sp/2);
     if(n.parts.legs){
       n.parts.legs[0].rotation.x=step;
       n.parts.legs[1].rotation.x=-step;
     }
-    n.parts.armL.rotation.x=-step*0.6;
+    if(n.parts.armL)n.parts.armL.rotation.x=-step*0.3;
     const sw=n.swing>0?1-n.swing/0.25:0;
-    n.parts.armR.rotation.x=lerp(step*0.6,-1.5,sw);
-    n.parts.body.position.y=n.parts.bodyY+
-      Math.abs(Math.sin(t*9))*0.03*Math.min(1,sp/2);
-    n.parts.head.rotation.y=n.target?0:Math.sin(t*1.4)*0.35;
+    if(n.parts.armR)n.parts.armR.rotation.x=lerp(step*0.3,-1.4,sw);
+    if(n.parts.body)n.parts.body.position.y=n.parts.bodyY+
+      Math.abs(Math.sin(t*8))*0.025*Math.min(1,sp/2);
+    if(n.parts.head)n.parts.head.rotation.y=n.target?0:Math.sin(t*1.2)*0.25;
   },
 };
 window.NPC_Guardian=NPC_Guardian;

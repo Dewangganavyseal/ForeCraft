@@ -477,6 +477,16 @@ const NPCS={
      ========================================================================= */
   talk(n){
     if(!n||n.dead)return;
+    /* NPC non-tim berhenti seketika dan memperhatikan pemain saat diajak bicara */
+    if(!this.isTeam(n)){
+      n.talking=true;
+      n.talkT=8.0;
+      n.vel.x=0;n.vel.z=0;n.walking=false;
+      if(typeof Player!=='undefined'&&!Player.dead){
+        n.mesh.rotation.y=Math.atan2(Player.pos.x-n.pos.x,Player.pos.z-n.pos.z);
+        n.headAngle=0;
+      }
+    }
     Sfx.click();
     /* pedagang desa: membuka panel toko (jual-beli dgn koin), bukan merekrut.
        Stok acak pedagang disimpan di n.shop (dibuat saat make()). */
@@ -1178,6 +1188,26 @@ const NPCS={
   },
 
   ai(n,dt){
+    /* NPC non-tim yang sedang diajak bicara berhenti total dan memperhatikan pemain */
+    if(!this.isTeam(n)&&(n.talking||(n.talkT||0)>0)){
+      if((n.talkT||0)>0)n.talkT-=dt;
+      const dialogActive=(typeof UI!=='undefined'&&((UI.bubble&&UI.bubble.npc===n)||(UI.open==='shop'&&UI.shopNpc===n)));
+      if(dialogActive)n.talkT=Math.max(n.talkT||0,3.5);
+      if((n.talkT||0)<=0&&!dialogActive){
+        n.talking=false;
+        n.headAngle=undefined;
+      }else{
+        n.vel.x*=Math.exp(-12*dt);
+        n.vel.z*=Math.exp(-12*dt);
+        n.walking=false;
+        if(typeof Player!=='undefined'&&!Player.dead){
+          const toP=Math.atan2(Player.pos.x-n.pos.x,Player.pos.z-n.pos.z);
+          n.mesh.rotation.y=angLerp(n.mesh.rotation.y,toP,clamp(8*dt,0,1));
+          n.headAngle=0;
+        }
+        return;
+      }
+    }
     /* NPC yang sedang mundur tidak mencari musuh sampai pulih ≥ REJOIN_HP */
     if(n.retreat){this.aiRetreat(n,dt);return;}
     const passive=this.isTeam(n)&&n.aggr===false;
@@ -1718,6 +1748,7 @@ const NPCS={
     else if(pd<CFG.NPC.FOLLOW_R-0.35)n._followMove=false;
 
     if(n._followMove){
+      n._teamWanderT=0;n.headAngle=undefined;
       /* tujuan default = pemain. TAPI bila pemain di dalam bangunan sementara
          NPC masih di luar, arahkan NPC ke pintu dulu (titik luar -> titik dalam)
          supaya ia masuk lewat pintu, bukan menabrak tembok. */
@@ -1742,10 +1773,55 @@ const NPCS={
       n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(6*dt,0,1));
       n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(6*dt,0,1));
     }else{
-      const damp=Math.exp(-6*dt);
-      n.vel.x*=damp;n.vel.z*=damp;
-      /* menghadap arah pandang pemain saat berdiri menunggu */
-      n.mesh.rotation.y=angLerp(n.mesh.rotation.y,Cam.yaw,dt*3);
+      /* ---------- PERILAKU IDLE REKAN TIM (BERJALAN SANTAI & MENOLEH SEKITAR) ----------
+         Saat dekat pemain dan tidak sedang bertarung, rekan tim sesekali berjalan santai
+         dan menoleh melihat kanan-kiri. Interval diacak ~8-14 detik per NPC agar rekan
+         tidak pernah bergerak bersamaan. */
+      if(n._teamIdleTimer===undefined){
+        n._teamIdleTimer=4.0+((n.id||0)%5)*2.2+Math.random()*3.0;
+      }
+      n._teamIdleTimer-=dt;
+      if(n._teamIdleTimer<=0){
+        n._teamIdleTimer=8.0+Math.random()*6.0; // Peluang acak tiap ~10 detik
+        if(Math.random()<0.65){
+          n._teamWanderT=2.2+Math.random()*1.8;
+          const a=Math.random()*Math.PI*2;
+          const r=1.4+Math.random()*2.0;
+          n._teamWanderTarget={
+            x:Player.pos.x+Math.sin(a)*r,
+            z:Player.pos.z+Math.cos(a)*r
+          };
+          n._teamLookPh=Math.random()*Math.PI*2;
+        }
+      }
+
+      if((n._teamWanderT||0)>0){
+        n._teamWanderT-=dt;
+        const tx=n._teamWanderTarget?n._teamWanderTarget.x:Player.pos.x;
+        const tz=n._teamWanderTarget?n._teamWanderTarget.z:Player.pos.z;
+        const wdx=tx-n.pos.x,wdz=tz-n.pos.z;
+        const wd=Math.hypot(wdx,wdz);
+        if(wd>0.4){
+          const wang=this.steer(n,Math.atan2(wdx,wdz));
+          n.mesh.rotation.y=angLerp(n.mesh.rotation.y,wang,dt*5);
+          const sp=n.speed*0.40; // jalan santai perlahan
+          n.vel.x=lerp(n.vel.x,Math.sin(wang)*sp,clamp(5*dt,0,1));
+          n.vel.z=lerp(n.vel.z,Math.cos(wang)*sp,clamp(5*dt,0,1));
+        }else{
+          n.vel.x*=Math.exp(-6*dt);
+          n.vel.z*=Math.exp(-6*dt);
+        }
+        // Menoleh melihat kanan dan kiri saat berjalan santai
+        const tNow=performance.now()*0.001;
+        n.headAngle=Math.sin(tNow*2.2+(n._teamLookPh||0))*0.42;
+      }else{
+        const damp=Math.exp(-6*dt);
+        n.vel.x*=damp;n.vel.z*=damp;
+        /* menghadap arah pandang pemain saat berdiri menunggu dengan lirikan sesekali */
+        n.mesh.rotation.y=angLerp(n.mesh.rotation.y,Cam.yaw,dt*3);
+        const glance=Math.sin(performance.now()*0.001*0.9+(n.id||0)*1.5)*0.22;
+        n.headAngle=glance;
+      }
     }
   },
 
@@ -2365,7 +2441,13 @@ const NPCS={
      NPCS.animate hanya meneruskan ke entitas yang sesuai. */
   animate(n,dt){
     const ent=n.role&&this.def(n.role.id);
-    if(ent&&ent.animate){ent.animate(n,dt);return;}
+    if(ent&&ent.animate){
+      ent.animate(n,dt);
+      if(n.headAngle!==undefined&&n.parts&&n.parts.head){
+        n.parts.head.rotation.y=n.headAngle;
+      }
+      return;
+    }
 
     /* Fallback generik bila file entitas belum dimuat */
     const t=performance.now()*0.001;

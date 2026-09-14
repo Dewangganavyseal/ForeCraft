@@ -108,6 +108,7 @@ const PlayerModelBuilder = {
 
     const rollG = new THREE.Group();
     rollG.name = 'RollGroup';
+    rollG.position.y = 0.055; // Mengangkat model agar sol sepatu rata presisi di atas balok (anti-tenggelam)
     this.mesh.add(rollG);
     this.rollG = rollG;
 
@@ -186,8 +187,21 @@ const PlayerModelBuilder = {
     const innerTorsoCloth = new THREE.Group();
     innerTorsoCloth.name = 'InnerTorsoCloth';
     innerTorsoCloth.add(this.pl(0.44, 0.50, 0.26, PANTS_D, 0.38));
+    innerTorsoCloth.add(this.pl(0.42, 0.18, 0.24, PANTS_D, 0.08)); // penyambung pinggul bawah anti-bolong
     innerTorsoCloth.visible = false;
     torso.add(innerTorsoCloth);
+
+    // Pelvis, pinggul & bokong default Ranger (tampil saat pemain tidak memakai celana zirah)
+    const defaultPelvisCloth = new THREE.Group();
+    defaultPelvisCloth.name = 'DefaultPelvisCloth';
+    defaultPelvisCloth.add(this.pl(0.46, 0.18, 0.28, PANTS_D, 0.08));
+    defaultPelvisCloth.add(this.pl(0.24, 0.14, 0.22, PANTS_D, 0.02));
+    defaultPelvisCloth.add(this.pl(0.44, 0.16, 0.12, PANTS_D, 0.07, -0.11)); // bokong belakang
+    defaultPelvisCloth.add(this.pl(0.48, 0.14, 0.26, PANTS, 0.08));           // pinggul samping
+    defaultPelvisCloth.add(this.pl(0.49, 0.08, 0.31, BELT, 0.14));            // sabuk dasar celana
+    defaultPelvisCloth.add(this.pl(0.12, 0.09, 0.33, ACCENT, 0.14));
+    defaultPelvisCloth.add(this.pl(0.05, 0.05, 0.02, 0xfff0b8, 0.14, 0.17));
+    torso.add(defaultPelvisCloth);
 
     // Jaket tebal Ranger Penjelajah
     const defaultTorsoCloth = new THREE.Group();
@@ -385,6 +399,8 @@ const PlayerModelBuilder = {
     torso.add(armorG.pantsWaist);
     legL.add(armorG.pantsL);
     legR.add(armorG.pantsR);
+    armorG.bootL.position.y = 0.038; // Mengangkat sol sepatu armor agar presisi sejajar dengan sol default
+    armorG.bootR.position.y = 0.038;
     legL.userData.shin.add(armorG.bootL);
     legR.userData.shin.add(armorG.bootR);
     armL.add(armorG.pauldL);
@@ -393,7 +409,7 @@ const PlayerModelBuilder = {
 
     Object.assign(parts, {
       legL, legR, armL, armR, head, torso, body, mouth, sword: null,
-      armorG, hairG, defaultTorsoCloth, innerTorsoCloth
+      armorG, hairG, defaultTorsoCloth, innerTorsoCloth, defaultPelvisCloth
     });
 
     this.parts = parts;
@@ -409,6 +425,11 @@ const PlayerModelBuilder = {
     if (parts.defaultTorsoCloth && parts.innerTorsoCloth) {
       parts.defaultTorsoCloth.visible = !hasChest;
       parts.innerTorsoCloth.visible = !!hasChest;
+    }
+
+    if (parts.defaultPelvisCloth) {
+      // Pelvis, bokong dan paha atas selalu tampil jika player melepas/tidak memakai celana armor
+      parts.defaultPelvisCloth.visible = !hasPants;
     }
 
     for (const leg of [parts.legL, parts.legR]) {

@@ -1,8 +1,8 @@
 ﻿'use strict';
 /* Keyboard + mouse (PC) dan joystick + tombol (mobile) */
 const Input={
-  keys:{},jumpQ:false,attackQ:false,dodgeQ:false,
-  joyX:0,joyY:0,lastShift:0,camDrag:false,lastMX:0,rmb:false,
+  keys:{},jumpQ:false,attackQ:false,dodgeQ:false,pointerLocked:false,
+  joyX:0,joyY:0,lastShift:0,camDrag:false,lastMX:0,lastMY:0,rmb:false,
   mouseX:undefined,mouseY:undefined,   // posisi kursor ( utk SlamAim PC )
 
   init(){
@@ -10,6 +10,9 @@ const Input={
     window.addEventListener('keydown',e=>{
       if(e.repeat)return;
       const k=e.code;
+      if(k==='Escape'&&this.pointerLocked){
+        if(document.exitPointerLock)document.exitPointerLock();
+      }
       /* Selama chat terbuka SEMUA tombol diserahkan ke kolom chat: karakter
          tidak boleh bergerak/menyerang saat pemain mengetik. Escape menutup
          chat; tombol lain diabaikan di sini (diketik ke input). */
@@ -108,19 +111,32 @@ const Input={
       if(si>=0&&typeof UI!=='undefined'&&UI.activeSlotSkill&&
          UI.activeSlotSkill(si)==='slam'&&typeof SlamAim!=='undefined')SlamAim.release();
     });
-    /* ---------- mouse ---------- */
-    const cv=()=>Game.renderer.domElement;
+    /* ---------- mouse & pointer lock ---------- */
+    const cv=()=>Game.renderer&&Game.renderer.domElement;
+    const onLockChange=()=>{
+      const c=cv();
+      this.pointerLocked=!!(document.pointerLockElement&&(document.pointerLockElement===c||document.pointerLockElement===document.body));
+    };
+    document.addEventListener('pointerlockchange',onLockChange);
+    document.addEventListener('mozpointerlockchange',onLockChange);
+
     window.addEventListener('mousedown',e=>{
-      if(!Game.started||UI.open)return;
-      /* klik saat chat terbuka = tutup chat, bukan menyerang */
-      if(typeof Chat!=='undefined'&&Chat.active)return;
-      /* klik tombol HUD khusus tidak boleh memicu serangan.
-         #modal-ov ikut dikecualikan: selama dialog konfirmasi/nama terbuka,
-         UI.open masih null sehingga klik pada dialog dulu tetap diteruskan
-         sebagai serangan (dan pada Log Pass membuat dialognya terbuka lagi
-         tepat setelah ditutup). */
+      if(!Game.started)return;
       const el=e.target;
-      if(el&&el.closest&&el.closest('#modal-ov,#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu'))return;
+      const isUI=!!(el&&el.closest&&el.closest('#modal-ov,#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu,#chat'));
+      if(isUI||UI.open||(typeof Chat!=='undefined'&&Chat.active)){
+        if(this.pointerLocked&&document.exitPointerLock)document.exitPointerLock();
+        return;
+      }
+
+      /* Kunci pointer/mouse saat klik di layar khusus mode TPP (zoom dekat) */
+      if(!IS_MOBILE&&!this.pointerLocked&&(typeof Cam!=='undefined'&&Cam.tppEnabled&&Cam.zoom<4.8&&Cam.tppWeight>0.2)){
+        const c=cv();
+        if(c&&c.requestPointerLock){
+          try{c.requestPointerLock();}catch(err){}
+        }
+      }
+
       if(e.button===0){
         /* saat mode penempatan / atur pintu, klik kiri menunjuk sasaran —
            tapi klik pada elemen UI (bar pasang, hotbar, panel) diabaikan */
@@ -133,12 +149,28 @@ const Input={
         }
         else this.attackQ=true;
       }
-      if(e.button===2){this.rmb=true;this.lastMX=e.clientX;}
+      if(e.button===2){this.rmb=true;this.lastMX=e.clientX;this.lastMY=e.clientY;}
     });
     window.addEventListener('mouseup',e=>{if(e.button===2)this.rmb=false;});
     window.addEventListener('mousemove',e=>{
       this.mouseX=e.clientX;this.mouseY=e.clientY;   // utk bidikan slam (PC)
-      if(this.rmb&&!this.inMenu()){Cam.yaw-=(e.clientX-this.lastMX)*0.005;this.lastMX=e.clientX;}
+      if(this.inMenu())return;
+
+      if(this.pointerLocked){
+        const dx=e.movementX||e.mozMovementX||e.webkitMovementX||0;
+        const dy=e.movementY||e.mozMovementY||e.webkitMovementY||0;
+        const sens=0.0032;
+        Cam.yaw-=dx*sens;
+        /* Gerak mouse ke bawah (dy > 0): elevasi naik -> kamera menunduk melihat tanah.
+           Gerak mouse ke atas (dy < 0): elevasi turun -> kamera mendongak melihat langit. */
+        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*sens,-0.65,0.75);
+      }else if(this.rmb){
+        const dx=e.clientX-this.lastMX;
+        const dy=e.clientY-this.lastMY;
+        Cam.yaw-=dx*0.005;
+        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*0.005,-0.65,0.75);
+        this.lastMX=e.clientX;this.lastMY=e.clientY;
+      }
     });
     window.addEventListener('wheel',e=>{
       /* Saat panel terbuka, roda mouse dipakai untuk menggulir isi panel —
@@ -147,7 +179,12 @@ const Input={
       /* main menu: zoom kamera dinonaktifkan (panorama terkunci) */
       if(this.inMenu())return;
       if(e.target&&e.target.closest&&e.target.closest('.panel,#team,#toast,#chat'))return;
-      Cam.targetZoom=clamp(Cam.targetZoom*(1+e.deltaY*0.0012),5,16);
+      const minZ=(typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5;
+      Cam.targetZoom=clamp(Cam.targetZoom*(1+e.deltaY*0.0012),minZ,16);
+      /* Bila zoom menjauh kembali ke isometrik (zoom >= 4.8), segera lepas lock mouse */
+      if(Cam.targetZoom>=4.8&&this.pointerLocked&&document.exitPointerLock){
+        try{document.exitPointerLock();}catch(err){}
+      }
     },{passive:true});
     window.addEventListener('contextmenu',e=>e.preventDefault());
     if(IS_MOBILE)this.initTouch();
@@ -236,8 +273,10 @@ const Input={
          Dinonaktifkan di main menu (panorama terkunci). */
       if(cam.b!==null&&!this.inMenu()){
         const d=twoDist(),mx=twoMidX();
-        if(d>10&&cam.dist>10)
-          Cam.targetZoom=clamp(cam.zoom*cam.dist/d,5,16);
+        if(d>10&&cam.dist>10){
+          const minZ=(typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5;
+          Cam.targetZoom=clamp(cam.zoom*cam.dist/d,minZ,16);
+        }
         if(cam.midX)Cam.yaw-=(mx-cam.midX)*0.010;
         cam.midX=mx;
         if(e.cancelable)e.preventDefault();
@@ -340,6 +379,12 @@ const Input={
     let t=0;
     if(this.keys.ArrowLeft)t-=1;
     if(this.keys.ArrowRight)t+=1;
+    return t;
+  },
+  camPitchTurn(){
+    let t=0;
+    if(this.keys.ArrowUp)t-=1;   // Panah atas: mendongak ke atas
+    if(this.keys.ArrowDown)t+=1; // Panah bawah: menunduk ke bawah
     return t;
   },
 

@@ -3146,7 +3146,7 @@ const Monsters={
 
   physics(m,dt){
     /* bila naga sedang terbang, lewati gravitasi & ground clamp agar melayang bebas */
-    if(m.type==='dragon' && (m.flyT||0)>0){
+    if(m.type==='dragon' && (m.flying || (m.flyT||0)>0)){
       m.pos.x+=m.vel.x*dt;
       m.pos.z+=m.vel.z*dt;
       return;

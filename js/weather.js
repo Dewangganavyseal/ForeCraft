@@ -128,8 +128,16 @@ const Weather={
        zoom seperti dulu: dengan begitu proporsi "area bersih di sekitar pemain"
        tetap sama di semua tingkat zoom. */
     const D=Cam.DIST;
-    Game.scene.fog.near=D*0.92-this.rain*3;
-    Game.scene.fog.far =D*1.55+8-this.rain*4;
+    const isoNear=D*0.92-this.rain*3;
+    const isoFar =D*1.55+8-this.rain*4;
+    /* Pada mode TPP, kamera berada dekat di belakang karakter (jarak ~3.4 blok), jadi jarak kabut
+       dialihkan ke rentang dunia terbuka (42-110 blok) agar jalan terlihat jelas dan tidak tertutup kabut tebal */
+    const tppNear=42-this.rain*10;
+    const tppFar =110-this.rain*20;
+    const w=(typeof Cam!=='undefined'&&(Cam.tppWeight!==undefined||Cam.fppWeight!==undefined))
+      ? Math.max(Cam.tppWeight||0, Cam.fppWeight||0) : 0;
+    Game.scene.fog.near=lerp(isoNear,tppNear,w);
+    Game.scene.fog.far =lerp(isoFar,tppFar,w);
 
     /* lampu */
     let inten=(0.15+dayF*1.05)*(1-this.rain*0.22)+this.flash*1.5;

@@ -502,9 +502,9 @@ const Player={
      if(this.tapGap>0)return;
      this.tapGap=0.10;
      /* memukul biasa kini TIDAK lagi menguras/membutuhkan stamina (hanya dodge & skill) */
-     let next=(this.attack.sinceEnd<0.95*RPG.comboWindowMult()&&this.attack.combo<4)?this.attack.combo+1:0;
-     this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0,
-       moveMul:0.45,recover:false};
+      let next=(this.attack.sinceEnd<0.95*RPG.comboWindowMult()&&this.attack.combo<4)?this.attack.combo+1:0;
+      this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0,
+        moveMul:0.45,recover:false};
       /* auto-aim ke monster terdekat; pet tidak ikut dibidik */
       let best=null,bd=4.2;
       for(const m of Monsters.list){
@@ -512,7 +512,10 @@ const Player={
        const d=m.pos.distanceTo(this.pos);
        if(d<bd){bd=d;best=m;}
      }
-     if(best)this.facing=Math.atan2(best.pos.x-this.pos.x,best.pos.z-this.pos.z);
+      if(best)this.facing=Math.atan2(best.pos.x-this.pos.x,best.pos.z-this.pos.z);
+      else if(typeof Cam!=='undefined'&&Cam.tppWeight>0.5){
+        this.facing=(Cam.yaw+Math.PI)%(Math.PI*2);
+      }
      /* posisi efek: dari bilah bila memegang pedang, dari kepalan bila bertinju */
      const fxPos=new THREE.Vector3();
      const src=this.unarmed
@@ -1265,16 +1268,20 @@ const Player={
 
     /* --- combo attack --- */
     this.updateAttack(dt);
-    /* hadap: arah terkunci selama AYUNAN, tapi sudah boleh berputar lagi saat
-       fase pemulihan supaya jedanya tidak terasa seperti karakter macet */
+    /* hadap: karakter menghadap arah lari saat bergerak; saat diam kamera dapat bebas mengorbit mengelilingi karakter */
     if(!A.active||A.recover){
-      if(moving)this.facing=angLerp(this.facing,Math.atan2(mv.x,mv.z),clamp(12*dt,0,1));
+      if(moving)this.facing=angLerp(this.facing,Math.atan2(mv.x,mv.z),clamp(14*dt,0,1));
     }
     this.animate(dt,moving,hspd,sprint);
     this.updateSwordGlow(dt);
     this.mesh.position.copy(this.pos);
     /* extraYaw menambahkan putaran 360° combo 3 di atas arah hadap */
     this.mesh.rotation.y=this.facing+(this.extraYaw||0);
+
+    /* Mode TPP: karakter selalu tampak penuh di depan kamera */
+    if(this.mesh){
+      this.mesh.visible=true;
+    }
   },
 
   /* ---------- animasi player — DELEGASI ke PlayerAnimator ----------

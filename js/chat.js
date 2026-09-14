@@ -69,6 +69,7 @@ const Chat={
     !UI.open&&!Player.dead;},
   open(){
     if(!this.canOpen()||this.active)return;
+    if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
     this.active=true;
     this.box.classList.add('show');
     document.body.classList.add('chat-open');
@@ -96,9 +97,16 @@ const Chat={
     this.input.value='';
     if(!text)return;
 
-    /* ---- KODE RAHASIA: buka terminal spawn ---- */
-    if(text===this.SECRET){
-      this.pushLog('&gt;&gt; akses diterima — TERMINAL dibuka','sys');
+    /* ---- KODE RAHASIA: buka terminal spawn / toggle mode TPP ---- */
+    if(text.startsWith(this.SECRET) || text === '/tpp' || text === '/fpp'){
+      const arg = text.slice(this.SECRET.length).trim().toLowerCase();
+      if(arg === 'tpp' || arg === 'fpp' || arg === 'toggle' || text === '/tpp' || text === '/fpp'){
+        if(typeof Cam !== 'undefined') Cam.setTPP(!Cam.tppEnabled);
+        this.pushLog('>> Mode TPP: ' + (Cam.tppEnabled ? 'AKTIF (zoom dekat untuk kamera belakang karakter)' : 'NONAKTIF'), 'sys');
+        this.close();
+        return;
+      }
+      this.pushLog('>> akses diterima — TERMINAL dibuka','sys');
       this.close();
       UI.toggle('term');
       return;
@@ -162,7 +170,11 @@ const Chat={
   /* dipanggil UI.toggle('term'); isi cukup dibangun sekali */
   renderTerm(){
     const body=document.getElementById('term-body');
-    if(!body||this._termBuilt)return;
+    if(!body)return;
+    if(this._termBuilt){
+      if(this._updateFppBtn)this._updateFppBtn();
+      return;
+    }
     this._termBuilt=true;
 
     /* --- baris kontrol: jumlah & varian boss --- */
@@ -171,6 +183,26 @@ const Chat={
     ctl.innerHTML=
       '<label>🔢 Jumlah <input id="term-qty" type="number" min="1" max="64" value="1"></label>'+
       '<label><input id="term-boss" type="checkbox"> 👹 Varian Boss (monster)</label>';
+
+    /* Tombol Toggle Mode TPP (Third Person Perspective di belakang karakter) */
+    const tppBtn=document.createElement('button');
+    tppBtn.className='tbtn';
+    tppBtn.style.cssText='width:100%;margin:8px 0 4px;padding:9px 12px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;transition:.15s;text-align:left;';
+    const updateTppBtn=()=>{
+      const on=(typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled));
+      tppBtn.style.borderColor=on?'#4ade80':'#64748b';
+      tppBtn.style.background=on?'rgba(74,222,128,0.20)':'rgba(0,0,0,0.40)';
+      tppBtn.style.color=on?'#86efac':'#cbd5e1';
+      tppBtn.innerHTML='🎥 Mode TPP (Zoom Dekat &rarr; Kamera Belakang Karakter): <b>'+(on?'AKTIF [ON]':'NONAKTIF [OFF]')+'</b>';
+    };
+    this._updateTppBtn=updateTppBtn;
+    updateTppBtn();
+    tppBtn.addEventListener('click',()=>{
+      if(typeof Cam!=='undefined')Cam.setTPP(!Cam.tppEnabled);
+      updateTppBtn();
+    });
+    ctl.appendChild(tppBtn);
+
     body.appendChild(ctl);
 
     /* --- helper pembuat kelompok tombol --- */

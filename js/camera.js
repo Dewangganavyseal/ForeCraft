@@ -34,28 +34,43 @@ const Cam={
      ≈ 41°) kalau ingin lebih membumi; naikkan ke 0.96 untuk kembali seperti
      dulu. */
   elev:0.82,
-  /* FOV vertikal (derajat) — tombol KEKUATAN PERSPEKTIF. Ada trade-off yang
-     perlu diketahui sebelum mengubahnya, karena `zoom` menentukan framing:
-     jarak kamera = zoom/tan(fov/2), jadi FOV besar menarik kamera MENDEKAT dan
-     ikut menurunkan ketinggiannya.
-
-       FOV besar  → perspektif kuat (sisi blok jelas melebar), tapi saat pemain
-                    zoom-in penuh kamera bisa turun sampai setinggi bangunan
-                    tertinggi (WORLD_H 24) sehingga bisa menembus dinding.
-       FOV kecil  → kamera jauh & tinggi, aman, tapi tampilannya makin
-                    mendekati ortografik (kembali ke masalah semula).
-
-     16° dipilih karena pada zoom TERDEKAT (5) kamera masih duduk di y≈32 —
-     di atas seluruh dunia, jadi minCamY() tidak perlu ikut campur dan framing
-     tiap tingkat zoom tetap tepat — sementara konvergensinya ±30% pada rentang
-     kedalaman 20 blok, cukup untuk terasa punya kedalaman. Kalau ingin
-     perspektif lebih kuat, naikkan angka ini; minCamY() di bawah menjaga kamera
-     tetap di atas dunia (dengan konsekuensi framing zoom terdekat melebar). */
   fov:16,
   /* Jarak kamera→target hasil perhitungan zoom. Disegarkan tiap applyZoom();
      dibaca Weather (kabut) & World (oklusi). */
   DIST:0,
   cam:null,
+
+  /* ---------- FITUR EKSPERIMENTAL: THIRD PERSON PERSPECTIVE (TPP) ----------
+     Diaktifkan/dinonaktifkan lewat menu rahasia /280195.
+     Saat aktif dan pemain zoom sangat dekat (zoom < 4.8), kamera bertransisi
+     mulus menjadi kamera belakang karakter (TPP chase camera). */
+  tppEnabled: (typeof localStorage!=='undefined' && (localStorage.getItem('forecraft_tpp_enabled')==='1'||localStorage.getItem('forecraft_fpp_enabled')==='1')),
+  tppWeight: 0,     // 0 = isometrik murni, 1 = TPP belakang karakter
+  tppPitch: 0.0,    // sudut pandang vertikal kamera saat di mode TPP (-0.75 s/d 0.75 rad)
+
+  setTPP(enabled){
+    this.tppEnabled=!!enabled;
+    try{
+      if(typeof localStorage!=='undefined'){
+        localStorage.setItem('forecraft_tpp_enabled',this.tppEnabled?'1':'0');
+        localStorage.removeItem('forecraft_fpp_enabled');
+      }
+    }catch(e){}
+    if(!this.tppEnabled){
+      this.targetZoom=Math.max(5.0,this.targetZoom);
+      if(typeof Input!=='undefined'&&Input.pointerLocked){
+        if(document.exitPointerLock&&document.pointerLockElement){
+          try{document.exitPointerLock();}catch(e){}
+        }
+      }
+      if(typeof UI!=='undefined'&&UI.toast)
+        UI.toast('🎥 Mode TPP: NONAKTIF (Kamera Isometrik Standar)');
+    }else{
+      if(typeof UI!=='undefined'&&UI.toast)
+        UI.toast('🎥 Mode TPP: AKTIF! (Zoom sangat dekat untuk kamera belakang karakter)');
+    }
+  },
+  setFPP(enabled){ this.setTPP(enabled); },
 
   /* jarak agar tinggi terlihat pada bidang target = 2*zoom */
   distFor(zoom){return zoom/Math.tan(this.fov*Math.PI/360);},
@@ -83,22 +98,44 @@ const Cam={
     this.cam.aspect=window.innerWidth/window.innerHeight;
     this.cam.updateProjectionMatrix();
   },
-  /* Pada kamera perspektif, "zoom" = MENDEKAT/MENJAUH (mengubah DIST), bukan
-     mengubah frustum. Nama metodenya dipertahankan karena dipanggil dari
-     main.js & input.js. */
+  /* Pada kamera perspektif, "zoom" = MENDEKAT/MENJAUH (mengubah DIST).
+     Di mode TPP, FOV beralih nyaman ke 56° di belakang karakter. */
   applyZoom(){
     this.DIST=this.distFor(this.zoom);
-    const a=window.innerWidth/window.innerHeight;
-    if(this.cam.aspect!==a||this.cam.fov!==this.fov){
-      this.cam.aspect=a;this.cam.fov=this.fov;
-      this.cam.updateProjectionMatrix();
-    }
+    const a=(typeof window!=='undefined'&&window.innerWidth&&window.innerHeight)?window.innerWidth/window.innerHeight:this.cam.aspect;
+    const targetFov=lerp(this.fov,56,this.tppWeight||0);
+    const targetNear=lerp(0.5,0.15,this.tppWeight||0);
+    let changed=false;
+    if(this.cam.aspect!==a){this.cam.aspect=a;changed=true;}
+    if(Math.abs(this.cam.fov-targetFov)>0.1){this.cam.fov=targetFov;changed=true;}
+    if(Math.abs(this.cam.near-targetNear)>0.02){this.cam.near=targetNear;changed=true;}
+    if(changed)this.cam.updateProjectionMatrix();
   },
   update(dt,target){
     /* di main menu kamera hanya mengorbit otomatis (updateMenu); rotasi lewat
        panah dinonaktifkan supaya panorama tidak bisa diputar pengguna */
-    if(!(typeof Game!=='undefined'&&Game.menuMode))this.yaw+=Input.camTurn()*dt*2.4;
+    if(!(typeof Game!=='undefined'&&Game.menuMode)){
+      this.yaw+=Input.camTurn()*dt*2.4;
+      if(this.tppWeight>0.4&&Input.camPitchTurn){
+        this.tppPitch=clamp(this.tppPitch+Input.camPitchTurn()*dt*2.0,-0.75,0.75);
+      }
+    }
     this.zoom=lerp(this.zoom,this.targetZoom,clamp(8*dt,0,1));
+
+    /* Hitung transisi TPP weight */
+    if(this.tppEnabled&&this.zoom<4.8){
+      const targetWeight=clamp((4.8-this.zoom)/3.6,0,1);
+      this.tppWeight=lerp(this.tppWeight,targetWeight,clamp(10*dt,0,1));
+    }else{
+      this.tppWeight=lerp(this.tppWeight,0,clamp(12*dt,0,1));
+      /* Keluar dari mode TPP kembali ke isometrik -> seketika lepas lock mouse */
+      if(typeof Input!=='undefined'&&Input.pointerLocked){
+        if(document.exitPointerLock&&document.pointerLockElement){
+          try{document.exitPointerLock();}catch(e){}
+        }
+      }
+    }
+
     this.applyZoom();
     const e=this.elev;
     /* naikkan jarak bila kamera akan duduk lebih rendah dari puncak dunia
@@ -109,18 +146,94 @@ const Cam={
       const need=minY/Math.sin(e);
       if(need>dist)dist=need;
     }
-    const ox=Math.sin(this.yaw)*Math.cos(e)*dist;
-    const oy=Math.sin(e)*dist;
-    const oz=Math.cos(this.yaw)*Math.cos(e)*dist;
-    /* DIST = jarak EFEKTIF (sudah termasuk kenaikan dari minCamY) supaya
-       Weather (kabut) & World (oklusi) tidak memakai angka yang berbeda dari
-       posisi kamera sebenarnya. */
-    this.DIST=dist;
-    const sh=FX.shake;
-    this.cam.position.set(
-      target.x+ox+(Math.random()-0.5)*sh*0.7,
-      target.y+oy+(Math.random()-0.5)*sh*0.5,
-      target.z+oz+(Math.random()-0.5)*sh*0.7);
-    this.cam.lookAt(target.x,target.y,target.z);
+
+    /* Posisi pusat orbit badan karakter */
+    const orbitCenter=new THREE.Vector3(target.x,target.y,target.z);
+    let bodySwayRoll=0;
+    if(typeof Player!=='undefined'&&Player.mesh&&Player.parts&&Player.parts.torso){
+      const tR=Player.parts.torso.rotation;
+      bodySwayRoll=(tR.z||0)*0.16;
+    }
+
+    /* View bobbing kamera saat berjalan/lari di mode TPP */
+    const isMoving=(typeof Player!=='undefined'&&Player.vel&&Math.hypot(Player.vel.x,Player.vel.z)>0.3);
+    const pSpeed=isMoving?Math.hypot(Player.vel.x,Player.vel.z):0;
+    if(isMoving){
+      this.tppWalkPhase=(this.tppWalkPhase||0)+dt*Math.min(16,pSpeed*2.6);
+    }else{
+      this.tppWalkPhase=(this.tppWalkPhase||0)+dt*2.0;
+    }
+    const bobWeight=isMoving?Math.min(1.2,pSpeed/3.8):0;
+    const viewBobY=Math.sin(this.tppWalkPhase*2)*0.024*bobWeight;
+    const viewSwayX=Math.cos(this.tppWalkPhase)*0.016*bobWeight;
+    const viewTiltZ=Math.sin(this.tppWalkPhase)*0.012*bobWeight;
+
+    if(this.tppWeight>0.02){
+      orbitCenter.y+=viewBobY*this.tppWeight;
+      orbitCenter.x+=Math.cos(this.yaw)*viewSwayX*this.tppWeight;
+      orbitCenter.z-=Math.sin(this.yaw)*viewSwayX*this.tppWeight;
+    }
+
+    /* Jarak & elevasi orbit di mode TPP (mengorbit di sekeliling badan karakter) */
+    const tppDist=clamp(this.zoom*0.95+1.2,1.8,5.8);
+    const baseTppElev=0.28;
+    const tppElev=clamp(baseTppElev+this.tppPitch,0.06,1.35);
+
+    const effectiveDist=lerp(dist,tppDist,this.tppWeight);
+    const effectiveElev=lerp(0.82,tppElev,this.tppWeight);
+
+    const cosElev=Math.cos(effectiveElev);
+    const sinElev=Math.sin(effectiveElev);
+    let ox=Math.sin(this.yaw)*cosElev*effectiveDist;
+    let oy=sinElev*effectiveDist;
+    let oz=Math.cos(this.yaw)*cosElev*effectiveDist;
+
+    let camX=orbitCenter.x+ox;
+    let camY=orbitCenter.y+oy;
+    let camZ=orbitCenter.z+oz;
+
+    // Anti-clipping kamera orbit di mode TPP (tidak menembus dinding/rintangan)
+    if(this.tppWeight>0.25&&typeof World!=='undefined'&&World.blockedAt){
+      const dirX=camX-orbitCenter.x, dirY=camY-orbitCenter.y, dirZ=camZ-orbitCenter.z;
+      const totalDist=Math.hypot(dirX,dirY,dirZ);
+      if(totalDist>0.3){
+        const nx=dirX/totalDist, ny=dirY/totalDist, nz=dirZ/totalDist;
+        const steps=Math.ceil(totalDist/0.32);
+        let safeDist=totalDist;
+        for(let s=1;s<=steps;s++){
+          const testDist=Math.min(totalDist,s*0.32);
+          const tx=orbitCenter.x+nx*testDist;
+          const ty=orbitCenter.y+ny*testDist;
+          const tz=orbitCenter.z+nz*testDist;
+          if(World.blockedAt(tx,ty,tz,0.26)){
+            safeDist=Math.max(0.65,testDist-0.28);
+            break;
+          }
+        }
+        if(safeDist<totalDist){
+          camX=orbitCenter.x+nx*safeDist;
+          camY=orbitCenter.y+ny*safeDist;
+          camZ=orbitCenter.z+nz*safeDist;
+        }
+      }
+    }
+
+    const sh=FX.shake||0;
+    camX+=(Math.random()-0.5)*sh*0.6;
+    camY+=(Math.random()-0.5)*sh*0.4;
+    camZ+=(Math.random()-0.5)*sh*0.6;
+
+    this.cam.position.set(camX,camY,camZ);
+
+    /* Kamera SELALU mengarah dan terkunci ke pusat badan karakter */
+    this.cam.lookAt(orbitCenter);
+    if(this.tppWeight>0.15){
+      this.cam.rotation.z+=(viewTiltZ+bodySwayRoll)*this.tppWeight;
+    }
+
+    if(typeof document!=='undefined'){
+      const ch=document.getElementById('fpp-crosshair');
+      if(ch)ch.classList.remove('show');
+    }
   },
 };

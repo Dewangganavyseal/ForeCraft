@@ -1878,6 +1878,7 @@ const UI={
 
   /* satu tempat untuk menyembunyikan/menampilkan panel sesuai this.open */
   syncPanels(){
+    if(this.open&&document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
     for(const n of this.PANELS){
       const el=document.getElementById('panel-'+n);
       if(el)el.classList.toggle('hidden',this.open!==n);

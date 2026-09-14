@@ -2,9 +2,10 @@
 /* =============================================================================
    ENTITAS NPC: PEDAGANG (🏪)
    -----------------------------------------------------------------------------
-   File mandiri: MODEL 3D (build) + ANIMASI (animate). Merchant adalah
-   pedagang yang membuka toko, memegang garu desa. Badan jubah & animasi sama persis dengan
-   in-game (dulu dibangun NPCS.makeMesh di js/npc.js).
+   Model 3D: Saudagar kelana kaya bertopi baret beludru berhias bulu dan koin emas,
+   rompi mewah bermotif, ransel peti dagangan raksasa (travel packframe) berisi
+   tenda gulung dan peta di punggung, buku catatan transaksi di tangan kiri, serta
+   tongkat jalan bernisan koin emas berkilau yang menghadap lurus ke depan.
    ============================================================================= */
 
 const NPC_Merchant={
@@ -19,114 +20,136 @@ const NPC_Merchant={
       m.castShadow=!IS_MOBILE;return m;
     };
     const at=(m,x,y,z)=>{m.position.set(x,y,z);return m;};
-    const ROT=(m,rx,ry,rz)=>{if(rx)m.rotation.x=rx;if(ry)m.rotation.y=ry;if(rz)m.rotation.z=rz;return m;};
-    const ROBE=0xc9a24b,HOOD=0x8a6a1e,
-          ROBE_D=(ROBE&0xfefefe)>>1,ROBE_L=Math.min(0xffffff,ROBE+0x181818),
-          HOOD_D=(HOOD&0xfefefe)>>1,
-          SKIN=0xc98b5e,SKIN_D=0xb0764c,SKIN_L=0xdba273,BEARD=0xe4dcc8,BEARD_D=0xcfc4ae,
-          BOOT=0x3b2f22,BOOT_D=0x2a2116,
-          WOODC=0x6f4d2a,WOOD_D=0x57391d,METAL=0xc9d3de,METAL_D=0x9aa6b4,METAL_H=0xeef3f8,
-          GOLD=0xd9a531,LEATHER=0x5c3f24;
+    const ROBE=0xc89838,ROBE_D=0x8c621e,ROBE_L=0xdeb44e,
+          TUNIC=0x74222a,TUNIC_D=0x4c141a,
+          BERET=0x8c2432,BERET_D=0x5c1420,
+          SKIN=0xd69c68,SKIN_D=0xb87a4c,
+          HAIR=0x3e2818,HAIR_D=0x26160c,
+          BOOT=0x2c2016,BOOT_D=0x18110a,
+          WOODC=0x664426,WOOD_D=0x422a16,
+          METAL=0xc8d4e0,GOLD=0xdca832,GOLD_L=0xffdf6c;
     const BODY_Y=0.78;
 
-    /* --- kaki detail: paha, tulang kering, sepatu bersol --- */
+    /* --- kaki: celana saudagar bergaris rapi & sepatu bot kulit bergesper emas --- */
     const legs=[];
     for(const side of[1,-1]){
       const lg=new THREE.Group();lg.position.set(0.12*side,0.52,0);
-      lg.add(at(box(0.18,0.14,0.20,ROBE_D),0,-0.07,0));
-      lg.add(at(box(0.165,0.20,0.185,ROBE_D),0,-0.22,0));
-      lg.add(at(box(0.15,0.14,0.17,BOOT),0,-0.36,0.01));
-      lg.add(at(box(0.17,0.09,0.22,BOOT),0,-0.44,0.03));
-      lg.add(at(box(0.18,0.035,0.25,BOOT_D),0,-0.49,0.04));
-      lg.add(at(box(0.155,0.04,0.175,BOOT_D),0,-0.30,0.01));
+      lg.add(at(box(0.19,0.18,0.21,TUNIC),0,-0.09,0));
+      lg.add(at(box(0.165,0.18,0.185,TUNIC_D),0,-0.24,0));
+      // sepatu bot saudagar bergesper emas
+      lg.add(at(box(0.16,0.14,0.18,BOOT),0,-0.35,0.01));
+      lg.add(at(box(0.175,0.09,0.23,BOOT),0,-0.44,0.03));
+      lg.add(at(box(0.08,0.04,0.02,GOLD),0,-0.40,0.13)); // gesper sepatu emas
+      lg.add(at(box(0.185,0.04,0.25,BOOT_D),0,-0.49,0.035));
       g.add(lg);legs.push(lg);
     }
 
-    /* --- torso berlapis: jubah, ikat pinggang, kerah, tali --- */
-    const body=box(0.50,0.44,0.34,ROBE);body.position.y=BODY_Y;g.add(body);
-    body.add(at(box(0.54,0.12,0.38,ROBE_D),0,-0.20,0));
-    body.add(at(box(0.46,0.10,0.35,ROBE_L),0,0.12,0));
-    body.add(at(box(0.42,0.08,0.36,LEATHER),0,0.02,0));
-    body.add(at(box(0.10,0.10,0.37,GOLD),0,0.02,0));
-    body.add(at(box(0.05,0.05,0.02,0xffe9a0),0,0.02,0.19));
-    body.add(at(box(0.56,0.10,0.40,HOOD_D),0,0.20,0));
-    const strap=box(0.46,0.06,0.02,LEATHER,0);strap.rotation.z=0.5;
-    strap.position.set(0,0.10,0.18);body.add(strap);
-    body.add(at(box(0.12,0.10,0.08,LEATHER),0.16,-0.06,0.17));
-    body.add(at(box(0.03,0.28,0.02,ROBE_D),0,0.02,0.175));
-
-    /* --- kepala detail: wajah, tudung, janggut, mata, alis --- */
-    const head=box(0.34,0.32,0.32,SKIN);head.position.y=1.16;g.add(head);
-    head.add(at(box(0.30,0.10,0.30,SKIN_D),0,-0.14,0));
-    head.add(at(box(0.40,0.16,0.38,HOOD),0,0.16,-0.02));
-    head.add(at(box(0.42,0.10,0.14,HOOD),0,0.06,-0.16));
-    head.add(at(box(0.36,0.06,0.10,HOOD_D),0,0.22,0.10));
-    head.add(at(box(0.10,0.14,0.10,SKIN_D),0,-0.02,0.18));
-    head.add(at(box(0.04,0.02,0.02,SKIN_L),0,-0.01,0.235));
-    head.add(at(box(0.26,0.18,0.10,BEARD),0,-0.20,0.10));
-    head.add(at(box(0.20,0.10,0.08,BEARD_D),0,-0.30,0.12));
-    head.add(at(box(0.24,0.06,0.24,BEARD),0,0.09,0.05));
-    head.add(at(box(0.06,0.10,0.06,BEARD_D),0.13,-0.08,0.14));
-    head.add(at(box(0.06,0.10,0.06,BEARD_D),-0.13,-0.08,0.14));
-    for(const side of[1,-1]){
-      head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.075,0.06,0.02),
-        new THREE.MeshLambertMaterial({color:0xf6f1e6})),0.08*side,0.0,0.165));
-      head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.045,0.06,0.02),
-        new THREE.MeshBasicMaterial({color:0x1b1f26})),0.08*side,0.0,0.175));
-      head.add(at(box(0.09,0.03,0.02,BEARD_D),0.08*side,0.06,0.17));
+    /* --- torso: rompi sutra emas + jubah merah marun + kantong koin berderet --- */
+    const body=box(0.50,0.46,0.34,TUNIC);body.position.y=BODY_Y;g.add(body);
+    // rompi emas saudagar mewah di dada
+    body.add(at(box(0.44,0.36,0.12,ROBE),0,0.02,0.13));
+    body.add(at(box(0.40,0.32,0.04,ROBE_L),0,0.02,0.18));
+    // deretan kancing emas mewah di dada
+    for(const by of[0.14,0.05,-0.04]){
+      body.add(at(box(0.04,0.04,0.02,GOLD_L),0,by,0.203));
     }
-    head.add(at(box(0.10,0.02,0.02,0xb07a6a),0,-0.09,0.17));
+    // sabuk kulit lebar dengan dompet koin bergantungan
+    body.add(at(box(0.52,0.08,0.36,WOOD_D),0,-0.11,0));
+    body.add(at(box(0.12,0.10,0.38,GOLD),0,-0.11,0)); // gesper emas besar
+    // kantong uang koin menggembung di pinggul kiri & kanan
+    body.add(at(box(0.12,0.14,0.10,ROBE_D),-0.20,-0.12,0.12));
+    body.add(at(box(0.10,0.12,0.09,ROBE),0.20,-0.12,0.12));
+    body.add(at(box(0.06,0.04,0.02,GOLD_L),-0.20,-0.06,0.17)); // koin mengintip
 
-    /* --- lengan kiri: bahu + lengan + tangan + lentera --- */
+    // Ransel Peti Dagangan Raksasa (Travel Packframe) di punggung
+    const pack=new THREE.Group();pack.position.set(0,0.08,-0.22);
+    // rangka peti kayu
+    pack.add(at(box(0.42,0.50,0.22,WOODC),0,0,0));
+    pack.add(at(box(0.44,0.04,0.24,WOOD_D),0,0.22,0));  // lis kayu atas
+    pack.add(at(box(0.44,0.04,0.24,WOOD_D),0,-0.22,0)); // lis kayu bawah
+    // gulungan tenda / karpet tidur di atas peti
+    const roll=box(0.44,0.14,0.14,0x58422e);roll.position.set(0,0.30,0);pack.add(roll);
+    roll.add(at(box(0.03,0.15,0.15,GOLD),-0.12,0,0)); // tali pengikat kulit/emas
+    roll.add(at(box(0.03,0.15,0.15,GOLD),0.12,0,0));
+    // lentera kecil bergoyang di sisi peti
+    pack.add(at(box(0.08,0.12,0.08,GOLD),0.24,-0.08,0.04));
+    pack.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.06,0.07,0.06),
+      new THREE.MeshBasicMaterial({color:0xffaa33})),0.24,-0.08,0.04));
+    body.add(pack);
+
+    /* --- kepala: baret beludru berhias bulu & koin emas + janggut saudagar cerdik --- */
+    const head=box(0.34,0.32,0.32,SKIN);head.position.y=1.16;g.add(head);
+    head.add(at(box(0.30,0.08,0.30,SKIN_D),0,-0.14,0));
+
+    // Baret beludru marun miring saudagar (merchant velvet beret)
+    const beret=new THREE.Group();beret.position.set(0,0.16,-0.01);
+    beret.rotation.z=-0.12;
+    beret.add(at(box(0.42,0.14,0.42,BERET),0,0,0));
+    beret.add(at(box(0.46,0.06,0.46,BERET_D),0,0.04,0));
+    // bros koin emas & bulu merak di samping baret
+    beret.add(at(box(0.09,0.09,0.03,GOLD_L),0.18,0.02,0.15));
+    const feather=box(0.03,0.28,0.06,ROBE_L);
+    feather.position.set(0.22,0.14,0.15);feather.rotation.z=-0.4;beret.add(feather);
+    head.add(beret);
+
+    // Mata saudagar cerdik & penuh peluang
+    for(const s of[1,-1]){
+      head.add(at(box(0.07,0.05,0.02,0xffffff),0.08*s,0.02,0.163));
+      head.add(at(box(0.04,0.05,0.02,0x281c10),0.08*s,0.02,0.174));
+      head.add(at(box(0.015,0.015,0.01,GOLD_L),0.085*s,0.035,0.182)); // kilau emas di mata!
+      head.add(at(box(0.09,0.03,0.02,HAIR_D),0.08*s,0.065,0.17));
+    }
+    head.add(at(box(0.06,0.09,0.08,SKIN_D),0,-0.02,0.19));
+    // kumis melintir & janggut rapi saudagar
+    head.add(at(box(0.24,0.05,0.05,HAIR_D),0,-0.07,0.18));
+    head.add(at(box(0.06,0.06,0.04,HAIR),-0.12,-0.06,0.17)); // ujung kumis kiri
+    head.add(at(box(0.06,0.06,0.04,HAIR),0.12,-0.06,0.17));  // ujung kumis kanan
+    head.add(at(box(0.12,0.08,0.05,HAIR_D),0,-0.12,0.16));
+
+    /* --- lengan kiri: buku catatan transaksi bersampul kulit emas --- */
     const armL=new THREE.Group();armL.position.set(-0.31,0.94,0);
-    armL.add(at(box(0.17,0.09,0.18,HOOD_D),0,0.0,0));
-    armL.add(at(box(0.14,0.24,0.14,ROBE),0,-0.14,0));
-    armL.add(at(box(0.13,0.06,0.13,ROBE_D),0,-0.26,0));
-    armL.add(at(box(0.145,0.10,0.145,SKIN_D),0,-0.34,0));
-    armL.add(at(box(0.13,0.09,0.13,SKIN),0,-0.42,0));
-    const lantern=box(0.16,0.18,0.16,WOODC);
-    lantern.position.set(0,-0.56,0.04);armL.add(lantern);
-    lantern.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.11,0.12,0.11),
-      new THREE.MeshBasicMaterial({color:0xffcc55})),0,0,0));
-    lantern.add(at(box(0.18,0.03,0.18,WOOD_D),0,0.10,0));
-    lantern.add(at(box(0.18,0.03,0.18,WOOD_D),0,-0.10,0));
+    armL.add(at(box(0.16,0.12,0.16,TUNIC),0,-0.07,0));
+    armL.add(at(box(0.18,0.08,0.18,ROBE_D),0,-0.16,0)); // manset sutra
+    armL.add(at(box(0.14,0.16,0.14,SKIN),0,-0.27,0));
+    armL.add(at(box(0.13,0.09,0.13,SKIN_D),0,-0.38,0));
+
+    // Buku Catatan Dagang (Ledger / Trade Book) di tangan kiri
+    const book=new THREE.Group();book.position.set(-0.06,-0.34,0.12);
+    book.rotation.set(0.25,0,0.10);
+    book.add(at(box(0.12,0.26,0.20,0x4a1820),0,0,0));       // sampul beludru marun
+    book.add(at(box(0.10,0.24,0.18,0xf4ebd4),0.015,0,0));   // kertas lembaran
+    book.add(at(box(0.13,0.04,0.21,GOLD),0,0,0));           // sabuk pengunci emas
+    armL.add(book);
     g.add(armL);
 
-    /* --- lengan kanan: bahu + lengan + tangan --- */
+    /* --- lengan kanan: tongkat jalan saudagar berkoin emas ke depan --- */
     const armR=new THREE.Group();armR.position.set(0.31,0.94,0);
-    armR.add(at(box(0.17,0.09,0.18,HOOD_D),0,0.0,0));
-    armR.add(at(box(0.14,0.24,0.14,ROBE),0,-0.14,0));
-    armR.add(at(box(0.13,0.06,0.13,ROBE_D),0,-0.26,0));
-    armR.add(at(box(0.145,0.10,0.145,SKIN_D),0,-0.34,0));
-    armR.add(at(box(0.13,0.09,0.13,SKIN),0,-0.42,0));
+    armR.add(at(box(0.16,0.12,0.16,TUNIC),0,-0.07,0));
+    armR.add(at(box(0.18,0.08,0.18,ROBE_D),0,-0.16,0));
+    armR.add(at(box(0.14,0.16,0.14,SKIN),0,-0.27,0));
+    armR.add(at(box(0.13,0.09,0.13,SKIN_D),0,-0.38,0));
 
-    /* --- SENJATA: dipasang pada pivot grip di telapak tangan.
-       Semua senjata dibangun memanjang ke -Y lokal lalu diputar pada pivot
-       sehingga rotasi presisi di sekitar titik genggaman, bukan mengambang. --- */
-    const grip=new THREE.Group();
-    grip.position.set(0,-0.44,0.06);
+    // Grip tongkat jalan di tangan kanan (menghadap ke depan +Z)
+    const grip=new THREE.Group();grip.position.set(0,-0.38,0.06);
+    grip.rotation.set(-0.25,0,0.04);
     armR.add(grip);
 
-    /* --- ALAT / SENJATA PERAN --- */
-                                       /* garu penjaga desa */
-    grip.add(at(box(0.055,0.85,0.055,WOODC),0,-0.30,0));
-    grip.add(at(box(0.065,0.10,0.065,WOOD_D),0,0.06,0));
-    const rake=new THREE.Group();rake.position.set(0,-0.74,0);
-    rake.add(at(box(0.26,0.05,0.06,METAL),0,0,0));
-    for(const px of[-0.09,0,0.09])
-      rake.add(at(box(0.05,0.20,0.05,METAL),px,-0.10,0));
-    rake.add(at(box(0.26,0.04,0.05,METAL_D),0,-0.19,0));
-    grip.add(rake);
-    ROT(grip,0.24,0,0.08);
+    // Batang kayu mahoni mewah tongkat jalan mengarah lurus ke depan (+Z)
+    grip.add(at(box(0.045,0.045,1.05,0x3a1810),0,0,0.36));
+    grip.add(at(box(0.055,0.055,0.20,GOLD),0,0,0)); // genggaman tangan emas
+    grip.add(at(box(0.065,0.065,0.08,GOLD),0,0,0.80)); // kerah emas
+    // Nisan Koin Emas Raksasa di kepala tongkat (menghadap depan +Z)
+    const coinFinial=new THREE.Group();coinFinial.position.set(0,0,0.94);
+    coinFinial.add(at(box(0.18,0.18,0.06,GOLD),0,0,0));     // koin emas tebal
+    coinFinial.add(at(box(0.14,0.14,0.08,GOLD_L),0,0,0));   // relief koin berpendar
+    coinFinial.add(at(box(0.06,0.06,0.09,0xffffff),0,0,0)); // kilau berlian di pusat koin
+    grip.add(coinFinial);
     g.add(armR);
 
     return {mesh:g,parts:{body,head,armL,armR,legs,bodyY:BODY_Y}};
   },
 
-  /* ---------- ANIMASI ----------
-     Jalan (kaki & lengan mengayun), ayunan alat saat menyerang, kepala
-     menoleh santai, flash merah saat terluka. Sama persis dengan logika
-     NPCS.animate() in-game untuk NPC non-langka. */
+  /* ---------- ANIMASI ---------- */
   animate(n,dt){
     const t=performance.now()*0.001;
     const sp=Math.hypot(n.vel.x,n.vel.z);
@@ -138,12 +161,12 @@ const NPC_Merchant={
       n.parts.legs[0].rotation.x=step;
       n.parts.legs[1].rotation.x=-step;
     }
-    n.parts.armL.rotation.x=-step*0.6;
+    if(n.parts.armL)n.parts.armL.rotation.x=-step*0.4;
     const sw=n.swing>0?1-n.swing/0.25:0;
-    n.parts.armR.rotation.x=lerp(step*0.6,-1.5,sw);
-    n.parts.body.position.y=n.parts.bodyY+
+    if(n.parts.armR)n.parts.armR.rotation.x=lerp(step*0.4,-1.4,sw);
+    if(n.parts.body)n.parts.body.position.y=n.parts.bodyY+
       Math.abs(Math.sin(t*9))*0.03*Math.min(1,sp/2);
-    n.parts.head.rotation.y=n.target?0:Math.sin(t*1.4)*0.35;
+    if(n.parts.head)n.parts.head.rotation.y=n.target?0:Math.sin(t*1.4)*0.35;
   },
 };
 window.NPC_Merchant=NPC_Merchant;

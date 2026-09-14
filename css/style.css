@@ -25,6 +25,20 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
    perpindahan antar desa tidak terlihat pop-in */
 #menu-fade{position:fixed;inset:0;pointer-events:none;opacity:0;background:#000;transition:opacity .6s ease;z-index:15}
 
+/* Crosshair mode FPP Minecraft */
+#fpp-crosshair{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:16px;height:16px;pointer-events:none;z-index:12;
+  opacity:0;transition:opacity .18s ease;
+}
+#fpp-crosshair::before, #fpp-crosshair::after{
+  content:'';position:absolute;background:rgba(255,255,255,0.9);
+  box-shadow:0 0 2px rgba(0,0,0,0.85);border-radius:1px;
+}
+#fpp-crosshair::before{top:7px;left:0;width:16px;height:2px;}
+#fpp-crosshair::after{top:0;left:7px;width:2px;height:16px;}
+#fpp-crosshair.show{opacity:1;}
+
 /* ==== HUD ==== */
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
 #stats{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:5px}

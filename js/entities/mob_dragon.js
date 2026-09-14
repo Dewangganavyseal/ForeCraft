@@ -574,7 +574,8 @@ const Mob_Dragon={
     }
     if((m.clawT||0)>0)m.clawT=Math.max(0,m.clawT-dt);
     if((m.tailT||0)>0)m.tailT=Math.max(0,m.tailT-dt);
-    if((m.flyT||0)>0)m.flyT=Math.max(0,m.flyT-dt);
+    /* Pet naga diatur tunggal oleh Capture agar tidak terjadi pengurangan ganda (double-decrement) */
+    if(!m.pet&&(m.flyT||0)>0)m.flyT=Math.max(0,m.flyT-dt);
 
     /* setel pose target sesuai state */
     this.resetPose(drag.P);
