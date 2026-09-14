@@ -1,28 +1,27 @@
 'use strict';
 /* =============================================================================
-   SMELTER INDUSTRI (PELEBURAN BIJIH & BATU BARA)
+   SMELTER BATU JADUL (PELEBURAN BIJIH & BATU BARA)
    -----------------------------------------------------------------------------
-   Diporting dari prototype otentik "NEW MODEL/Smelter, Rod.html".
+   Diporting dari prototype otentik "NEW MODEL/Smelter, Ore.html".
    Fitur:
-     - Mengubah 2 Ore menjadi 1 Ingot (durasi 5 detik per ingot).
+     - Mengubah 2 Ore menjadi 1 Ingot (durasi 10 detik per ingot).
      - Bahan bakar Batu Bara (Coal): 1 Coal bertahan 1 menit (60 detik).
-     - Dapat memasukkan banyak Coal dan Ore sekaligus, memproses mandiri
-       di latar belakang (background asynchronous smelting process).
-     - Model Voxel 3D lengkap dengan semua animasi:
-         * Kipas exhaust berputar dinamis
-         * Roda katup samping berputar dinamis
+     - Dapat memasukkan 1x, 10x, atau Semua Ore dan Coal sekaligus.
+     - Live UI: hasil Ingot dan cadangan bahan bakar terupdate langsung tanpa
+       perlu menutup panel UI.
+     - Model Voxel 3D otentik "Smelter Batu Jadul":
+         * Pondasi & tumpukan batu bertingkat mengecil ke atas
+         * Balok kayu perancah melintang dengan lentera berayun
+         * Mulut tungku lengkung batu, batu kunci, ambang & kayu bakar
          * Cahaya point light & glow api berkedip (flicker)
-         * 14 lidah kobaran api 3D di mulut tungku
-         * Panel kontrol dengan 3 lampu indikator berkedip
-         * Layar monitor berdenyut toska
-         * Suar mercu cerobong berkedip merah
-         * Kepulan partikel asap dari cerobong & percikan bara api
+         * 5 lidah kobaran api 3D di mulut tungku
+         * Kepulan partikel asap dari puncak cerobong & percikan bara api
    ============================================================================= */
 
 const Smelter = {
-  SCALE: 0.13,
+  SCALE: 1.0,
   ORE_PER_INGOT: 2,
-  COOK_DURATION: 5.0,  // 5 detik per 1 ingot
+  COOK_DURATION: 10.0, // 10 detik per 1 ingot
   COAL_DURATION: 60.0, // 1 coal bertahan 60 detik (1 menit)
 
   ORE_TO_INGOT: {
@@ -37,7 +36,6 @@ const Smelter = {
   currentFurni: null,
   _smokePool: null,
   _fxPool: null,
-  _uiTimer: null,
 
   /* ---------- POOL PARTIKEL KHUSUS ASAP & BARA SMELTER ---------- */
   initPools() {
@@ -72,15 +70,15 @@ const Smelter = {
     const b = big ? 1 : 0.7;
     const colors = [0x9a9ea6, 0x8b8f97, 0xa9adb5, 0x7f838b];
     s.d = {
-      x: pos.x + (Math.random() - 0.5) * 0.25,
+      x: pos.x + (Math.random() - 0.5) * 0.2,
       y: pos.y + 0.05,
-      z: pos.z + (Math.random() - 0.5) * 0.25,
-      vx: (Math.random() - 0.5) * 0.25,
-      vy: (0.9 + Math.random() * 0.5) * b,
-      vz: (Math.random() - 0.5) * 0.25,
+      z: pos.z + (Math.random() - 0.5) * 0.2,
+      vx: 0.05 + (Math.random() - 0.5) * 0.15,
+      vy: (0.7 + Math.random() * 0.4) * b,
+      vz: (Math.random() - 0.5) * 0.15,
       age: 0, life: 2.2 + Math.random() * 1.2,
-      s0: 0.18 * b, s1: 0.75 * b,
-      op: 0.55, g: -0.06, drag: 0.25, spin: (Math.random() - 0.5) * 1.5
+      s0: 0.10 * b, s1: 0.42 * b,
+      op: 0.45, g: -0.05, drag: 0.28, spin: (Math.random() - 0.5) * 1.2
     };
     s.mt.color.setHex(colors[(Math.random() * colors.length) | 0]);
     s.ms.visible = true; s.ms.scale.setScalar(s.d.s0);
@@ -93,11 +91,11 @@ const Smelter = {
       x: pos.x + (Math.random() - 0.5) * 0.2,
       y: pos.y,
       z: pos.z + (Math.random() - 0.5) * 0.2,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: 1.2 + Math.random() * 1.0,
-      vz: (Math.random() - 0.5) * 0.4,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: 0.8 + Math.random() * 0.6,
+      vz: 0.05 + (Math.random() - 0.5) * 0.2,
       age: 0, life: 0.7 + Math.random() * 0.5,
-      s0: 0.06, s1: 0.015,
+      s0: 0.04, s1: 0.01,
       op: 0.95, g: -0.2, drag: 0.4, spin: 3
     };
     s.mt.color.setHex(Math.random() < 0.5 ? 0xff841a : 0xffd23e);
@@ -138,10 +136,9 @@ const Smelter = {
     }
   },
 
-  /* ---------- BUILD MODEL 3D VOXEL OTENTIK DARI Smelter, Rod.html ---------- */
+  /* ---------- BUILD MODEL 3D VOXEL OTENTIK DARI Smelter, Ore.html ---------- */
   buildModel() {
     this.initPools();
-    const S = this.SCALE;
     const group = new THREE.Group();
 
     // Cache material Lambert per warna
@@ -152,228 +149,132 @@ const Smelter = {
       return m;
     };
     const bGeo = new THREE.BoxGeometry(1, 1, 1);
-    const box = (x, y, z, w, h, d, c, ry = 0, rz = 0, rx = 0) => {
+    const box = (x, y, z, w, h, d, c, ry = 0, rz = 0, rx = 0, parent = group) => {
       const m = new THREE.Mesh(bGeo, getMat(c));
-      m.position.set(x * S, y * S, z * S);
-      m.scale.set(w * S, h * S, d * S);
+      m.position.set(x, y, z);
+      m.scale.set(w, h, d);
       if (rx) m.rotation.x = rx;
       if (rz) m.rotation.z = rz;
       if (ry) m.rotation.y = ry;
-      group.add(m);
-      return m;
-    };
-    const cyl = (x, y, z, r, h, c, seg = 8, axis = 'y') => {
-      const g = new THREE.CylinderGeometry(r * S, r * S, h * S, seg);
-      if (axis === 'x') g.rotateZ(Math.PI / 2);
-      if (axis === 'z') g.rotateX(Math.PI / 2);
-      const m = new THREE.Mesh(g, getMat(c));
-      m.position.set(x * S, y * S, z * S);
-      group.add(m);
+      m.castShadow = true; m.receiveShadow = true;
+      parent.add(m);
       return m;
     };
 
-    const D1 = 0x2b2d33, D2 = 0x34363d, M1 = 0x3b3e46, M2 = 0x43464f, M3 = 0x4a4e58, L = 0x585c66,
-          DARK = 0x1f2126, YEL = 0xe8b62a, GOLD = 0xd9a441, WOOD = 0x8a6a42;
+    const S = [0x6e727a, 0x5f636b, 0x7b7f88, 0x565a62, 0x686c74]; // variasi warna batu
+    const WOOD = 0x6e5232, WOOD2 = 0x5f452c;
+    const lerp = (a, b, t) => a + (b - a) * t;
 
-    // ---- Fondasi ----
-    box(0, 0.3, 0, 12, 0.6, 9.5, D2);
-    box(0, 0.62, 0, 11.3, 0.14, 8.9, M1);
-    for (let i = 0; i < 15; i++) box(-5.25 + i * 0.75, 0.71, 4.25, 0.7, 0.05, 0.34, i % 2 ? YEL : DARK);
+    // ---- 1. Pondasi Batu ----
+    box(0, 0.08, 0, 1.75, 0.16, 1.55, S[3], 0.01);
+    box(0, 0.20, 0, 1.55, 0.10, 1.38, S[1], -0.02);
 
-    // ---- Menara Utama (Bertingkat) ----
-    box(-1, 2.65, -0.5, 6.4, 4, 5.6, M1);
-    box(-1, 4.72, -0.5, 6.75, 0.32, 5.95, D1);
-    box(-1, 6.85, -0.5, 5.6, 3.8, 4.8, M2);
-    box(-1, 8.82, -0.5, 5.95, 0.3, 5.15, D1);
-    box(-1, 10.25, -0.5, 4.6, 2.6, 3.9, M3);
-    box(-1, 11.7, -0.5, 5.5, 0.5, 4.7, D1);
-
-    // ---- Rivet Sudut ----
-    for (let y = 1.1; y <= 4.3; y += 0.8) {
-      box(-4.25, y, 2.32, 0.14, 0.14, 0.14, DARK); box(2.25, y, 2.32, 0.14, 0.14, 0.14, DARK);
-      box(-4.25, y, -3.32, 0.14, 0.14, 0.14, DARK); box(2.25, y, -3.32, 0.14, 0.14, 0.14, DARK);
+    // ---- 2. Badan: Lapisan Batu Ditumpuk, Tapering Mengecil ke Atas ----
+    let y = 0.25, i = 0;
+    while (y < 1.95) {
+      const t = (y - 0.25) / (1.95 - 0.25);
+      const w = lerp(1.3, 0.62, t), d = lerp(1.14, 0.58, t), h = 0.24;
+      const c1 = S[(i * 2) % 5], c2 = S[(i * 2 + 1) % 5];
+      const ox = Math.sin(i * 12.9) * 0.015, oz = Math.cos(i * 7.7) * 0.015;
+      const ry = Math.sin(i * 5.3) * 0.025;
+      if (i % 2 === 0) {
+        const sp = w * (0.45 + 0.1 * Math.sin(i * 3.7));
+        box(-w / 2 + sp / 2 + ox, y + h / 2, oz, sp, h, d, c1, ry);
+        box(-w / 2 + sp + (w - sp) / 2 + ox, y + h / 2, -oz, w - sp, h, d, c2, ry);
+      } else {
+        const sp = d * (0.5 + 0.12 * Math.cos(i * 2.3));
+        box(ox, y + h / 2, -d / 2 + sp / 2 + oz, w, h, sp, c2, ry);
+        box(-ox, y + h / 2, -d / 2 + sp + (d - sp) / 2 + oz, w, h, d - sp, c1, ry);
+      }
+      // Batu menonjol acak (tekstur tumpukan kasar alami)
+      if (i % 2 === 1) box(w / 2 + 0.03, y + h / 2, 0.1, 0.12, 0.14, 0.2, S[(i + 3) % 5], 0.2);
+      if (i % 3 === 0) box(-w / 2 - 0.03, y + h / 2, -0.12, 0.12, 0.13, 0.18, S[(i + 2) % 5], -0.15);
+      if (y >= 1.21) box(0.18, y + h / 2 + 0.02, d / 2 + 0.02, 0.2, 0.13, 0.1, S[(i + 1) % 5], 0.1);
+      y += h; i++;
     }
-    for (let y = 5.3; y <= 8.4; y += 0.8) {
-      box(-3.85, y, 1.92, 0.12, 0.12, 0.12, DARK); box(1.85, y, 1.92, 0.12, 0.12, 0.12, DARK);
-      box(-3.85, y, -2.92, 0.12, 0.12, 0.12, DARK); box(1.85, y, -2.92, 0.12, 0.12, 0.12, DARK);
-    }
 
-    // ---- Cerobong A (Besar) & B (Kecil) ----
-    box(-2.2, 13.2, -1, 1.75, 2.5, 1.75, M2);
-    box(-2.2, 14.55, -1, 1.95, 0.2, 1.95, D1);
-    box(-2.2, 15.7, -1, 1.5, 2.1, 1.5, M3);
-    box(-2.2, 16.85, -1, 1.7, 0.2, 1.7, D1);
-    box(-2.2, 17.9, -1, 1.28, 1.9, 1.28, L);
-    box(-2.2, 19, -1, 1.6, 0.4, 1.6, D1);
+    // ---- 3. Puncak Cerobong: Rim Batu + Lubang Gelap ----
+    box(0, 1.99, 0, 0.8, 0.12, 0.74, S[4], 0.02);
+    box(0, 2.03, 0, 0.5, 0.06, 0.44, 0x191b1f);
 
-    box(0.9, 13, 0.4, 1.3, 2.1, 1.3, M2);
-    box(0.9, 14.15, 0.4, 1.5, 0.18, 1.5, D1);
-    box(0.9, 15.2, 0.4, 1.1, 1.95, 1.1, M3);
-    box(0.9, 16.3, 0.4, 1.4, 0.35, 1.4, D1);
-    box(1.9, 12.15, -1.3, 0.7, 0.4, 0.7, M2);
+    // ---- 4. Balok Kayu Melintang (Perancah Jadul Penyangga Lentera) ----
+    box(0, 1.35, -0.1, 1.5, 0.09, 0.09, WOOD, 0, 0, 0.02);
+    box(0.15, 1.50, 0, 0.09, 0.09, 1.15, WOOD2, 0.03);
 
-    // Tangga Cerobong
-    box(-2.52, 15.35, -0.02, 0.08, 6.6, 0.08, D1); box(-1.88, 15.35, -0.02, 0.08, 6.6, 0.08, D1);
-    for (let y = 12.2; y < 18.6; y += 0.55) box(-2.2, y, -0.02, 0.72, 0.06, 0.06, M3);
+    // ---- 5. Mulut Tungku: Lengkung Batu, Pilar & Ambang ----
+    box(-0.24, 0.62, 0.60, 0.16, 0.56, 0.18, S[1], 0.03);            // Pilar kiri
+    box(0.34, 0.62, 0.60, 0.16, 0.56, 0.18, S[3], -0.03);           // Pilar kanan
+    box(-0.14, 0.95, 0.60, 0.24, 0.12, 0.18, S[2], 0, 0.45);        // Batu lengkung kiri
+    box(0.24, 0.95, 0.60, 0.24, 0.12, 0.18, S[0], 0, -0.45);        // Batu lengkung kanan
+    box(0.05, 1.03, 0.60, 0.18, 0.14, 0.18, S[1]);                  // Batu kunci lengkung
+    box(0.05, 0.62, 0.52, 0.52, 0.60, 0.10, 0x17110c);              // Rongga gelap dalam
+    box(0.05, 0.30, 0.62, 0.70, 0.09, 0.24, S[3]);                  // Ambang bawah
+    box(0.05, 0.24, 0.80, 0.80, 0.08, 0.20, S[1], 0.02);            // Tangga batu
+    box(-0.07, 0.42, 0.58, 0.30, 0.06, 0.07, 0x4a3524, 0.4);        // Kayu bakar bersilang
+    box(0.17, 0.42, 0.60, 0.30, 0.06, 0.07, 0x3d2b1d, -0.4);
 
-    // ---- Mulut Tungku & Bara Api ----
-    box(-2.5, 2.5, 2.55, 0.8, 3.4, 0.55, D1);
-    box(0.5, 2.5, 2.55, 0.8, 3.4, 0.55, D1);
-    box(-1, 4.05, 2.55, 3.8, 0.55, 0.55, D1);
-    box(-1, 1.05, 2.55, 3.8, 0.65, 0.55, D1);
-    box(-2.05, 3.6, 2.55, 0.45, 0.45, 0.55, D1);
-    box(0.05, 3.6, 2.55, 0.45, 0.45, 0.55, D1);
-    box(-1, 2.57, 2.28, 2.2, 2.4, 0.12, 0x17110c);
-    box(-2.02, 2.57, 2.42, 0.16, 2.4, 0.35, 0x241a12);
-    box(-0.02, 2.57, 2.42, 0.16, 2.4, 0.35, 0x241a12);
-    box(-1, 4.42, 2.62, 4, 0.4, 1, D2);
-    box(-1, 1.3, 2.9, 3.8, 0.2, 0.3, D2);
-    box(-1.35, 1.55, 2.5, 1.1, 0.22, 0.24, 0x4a3524, 0.5);
-    box(-0.75, 1.55, 2.52, 1.1, 0.22, 0.24, 0x3d2b1d, -0.5);
-    box(-1.05, 1.72, 2.5, 0.8, 0.2, 0.22, 0x54402c, 0.1);
-    for (let i = 0; i < 6; i++) box(-1.75 + i * 0.3, 1.44, 2.45 + (i % 2) * 0.12, 0.18, 0.12, 0.18, i % 2 ? 0x2a1a10 : 0x54280f, i * 0.7);
-    box(-1, 4.42, 3.16, 0.9, 0.34, 0.05, YEL);
-    box(-1, 4.48, 3.2, 0.09, 0.16, 0.02, DARK);
-    box(-1, 4.33, 3.2, 0.09, 0.07, 0.02, DARK);
+    // ---- 6. Batu Lepas & Lumut Sekitar Dasar ----
+    box(0.78, 0.30, 0.55, 0.22, 0.16, 0.20, S[0], 0.4);
+    box(-0.82, 0.28, 0.48, 0.18, 0.14, 0.18, S[2], -0.3);
+    box(0.62, 0.26, -0.62, 0.20, 0.14, 0.20, S[1], 0.8);
+    box(0.70, 0.27, -0.50, 0.14, 0.04, 0.10, 0x4e9843, 0.3);
+    box(-0.75, 0.27, -0.55, 0.12, 0.04, 0.12, 0x59a84c, -0.5);
 
-    // ---- Catwalk & Railing ----
-    box(-1, 4.95, -0.5, 7.9, 0.16, 7.1, D1);
-    const X0 = -4.95, X1 = 2.95, Z0 = -4.05, Z1 = 3.0;
-    for (let x = X0; x <= X1 + 0.01; x += 0.99) {
-      box(x, 5.38, Z0, 0.08, 0.7, 0.08, D2);
-      if (x > -4.05) box(x, 5.38, Z1, 0.08, 0.7, 0.08, D2);
-    }
-    for (let z = Z0; z <= 2.6; z += 0.99) { box(X0, 5.38, z, 0.08, 0.7, 0.08, D2); box(X1, 5.38, z, 0.08, 0.7, 0.08, D2); }
-    box(-1, 5.7, Z0, 7.9, 0.09, 0.09, L); box(-1, 5.4, Z0, 7.9, 0.06, 0.06, L);
-    box(-0.55, 5.7, Z1, 7, 0.09, 0.09, L); box(-0.55, 5.4, Z1, 7, 0.06, 0.06, L);
-    box(X0, 5.7, -0.5, 0.09, 0.09, 7.1, L); box(X0, 5.4, -0.5, 0.06, 0.06, 7.1, L);
-    box(X1, 5.7, -0.5, 0.09, 0.09, 7.1, L); box(X1, 5.4, -0.5, 0.06, 0.06, 7.1, L);
-    box(-4.83, 2.9, 3.15, 0.07, 4.4, 0.07, D1); box(-4.27, 2.9, 3.15, 0.07, 4.4, 0.07, D1);
-    for (let y = 0.85; y < 5.05; y += 0.45) box(-4.55, y, 3.15, 0.63, 0.06, 0.06, M3);
+    // ---- 7. Lentera Menggantung di Ujung Balok (Berayun Dinamis) ----
+    const lantern = new THREE.Group();
+    lantern.position.set(0.72, 1.31, -0.1);
+    box(0, -0.05, 0, 0.03, 0.10, 0.03, 0x3a3d44, 0, 0, 0, lantern); // Rantai gantung
+    box(0, -0.13, 0, 0.14, 0.05, 0.14, 0x3a3d44, 0, 0, 0, lantern); // Atap lentera
+    box(0, -0.24, 0, 0.15, 0.05, 0.15, 0x3a3d44, 0, 0, 0, lantern); // Dasar lentera
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a });
+    const glass = new THREE.Mesh(bGeo, lanternMat);
+    glass.position.set(0, -0.185, 0);
+    glass.scale.set(0.10, 0.14, 0.10);
+    lantern.add(glass);
+    group.add(lantern);
 
-    // ---- Pipa Samping + Flange ----
-    cyl(3.45, 4.3, -0.5, 0.42, 7, L, 8, 'y');
-    cyl(3.45, 2, -0.5, 0.58, 0.2, D1); cyl(3.45, 4, -0.5, 0.58, 0.2, D1); cyl(3.45, 6, -0.5, 0.58, 0.2, D1);
-    cyl(2.98, 7.8, -0.5, 0.36, 0.95, L, 8, 'x');
-    cyl(4.1, 3, 0.9, 0.18, 4.4, 0x5f636c, 8, 'y');
-    cyl(4.1, 5.2, 0.9, 0.3, 0.16, D1, 'y');
-
-    // ---- Housing Kipas & Roda ----
-    cyl(2.35, 6.2, -0.5, 0.8, 0.75, L, 8, 'x');
-    cyl(2.76, 6.2, -0.5, 0.9, 0.14, D1, 8, 'x');
-    box(2.9, 6.2, -0.5, 0.05, 1.75, 0.07, D1);
-    box(2.9, 6.2, -0.5, 0.05, 0.07, 1.75, D1);
-
-    // ---- Hopper Batu Bara ----
-    for (const sx of [-0.95, 0.95]) for (const sz of [-0.95, 0.95]) box(-5.5 + sx, 1.6, -0.5 + sz, 0.18, 2, 0.18, D1);
-    box(-5.5, 3.1, -0.5, 2.7, 1.1, 2.7, M2);
-    box(-5.5, 2.35, -0.5, 1.9, 0.75, 1.9, M1);
-    box(-5.5, 1.85, -0.5, 1.05, 0.55, 1.05, D1);
-    box(-5.5, 3.7, -0.5, 2.9, 0.16, 2.9, D1);
-    box(-5.9, 3.92, -0.8, 0.4, 0.3, 0.4, 0x181a1e, 0.4);
-    box(-5.2, 3.9, -0.2, 0.36, 0.28, 0.36, 0x181a1e, -0.3);
-    box(-5.6, 3.95, -0.1, 0.34, 0.26, 0.34, 0x101215, 0.8);
-    cyl(-4.6, 1.85, -0.5, 0.32, 1.1, L, 8, 'x');
-    box(-4.6, 1.45, -0.5, 1.1, 0.12, 0.12, D1);
-
-    // ---- Panel Kontrol & Tong ----
-    box(3.1, 1.1, 2.6, 0.14, 0.9, 0.14, D1);
-    box(3.1, 1.78, 2.6, 0.95, 0.75, 0.24, M2);
-    box(3.1, 2.2, 2.6, 1.05, 0.12, 0.3, D1);
-    cyl(1, 1.19, 3.9, 0.46, 1, WOOD, 8);
-    box(-3.4, 1.17, 3.75, 0.95, 0.95, 0.95, 0x9a7a52, 0.35);
-    box(1.7, 0.81, 3.1, 0.62, 0.2, 0.32, GOLD, 0.25);
-    box(2.35, 0.81, 3.2, 0.62, 0.2, 0.32, 0xb9c2cc, 0.5);
-
-    /* ---- BAGIAN DINAMIS & ANIMASI ---- */
-    // 1. Glow Api Mulut Tungku
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(2 * S, 2.2 * S),
-      new THREE.MeshBasicMaterial({ color: 0xff7b24, transparent: true, opacity: 0.55, depthWrite: false }));
-    glow.position.set(-1 * S, 2.55 * S, 2.36 * S);
+    // ---- 8. Glow Bara Api & Point Light ----
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.46, 0.52),
+      new THREE.MeshBasicMaterial({ color: 0xff7b24, transparent: true, opacity: 0.5, depthWrite: false })
+    );
+    glow.position.set(0.05, 0.60, 0.585);
     group.add(glow);
 
-    // 2. Point Light Api
-    const light = new THREE.PointLight(0xff7a2a, 1.8, 6, 2);
-    light.position.set(-1 * S, 2.4 * S, 3.1 * S);
+    const light = new THREE.PointLight(0xff7a2a, 1.1, 4.5, 2);
+    light.position.set(0.05, 0.55, 0.80);
     group.add(light);
 
-    // 3. Lidah Kobaran Api (14 box melayang)
+    // ---- 9. 5 Lidah Kobaran Api di Mulut Tungku ----
     const flames = [];
     const fcols = [0xffd23e, 0xffb02e, 0xff841a, 0xffe27a];
-    for (let i = 0; i < 14; i++) {
-      const mt = new THREE.MeshBasicMaterial({ color: fcols[i % 4], transparent: true, opacity: 0, depthWrite: false });
+    for (let j = 0; j < 5; j++) {
+      const mt = new THREE.MeshBasicMaterial({ color: fcols[j % 4], transparent: true, opacity: 0, depthWrite: false });
       const ms = new THREE.Mesh(bGeo, mt);
       ms.frustumCulled = false;
       group.add(ms);
       flames.push({
         ms, mt,
-        x: (-1.95 + (i % 5) * 0.45) * S,
-        z: (2.5 + Math.floor(i / 5) * 0.05) * S,
-        sp: 0.85 + Math.random() * 0.7,
+        x: 0.05 + ((j % 3) - 1) * 0.11,
+        z: 0.60 + Math.floor(j / 3) * 0.03,
+        sp: 0.9 + Math.random() * 0.8,
         ph: Math.random(),
-        sd: i * 1.7
+        sd: j * 2.3
       });
     }
 
-    // 4. Kipas Exhaust Samping
-    const fan = new THREE.Group();
-    fan.position.set(2.78 * S, 6.2 * S, -0.5 * S);
-    for (let i = 0; i < 3; i++) {
-      const fb = new THREE.Mesh(bGeo, getMat(0x8b9099));
-      fb.position.set(0, 0.33 * S, 0);
-      fb.scale.set(0.07 * S, 0.6 * S, 0.16 * S);
-      const pivot = new THREE.Group();
-      pivot.rotation.x = i * Math.PI * 2 / 3;
-      pivot.add(fb);
-      fan.add(pivot);
-    }
-    group.add(fan);
+    // ---- 10. Anchor Titik Partikel ----
+    const ancSmoke = new THREE.Object3D();
+    ancSmoke.position.set(0, 2.05, 0);
+    group.add(ancSmoke);
 
-    // 5. Roda Katup Samping
-    const wheel = new THREE.Group();
-    wheel.position.set(4.42 * S, 5.2 * S, 0.9 * S);
-    const wCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.4 * S, 0.4 * S, 0.08 * S, 8), getMat(0x9c3b2e));
-    wCyl.rotateZ(Math.PI / 2); wheel.add(wCyl);
-    const wb1 = new THREE.Mesh(bGeo, getMat(0x7d2f24));
-    wb1.scale.set(0.06 * S, 0.74 * S, 0.1 * S); wheel.add(wb1);
-    const wb2 = new THREE.Mesh(bGeo, getMat(0x7d2f24));
-    wb2.scale.set(0.06 * S, 0.1 * S, 0.74 * S); wheel.add(wb2);
-    group.add(wheel);
-
-    // 6. Lampu Indikator Panel Kontrol (3 warna)
-    const lamps = [];
-    for (let i = 0; i < 3; i++) {
-      const mt = new THREE.MeshBasicMaterial({ color: 0x2a2a2a });
-      const ms = new THREE.Mesh(bGeo, mt);
-      ms.position.set((2.85 + i * 0.25) * S, 1.63 * S, 2.75 * S);
-      ms.scale.set(0.12 * S, 0.12 * S, 0.05 * S);
-      group.add(ms);
-      lamps.push(mt);
-    }
-
-    // 7. Layar Monitor Panel Kontrol
-    const screenMt = new THREE.MeshBasicMaterial({ color: 0x123333, transparent: true, opacity: 0.5 });
-    const screen = new THREE.Mesh(bGeo, screenMt);
-    screen.position.set(3.1 * S, 1.92 * S, 2.75 * S);
-    screen.scale.set(0.55 * S, 0.3 * S, 0.04 * S);
-    group.add(screen);
-
-    // 8. Lampu Suar Mercu Cerobong
-    const beaconMt = new THREE.MeshBasicMaterial({ color: 0x4a2222 });
-    const beacon = new THREE.Mesh(bGeo, beaconMt);
-    beacon.position.set(-2.2 * S, 19.35 * S, -1 * S);
-    beacon.scale.set(0.18 * S, 0.18 * S, 0.18 * S);
-    group.add(beacon);
-
-    // Node anchor untuk titik keluar partikel asap
-    const ancA = new THREE.Object3D(); ancA.position.set(-2.2 * S, 19.4 * S, -1 * S); group.add(ancA);
-    const ancB = new THREE.Object3D(); ancB.position.set(0.9 * S, 16.7 * S, 0.4 * S); group.add(ancB);
-    const ancM = new THREE.Object3D(); ancM.position.set(-1 * S, 2.3 * S, 2.75 * S); group.add(ancM);
+    const ancMouth = new THREE.Object3D();
+    ancMouth.position.set(0.05, 0.75, 0.80);
+    group.add(ancMouth);
 
     group.userData.smelter = {
-      fan, wheel, glow, light, flames, lamps, screen, beacon,
-      ancA, ancB, ancM,
-      fanSpeed: 0, wheelSpeed: 0,
+      glow, light, flames, lantern, lanternMat,
+      ancSmoke, ancMouth,
       smokeTimer: 0, emberTimer: 0
     };
 
@@ -397,14 +298,16 @@ const Smelter = {
       };
     }
     const sm = f.smelter;
+    let stateChanged = false;
 
     // 1. AUTO-CONSUME COAL bila api habis dan masih ada ore yang bisa dimasak
     if (sm.fuelTime <= 0 && sm.fuelCoal > 0 && sm.oreCount >= this.ORE_PER_INGOT) {
       sm.fuelCoal--;
       sm.fuelTime += this.COAL_DURATION; // 1 coal = 60 detik!
+      stateChanged = true;
     }
 
-    // 2. LOGIKA PELEBURAN (5 DETIK PER INGOT)
+    // 2. LOGIKA PELEBURAN (10 DETIK PER INGOT)
     const canSmelt = (sm.fuelTime > 0 && sm.oreCount >= this.ORE_PER_INGOT);
     if (canSmelt) {
       sm.fuelTime = Math.max(0, sm.fuelTime - dt);
@@ -415,6 +318,7 @@ const Smelter = {
         const outIngot = this.ORE_TO_INGOT[sm.oreType] || 'iron_ingot';
         sm.outType = outIngot;
         sm.outCount = (sm.outCount || 0) + 1;
+        stateChanged = true;
 
         if (sm.oreCount < this.ORE_PER_INGOT) {
           sm.oreCount = 0;
@@ -437,64 +341,68 @@ const Smelter = {
     if (mData) {
       const time = performance.now() * 0.001;
 
-      // Kipas & Roda Katup
-      mData.fanSpeed += ((smelterOn ? 7.5 : 0) - mData.fanSpeed) * Math.min(dt * 2, 1);
-      mData.wheelSpeed += ((smelterOn ? 0.9 : 0) - mData.wheelSpeed) * Math.min(dt * 2, 1);
-      mData.fan.rotation.x += mData.fanSpeed * dt;
-      mData.wheel.rotation.x -= mData.wheelSpeed * dt;
-
-      // Cahaya & Glow Mulut Tungku
-      const targetLi = smelterOn ? (1.6 + Math.sin(time * 13) * 0.35 + Math.sin(time * 29.5) * 0.2) : 0;
-      mData.light.intensity += (targetLi - mData.light.intensity) * Math.min(dt * (smelterOn ? 18 : 3), 1);
-      mData.glow.material.opacity = smelterOn
-        ? (0.5 + Math.sin(time * 11) * 0.12 + Math.sin(time * 27) * 0.05)
-        : Math.max(0, mData.glow.material.opacity - dt * 0.8);
-
-      // Lidah Kobaran Api
-      for (const fl of mData.flames) {
-        fl.ms.visible = smelterOn;
-        if (!smelterOn) continue;
-        fl.ph = (fl.ph + dt * fl.sp * 0.85) % 1;
-        const t = fl.ph, s = (1 - t) * (0.026 + (fl.sd * 13 % 10) * 0.0015);
-        fl.ms.position.set(fl.x + Math.sin(time * 3 + fl.sd) * 0.01, (1.5 + t * 1.25) * this.SCALE, fl.z);
-        fl.ms.scale.set(s, s * (1.4 + t), s);
-        fl.mt.opacity = (1 - t * t) * 0.95;
+      // Lentera menggantung berayun + menyala saat smelter hidup
+      if (mData.lantern) {
+        mData.lantern.rotation.z = Math.sin(time * 1.7) * 0.12 + (smelterOn ? Math.sin(time * 5.3) * 0.02 : 0);
+      }
+      if (mData.lanternMat) {
+        mData.lanternMat.color.setHex(smelterOn ? 0xffb02e : 0x2a2a2a);
       }
 
-      // Lampu Indikator & Layar Monitor
-      mData.lamps[0].color.setHex(smelterOn && Math.sin(time * 0.8) > 0.93 ? 0xff4d3d : 0x3a2323);
-      mData.lamps[1].color.setHex(smelterOn && Math.sin(time * 3.1) > 0.2 ? 0xffd23e : 0x3a3223);
-      mData.lamps[2].color.setHex(smelterOn ? 0x3dff7a : 0x233a2a);
-      mData.screen.material.color.setHex(smelterOn ? 0x54e0d0 : 0x123333);
-      mData.screen.material.opacity = smelterOn ? (0.75 + Math.sin(time * 5) * 0.2) : 0.3;
-      mData.beacon.material.color.setHex(smelterOn && ((time % 1.6) < 0.3) ? 0xff3b2e : 0x4a2222);
+      // Cahaya & Glow Mulut Tungku
+      if (mData.light) {
+        const targetLi = smelterOn ? (1.15 + Math.sin(time * 13) * 0.25 + Math.sin(time * 29.5) * 0.15) : 0;
+        mData.light.intensity += (targetLi - mData.light.intensity) * Math.min(dt * (smelterOn ? 18 : 3), 1);
+      }
+      if (mData.glow && mData.glow.material) {
+        mData.glow.material.opacity = smelterOn
+          ? (0.45 + Math.sin(time * 11) * 0.10 + Math.sin(time * 27) * 0.05)
+          : Math.max(0, mData.glow.material.opacity - dt * 0.8);
+      }
 
-      // Partikel Asap & Bara Api (Hanya bila dekat dengan pemain agar hemat performa)
+      // 5 Lidah Kobaran Api di Mulut Tungku
+      if (mData.flames) {
+        for (const fl of mData.flames) {
+          fl.ms.visible = smelterOn;
+          if (!smelterOn) continue;
+          fl.ph = (fl.ph + dt * fl.sp * 0.85) % 1;
+          const t = fl.ph, s = (1 - t) * (0.045 + (fl.sd * 7 % 5) * 0.007);
+          fl.ms.position.set(fl.x + Math.sin(time * 3 + fl.sd) * 0.025, 0.44 + t * 0.35, fl.z);
+          fl.ms.scale.set(s, s * (1.5 + t), s);
+          fl.mt.opacity = (1 - t * t) * 0.95;
+        }
+      }
+
+      // Partikel Asap Cerobong & Percikan Bara Api
       const pDist = (typeof Player !== 'undefined' && Player.pos)
         ? Math.hypot(f.x - Player.pos.x, f.z - Player.pos.z) : 0;
       if (smelterOn && pDist < 45) {
         mData.smokeTimer = (mData.smokeTimer || 0) + dt;
-        if (mData.smokeTimer >= 0.16) {
+        if (mData.smokeTimer >= 0.24) {
           mData.smokeTimer = 0;
-          const wPosA = new THREE.Vector3(); mData.ancA.getWorldPosition(wPosA);
-          const wPosB = new THREE.Vector3(); mData.ancB.getWorldPosition(wPosB);
-          this.emitSmoke(wPosA, true);
-          if (Math.random() < 0.6) this.emitSmoke(wPosB, false);
+          const wPosSmoke = new THREE.Vector3();
+          if (mData.ancSmoke) mData.ancSmoke.getWorldPosition(wPosSmoke);
+          else wPosSmoke.set(f.x, f.y + 2.05, f.z);
+          this.emitSmoke(wPosSmoke, true);
         }
         mData.emberTimer = (mData.emberTimer || 0) + dt;
-        if (mData.emberTimer >= 0.35) {
+        if (mData.emberTimer >= 0.45) {
           mData.emberTimer = 0;
-          const wPosA = new THREE.Vector3(); mData.ancA.getWorldPosition(wPosA);
-          const wPosM = new THREE.Vector3(); mData.ancM.getWorldPosition(wPosM);
-          this.emitEmber(wPosA);
-          this.emitEmber(wPosM);
+          const wPosMouth = new THREE.Vector3();
+          if (mData.ancMouth) mData.ancMouth.getWorldPosition(wPosMouth);
+          else wPosMouth.set(f.x + 0.05, f.y + 0.75, f.z + 0.8);
+          this.emitEmber(wPosMouth);
         }
       }
     }
 
     // Refresh UI secara live bila panel sedang dibuka untuk smelter ini
     if (this.currentFurni === f && typeof UI !== 'undefined' && UI.open === 'smelter') {
-      this._liveUpdateUI();
+      if (stateChanged) {
+        this.render();
+      } else {
+        this._liveUpdateUI();
+      }
     }
   },
 
@@ -522,7 +430,7 @@ const Smelter = {
     if (!el) return;
     const f = this.currentFurni;
     if (!f || f.def !== 'smelter') {
-      el.innerHTML = '<p class="tip">Dekati Smelter Industri untuk menggunakannya.</p>';
+      el.innerHTML = '<p class="tip">Dekati Smelter untuk menggunakannya.</p>';
       return;
     }
     const sm = f.smelter || (f.smelter = { fuelTime: 0, fuelCoal: 0, oreType: null, oreCount: 0, cookProgress: 0, outType: null, outCount: 0 });
@@ -530,15 +438,16 @@ const Smelter = {
     const coalInBag = (typeof RPG !== 'undefined' && RPG.countItem) ? RPG.countItem('coal') : 0;
     const isSmelting = (sm.fuelTime > 0 && sm.oreCount >= this.ORE_PER_INGOT);
     const progressPct = isSmelting ? Math.min(100, Math.round((sm.cookProgress / this.COOK_DURATION) * 100)) : 0;
+    const oreInBag = (sm.oreType && typeof RPG !== 'undefined' && RPG.countItem) ? RPG.countItem(sm.oreType) : 0;
 
     let html = `
       <div class="smelter-container">
         <!-- BARIS STATUS & INDIKATOR API -->
-        <div class="smelter-status-card ${sm.fuelTime > 0 ? 'active' : ''}">
+        <div id="sm-status-card" class="smelter-status-card ${sm.fuelTime > 0 ? 'active' : ''}">
           <div class="ssc-left">
-            <span class="ssc-fire-ico">${sm.fuelTime > 0 ? '🔥' : '⚫'}</span>
+            <span class="ssc-fire-ico" id="sm-status-ico">${sm.fuelTime > 0 ? '🔥' : '⚫'}</span>
             <div class="ssc-info">
-              <b>${sm.fuelTime > 0 ? (isSmelting ? 'SEDANG MELEBUR ORE' : 'TUNGKU PANAS (MENUNGGU ORE)') : 'TUNGKU PADAM (BUTUH BATU BARA)'}</b>
+              <b id="sm-status-title">${sm.fuelTime > 0 ? (isSmelting ? 'SEDANG MELEBUR ORE' : 'TUNGKU PANAS (MENUNGGU ORE)') : 'TUNGKU PADAM (BUTUH BATU BARA)'}</b>
               <span id="sm-fuel-txt">Sisa Api: ${Math.ceil(sm.fuelTime)}s &nbsp;•&nbsp; Cadangan Coal: ${sm.fuelCoal}x</span>
             </div>
           </div>
@@ -552,7 +461,7 @@ const Smelter = {
             <div class="sm-card-title">🖤 BAHAN BAKAR</div>
             <div class="sm-slot sm-slot-coal">
               <span class="sm-slot-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon('coal') : '🖤'}</span>
-              <div class="sm-slot-qty">${sm.fuelCoal}x</div>
+              <div class="sm-slot-qty" id="sm-fuel-coal-qty">${sm.fuelCoal}x</div>
               <div class="sm-slot-sub">Batu Bara</div>
             </div>
             <div class="sm-btn-group">
@@ -567,16 +476,21 @@ const Smelter = {
             <div class="sm-card-title">🔘 INPUT ORE (2 Ore → 1 Ingot)</div>
             ${sm.oreType ? `
               <div class="sm-slot sm-slot-ore">
-                <span class="sm-slot-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(sm.oreType) : ITEMS[sm.oreType].e}</span>
-                <div class="sm-slot-qty">${sm.oreCount}x</div>
+                <span class="sm-slot-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(sm.oreType) : (ITEMS[sm.oreType] ? ITEMS[sm.oreType].e : '🔘')}</span>
+                <div class="sm-slot-qty" id="sm-ore-qty">${sm.oreCount}x</div>
                 <div class="sm-slot-sub">${ITEMS[sm.oreType] ? ITEMS[sm.oreType].n : sm.oreType}</div>
               </div>
               <!-- PROGRESS BAR PELEBURAN -->
               <div class="sm-progress-wrap">
-                <div class="sm-progress-label"><span id="sm-prog-txt">${progressPct}%</span> (5s / Ingot)</div>
+                <div class="sm-progress-label"><span id="sm-prog-txt">${progressPct}%</span> (10s / Ingot)</div>
                 <div class="sm-progress-track"><div id="sm-prog-fill" style="width:${progressPct}%"></div></div>
               </div>
               <div class="sm-btn-group">
+                ${oreInBag > 0 ? `
+                  <button class="sm-btn mini" onclick="Smelter.insertOre('${sm.oreType}', 1)">+1x</button>
+                  <button class="sm-btn mini" onclick="Smelter.insertOre('${sm.oreType}', 10)" ${oreInBag >= 10 ? '' : 'disabled'}>+10x</button>
+                  <button class="sm-btn mini sm-btn-all" onclick="Smelter.insertOre('${sm.oreType}', ${oreInBag})">All (${oreInBag})</button>
+                ` : ''}
                 <button class="sm-btn sm-btn-warn" onclick="Smelter.withdrawOre()">⬅ Tarik Kembali Ore</button>
               </div>
             ` : `
@@ -590,17 +504,18 @@ const Smelter = {
           <!-- 3. SEKSI OUTPUT INGOT -->
           <div class="sm-card sm-output-col">
             <div class="sm-card-title">📦 HASIL INGOT</div>
-            <div class="sm-slot sm-slot-out ${sm.outCount > 0 ? 'has-item' : ''}">
+            <div id="sm-out-slot" class="sm-slot sm-slot-out ${sm.outCount > 0 ? 'has-item' : ''}">
               ${sm.outType && sm.outCount > 0 ? `
-                <span class="sm-slot-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(sm.outType) : ITEMS[sm.outType].e}</span>
-                <div class="sm-slot-qty">${sm.outCount}x</div>
+                <span class="sm-slot-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(sm.outType) : (ITEMS[sm.outType] ? ITEMS[sm.outType].e : '📦')}</span>
+                <div class="sm-slot-qty" id="sm-out-qty">${sm.outCount}x</div>
                 <div class="sm-slot-sub">${ITEMS[sm.outType] ? ITEMS[sm.outType].n : sm.outType}</div>
               ` : `
                 <span class="sm-slot-ico empty">📦</span>
+                <div class="sm-slot-qty" id="sm-out-qty" style="display:none">0x</div>
                 <div class="sm-slot-sub empty">Belum ada hasil</div>
               `}
             </div>
-            <button class="big sm-btn-take" onclick="Smelter.collectOutput()" ${sm.outCount > 0 ? '' : 'disabled'}>
+            <button id="sm-take-btn" class="big sm-btn-take" onclick="Smelter.collectOutput()" ${sm.outCount > 0 ? '' : 'disabled'}>
               ✨ Ambil Ingot (${sm.outCount || 0})
             </button>
           </div>
@@ -611,7 +526,7 @@ const Smelter = {
     el.innerHTML = html;
   },
 
-  /* List pilihan ore yang ada di inventory pemain */
+  /* List pilihan ore yang ada di inventory pemain dengan opsi 1x, 10x, dan All */
   _renderOrePickerList() {
     const ores = ['iron_ore', 'gold_ore', 'copper_ore', 'steel_ore', 'tungsten_ore', 'tungstensteel_ore'];
     let listHtml = '';
@@ -623,14 +538,15 @@ const Smelter = {
         found++;
         listHtml += `
           <div class="sm-ore-pick-item">
-            <span class="opi-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(id) : it.e}</span>
+            <span class="opi-ico">${(typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(id) : (it ? it.e : '🔘')}</span>
             <div class="opi-info">
-              <b>${it.n}</b>
+              <b>${it ? it.n : id}</b>
               <span>Punya: ${count}x</span>
             </div>
             <div class="opi-btns">
-              <button class="sm-btn mini" onclick="Smelter.insertOre('${id}', 10)" ${count >= 2 ? '' : 'disabled'}>+10</button>
-              <button class="sm-btn mini" onclick="Smelter.insertOre('${id}', ${count})">Semua</button>
+              <button class="sm-btn mini" onclick="Smelter.insertOre('${id}', 1)" title="Masukkan 1x">1x</button>
+              <button class="sm-btn mini" onclick="Smelter.insertOre('${id}', 10)" ${count >= 10 ? '' : 'disabled'} title="Masukkan 10x">10x</button>
+              <button class="sm-btn mini sm-btn-all" onclick="Smelter.insertOre('${id}', ${count})" title="Masukkan Semua">All (${count})</button>
             </div>
           </div>
         `;
@@ -642,24 +558,44 @@ const Smelter = {
     return listHtml;
   },
 
-  /* Update halus elemen progress & timer di UI tanpa me-render ulang seluruh DOM */
+  /* Update halus elemen progress & timer di UI setiap frame */
   _liveUpdateUI() {
     if (typeof document === 'undefined') return;
     const f = this.currentFurni;
     if (!f || !f.smelter) return;
     const sm = f.smelter;
+
     const fuelTxt = document.getElementById('sm-fuel-txt');
     if (fuelTxt) fuelTxt.innerHTML = `Sisa Api: ${Math.ceil(sm.fuelTime)}s &nbsp;•&nbsp; Cadangan Coal: ${sm.fuelCoal}x`;
+
+    const fuelCoalQty = document.getElementById('sm-fuel-coal-qty');
+    if (fuelCoalQty) fuelCoalQty.textContent = `${sm.fuelCoal}x`;
+
     const fuelFill = document.getElementById('sm-fuel-fill');
     if (fuelFill) fuelFill.style.width = Math.min(100, (sm.fuelTime / this.COAL_DURATION) * 100) + '%';
 
+    const isSmelting = (sm.fuelTime > 0 && sm.oreCount >= this.ORE_PER_INGOT);
+    const pct = isSmelting ? Math.min(100, Math.round((sm.cookProgress / this.COOK_DURATION) * 100)) : 0;
+
     const progFill = document.getElementById('sm-prog-fill');
+    if (progFill) progFill.style.width = pct + '%';
+
     const progTxt = document.getElementById('sm-prog-txt');
-    if (progFill && progTxt) {
-      const isSmelting = (sm.fuelTime > 0 && sm.oreCount >= this.ORE_PER_INGOT);
-      const pct = isSmelting ? Math.min(100, Math.round((sm.cookProgress / this.COOK_DURATION) * 100)) : 0;
-      progFill.style.width = pct + '%';
-      progTxt.textContent = pct + '%';
+    if (progTxt) progTxt.textContent = pct + '%';
+
+    const oreQty = document.getElementById('sm-ore-qty');
+    if (oreQty) oreQty.textContent = `${sm.oreCount}x`;
+
+    const outQty = document.getElementById('sm-out-qty');
+    if (outQty && sm.outCount > 0) {
+      outQty.style.display = '';
+      outQty.textContent = `${sm.outCount}x`;
+    }
+
+    const takeBtn = document.getElementById('sm-take-btn');
+    if (takeBtn) {
+      takeBtn.disabled = (sm.outCount <= 0);
+      takeBtn.textContent = `✨ Ambil Ingot (${sm.outCount || 0})`;
     }
   },
 
@@ -701,7 +637,7 @@ const Smelter = {
     f.smelter.oreType = oreId;
     f.smelter.oreCount = (f.smelter.oreCount || 0) + amount;
     if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
-    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`🔘 Memasukkan ${amount}x ${ITEMS[oreId].n}`);
+    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`🔘 Memasukkan ${amount}x ${ITEMS[oreId] ? ITEMS[oreId].n : oreId}`);
     if (typeof Furni !== 'undefined' && Furni.save) Furni.save();
     this.render();
   },
@@ -719,7 +655,7 @@ const Smelter = {
     f.smelter.cookProgress = 0;
 
     if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
-    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`📦 Menarik kembali ${count}x ${ITEMS[oreId].n}`);
+    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`📦 Menarik kembali ${count}x ${ITEMS[oreId] ? ITEMS[oreId].n : oreId}`);
     if (typeof Furni !== 'undefined' && Furni.save) Furni.save();
     this.render();
   },
@@ -736,7 +672,7 @@ const Smelter = {
     f.smelter.outCount = 0;
 
     if (typeof Sfx !== 'undefined' && Sfx.craft) Sfx.craft();
-    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`✨ Berhasil mengambil ${count}x ${ITEMS[ingotId].n}!`);
+    if (typeof UI !== 'undefined' && UI.toast) UI.toast(`✨ Berhasil mengambil ${count}x ${ITEMS[ingotId] ? ITEMS[ingotId].n : ingotId}!`);
     if (typeof Player !== 'undefined' && Player.addXP) Player.addXP(count * 6);
     if (typeof Furni !== 'undefined' && Furni.save) Furni.save();
     this.render();
@@ -744,3 +680,4 @@ const Smelter = {
 };
 
 window.Smelter = Smelter;
+

@@ -251,7 +251,7 @@
       DM berdiri di z lokal -0.45 (offset standX/standZ), DI ATAS panggung
       tapi LUAR kotak meja — collision sendiri tidak menolaknya. */
   Furni.DEFS.dmshop={
-    n:'Toko Dungeon Master',e:'🧙',item:null,r:3.4,
+    n:'Toko Dungeon Master',e:'🧙',item:null,r:2.2,
     label:'🗝️ Toko Dungeon Changer',
     solid:true,
     /* kotak dalam satuan DUNIA (sudah dikali skala kios 0.62):

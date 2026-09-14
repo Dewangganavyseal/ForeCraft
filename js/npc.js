@@ -437,13 +437,25 @@ const NPCS={
 
 
   /* ---------- interaksi pemain ---------- */
-  /* NPC terdekat dalam jarak bicara yang belum jadi rekan */
-  nearby(){
-    let best=null,bd=CFG.NPC.TALK_R;
+  /* NPC terdekat dalam jarak bicara yang belum jadi rekan (jarak sangat dekat, hadap pemain) */
+  nearby(pos, maxDist){
+    if(typeof Player === 'undefined' || !Player.pos) return null;
+    const p = pos || Player.pos;
+    const bdLimit = maxDist || (typeof CFG !== 'undefined' && CFG.NPC ? CFG.NPC.TALK_R : 1.35);
+    let best=null, bd=bdLimit;
+    const pFacing = (typeof Player !== 'undefined' && Player.facing !== undefined) ? Player.facing : null;
     for(const n of this.list){
       if(n.dead||this.isTeam(n))continue;
-      const d=n.pos.distanceTo(Player.pos);
-      if(d<bd){best=n;bd=d;}
+      const dx = n.pos.x - p.x, dz = n.pos.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if(d < bd && Math.abs(n.pos.y - p.y) < 2.0){
+        if(pFacing !== null){
+          let diff = Math.abs(Math.atan2(dx, dz) - pFacing);
+          if(diff > Math.PI) diff = Math.PI * 2 - diff;
+          if(diff > 1.4) continue; // abaikan NPC di belakang punggung pemain
+        }
+        best=n; bd=d;
+      }
     }
     return best;
   },

@@ -92,45 +92,42 @@ const Furni={
   DEFS:{
     /* Meja kayu biasa kini DEKORASI saja — crafting pindah ke Meja Kerja
        (workbench, model voxel dari NEW MODEL/Workstation.html). */
-    table:{n:'Meja Kayu',e:'🍽️',item:'f_table',r:1.9,decor:true,
+    table:{n:'Meja Kayu',e:'🍽️',item:'f_table',r:1.1,decor:true,
       build(){return Furni.buildTable();}},
-    chair:{n:'Kursi Kayu',e:'💺',item:'f_chair',r:1.5,label:'💺 Duduk',
+    chair:{n:'Kursi Kayu',e:'💺',item:'f_chair',r:1.1,label:'💺 Duduk',
       build(){return Furni.buildChair();},
       use(f){Furni.sit(f);}},
-    bed:{n:'Tempat Tidur',e:'🛏️',item:'f_bed',r:2.1,label:'🛏️ Tidur',
+    bed:{n:'Tempat Tidur',e:'🛏️',item:'f_bed',r:1.3,label:'🛏️ Tidur',
       build(){return Furni.buildBed();},
       use(f){Furni.sleep(f);}},
     /* Peti: gudang pribadi. Isinya menempel pada objek peti (f.inv), bukan
         inventory pemain, sehingga resource bisa dititipkan di basis. */
-    chest:{n:'Peti Penyimpanan',e:'🧰',item:'f_chest',r:1.7,label:'🧰 Buka Peti',
+    chest:{n:'Peti Penyimpanan',e:'🧰',item:'f_chest',r:1.25,label:'🧰 Buka Peti',
       build(){return Furni.buildChest();},
       use(f){Furni.openChest(f);}},
     /* Perahu: satu-satunya perabot yang hidup di atas air. Saat dinaiki,
-        pemain bergerak cepat di permukaan tanpa terkena penalti berenang.
-        Radius interaksi diperbesar 2.2 → 3.4 mengikuti model yang kini
-        BOAT_SCALE× lebih besar; dengan radius lama pemain harus berdiri
-        nyaris di tengah perahu untuk memunculkan tombol naik. */
-    boat:{n:'Perahu Kayu',e:'🛶',item:'f_boat',r:3.4,label:'🛶 Naiki Perahu',
+        pemain bergerak cepat di permukaan tanpa terkena penalti berenang. */
+    boat:{n:'Perahu Kayu',e:'🛶',item:'f_boat',r:1.8,label:'🛶 Naiki Perahu',
       build(){return Furni.buildBoat();},
       use(f){Furni.board(f);}},
 
     /* ---------- STASIUN KERJA (model voxel Workstation.html) ---------- */
     /* Meja Kerja: stasiun crafting pengganti meja biasa */
-    workbench:{n:'Meja Kerja',e:'🔨',item:'f_workbench',r:2.0,label:'🔨 Meja Kerja',
+    workbench:{n:'Meja Kerja',e:'🔨',item:'f_workbench',r:1.25,label:'🔨 Meja Kerja',
       build(){return WSModels.make('bench',0.32);},
       use(){
         const benchIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_workbench)?`<img class="iico" src="${UI.ITEM_IMG.f_workbench}"> `:'';
         UI.toast(benchIco+'Meja kerja — panel crafting terbuka');Sfx.open();
         if(UI.open!=='craft')UI.toggle('craft');}},
     /* Landasan Tempa: enchant/naikkan level equipment (panel anvil) */
-    anvil:{n:'Landasan Tempa',e:'⚒️',item:'f_anvil',r:1.9,label:'⚒️ Tempa Equipment',
+    anvil:{n:'Landasan Tempa',e:'⚒️',item:'f_anvil',r:1.25,label:'⚒️ Tempa Equipment',
       build(){return WSModels.make('anvil',0.24);},
       use(){
         const anvilIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_anvil)?`<img class="iico" src="${UI.ITEM_IMG.f_anvil}"> `:'';
         UI.toast(anvilIco+'Landasan tempa — pilih equipment yang akan ditempa');Sfx.open();
         if(UI.open!=='anvil')UI.toggle('anvil');}},
     /* Tungku: stasiun memasak (panel crafting langsung ke tab Makanan) */
-    stove:{n:'Tungku Masak',e:'🍲',item:'f_stove',r:2.1,label:'🍲 Masak di Tungku',
+    stove:{n:'Tungku Masak',e:'🍲',item:'f_stove',r:1.25,label:'🍲 Masak di Tungku',
       build(){return WSModels.make('stove',0.27);},
       use(){
         const stoveIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.f_stove)?`<img class="iico" src="${UI.ITEM_IMG.f_stove}"> `:'';
@@ -138,11 +135,11 @@ const Furni={
         UI.craftTab='food';
         if(UI.open!=='craft')UI.toggle('craft');}},
     /* Api Unggun: tempat beristirahat — pulihkan HP & stamina (cooldown) */
-    campfire:{n:'Api Unggun',e:'🔥',item:'f_campfire',r:2.1,label:'🔥 Hangatkan Diri',
+    campfire:{n:'Api Unggun',e:'🔥',item:'f_campfire',r:1.3,label:'🔥 Hangatkan Diri',
       build(){return WSModels.make('campfire',0.30);},
       use(f){Furni.warm(f);}},
-    /* Smelter Industri: melebur 2 Ore menjadi 1 Ingot dengan bahan bakar Coal */
-    smelter:{n:'Smelter Industri',e:'🏭',item:'f_smelter',r:2.4,label:'🏭 Buka Smelter',
+    /* Smelter: melebur 2 Ore menjadi 1 Ingot dengan bahan bakar Coal */
+    smelter:{n:'Smelter Industri',e:'🏭',item:'f_smelter',r:1.35,label:'🏭 Buka Smelter',
       build(){return (typeof Smelter!=='undefined'&&Smelter.buildModel)?Smelter.buildModel():new THREE.Group();},
       use(f){if(typeof Smelter!=='undefined'&&Smelter.openUI)Smelter.openUI(f);}},
 
@@ -151,7 +148,7 @@ const Furni={
        (B.PLANK/B.WOOD/B.ROOF) memakai algoritme persis rumah desa — lihat
        writeHouseBlocks(). DEFS ini hanya menyediakan model ghost utk preview;
        tidak punya aksi `use` dan tidak masuk Furni.list. */
-    house:{n:'Rumah Kayu',e:'🏠',item:'f_house',r:3.4,decor:true,
+    house:{n:'Rumah Kayu',e:'🏠',item:'f_house',r:2.2,decor:true,
       build(){return Furni.buildHouse();}},
   },
 
@@ -343,22 +340,113 @@ const Furni={
     return g;
   },
 
-  /* ---------- PETI PENYIMPANAN ----------
-     Model voxel ala Minecraft hasil porting Chest.html (NEW MODEL) lewat
-     PortChest di js/ports.js: tutup berengsel di tepi atas belakang, harta
-     bercahaya di dalam, dan glow yang menguat saat terbuka. userData.lid
-     tetap dipakai Furni.update untuk animasi membuka/menutup. */
+  /* ---------- PETI PENYIMPANAN PEMAIN (STORAGE CHEST) ----------
+     Model voxel penyimpanan pemain beraksen kayu oak kokoh, plat besi sudut,
+     sabuk plat pelindung, pegangan samping, grendel kuningan, kaki runner,
+     dan tutup berengsel di tepi atas belakang.
+     DIBEDAKAN dari peti dungeon (PortChest) yang berisi batu mulia berkilau. */
   buildChest(){
-    if(typeof PortChest!=='undefined')return PortChest.build();
-    /* fallback sederhana bila ports.js tidak dimuat */
-    const wood=this.M('wood',0x9a6b3c),dark=this.M('wood',0x6b4522);
-    const g=new THREE.Group();
-    g.add(this.vp(this.vb(1.02,0.5,0.66,wood),0,0.27,0));
-    g.add(this.vp(this.vb(1.06,0.08,0.7,dark),0,0.52,0));
-    const lid=new THREE.Group();lid.position.set(0,0.56,-0.33);
-    lid.add(this.vp(this.vb(1.02,0.16,0.66,wood),0,0.08,0.33));
-    g.add(lid);g.userData.lid=lid;
-    return g;
+    const bGeo = new THREE.BoxGeometry(1, 1, 1);
+    const mats = new Map();
+    const getMat = c => {
+      let m = mats.get(c);
+      if (!m) { m = new THREE.MeshLambertMaterial({ color: c }); mats.set(c, m); }
+      return m;
+    };
+    const group = new THREE.Group();
+    const box = (x, y, z, w, h, d, c, ry = 0, rz = 0, rx = 0, parent = group) => {
+      const m = new THREE.Mesh(bGeo, getMat(c));
+      m.position.set(x, y, z);
+      m.scale.set(w, h, d);
+      if (rx) m.rotation.x = rx;
+      if (rz) m.rotation.z = rz;
+      if (ry) m.rotation.y = ry;
+      m.castShadow = true; m.receiveShadow = true;
+      parent.add(m);
+      return m;
+    };
+
+    const OAK = 0x8a5426, OAK_D = 0x643c18, OAK_L = 0x9c6230,
+          IRON = 0x343840, IRON_L = 0x5e6672, BRASS = 0xc9a442,
+          FEET = 0x3a2210, INNER = 0x4e2e14;
+
+    // ---- 1. Kaki / Runner Kayu Bawah ----
+    box(0, 0.02, 0.22, 0.94, 0.04, 0.12, FEET);
+    box(0, 0.02, -0.22, 0.94, 0.04, 0.12, FEET);
+
+    // ---- 2. Dasar & Badan Peti (Hollow Interior Bersih) ----
+    box(0, 0.06, 0, 0.92, 0.04, 0.64, OAK_D); // lantai peti
+    box(0, 0.25, 0.30, 0.92, 0.34, 0.05, OAK); // dinding depan
+    box(0, 0.25, -0.30, 0.92, 0.34, 0.05, OAK); // dinding belakang
+    box(0.44, 0.25, 0, 0.05, 0.34, 0.55, OAK); // dinding kanan
+    box(-0.44, 0.25, 0, 0.05, 0.34, 0.55, OAK); // dinding kiri
+    box(0, 0.23, 0, 0.04, 0.30, 0.55, INNER); // sekat tengah penyimpanan
+
+    // Panel aksen kayu bergaris
+    box(0, 0.25, 0.327, 0.88, 0.02, 0.005, OAK_D);
+    box(0, 0.25, -0.327, 0.88, 0.02, 0.005, OAK_D);
+    box(0, 0.35, 0.326, 0.86, 0.06, 0.005, OAK_L);
+
+    // ---- 3. Penguat Besi Sudut (Corner Braces) & Rivet ----
+    for (const sx of [-0.445, 0.445]) {
+      for (const sz of [-0.305, 0.305]) {
+        box(sx, 0.25, sz, 0.065, 0.35, 0.065, IRON);
+        box(sx, 0.40, sz, 0.075, 0.05, 0.075, IRON_L);
+        box(sx, 0.10, sz, 0.075, 0.05, 0.075, IRON_L);
+      }
+    }
+
+    // ---- 4. Sabuk Plat Besi Vertikal ----
+    for (const sx of [-0.22, 0.22]) {
+      box(sx, 0.25, 0.327, 0.05, 0.35, 0.008, IRON);
+      box(sx, 0.25, -0.327, 0.05, 0.35, 0.008, IRON);
+      box(sx, 0.045, 0, 0.05, 0.008, 0.65, IRON);
+      box(sx, 0.25, 0.332, 0.03, 0.03, 0.005, IRON_L);
+      box(sx, 0.12, 0.332, 0.03, 0.03, 0.005, IRON_L);
+      box(sx, 0.37, 0.332, 0.03, 0.03, 0.005, IRON_L);
+    }
+
+    // ---- 5. Pegangan Samping (Drop Handles) ----
+    for (const sx of [-0.47, 0.47]) {
+      box(sx, 0.25, 0, 0.015, 0.08, 0.16, IRON);
+      box(sx * 1.02, 0.25, 0, 0.02, 0.04, 0.12, IRON_L);
+    }
+
+    // ---- 6. Plat Kunci / Grendel Depan (Lock Plate & Brass Clasp) ----
+    box(0, 0.32, 0.332, 0.10, 0.12, 0.012, IRON);
+    box(0, 0.32, 0.340, 0.06, 0.07, 0.010, BRASS);
+    box(0, 0.30, 0.346, 0.02, 0.03, 0.008, 0x1a1a1a); // lubang kunci
+
+    // ---- 7. Tutup Berengsel (Lid Pivot di Tepi Atas Belakang: z = -0.325, y = 0.42) ----
+    const lid = new THREE.Group();
+    lid.position.set(0, 0.42, -0.325);
+
+    box(0, 0.04, 0.325, 0.94, 0.08, 0.67, OAK, 0, 0, 0, lid);
+    box(0, 0.10, 0.325, 0.90, 0.06, 0.59, OAK_L, 0, 0, 0, lid);
+    box(0, 0.15, 0.325, 0.84, 0.05, 0.47, OAK, 0, 0, 0, lid);
+    box(0, 0.185, 0.325, 0.76, 0.03, 0.33, OAK_D, 0, 0, 0, lid);
+
+    for (const sx of [-0.455, 0.455]) {
+      box(sx, 0.05, 0.325, 0.05, 0.10, 0.68, IRON, 0, 0, 0, lid);
+    }
+    box(0, 0.05, 0.655, 0.95, 0.10, 0.03, IRON, 0, 0, 0, lid);
+    box(0, 0.05, 0.005, 0.95, 0.10, 0.03, IRON, 0, 0, 0, lid);
+
+    for (const sx of [-0.22, 0.22]) {
+      box(sx, 0.05, 0.325, 0.05, 0.11, 0.68, IRON, 0, 0, 0, lid);
+      box(sx, 0.11, 0.325, 0.05, 0.06, 0.60, IRON, 0, 0, 0, lid);
+      box(sx, 0.16, 0.325, 0.05, 0.05, 0.48, IRON, 0, 0, 0, lid);
+      box(sx, 0.19, 0.325, 0.05, 0.03, 0.34, IRON, 0, 0, 0, lid);
+      box(sx, 0.20, 0.325, 0.03, 0.015, 0.20, IRON_L, 0, 0, 0, lid);
+    }
+
+    box(0, 0.02, 0.665, 0.08, 0.08, 0.015, BRASS, 0, 0, 0, lid);
+    box(0, -0.02, 0.670, 0.04, 0.05, 0.010, IRON, 0, 0, 0, lid);
+
+    group.add(lid);
+    group.userData.lid = lid;
+
+    return group;
   },
 
   /* ---------- PERAHU VOXEL ----------
@@ -1103,10 +1191,57 @@ const Furni={
     this.list.splice(i,1);
     this.scene.remove(f.mesh);
     f.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
-    if(drop&&this.DEFS[f.def])RPG.addItem(this.DEFS[f.def].item,1);
-    /* peti dibongkar → isinya tidak boleh ikut hilang (data per-instance ikut) */
-    if(drop&&f.inv)for(const s of f.inv)if(s)RPG.addItem(s.id,s.n,s.lvl,s.mark);
+
+    // 1. Furnitur dihancurkan: jatuhkan kembali item furnitur ke tanah agar bisa diambil lagi
+    if(drop && this.DEFS[f.def]){
+      const itm = this.DEFS[f.def].item;
+      if(itm){
+        if(typeof World !== 'undefined' && World.dropItem){
+          World.dropItem(f.x, f.y + 0.45, f.z, itm, 1, {owner:true});
+        } else {
+          RPG.addItem(itm, 1);
+        }
+      }
+    }
+
+    // 2. PETI DIHANCURKAN: SELURUH isinya keluar tumpah berserakan ke tanah!
+    if(drop && f.inv){
+      for(const s of f.inv){
+        if(!s || !s.id || s.n <= 0) continue;
+        const rx = f.x + (Math.random() - 0.5) * 0.7;
+        const rz = f.z + (Math.random() - 0.5) * 0.7;
+        const ry = f.y + 0.45 + Math.random() * 0.35;
+        if(typeof World !== 'undefined' && World.dropItem){
+          World.dropItem(rx, ry, rz, s.id, s.n, {owner:true, lvl:s.lvl, mark:s.mark});
+        } else {
+          RPG.addItem(s.id, s.n, s.lvl, s.mark);
+        }
+      }
+      f.inv = [];
+    }
+
+    // 3. SMELTER DIHANCURKAN: batu bara, ore, & ingot yang tersisa keluar tumpah ke tanah!
+    if(drop && f.smelter){
+      const sm = f.smelter;
+      const dropSm = (id, count) => {
+        if(!id || count <= 0) return;
+        const rx = f.x + (Math.random() - 0.5) * 0.6;
+        const rz = f.z + (Math.random() - 0.5) * 0.6;
+        if(typeof World !== 'undefined' && World.dropItem) {
+          World.dropItem(rx, f.y + 0.45, rz, id, count, {owner:true});
+        } else {
+          RPG.addItem(id, count);
+        }
+      };
+      if(sm.fuelCoal > 0) { dropSm('coal', sm.fuelCoal); sm.fuelCoal = 0; }
+      if(sm.oreType && sm.oreCount > 0) { dropSm(sm.oreType, sm.oreCount); sm.oreCount = 0; sm.oreType = null; }
+      if(sm.outType && sm.outCount > 0) { dropSm(sm.outType, sm.outCount); sm.outCount = 0; sm.outType = null; }
+    }
+
     if(this.chest===f){this.chest=null;if(UI.open==='chest')UI.toggle('chest');}
+    if(typeof Smelter !== 'undefined' && Smelter.currentFurni === f){
+      Smelter.closeUI();
+    }
     if(f.akey){
       /* drop=true berarti dihancurkan pemain → jangan dibangkitkan lagi.
          drop=false hanya pembersihan jarak oleh populate(), jadi isi peti
@@ -1117,16 +1252,27 @@ const Furni={
     }else if(!f.auto)this.save();
 
   },
-  /* perabot terdekat yang masih dalam radius interaksinya
+  /* perabot terdekat yang masih dalam radius interaksinya sangat dekat & searah hadap pemain
      (perabot dekorasi tanpa aksi dilewati) */
   nearest(pos){
     let best=null,bd=1e9;
+    const pFacing = (typeof Player !== 'undefined' && Player.facing !== undefined) ? Player.facing : null;
     for(const f of this.list){
       const def=this.DEFS[f.def];
       if(!def||def.decor)continue;
       const r=def.r;
-      const d=Math.hypot(f.x-pos.x,f.z-pos.z);
-      if(d<r&&d<bd&&Math.abs(f.y-pos.y)<2.6){best=f;bd=d;}
+      const dx = f.x - pos.x, dz = f.z - pos.z;
+      const d=Math.hypot(dx, dz);
+      if(d>r||Math.abs(f.y-pos.y)>2.0)continue;
+      let anglePen = 0;
+      if(pFacing !== null){
+        let diff = Math.abs(Math.atan2(dx, dz) - pFacing);
+        if(diff > Math.PI) diff = Math.PI * 2 - diff;
+        if(diff > 1.4) continue; // abaikan perabot di belakang punggung pemain
+        anglePen = diff * 0.35;
+      }
+      const score = d + anglePen;
+      if(score < bd){ best = f; bd = score; }
     }
     return best;
   },
@@ -1811,23 +1957,29 @@ const Furni={
     if(n>=0)this.save();
     return n;
   },
-  /* ambil satu tumpukan dari peti ke inventory pemain */
-  chestTake(f,i){
+  /* ambil satu tumpukan atau sejumlah qty dari peti ke inventory pemain */
+  chestTake(f,i,qty){
     const s=f.inv[i];
     if(!s)return;
-    const left=RPG.addItem(s.id,s.n,s.lvl,s.mark);
-    if(left>=s.n){UI.toast('Tas penuh!');return;}
-    if(left<=0)f.inv[i]=null;else s.n=left;
+    const count = (qty !== undefined) ? Math.min(s.n, Math.max(1, Math.floor(qty))) : s.n;
+    const left=RPG.addItem(s.id,count,s.lvl,s.mark);
+    const taken=count-left;
+    if(taken<=0){UI.toast('Tas penuh!');return;}
+    s.n-=taken;
+    if(s.n<=0)f.inv[i]=null;
     Sfx.click();this.save();
     UI.renderChest();UI.renderHotbar();
   },
-  /* simpan satu tumpukan dari inventory pemain ke peti */
-  chestPut(f,arr,i){
+  /* simpan satu tumpukan atau sejumlah qty dari inventory pemain ke peti */
+  chestPut(f,arr,i,qty){
     const s=arr[i];
     if(!s)return;
-    const left=this.chestAdd(f,s.id,s.n,s);
-    if(left>=s.n){UI.toast('Peti penuh!');return;}
-    if(left<=0)arr[i]=null;else s.n=left;
+    const count = (qty !== undefined) ? Math.min(s.n, Math.max(1, Math.floor(qty))) : s.n;
+    const left=this.chestAdd(f,s.id,count,s);
+    const stored=count-left;
+    if(stored<=0){UI.toast('Peti penuh!');return;}
+    s.n-=stored;
+    if(s.n<=0)arr[i]=null;
     Sfx.click();
     UI.renderChest();UI.renderHotbar();
   },
@@ -1934,6 +2086,26 @@ const Furni={
     for(const f of this.list){
       if(f.def==='smelter'&&typeof Smelter!=='undefined'&&Smelter.update)
         Smelter.update(f,dt);
+    }
+
+    /* --- REGENERASI HP PERABOT: pulih penuh bila tidak diserang selama 10 detik --- */
+    for(const f of this.list){
+      if(f.hp !== undefined){
+        const max = this.HP[f.def] || 24;
+        if(f.hp < max){
+          if(f.regenT === undefined) f.regenT = 10;
+          f.regenT -= dt;
+          if(f.regenT <= 0){
+            f.hp = max;
+            f.regenT = undefined;
+            if(typeof FX !== 'undefined' && FX.text){
+              FX.text(new THREE.Vector3(f.x, f.y + 1.2, f.z), '💚 Pulih', '#63d471');
+            }
+          }
+        }else{
+          f.regenT = undefined;
+        }
+      }
     }
     if(typeof Smelter!=='undefined'&&Smelter.updatePools)
       Smelter.updatePools(dt);
@@ -2070,46 +2242,56 @@ const Furni={
      Semua perabot — termasuk milik desa — bisa dipukul sampai hancur dan
      menjatuhkan kembali itemnya, sehingga isi rumah desa bisa dipanen.
      ========================================================================= */
-  HP:{table:14,chair:10,bed:18,chest:24,boat:20,board:14,
-    workbench:16,anvil:30,stove:24,campfire:10,smelter:30},
-  hitNearest(pos,facing){
+  HP:{table:18,chair:12,bed:18,chest:24,boat:30,board:15,
+    workbench:24,anvil:30,stove:24,campfire:12,smelter:30},
+  hitNearest(pos,facing,dmg = 3){
+    const reach = (typeof RPG !== 'undefined' && RPG.weaponReach) ? Math.max(2.6, RPG.weaponReach() + 0.4) : 2.6;
     let best=null,bd=1e9;
     for(const f of this.list){
       const dx=f.x-pos.x,dz=f.z-pos.z;
       const d=Math.hypot(dx,dz);
-      if(d>2.2||Math.abs(f.y-pos.y)>2.2)continue;
+      if(d>reach||Math.abs(f.y-pos.y)>2.5)continue;
       /* hanya perabot yang berada di arah hadap pemain */
       let diff=Math.abs(Math.atan2(dx,dz)-facing);
       if(diff>Math.PI)diff=Math.PI*2-diff;
-      if(diff>1.25)continue;
+      if(diff>1.20)continue;
       if(d<bd){bd=d;best=f;}
     }
     if(!best)return false;
-    return this.damage(best,1);
+    return this.damage(best,dmg||3);
   },
   damage(f,dmg){
     if(!this.DEFS[f.def])return false;
-    const max=this.HP[f.def]||12;
+    const max=this.HP[f.def]||24;
     f.hp=(f.hp===undefined?max:f.hp)-dmg;
+    f.regenT=10; // Reset hitungan mundur regenerasi 10 detik setiap kali diserang
     const col=DROP_COLOR[this.DEFS[f.def].item]||0x8a5a2b;
     const c=new THREE.Vector3(f.x,f.y+0.5,f.z);
-    FX.debris(c,col,3,1.8);
+    FX.debris(c,col,4,1.8);
     Sfx.chop();
+    if(typeof FX!=='undefined'&&FX.text){
+      const rem=Math.max(0,f.hp);
+      FX.text(new THREE.Vector3(f.x,f.y+1.2,f.z),`🔨 ${rem}/${max}`,rem<=0?'#ff4d4d':'#ffd24d');
+    }
     if(f.hp>0){
-      /* getar sedikit sebagai umpan balik "belum hancur" */
+      /* getar sebagai umpan balik lalu kembali ke posisi semula */
       if(f.mesh){
-        f.mesh.position.x=f.x+rand(-0.04,0.04);
-        f.mesh.position.z=f.z+rand(-0.04,0.04);
+        const ox=f.x, oz=f.z;
+        f.mesh.position.x=ox+rand(-0.06,0.06);
+        f.mesh.position.z=oz+rand(-0.06,0.06);
+        setTimeout(()=>{
+          if(f&&f.mesh){f.mesh.position.x=ox;f.mesh.position.z=oz;}
+        },100);
       }
-      return false;
+      return true;
     }
     if(this.sitting===f)this.stand();
     if(this.riding===f)this.disembark();
-    FX.debris(c,col,12,3.2);
+    FX.debris(c,col,14,3.2);
     Sfx.smash();
     UI.toast('🪓 '+this.DEFS[f.def].n+' hancur');
     this.remove(f,true);
-    Player.addXP(1);
+    Player.addXP(2);
     return true;
   },
 
@@ -2290,18 +2472,65 @@ const Action={
       return {kind:'pet-dismount',label:'🐾 Turun',
         pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
     }
-    const n=NPCS.nearby();
-    if(n)return {kind:'talk',npc:n,
-      label:`💬 Bicara · ${n.role.e} ${n.name}`,
-      pos:n.pos.clone().add(new THREE.Vector3(0,1.95,0))};
-    const f=Furni.nearest(Player.pos);
-    if(f)return {kind:'furni',furni:f,label:Furni.DEFS[f.def].label,
-      pos:new THREE.Vector3(f.x,f.y+1.15,f.z)};
-    /* ALTAR RITUAL: interaksi bagian tengah altar untuk membuka UI ingredient */
-    if(typeof Altar!=='undefined'&&Altar.nearest){
-      const al=Altar.nearest(Player.pos);
-      if(al)return {kind:'altar',altar:al,label:'🔮 Isi Altar Ritual',
-        pos:new THREE.Vector3(al.x,al.y+4.9,al.z)};
+    /* Calon interaksi: kumpulkan kandidat interaksi jarak sangat dekat (<1.35 blok)
+       lalu pilih kandidat dengan skor terbaik berdasarkan jarak & arah hadap pemain.
+       Ini mencegah bentrok bila 2 objek/NPC berdekatan: pemain cukup menghadap
+       ke objek/NPC yang dituju tanpa salah sasaran. */
+    const candidates = [];
+    const pPos = Player.pos;
+    const pFacing = (Player.facing !== undefined) ? Player.facing : 0;
+
+    const n = (typeof NPCS !== 'undefined' && NPCS.nearby) ? NPCS.nearby(pPos, 1.35) : null;
+    if(n){
+      const dx = n.pos.x - pPos.x, dz = n.pos.z - pPos.z;
+      const d = Math.hypot(dx, dz);
+      let diff = Math.abs(Math.atan2(dx, dz) - pFacing);
+      if(diff > Math.PI) diff = Math.PI * 2 - diff;
+      candidates.push({
+        score: d + (diff > 1.4 ? 99 : diff * 0.35),
+        action: {
+          kind:'talk', npc:n,
+          label:`💬 Bicara · ${n.role.e} ${n.name}`,
+          pos:n.pos.clone().add(new THREE.Vector3(0, 1.95, 0))
+        }
+      });
+    }
+
+    const f = Furni.nearest(pPos);
+    if(f){
+      const dx = f.x - pPos.x, dz = f.z - pPos.z;
+      const d = Math.hypot(dx, dz);
+      let diff = Math.abs(Math.atan2(dx, dz) - pFacing);
+      if(diff > Math.PI) diff = Math.PI * 2 - diff;
+      candidates.push({
+        score: d + (diff > 1.4 ? 99 : diff * 0.35),
+        action: {
+          kind:'furni', furni:f, label:Furni.DEFS[f.def].label,
+          pos:new THREE.Vector3(f.x, f.y + 1.15, f.z)
+        }
+      });
+    }
+
+    if(typeof Altar !== 'undefined' && Altar.nearest){
+      const al = Altar.nearest(pPos);
+      if(al){
+        const dx = al.x - pPos.x, dz = al.z - pPos.z;
+        const d = Math.hypot(dx, dz);
+        if(d <= 2.2){
+          candidates.push({
+            score: d,
+            action: {
+              kind:'altar', altar:al, label:'🔮 Isi Altar Ritual',
+              pos:new THREE.Vector3(al.x, al.y + 4.9, al.z)
+            }
+          });
+        }
+      }
+    }
+
+    if(candidates.length > 0){
+      candidates.sort((a, b) => a.score - b.score);
+      return candidates[0].action;
     }
     const s=RPG.hotbar[RPG.sel];
     if(s&&ITEMS[s.id].place)

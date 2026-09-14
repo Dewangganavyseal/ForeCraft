@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.19',
+  VERSION:'0.2.20',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -79,7 +79,7 @@ const CFG={
     HP:120, DMG:11, SPEED:3.2, ATK_CD:1.1, REACH:1.9,
     /* --- perekrutan & mode rekan --- */
     TEAM_MAX:3,               // rekan aktif maksimum
-    TALK_R:3.2,               // jarak pemain bisa mengajak bicara / merekrut
+    TALK_R:1.35,              // jarak pemain bisa mengajak bicara / merekrut (dibuat sangat dekat agar tidak bentrok)
     FOLLOW_R:3.6,             // rekan berhenti mendekat pada jarak ini
     TELEPORT_R:34,            // rekan yang tertinggal jauh dipanggil ulang
     GATHER_R:18,              // radius maksimum rekan mencari resource

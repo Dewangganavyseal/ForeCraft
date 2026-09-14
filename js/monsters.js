@@ -1039,63 +1039,57 @@ const Monsters={
     }
 
     const d=
-      m.type==='slime'?[['gel',1+(Math.random()<0.5?1:0)]]:
+      m.type==='slime'?[['gel',1+(Math.random()<0.5?1:0)],['green_blood',Math.random()<0.20?1:0]]:
       m.type==='boar'?[['meat',1+(Math.random()<0.5?1:0)],['fiber',Math.random()<0.4?1:0]]:
       /* serigala: kulit bulu untuk armor kulit + daging */
       m.type==='wolf'?[['pelt',1+(Math.random()<0.45?1:0)],['meat',1]]:
-      /* kalajengking: racun sebagai bahan langka */
-      m.type==='scorpion'?[['venom',1],['fiber',Math.random()<0.5?1:0]]:
+      /* kalajengking: racun kalajengking + bahan altar 20% (racun berbisa, kulit keras, kaki serangga) */
+      m.type==='scorpion'?[['venom',1],['fiber',Math.random()<0.5?1:0],['toxic_venom',Math.random()<0.20?1:0],['hard_shell',Math.random()<0.20?1:0],['insect_leg',Math.random()<0.20?1:0]]:
        /* kelinci: daging + jarang sekali bulu halus */
        m.type==='rabbit'?[['meat',1],['fiber',Math.random()<0.25?1:0]]:
        /* ternak: daging + kulit */
        m.type==='cow'?[['meat',2],['leather',2]]:
        m.type==='horse'?[['meat',2],['leather',2]]:
-       /* kelabang: kulit kelabang + racun (kepala; ruas menjatuhkan kulit sendiri) */
-       m.type==='kelabang'?[['centipede_shell',2],['venom',1]]:
+       /* kelabang: kulit kelabang + racun + bahan altar (40%, tidak ada 100%) */
+       m.type==='kelabang'?[['centipede_shell',2],['venom',1],['toxic_venom',Math.random()<0.40?1:0],['hard_shell',Math.random()<0.40?1:0],['insect_leg',Math.random()<0.40?1:0]]:
        /* potongan ruas kelabang: kulit kelabang murni */
-       m.type==='kelabang_part'?[['centipede_shell',1+(Math.random()<0.5?1:0)]]:
-       /* kumbang tanduk: cangkang (kulit kelabang) + serat */
-       m.type==='kumbang'?[['centipede_shell',1+(Math.random()<0.4?1:0)],['fiber',Math.random()<0.5?1:0]]:
+       m.type==='kelabang_part'?[['centipede_shell',1+(Math.random()<0.5?1:0)],['toxic_venom',Math.random()<0.20?1:0]]:
+       /* kumbang tanduk: cangkang + bahan altar 20% (kulit keras, kaki serangga, darah hijau) */
+       m.type==='kumbang'?[['centipede_shell',1+(Math.random()<0.4?1:0)],['fiber',Math.random()<0.5?1:0],['hard_shell',Math.random()<0.20?1:0],['insect_leg',Math.random()<0.20?1:0],['green_blood',Math.random()<0.20?1:0]]:
        /* yeti: bulu tebal (dipakai armor kulit) + daging besar */
        m.type==='yeti'?[['pelt',2],['meat',2]]:
-       /* semut raksasa: cangkang keras + kaki serangga sesekali */
-       m.type==='semut'?[['centipede_shell',1],['fiber',Math.random()<0.5?1:0]]:
-       /* REAPER (penjaga dungeon): pecahan jiwa + inti boss bila mini boss.
-          `soul_shard` adalah bahan langka khas reruntuhan. */
+       /* semut raksasa: cangkang + bahan altar 20% (kaki serangga, darah hijau, racun berbisa) */
+       m.type==='semut'?[['centipede_shell',1],['fiber',Math.random()<0.5?1:0],['insect_leg',Math.random()<0.20?1:0],['green_blood',Math.random()<0.20?1:0],['toxic_venom',Math.random()<0.20?1:0]]:
+       /* REAPER (penjaga dungeon): pecahan jiwa + kristal */
        m.type==='reaper'?[['soul_shard',1+(Math.random()<0.45?1:0)],
                           ['crystal',Math.random()<0.35?1:0]]:
-       /* T-REX: daging melimpah + kulit keras purba */
-       m.type==='trex'?[['meat',4],['hard_shell',2],['boss_core',1]]:
+       /* T-REX: daging melimpah + kulit keras purba (20% hard_shell, tidak 100%) */
+       m.type==='trex'?[['meat',4],['hard_shell',Math.random()<0.20?1:0],['boss_core',1]]:
+       m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.20?1:0],['green_blood',Math.random()<0.20?1:0]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
     /* boss selalu menjatuhkan inti boss (bahan set kristal) + drop ganda */
     if(m.boss){
       d.push(['boss_core',1]);
       for(const e of d)e[1]*=2;
     }
-    /* ---------- 4 BAHAN RITUAL ALTAR: SANGAT LANGKA (masing-masing 1%) ----------
-       Kaki Serangga, Kulit Keras, Darah Hijau, dan Racun Berbisa hanya
-       dijatuhkan MOB BIASA yang mati di dalam biome TANAH MERAH (REDLANDS).
-       Peluang tiap bahan diundi terpisah 1%, jadi mengumpulkan keempatnya butuh
-       usaha panjang. KELABANG (boss) & ruas tubuhnya TIDAK menjatuhkan bahan ini
-       supaya ritual tidak bisa "mendaur" boss-nya sendiri. */
-    if(m.type!=='kelabang'&&m.type!=='kelabang_part'&&
-       typeof WGEN!=='undefined'&&WGEN.biomeAt&&
+    /* ---------- 4 BAHAN RITUAL ALTAR: BONUS TANAH MERAH (20%) ----------
+       Kaki Serangga, Kulit Keras, Darah Hijau, dan Racun Berbisa memiliki
+       peluang drop ekstra 20% per bahan untuk SEMUA mob yang mati di dalam
+       biome TANAH MERAH (REDLANDS). */
+    if(typeof WGEN!=='undefined'&&WGEN.biomeAt&&
        typeof BIOME!=='undefined'&&BIOME.REDLANDS!==undefined){
       const bi=WGEN.biomeAt(Math.floor(m.pos.x),Math.floor(m.pos.z));
       if(bi===BIOME.REDLANDS){
         for(const rid of ['insect_leg','hard_shell','green_blood','toxic_venom'])
-          if(Math.random()<0.01)d.push([rid,1]);
+          if(Math.random()<0.20)d.push([rid,1]);
       }
     }
-    /* ---------- MINI BOSS: peluang 15% menjatuhkan 1 bahan ritual Altar ----------
-       Permintaan pemain: sumber bahan altar selain Redlands & peti boss.
-       Mini boss dunia (boss raksasa acak, bukan kelabang ritual) menjatuhkan
-       SATU bahan altar acak dengan peluang 15% (+5% dari 10% pembanding peti
-       boss dungeon yang kini 20%). Berlaku di biome mana pun agar kejar-kejaran
-       mini boss lebih terasa berharga. */
-    if(m.boss&&m.type!=='kelabang'&&m.type!=='kelabang_part'&&Math.random()<0.15){
+    /* ---------- MINI BOSS: peluang 40% menjatuhkan 1 bahan ritual Altar ----------
+       Mini boss dunia (boss raksasa acak) menjatuhkan bahan altar dengan
+       peluang 40% di biome mana pun agar perburuan boss terasa berharga. */
+    if(m.boss&&m.type!=='kelabang'&&m.type!=='kelabang_part'){
       const altar=['insect_leg','hard_shell','green_blood','toxic_venom'];
-      d.push([altar[(Math.random()*altar.length)|0],1]);
+      if(Math.random()<0.40) d.push([altar[(Math.random()*altar.length)|0],1]);
     }
     for(const[id,n]of d)if(n>0)
       FX.spawnDrop(m.pos.clone().add(new THREE.Vector3(rand(-0.4,0.4),0.6,rand(-0.4,0.4))),id,n);

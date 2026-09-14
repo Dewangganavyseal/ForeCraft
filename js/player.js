@@ -788,24 +788,25 @@ const Player={
     const pcx=Math.floor(this.pos.x),pcz=Math.floor(this.pos.z);
     let blkHit=null,bestScore=Infinity;
 
-    /* 1. ORE 3D MESH COLLIDER: prioritas utama bila pemain menempel atau berdiri
-       di atas bongkahan Env_Ore dari SISI MANA PUN (North, South, East, West, atas,
-       atau sudut diagonal) — mendeteksi node ore langsung dari 3D modelnya. */
+    /* 1. ORE 3D MESH COLLIDER: mendeteksi node ore dari 3D modelnya.
+       ATURAN HADAP KETAT: pemain WAJIB menghadap ke arah ore (forward cone diff <= 1.15 rad ≈ 66°).
+       Bila posisi membelakangi ore, TIDAK BOLEH kena, kecuali pemain berdiri tepat di atas batu ore. */
     if(typeof Env_Ore!=='undefined'&&Env_Ore.activeNodes){
       for(const node of Env_Ore.activeNodes.values()){
+        const dx=node.wx+0.5-this.pos.x, dz=node.wz+0.5-this.pos.z;
+        const distToCenter=Math.hypot(dx,dz);
+        const ang=Math.atan2(dx,dz);
+        let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
+
+        const standingOnTop = (this.pos.y >= node.wy + 0.45 && distToCenter <= 0.85);
+        if(!standingOnTop && diff > 1.15) continue; // TOLAK TOTAL BILA MEMBELAKANGI ORE
+
         if(Env_Ore.hitNode(node.wx,node.wy,node.wz,this.pos.x,this.pos.y,this.pos.z)){
-          const dx=node.wx+0.5-this.pos.x, dz=node.wz+0.5-this.pos.z;
-          const distToCenter=Math.hypot(dx,dz);
-          const ang=Math.atan2(dx,dz);
-          let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
-          /* berdiri di atas bongkahan atau menghadap ke arah bongkahan */
-          if(distToCenter<=1.2||diff<=1.8){
-            const prio=PRIO[node.blockId]!==undefined?PRIO[node.blockId]:-0.85;
-            const score=0.2+diff*0.2+prio;
-            if(score<bestScore){
-              bestScore=score;
-              blkHit={x:node.wx,y:node.wy,z:node.wz};
-            }
+          const prio=PRIO[node.blockId]!==undefined?PRIO[node.blockId]:-0.85;
+          const score=0.2+diff*0.2+prio;
+          if(score<bestScore){
+            bestScore=score;
+            blkHit={x:node.wx,y:node.wy,z:node.wz};
           }
         }
       }
@@ -828,26 +829,26 @@ const Player={
           const dx=x+0.5-this.pos.x,dz=z+0.5-this.pos.z;
           const ang=Math.atan2(dx,dz);
           let diff=Math.abs(ang-this.facing);if(diff>Math.PI)diff=Math.PI*2-diff;
-          if(diff>(edge<0.25?1.7:1.2))continue;
+          if(diff>1.15)continue; // HANYA BLOK DI DEPAN PEMAIN (FORWARD CONE ~66°)
 
           const score=edge+diff*0.3+prio+(y===fy?0:0.1);
           if(score<bestScore){bestScore=score;blkHit={x,y,z};}
         }
       }
-    if(blkHit){
-      /* proficiency gathering mempercepat memecah blok: damage pukul blok
-         dinaikkan sesuai sub-skill bloknya (mis. Penambangan utk batu/bijih). */
+
+    /* 3. Eksekusi pukulan: prioritaskan perabot yang berada tepat di hadapan pemain */
+    let spd = 0, chop = 1;
+    let hitFurni = false;
+    if(typeof Furni!=='undefined'&&Furni.hitNearest){
+      hitFurni = Furni.hitNearest(this.pos, this.facing, 3);
+    }
+    if(!hitFurni && blkHit){
       const bid=World.getBlock(blkHit.x,blkHit.y,blkHit.z);
       const bdef=(typeof BLOCK_PROF!=='undefined')?BLOCK_PROF[bid]:null;
-      const spd=(bdef&&typeof Prof!=='undefined')?Prof.speedBonus(bdef.sk):0;
-      /* SKILL PENEBANG (axe): khusus blok KAYU, pukulan jauh lebih kuat.
-         Lihat RPG.chopSpeedMult() — dulu skill ini tidak berefek apa pun. */
-      const chop=(bid===B.WOOD&&RPG.chopSpeedMult)?RPG.chopSpeedMult():1;
+      spd=(bdef&&typeof Prof!=='undefined')?Prof.speedBonus(bdef.sk):0;
+      chop=(bid===B.WOOD&&RPG.chopSpeedMult)?RPG.chopSpeedMult():1;
       World.hitBlock(blkHit.x,blkHit.y,blkHit.z,(1+spd)*chop);
     }
-    /* perabot (meja/kursi/kasur/peti/perahu) juga ikut hancur bila dipukul */
-    if(typeof Furni!=='undefined'&&Furni.hitNearest)
-      Furni.hitNearest(this.pos,this.facing);
     World.harvestPlants(this.pos,1.7);
     if(hitAny){UI.showCombo(ci+1);FX.addShake(ci===4?0.35:0.12);}
     if(ci===4)FX.ring(this.pos.x+Math.sin(this.facing)*1.3,this.pos.y+0.1,this.pos.z+Math.cos(this.facing)*1.3,0xffd24d,0.4,2.4);

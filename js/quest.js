@@ -730,7 +730,7 @@ Furni.buildBoard=function(){
 };
 
 Furni.DEFS.board={
-  n:'Papan Quest',e:'📜',item:'f_board',r:2.2,label:'📜 Papan Quest',
+  n:'Papan Quest',e:'📜',item:'f_board',r:1.25,label:'📜 Papan Quest',
   build(){return Furni.buildBoard();},
   use(f){Quest.open(f);},
 };

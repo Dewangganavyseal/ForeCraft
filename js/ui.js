@@ -2068,7 +2068,21 @@ const UI={
         deco(d,it);
         d.addEventListener('click',()=>{
           if(this._chestSkipClick){this._chestSkipClick=false;return;}
-          Furni.chestTake(f,i);
+          if(s.n <= 1){
+            Furni.chestTake(f,i,1);
+          }else{
+            this.modal({
+              icon: this.itemIcon(s.id),
+              text: `Ambil <b>${it ? it.n : s.id}</b> dari Peti ke Tas?<br><span class="m-sub">Tersedia di peti: ${s.n} unit</span>`,
+              input: { value: s.n, min: 1, max: s.n },
+              allLabel: `Semua (${s.n})`,
+              okLabel: '📥 Ambil',
+              cancelLabel: '✖ Batal',
+              onOk: (qty) => {
+                Furni.chestTake(f, i, qty);
+              }
+            });
+          }
         });
       }
       gEl.appendChild(d);
@@ -2088,7 +2102,21 @@ const UI={
         deco(d,it);
         d.addEventListener('click',()=>{
           if(this._chestSkipClick){this._chestSkipClick=false;return;}
-          Furni.chestPut(f,arr,i);
+          if(s.n <= 1){
+            Furni.chestPut(f,arr,i,1);
+          }else{
+            this.modal({
+              icon: this.itemIcon(s.id),
+              text: `Simpan <b>${it ? it.n : s.id}</b> dari Tas ke Peti?<br><span class="m-sub">Tersedia di tas: ${s.n} unit</span>`,
+              input: { value: s.n, min: 1, max: s.n },
+              allLabel: `Semua (${s.n})`,
+              okLabel: '📤 Simpan',
+              cancelLabel: '✖ Batal',
+              onOk: (qty) => {
+                Furni.chestPut(f, arr, i, qty);
+              }
+            });
+          }
         });
       }
       bEl.appendChild(d);

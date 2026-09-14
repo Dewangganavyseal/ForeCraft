@@ -722,9 +722,9 @@ const Dungeon={
      dua kali setelah dibuka.
      ========================================================================= */
   BOSS_CHEST_SCALE:1.8,          // peti boss jauh lebih besar dari peti biasa
-  /* RARE_CHANCE 20% (dulu 10%, permintaan pemain +10%): peluang peti boss
-     dungeon memberi SATU item langka — termasuk 4 bahan ritual Altar. */
-  RARE_CHANCE:0.20,
+  /* RARE_CHANCE 40%: peluang peti boss dungeon memberi SATU item langka
+     (termasuk 4 bahan ritual Altar: insect_leg/hard_shell/green_blood/toxic_venom). */
+  RARE_CHANCE:0.40,
   /* Item langka: normalnya sangat sulit didapat. Bahan ritual Altar
      (insect_leg/hard_shell/green_blood/toxic_venom) biasanya hanya 1% drop dari
      mob Redlands, jadi menemukannya di sini adalah jalan pintas berharga. */
@@ -884,7 +884,7 @@ const Dungeon={
        'chest' (peti penyimpanan pemain). Modelnya sama-sama voxel Chest.html
        (PortChest) tetapi isinya loot acak, bukan inventori titipan. */
     Furni.DEFS.dchest={
-      n:'Peti Harta',e:'🧰',item:null,r:1.9,label:'🧰 Buka Peti',
+      n:'Peti Harta',e:'🧰',item:null,r:1.35,label:'🧰 Buka Peti',
       build(){return typeof PortChest!=='undefined'
         ?PortChest.build():Dungeon.buildChest();},
       use(f){Dungeon.openChest(f);},

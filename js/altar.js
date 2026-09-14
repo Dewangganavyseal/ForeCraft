@@ -350,7 +350,8 @@ const Altar={
     if(!this.current){el.innerHTML='<p class="tip">Tidak ada altar aktif.</p>';return;}
     let rows='';
     for(const id in this.REQ){
-      const need=this.REQ[id],have=RPG.countItem(id);
+      const need=this.REQ[id];
+      const have=RPG.countItem(id);
       const it=ITEMS[id]||{e:'❔',n:id};
       const ok=have>=need;
       rows+=`<div class="altar-ing ${ok?'ok':'no'}" style="border-color:${ok?'#ff3838':'#7a2020'};background:${ok?'rgba(255,56,56,0.18)':'rgba(40,10,10,0.35)'}">
