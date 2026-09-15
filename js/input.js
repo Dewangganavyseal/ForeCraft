@@ -186,13 +186,14 @@ const Input={
         const sens=0.0032;
         Cam.yaw-=dx*sens;
         /* Gerak mouse ke bawah (dy > 0): elevasi naik -> kamera menunduk melihat tanah.
-           Gerak mouse ke atas (dy < 0): elevasi turun -> kamera mendongak melihat langit. */
-        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*sens,-0.65,0.75);
+           Gerak mouse ke atas (dy < 0): elevasi turun -> kamera mendongak ke atas karakter.
+           Rentang diperluas agar orbit FPP bebas penuh ke atas/bawah (khusus FPP/TPP, isometrik tak terpengaruh). */
+        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*sens,-1.55,1.22);
       }else if(this.rmb){
         const dx=e.clientX-this.lastMX;
         const dy=e.clientY-this.lastMY;
         Cam.yaw-=dx*0.005;
-        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*0.005,-0.65,0.75);
+        Cam.tppPitch=clamp((Cam.tppPitch||0)+dy*0.005,-1.55,1.22);
         this.lastMX=e.clientX;this.lastMY=e.clientY;
       }
     });

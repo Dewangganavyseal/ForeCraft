@@ -1,0 +1,20 @@
+Ringkasan Perubahan di v0.2.22
+Drop Blok Khusus Biome: Hanya blok alami biome (rumput, tanah, batu, pasir, salju, tanah merah) yang jatuh sebagai blok; pohon/kayu yang ditebang tetap menjadi item bahan wood biasa.
+Tab Blok di Tas: Blok bangunan tersimpan di tab tersendiri (RPG.blockBag, 21 slot, stack hingga 64) tanpa memenuhi inventori biasa.
+Mode Bangun (Building Mode) Presisi FPP: Penempatan blok di mode FPP terkunci tepat di crosshair tengah layar (0,0), 100% selaras dengan posisi preview ghost.
+Drag Horizontal & Modal Konfirmasi: Menyeret mouse/jari memperluas seleksi blok secara horizontal; saat dilepas muncul modal konfirmasi konfirmasi jumlah blok sebelum dipasang serentak (dioptimalkan untuk desktop dan mobile).
+Tombol Mobile: Tombol icon Mode Bangun (#m-build) di samping deretan menu HUD mobile.
+Rotasi Pedang (Player & Royal Guard): Bilah diputar 45° kesamping pada sumbu panjangnya agar kedua mata bilah menghadap ke atas dan ke bawah.
+📌 Catatan Panduan Penggabungan (Merge) di PC Satunya:
+Saat Anda membuka proyek di PC satunya yang sudah memiliki sistem pancing:
+Amankan Pekerjaan Lokal Terlebih Dahulu:
+git stash
+Tarik Pembaruan v0.2.22:
+git pull origin main
+Kembalikan dan Gabungkan Kode Pancing:
+git stash pop
+Poin yang Perlu Diperhatikan Saat Merge:
+- Di js/config.js: Pastikan definisi ITEMS.fishing_rod dan resep crafting pancing di RECIPES tetap menyatu dengan penambahan ITEMS.blk_* dan BLOCK_TO_ITEM.
+- Di js/player/held_items.js: Pastikan rotasi hold pancing menggunakan rot: [-0.05, 0, 0] agar joran pancing mengarah lurus ke depan seperti pedang (tidak menunduk ke bawah).
+- Di js/player.js & js/entities/npc_royalguard.js: Pertahankan rotasi bilah pedang 45 derajat (sw.rotation.set(Math.PI/2, Math.PI/4, 0) dan w.rotation.set(0, Math.PI/4, 0)).
+- Jalankan npm run build setelah penggabungan selesai.

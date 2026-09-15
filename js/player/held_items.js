@@ -10,7 +10,14 @@ const HeldModels={
   _mats:{},
   mat(c){
     const k=String(c);
-    if(!this._mats[k])this._mats[k]=new THREE.MeshLambertMaterial({color:c});
+    if(!this._mats[k]){
+      const m=new THREE.MeshLambertMaterial({color:c});
+      /* tandai material yang dipakai BERSAMA agar tidak ikut dibuang
+         (dispose) saat refreshWeapon membersihkan model lama — jika dibuang,
+         semua item lain & joran yang memakai warna sama jadi hilang/rusak. */
+      m.userData.heldShared=true;
+      this._mats[k]=m;
+    }
     return this._mats[k];
   },
   box(g,w,h,d,c,x=0,y=0,z=0,rx=0,ry=0,rz=0){
@@ -130,6 +137,22 @@ const HeldModels={
       this.box(g,0.16,0.12,0.08,0xf6f3ec,0,0,0.02);
       this.box(g,0.04,0.02,0.16,0xd8d2c6,0,0.06,0);
     },
+    /* alat pancing: porting model joran dari Smelter, Rod.html */
+    fishing_rod(g){
+      if(typeof Fishing !== 'undefined' && Fishing.buildHeldRod){
+        const r = Fishing.buildHeldRod();
+        g.add(r);
+        g.userData.hold = { pos: [0, -0.29, 0.04], rot: [-0.05, 0, 0], scale: 0.95 };
+      }else{
+        this._buildFishingRod(g);
+      }
+    },
+    rod(g){
+      this.fishing_rod(g);
+    },
+    pancing(g){
+      this.fishing_rod(g);
+    },
     /* ikan: memakai model ikan yang sudah ada (Env_Fish) */
     fish(g){
       if(window.Env_Fish){
@@ -193,13 +216,6 @@ const HeldModels={
     hoe(g){
       this.box(g,0.05,0.46,0.05,0x8a5f35,0,-0.05,0);
       this.box(g,0.16,0.10,0.04,0x9aa2ac,0,0.20,0.04,0.5,0,0);
-    },
-    /* alat: pancing (joran memanjang lurus ke depan seperti pedang) */
-    fishing_rod(g){
-      this._buildFishingRod(g);
-    },
-    pancing(g){
-      this._buildFishingRod(g);
     },
     /* item 3D khusus untuk drop & held */
     boss_core(g){

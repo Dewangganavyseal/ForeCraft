@@ -212,7 +212,9 @@ const Player={
       if(c.name&&(c.name.indexOf('Weapon_')===0||c.name.indexOf('Held_')===0)){
         fore.remove(c);
         c.traverse(o=>{if(o.geometry)o.geometry.dispose();
-          if(o.material)o.material.dispose();});
+          /* JANGAN buang material yang dipakai bersama (cached HeldModels) —
+             kalau dibuang, joran pancing & item lain berwarna sama ikut hilang. */
+          if(o.material&&!(o.material.userData&&o.material.userData.heldShared))o.material.dispose();});
       }
     }
     const id=(typeof RPG!=='undefined'&&RPG.weaponId)?RPG.weaponId():null;
@@ -222,9 +224,9 @@ const Player={
       WeaponManager.attachToCharacterHand(this.parts,id);
       const sw=this.parts.sword;
       if(sw){
-        /* Normalisasi posisi grip di kepalan: bilah forward 90° & putar 45° kesamping agar mata bilah menghadap atas/bawah */
+        /* Normalisasi posisi grip di kepalan: bilah forward 90° & putar 90° kesamping pada sumbu panjangnya agar kedua mata bilah menghadap lurus atas & bawah */
         sw.position.set(0,-0.29,0.02);
-        sw.rotation.set(Math.PI/2,Math.PI/4,0);
+        sw.rotation.set(Math.PI/2,Math.PI/2,0);
         /* kompatibilitas nyala combo (updateSwordGlow): kumpulkan material
            ber-emissive sebagai glowMats + warna dasarnya. Grup aura (userData.fx)
            dianimasikan builder sendiri via tick(), jadi dilewati agar tidak
@@ -480,9 +482,14 @@ const Player={
      }
      /* pertanian: cangkul / tanam / panen memakai tombol serang */
      if(typeof Farming!=='undefined'&&Farming.tryUse(this))return;
-     /* makanan: klik/tombol serang dipakai untuk makan saat sedang memegang
-        makanan (ala Minecraft), bukan memukul. */
-     if(typeof RPG!=='undefined'&&RPG.tryEatSelected&&RPG.tryEatSelected())return;
+      /* makanan: klik/tombol serang dipakai untuk makan saat sedang memegang
+         makanan (ala Minecraft), bukan memukul. */
+      if(typeof RPG!=='undefined'&&RPG.tryEatSelected&&RPG.tryEatSelected())return;
+      /* MEMANCING: klik/tombol serang dipakai untuk melempar & menggulung kail
+         saat pemain memegang Alat Pancing (rod). */
+      if(typeof Fishing!=='undefined'&&Fishing.isHoldingRod&&Fishing.isHoldingRod()){
+        Fishing.tryCast();return;
+      }
      /* item dengan mekanik pakai (Dungeon Changer, dll.): klik = pakai item,
         bukan menyerang. Diletakkan setelah makan supaya prioritas tetap. */
      if(typeof RPG!=='undefined'&&RPG.useSelected&&RPG.useSelected())return;
@@ -766,10 +773,6 @@ const Player={
       this.hitStop=Math.min(0.09,0.03+ci*0.012);
       if(ci===4)FX.shockwave(this.pos.x+Math.sin(this.facing)*1.3,this.pos.y+0.1,this.pos.z+Math.cos(this.facing)*1.3,0xff6b57,4.5);
     }
-    /* ikan yang berenang di perairan bisa ditangkap dengan serangan biasa
-       (sistem FishSys — porting fish.html) */
-    if(typeof FishSys!=='undefined'&&FishSys.checkHit(reach,this.facing))
-      hitAny=true;
     /* ---------- pilih blok yang dipukul ----------
        Dulu hanya batang pohon (WOOD) yang dicari menyapu area, sementara
        batu & bijih memakai satu titik di depan pemain. Akibatnya bijih
@@ -803,6 +806,7 @@ const Player={
 
         const standingOnTop = (this.pos.y >= node.wy + 0.45 && distToCenter <= 0.85);
         if(!standingOnTop && diff > 1.15) continue; // TOLAK TOTAL BILA MEMBELAKANGI ORE
+        if(!standingOnTop && distToCenter > 2.5) continue; // ore hanya kena bila benar-benar dekat/depan
 
         if(Env_Ore.hitNode(node.wx,node.wy,node.wz,this.pos.x,this.pos.y,this.pos.z)){
           const prio=PRIO[node.blockId]!==undefined?PRIO[node.blockId]:-0.85;
@@ -1330,6 +1334,9 @@ const Player={
       this.animator=new PlayerAnimator(this.parts);
     }
     const an=this.animator;
+    /* Beri tahu animator kecepatan gerak horizontal AKTUAL supaya fase langkah
+       kaki disinkronkan ke JARAK tempuh (anti sliding), bukan ke waktu tetap. */
+    an.moveSpeed=(moving&&this.onGround&&!this.inWater)?hspd:(this.inWater&&moving?hspd*0.6:0);
 
     /* COMBO VFX/SYSTEM (port NEW MODEL/New Animation):
        - ComboVFX  : trail pedang, slash arc, spark, shockwave, flash, shake.
@@ -1441,6 +1448,9 @@ const Player={
     if(this.inWater){
       this._airJumpPlayed=false;
       if(an.currentAnim!=='jump')an.setAnimation('jump');
+    }else if(typeof Furni!=='undefined'&&Furni.sittingPose){
+      /* duduk di kursi: pose duduk, kaki tidak melangkah */
+      if(an.currentAnim!=='sit')an.setAnimation('sit');
     }else if(!this.onGround){
       /* di udara: pose statis 'jump' ditahan selama melayang (bukan one-shot,
          jadi tidak auto-selesai — fisikanya yang menggerakkan naik-turun) */

@@ -375,10 +375,18 @@ const BuildSys = {
     const held = this.getHeldBlock();
     const it = held ? ITEMS[held.id] : null;
     const bColor = (it && BLOCK_INFO[it.blockId]) ? BLOCK_INFO[it.blockId].color : 0x58b868;
+    /* Ghost hanya boleh menampilkan sejumlah blok yang benar-benar tersedia di tas.
+       Bila drag lebih luas dari sisa blok, sel sisanya ditandai invalid (abu-abu)
+       sehingga tidak ikut dipasang & tidak menambah ghost valid. */
+    const available = (typeof RPG !== 'undefined' && RPG.countBlock && held)
+      ? RPG.countBlock(held.id) : (held ? held.n : 0);
+    let validLeft = available;
 
     for (let x = minX; x <= finalMaxX; x++) {
       for (let z = minZ; z <= finalMaxZ; z++) {
-        const valid = this.canPlaceBlock(x, py, z);
+        let valid = this.canPlaceBlock(x, py, z);
+        if (valid && validLeft <= 0) valid = false; // habiskan jatah blok
+        if (valid) validLeft--;
         this.dragSelection.push({ px: x, py, pz: z, valid });
       }
     }

@@ -1085,6 +1085,14 @@ const UI={
     }
     const merchant=this.shopNpc;
     const stock=(merchant&&merchant.shop)?merchant.shop:[];
+    /* JAMINAN upgrade tas SELALU tersedia di pedagang mana pun selama tier belum
+       maksimum (dulu hanya 25% muncul di stok acak sehingga sering tak terlihat).
+       Entri dihitung ulang tiap render agar harganya mengikuti bagTier terkini. */
+    if(merchant&&RPG.bagTier<RPG.BAG_MAX_TIER){
+      let bag=stock.find(g=>g.id==='bag');
+      if(!bag){bag={id:'bag',price:BAG_PRICES[RPG.bagTier],n:1};stock.push(bag);}
+      else{bag.price=BAG_PRICES[RPG.bagTier];if(bag.n<=0)bag.n=1;}
+    }
     /* judul & label sub-panel dikembalikan ke bawaan pedagang (Dungeon Master
        mengubahnya di renderDungeonShop) */
     const panel=document.getElementById('panel-shop');
@@ -2063,7 +2071,7 @@ const UI={
     const curSel=(RPG.selectedBlockSlot>=0)?RPG.blockBag[RPG.selectedBlockSlot]:null;
     if(curSel&&ITEMS[curSel.id]){
       const it=ITEMS[curSel.id];
-      if(descIcon)descIcon.innerHTML=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(curSel.id):it.e;
+      if(descIcon)descIcon.textContent=it.e||'🧱';
       if(descName)descName.innerHTML=`Blok Aktif: <b>${it.n}</b> (×${curSel.n})`;
     }else{
       if(descIcon)descIcon.textContent='🧱';
@@ -2085,8 +2093,15 @@ const UI={
       if(RPG.selectedBlockSlot===i&&s)d.classList.add('picked');
       if(s&&s.n>0){
         const it=ITEMS[s.id];
-        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`;
+        /* Blok belum punya file PNG ikon tersendiri → pakai emoji langsung
+           agar tidak berkedip "gambar rusak" saat slot di-render ulang. */
+        d.innerHTML=`<span class="emo">${(it&&it.e)?it.e:'🧱'}</span><span class="cnt">${s.n>1?s.n:''}</span>`;
         d.title=`${it?it.n:s.id} (×${s.n})\nKlik untuk memilih blok ini`;
+        /* bingkai slot memakai warna rarity agar konsisten dengan tas biasa */
+        if(it&&it.rarity&&RARITY[it.rarity]){
+          d.classList.add('r-'+it.rarity);
+          d.style.borderColor=RARITY[it.rarity].css;
+        }
         d.addEventListener('click',()=>{
           RPG.selectedBlockSlot=i;
           this.renderBlockBag();

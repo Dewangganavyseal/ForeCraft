@@ -1424,6 +1424,34 @@ const NPCS={
     }
     return {x:dx,z:dz,ox,oz,ix,iz};
   },
+  /* ---------- RUTE PINTU TERPUSTAKAKAN ----------
+     Dipakai SEMUA NPC (bukan hanya tim) agar bisa keluar-masuk bangunan lewat
+     pintu, bukan menabrak tembok. Bila tujuan (gx,gz) berada DI DALAM sebuah
+     bangunan sementara NPC belum di dalam bangunan yang sama, arah diarahkan ke
+     mulut luar pintu lebih dulu; begitu dekat pintu, diarahkan ke titik dalam.
+     Mengembalikan {gx,gz} yang sudah disesuaikan (sama dengan argumen bila tidak
+     ada bangunan di tujuan). */
+  doorRoute(n,gx,gz){
+    if(typeof WGEN==='undefined'||!WGEN.buildingAt)return{gx,gz};
+    const gb=WGEN.buildingAt(gx,gz,0);
+    const nb=WGEN.buildingAt(n.pos.x,n.pos.z,0);
+    if(gb&&gb!==nb){
+      /* tujuan di dalam bangunan lain -> masuk lewat pintu (luar dulu, lalu dalam) */
+      const dr=this.doorOf(gb);
+      const dOut=Math.hypot(dr.ox-n.pos.x,dr.oz-n.pos.z);
+      if(dOut>1.15)return{gx:dr.ox,gz:dr.oz};   // masih jauh -> menuju mulut luar pintu
+      return{gx:dr.ix,gz:dr.iz};                // sudah dekat -> masuk lewat pintu
+    }
+    if(nb&&!gb){
+      /* KEBALIKNYA: NPC sedang DI DALAM bangunan (mis. tavern) sementara tujuan
+         di luar -> ia harus KELUAR lewat pintu lebih dulu, bukan menabrak dinding. */
+      const dr=this.doorOf(nb);
+      const dIn=Math.hypot(dr.ix-n.pos.x,dr.iz-n.pos.z);
+      if(dIn>1.15)return{gx:dr.ix,gz:dr.iz};    // menuju titik dalam pintu
+      return{gx:dr.ox,gz:dr.oz};                 // lalu keluar ke sisi luar pintu
+    }
+    return{gx,gz};
+  },
   /* =========================================================================
      TABRAKAN ANTAR-NPC
       -------------------------------------------------------------------------
@@ -1551,7 +1579,16 @@ const NPCS={
        jangkauan & sedang mengayun, jadi macet SUNGGUHAN (tak bisa mencapai
        node) tetap terdeteksi seperti biasa. */
     if(n.working){n.stuckT=0;n.working=false;return;}
-    const wantsToMove=n.state!=='wait'&&(this.isTeam(n)||!!n.target);
+    /* Rekan / monster yang dikejar selalu ingin gerak. NPC patrol non-tim juga
+       dianggap "ingin bergerak" saat ia sedang melangkah (n.walking) atau saat
+       terlempar jauh dari rumahnya (mis. pengembara langka nyangkut di tepi
+       tavern/sempadan bangunan) → stuckT boleh menumpuk supaya bisa melepas diri
+       dengan membaliK arah & sisi belokan (bukan diam menempel tembok selamanya). */
+    let wantsToMove=n.state!=='wait'&&(this.isTeam(n)||!!n.target);
+    if(!wantsToMove&&n.state==='patrol'){
+      const farHome=n.home&&Math.hypot(n.pos.x-n.home.x,n.pos.z-n.home.z)>CFG.NPC.HOME_R;
+      wantsToMove=!!(n._pWantMove||farHome||n.walking);
+    }
     if(!wantsToMove||moved>=0.18){n.stuckT=0;return;}
     n.stuckT=(n.stuckT||0)+0.5;
     /* macet sebentar → balik sisi belokan & paksa repath (detourT di-nol-kan
@@ -2329,17 +2366,32 @@ const NPCS={
     const R=n.tavernSpot?4.5:CFG.NPC.HOME_R;
     const dh=Math.hypot(n.pos.x-n.home.x,n.pos.z-n.home.z);
     if(dh>R){
-      n.dir=Math.atan2(n.home.x-n.pos.x,n.home.z-n.pos.z);n.t=1.5;
+      n.dir=Math.atan2(n.home.x-n.pos.x,n.home.z-n.pos.z);n.t=1.5;n._pWantMove=true;
     }else if(n.t<=0){
       n.t=rand(2,5);n.dir=Math.random()*Math.PI*2;
       n.walking=Math.random()<(n.tavernSpot?0.35:0.65);
+      /* saat berhenti melangkah, matikan flag gerak agar stuck tidak terhitung */
+      if(!n.walking)n._pWantMove=false;
     }
     if(n.walking||dh>R){
-      n.mesh.rotation.y=angLerp(n.mesh.rotation.y,n.dir,dt*4);
-      const sp=n.speed*(n.tavernSpot?0.28:0.42);
-      n.vel.x=lerp(n.vel.x,Math.sin(n.dir)*sp,clamp(4*dt,0,1));
-      n.vel.z=lerp(n.vel.z,Math.cos(n.dir)*sp,clamp(4*dt,0,1));
-    }else{n.vel.x*=0.85;n.vel.z*=0.85;}
+      /* TUJUAN: pulang ke home (rute pintu) bila terlalu jauh, else langkah acak
+         yang juga dirutekan lewat pintu bila menembus bangunan. */
+      let gx,gz;
+      if(dh>R){gx=n.home.x;gz=n.home.z;}
+      else{
+        const step=4;
+        gx=n.pos.x+Math.sin(n.dir)*step;
+        gz=n.pos.z+Math.cos(n.dir)*step;
+      }
+      const rt=this.doorRoute(n,gx,gz);
+      const ang=this.steer(n,Math.atan2(rt.gx-n.pos.x,rt.gz-n.pos.z));
+      n.dir=ang;
+      n.mesh.rotation.y=angLerp(n.mesh.rotation.y,ang,dt*4);
+      const sp=n.speed*(n.tavernSpot?0.28:0.42)*(dh>R?1.7:1);
+      n.vel.x=lerp(n.vel.x,Math.sin(ang)*sp,clamp(4*dt,0,1));
+      n.vel.z=lerp(n.vel.z,Math.cos(ang)*sp,clamp(4*dt,0,1));
+      n._pWantMove=true;
+    }else{n.vel.x*=0.85;n.vel.z*=0.85;n._pWantMove=false;}
   },
 
   physics(n,dt){

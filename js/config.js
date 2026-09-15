@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.22',
+  VERSION:'0.2.23',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -661,6 +661,7 @@ const ITEMS={
   /* ---------- pertanian ---------- */
   hoe:{n:'Cangkul',e:'⛏️',tool:'hoe',rarity:'common'},
   fishing_rod:{n:'Pancing',e:'🎣',tool:'rod',rarity:'common',desc:'Alat pancing ikan di sungai dan laut.'},
+  rod:{n:'Pancing',e:'🎣',tool:'rod',rarity:'common',desc:'Alat pancing ikan di sungai dan laut.'},
   /* ---------- LOG PASS: penanda lokasi pribadi ----------
      `tool` membuatnya TIDAK BISA di-stack (stackCap → 1) sehingga setiap Log
      Pass menempati slotnya sendiri dan bisa menyimpan tandanya masing-masing
@@ -965,7 +966,7 @@ const DROP_COLOR={
   sugar_cane:0xc9c157,sugar:0xf2ecdf,cake:0xf5d9a8,
   fish:0x93adc0,cfish:0xd98a4d,
   resin:0xd9a13c,leather:0x8a5f35,
-  hoe:0x8a5f35,fishing_rod:0x9c7848,
+  hoe:0x8a5f35,fishing_rod:0x9c7848,rod:0x9c7848,
   log_pass:0xd94a4a,
   seed_wheat:0xd4a431,seed_carrot:0xe07f1d,seed_cabbage:0x5f9e30,
   seed_tomato:0xe2451e,seed_watermelon:0x3a7d23,
@@ -1019,6 +1020,8 @@ const RECIPES=[
   {out:'pet_charm',need:{boss_core:1,gold_ingot:2,crystal:2},skill:'catch_master',name:'Jimat Pawang'},
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
   {out:'hoe',need:{wood:3,stone:2},name:'Cangkul'},
+  {out:'fishing_rod',need:{wood:3,fiber:2},name:'Pancing'},
+  {out:'rod',need:{wood:3,fiber:2},name:'Pancing'},
   /* Log Pass: penanda lokasi. Murah & bisa dibuat berulang supaya pemain bisa
      menandai banyak tempat sekaligus (tiap Log Pass menyimpan 1 tanda). */
   {out:'log_pass',need:{wood:2,fiber:2,resin:1},name:'Log Pass'},
@@ -1439,7 +1442,7 @@ const SHOP_GOODS=[
 ];
 /* nilai dasar koin per item saat dijual (fallback bila tak ada di toko) */
 const SHOP_VALUE={
-  wood:1,stone:1,fiber:1,berry:2,mush:1,gel:2,meat:3,cmeat:5,bread:3,salad:6,
+  wood:1,stone:1,fiber:1,berry:2,mush:1,gel:2,meat:3,cmeat:5,bread:3,salad:6,fishing_rod:12,rod:12,
   pie:11,bandage:7,potion_stam:8,fish:4,cfish:6,resin:3,leather:5,sand:1,coal:3,
   sugar_cane:2,sugar:5,cake:14,
   iron_ore:5,gold_ore:8,crystal:12,iron_ingot:9,gold_ingot:15,pelt:4,venom:7,

@@ -1319,63 +1319,18 @@ const FishSys={
     }
   },
 
-  /* ---------- ditangkap / diserang oleh pemain ---------- */
+  /* ---------- ditangkap / diserang oleh pemain ----------
+     Sesuai patch: ikan siluet / ikan berenang tidak bisa dipukul langsung dengan serangan */
   checkHit(reach,facing){
-    let caught=false;
-    for(let i=this.list.length-1;i>=0;i--){
-      const f=this.list[i],d=f.def;
-      /* Ikan predator yang hostile diproses lewat sistem Monsters.list dan Monsters.hurt */
-      if(d.hostile)continue;
-      const mouthDist=(d.id==='leviathan')?4.2:((d.id==='todak')?2.2:1.4);
-      const mx=f.pos.x+Math.sin(f.visDir)*mouthDist;
-      const mz=f.pos.z+Math.cos(f.visDir)*mouthDist;
-
-      const dBody=Math.hypot(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
-      const dMouth=Math.hypot(mx-Player.pos.x,mz-Player.pos.z);
-      const distHit=Math.min(dBody,dMouth);
-      const hitR=reach+(d.id==='leviathan'?2.8:0.9);
-      if(distHit>hitR)continue;
-
-      const ang=Math.atan2(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
-      let diff=Math.abs(ang-facing);
-      if(diff>Math.PI)diff=Math.PI*2-diff;
-      if(diff>1.5&&distHit>1.2)continue;
-
-      const dmg=(typeof RPG!=='undefined'&&RPG.weaponDmg)?RPG.weaponDmg():20;
-      f.hp-=dmg;
-      f.flash=0.28;
-      caught=true;
-
-      if(typeof FX!=='undefined'){
-        if(FX.debris)FX.debris(f.pos.clone(),0x8fd8ff,6,1.8);
-        if(FX.text)FX.text(f.pos.clone().add(new THREE.Vector3(0,0.8,0)),'-'+Math.round(dmg),'#ff4d4d');
-      }
-      if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(f.pos,'hit');
-
-      if(f.hp<=0){
-        this.onFishKilled(f);
-        this.despawn(i);
-      }else{
-        if(f.def.hostile){
-          f.state='chase';
-        }else{
-          f.fleeTimer=3.0;
-          f.dir=Math.atan2(f.pos.x-Player.pos.x,f.pos.z-Player.pos.z);
-          f.targetY=f.minY;
-        }
-      }
-    }
-    return caught;
+    return false;
   },
 
   /* ---------- penanganan kematian ikan & sistem drop ---------- */
   onFishKilled(f){
     const pos=f.pos.clone();
-    // 1. Ikan biasa (fish)
-    const fishCount=f.def.dropFish||(f.def.id==='leviathan'?5:(f.def.rarity==='rare'?2:1));
-    World.dropItem(pos.x,pos.y+0.4,pos.z,'fish',fishCount);
+    /* Ikan yang berenang tidak drop ikan segar saat dibunuh (harus dipancing dengan alat pancing) */
 
-    // 2. Sisik ikan (fish_scale)
+    // 1. Sisik ikan (fish_scale)
     const minSc=(f.def.dropScale&&f.def.dropScale[0])||1;
     const maxSc=(f.def.dropScale&&f.def.dropScale[1])||2;
     const scaleCount=Math.floor(rand(minSc,maxSc+1));

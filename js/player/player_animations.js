@@ -15,6 +15,9 @@ class PlayerAnimator {
     this.currentAnim = 'idle';
     this.time = 0;
     this.speed = 1.0;
+    this.moveSpeed = 0;          // kecepatan gerak horizontal aktual (blok/dtk) dari player
+    this.gait = 0;               // fase langkah terakumulasi dari JARAK (anti sliding)
+    this.gaitAmp = 0;            // amplitudo langkah halus (0 saat diam → kaki tidak beku tengah langkah)
     this.comboIndex = 0;
     this.sequenceTimer = 0;
     this.finished = false;
@@ -120,6 +123,15 @@ class PlayerAnimator {
       if (autoIdle) return;
     }
 
+    /* SINKRONISASI LANGKAH BERBASIS JARAK: fase `gait` maju mengikuti jarak yang
+       benar-benar ditempuh (moveSpeed*dt), BUKAN waktu tetap. */
+    if (this.currentAnim === 'walk' || this.currentAnim === 'sprint') {
+      const strideRate = this.currentAnim === 'sprint' ? 1.62 : 1.55;
+      const spd = Math.max(this.moveSpeed || 0, 1.2);
+      this.gait = (this.gait || 0) + spd * dt * strideRate;
+      if (this.gait > 1e6) this.gait = 0;
+    }
+
     const p = dur > 0 ? this.clamp(t / dur, 0, 1) : 0;
 
     // Event frame impact (untuk VFX / hitstop / audio)
@@ -131,6 +143,7 @@ class PlayerAnimator {
 
     switch (this.currentAnim) {
       case 'idle': this.animIdle(t, P); break;
+      case 'sit': this.animSit(t, P); break;
       case 'walk': this.animWalk(t, P); break;
       case 'sprint': this.animSprint(t, P); break;
       case 'jump': this.animJump(p, P); break;
@@ -333,10 +346,42 @@ class PlayerAnimator {
       if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(0, 0, 0);
     }
   }
+  /* POSE DUDUK: paha ke depan (horizontal), tulang kering turun, badan sedikit
+     condong & tangan bertumpu di panggul — diposisikan agar pas di kursi. */
+  animSit(t, P) {
+    const br = Math.sin(t * 1.4) * 0.01;           // napas duduk halus
+    if (P.body) P.body.position.y = -0.05;
+    if (P.torso) {
+      P.torso.position.y = 0.66 + br;
+      P.torso.rotation.set(0.12, 0, 0);
+    }
+    if (P.legL) {
+      P.legL.rotation.x = -1.45;
+      P.legL.rotation.z = 0.06;
+      if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(1.5, 0, 0);
+    }
+    if (P.legR) {
+      P.legR.rotation.x = -1.45;
+      P.legR.rotation.z = -0.06;
+      if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(1.5, 0, 0);
+    }
+    if (P.armL) {
+      P.armL.rotation.x = -0.62;
+      P.armL.rotation.z = 0.2;
+      if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = -0.7;
+    }
+    if (P.armR) {
+      P.armR.rotation.x = -0.62;
+      P.armR.rotation.z = -0.2;
+      if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = -0.7;
+    }
+    if (P.head) { P.head.rotation.y = 0; P.head.rotation.x = -0.05; }
+  }
   animWalk(t, P) {
-    const f = 7;
-    const s = Math.sin(t * f);
-    const c = Math.cos(t * f);
+    /* fase dari JARAK (this.gait), disinkronkan ke kecepatan lari/jalan nyata */
+    const g = (this.gait !== undefined) ? this.gait : (t * 7);
+    const s = Math.sin(g);
+    const c = Math.cos(g);
     if (P.legL) {
       P.legL.rotation.x = s * 0.55;
       if (P.legL.userData.shin) P.legL.userData.shin.rotation.x = Math.max(0, -c) * 0.6;
@@ -351,12 +396,12 @@ class PlayerAnimator {
     if (P.armR && P.armR.userData.fore) P.armR.userData.fore.rotation.x = -0.3;
     if (P.torso) { P.torso.rotation.y = s * 0.08; P.torso.rotation.x = 0.05; }
     if (P.head) P.head.rotation.y = -s * 0.05;
-    if (P.body) P.body.position.y = Math.abs(Math.sin(t * f)) * 0.05;
+    if (P.body) P.body.position.y = Math.abs(Math.sin(g)) * 0.05;
   }
   animSprint(t, P) {
-    const f = 12;
-    const s = Math.sin(t * f);
-    const c = Math.cos(t * f);
+    const g = (this.gait !== undefined) ? this.gait : (t * 12);
+    const s = Math.sin(g);
+    const c = Math.cos(g);
     if (P.legL) {
       P.legL.rotation.x = s * 0.9;
       if (P.legL.userData.shin) P.legL.userData.shin.rotation.x = Math.max(0, -c) * 1.1;
@@ -374,7 +419,7 @@ class PlayerAnimator {
       if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = -1.2;
     }
     if (P.torso) P.torso.rotation.x = 0.3;
-    if (P.body) P.body.position.y = Math.abs(Math.sin(t * f)) * 0.09;
+    if (P.body) P.body.position.y = Math.abs(Math.sin(g)) * 0.09;
   }
   animJump(p, P) {
     const arc = Math.sin(p * Math.PI);

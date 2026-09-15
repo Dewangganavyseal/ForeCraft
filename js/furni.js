@@ -1769,6 +1769,13 @@ const Furni={
     if(this.sitting===f){this.stand();return;}
     this.sitting=f;
     Player.pos.x=f.x;Player.pos.z=f.z;
+    /* dudukkan di atas dudukan kursi & hadapkan ke arah kursi (kursi menghadap +z
+       lokal → sudut hadap = f.yaw), sehingga punggung pas di sandaran & wajah ke depan */
+    const seatY=f.y+0.5;
+    if(typeof World!=='undefined'&&World.groundAt)
+      Player.pos.y=Math.max(seatY,World.groundAt(f.x,f.z,f.y+2));
+    Player.onGround=true;
+    Player.facing=(typeof f.yaw==='number')?f.yaw:Player.facing;
     Player.vel.set(0,0,0);
     UI.toast('💺 Duduk — stamina pulih lebih cepat. Bergerak untuk berdiri.');
     Sfx.click();
@@ -2075,12 +2082,20 @@ const Furni={
         else{
           Player.pos.x=lerp(Player.pos.x,f.x,clamp(dt*8,0,1));
           Player.pos.z=lerp(Player.pos.z,f.z,clamp(dt*8,0,1));
-          Player.vel.x=Player.vel.z=0;
+          /* pin di atas dudukan kursi (lawan gravitasi) & hadapkan ke arah kursi */
+          const seatY=(typeof World!=='undefined'&&World.groundAt)?
+            Math.max(f.y+0.5,World.groundAt(f.x,f.z,f.y+2)):f.y+0.5;
+          Player.pos.y=lerp(Player.pos.y,seatY,clamp(dt*10,0,1));
+          Player.vel.x=Player.vel.z=Player.vel.y=0;
+          Player.onGround=true;
+          Player.sittingPose=true;
+          if(typeof f.yaw==='number')
+            Player.facing=angLerp(Player.facing,f.yaw,clamp(dt*10,0,1));
           Player.stamina=Math.min(Player.maxStamina(),Player.stamina+22*dt);
           Player.hp=Math.min(Player.maxHp(),Player.hp+1.2*dt);
         }
       }
-    }
+    }else Player.sittingPose=false;
 
     /* --- Smelter Industri: proses peleburan latar belakang & animasi --- */
     for(const f of this.list){
@@ -2535,6 +2550,19 @@ const Action={
     const s=RPG.hotbar[RPG.sel];
     if(s&&ITEMS[s.id].place)
       return {kind:'place',label:`📦 Pasang ${ITEMS[s.id].n}`};
+    /* ---------- AKSI MEMANCING (saat memegang Alat Pancing 🎣) ---------- */
+    if(typeof Fishing!=='undefined'&&Fishing.isHoldingRod&&Fishing.isHoldingRod()){
+      if(Fishing.active&&Fishing.state!=='rest'){
+        if(Fishing.state==='minigame'){
+          return {kind:'fish-pull',label:'🎣 TAHAN & ULUR TALI!',
+            pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
+        }
+        return {kind:'fish-cast',label:'🎣 Tarik Kail Pancing',
+          pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
+      }
+      return {kind:'fish-cast',label:'🎣 Lemparkan Kail Pancing',
+        pos:Player.pos.clone().add(new THREE.Vector3(0,2.2,0))};
+    }
     /* ATUR PINTU: muncul saat pemain berdiri di rumahnya sendiri & tangannya
        tidak memegang barang yang bisa dipasang. Prioritas di bawah NPC/perabot
        supaya tidak menutupi interaksi lain di dalam rumah. */
@@ -2569,6 +2597,8 @@ const Action={
     else if(a.kind==='place-ok')Furni.confirmPlace();
     else if(a.kind==='door-edit')Furni.beginDoorEdit();
     else if(a.kind==='door-ok')Furni.applyDoorEdit();
+    else if(a.kind==='fish-cast'&&typeof Fishing!=='undefined')Fishing.tryCast();
+    else if(a.kind==='fish-pull'&&typeof Fishing!=='undefined')Fishing.onPointerDown();
   },
 };
 

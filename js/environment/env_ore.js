@@ -522,14 +522,18 @@ const Env_Ore={
     for(const node of this.activeNodes.values()){
       if(Math.abs(bx-node.wx)>3||Math.abs(bz-node.wz)>3||
          by<node.wy-2||by>node.wy+5)continue;
-      const hx=2.2*node.scale, hz=hx;
+      /* Gunakan lebar batuan visual sebenarnya (~1.7 blok skala penuh), BUKAN
+         kotak lebar 2.2, plus toleransi ayunan kecil 0.7. Dahulu toleransinya 1.8
+         sehingga ore bisa terkena dari ~3 blok. Kini pemain harus benar-benar
+         menempel / tepat di depan bongkahan untuk memukulnya. */
+      const hx=1.7*node.scale, hz=hx;
       const dx=Math.max(0,Math.abs(px-(node.wx+0.5))-hx);
       const dz=Math.max(0,Math.abs(pz-(node.wz+0.5))-hz);
       const nodeTop=node.wy+2.6*node.scale;
       let dy=0;
       if(py>nodeTop)dy=py-nodeTop;
       else if(py+1.6<node.wy)dy=node.wy-(py+1.6);
-      if(Math.hypot(dx,dz,dy)<=1.8)return node;
+      if(Math.hypot(dx,dz,dy)<=0.7)return node;
     }
     return null;
   },

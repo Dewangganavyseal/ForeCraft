@@ -50,6 +50,7 @@ const I18N_ITEMS={
   leather:{en:'Leather',zh:'皮革',ja:'革'},
   hoe:{en:'Hoe',zh:'锄头',ja:'クワ'},
   fishing_rod:{en:'Fishing Rod',zh:'钓鱼竿',ja:'釣り竿'},
+  rod:{en:'Fishing Rod',zh:'钓鱼竿',ja:'钓鱼竿'},
   log_pass:{en:'Log Pass',zh:'定位牌',ja:'ログパス'},
   rope:{en:'Rope',zh:'绳子',ja:'ロープ'},
   saddle:{en:'Saddle',zh:'鞍',ja:'サドル'},

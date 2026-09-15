@@ -482,6 +482,7 @@ const Game={
       try{NPCS.update(dt);}catch(e){console.error('[NPCS error]',e);}
       if(typeof RareNPC!=='undefined'){try{RareNPC.update(dt);}catch(e){console.error('[RareNPC error]',e);}}
       if(typeof FishSys!=='undefined'){try{FishSys.update(dt);}catch(e){console.error('[FishSys error]',e);}}
+      if(typeof Fishing!=='undefined'){try{Fishing.update(dt);}catch(e){console.error('[Fishing error]',e);}}
       if(typeof PortFX!=='undefined'){try{PortFX.update(dt);}catch(e){console.error('[PortFX error]',e);}}
       try{Furni.update(dt);}catch(e){console.error('[Furni error]',e);}
       if(typeof BuildSys!=='undefined'){try{BuildSys.update(dt);}catch(e){console.error('[BuildSys error]',e);}}

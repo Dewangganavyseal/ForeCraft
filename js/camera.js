@@ -117,7 +117,7 @@ const Cam={
     if(!(typeof Game!=='undefined'&&Game.menuMode)){
       this.yaw+=Input.camTurn()*dt*2.4;
       if(this.tppWeight>0.4&&Input.camPitchTurn){
-        this.tppPitch=clamp(this.tppPitch+Input.camPitchTurn()*dt*2.0,-0.75,0.75);
+        this.tppPitch=clamp(this.tppPitch+Input.camPitchTurn()*dt*2.0,-1.55,1.22);
       }
     }
     this.zoom=lerp(this.zoom,this.targetZoom,clamp(8*dt,0,1));
@@ -177,7 +177,9 @@ const Cam={
     /* Jarak & elevasi orbit di mode TPP (mengorbit di sekeliling badan karakter) */
     const tppDist=clamp(this.zoom*0.95+1.2,1.8,5.8);
     const baseTppElev=0.28;
-    const tppElev=clamp(baseTppElev+this.tppPitch,0.06,1.35);
+    /* Rentang elevasi diperluas agar kamera bebas mengorbit penuh mengelilingi karakter
+       (mendongak dari bawah hingga menengok dari atas). Hanya berlaku saat TPP/FPP. */
+    const tppElev=clamp(baseTppElev+this.tppPitch,-1.45,1.5);
 
     const effectiveDist=lerp(dist,tppDist,this.tppWeight);
     const effectiveElev=lerp(0.82,tppElev,this.tppWeight);
@@ -192,21 +194,28 @@ const Cam={
     let camY=orbitCenter.y+oy;
     let camZ=orbitCenter.z+oz;
 
-    // Anti-clipping kamera orbit di mode TPP (tidak menembus dinding/rintangan)
-    if(this.tppWeight>0.25&&typeof World!=='undefined'&&World.blockedAt){
+    // Anti-clipping kamera orbit di mode TPP (tidak menembus dinding, atap, maupun tanah)
+    if(this.tppWeight>0.25&&typeof World!=='undefined'){
       const dirX=camX-orbitCenter.x, dirY=camY-orbitCenter.y, dirZ=camZ-orbitCenter.z;
       const totalDist=Math.hypot(dirX,dirY,dirZ);
       if(totalDist>0.3){
         const nx=dirX/totalDist, ny=dirY/totalDist, nz=dirZ/totalDist;
-        const steps=Math.ceil(totalDist/0.32);
+        const steps=Math.ceil(totalDist/0.25);
         let safeDist=totalDist;
         for(let s=1;s<=steps;s++){
-          const testDist=Math.min(totalDist,s*0.32);
+          const testDist=Math.min(totalDist,s*0.25);
           const tx=orbitCenter.x+nx*testDist;
           const ty=orbitCenter.y+ny*testDist;
           const tz=orbitCenter.z+nz*testDist;
-          if(World.blockedAt(tx,ty,tz,0.26)){
-            safeDist=Math.max(0.65,testDist-0.28);
+          // Cek tabrakan dinding/atap/perabot
+          let hit=(typeof World.blockedAt==='function')&&World.blockedAt(tx,ty,tz,0.26);
+          // Cek tanah / lantai (fromY dari orbitCenter.y, HANYA memindai ke bawah, tidak pernah kena atap)
+          if(!hit&&typeof World.groundAt==='function'){
+            const floorH=World.groundAt(tx,tz,orbitCenter.y);
+            if(ty<=floorH+0.22) hit=true;
+          }
+          if(hit){
+            safeDist=Math.max(0.45,testDist-0.22);
             break;
           }
         }

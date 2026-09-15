@@ -724,7 +724,7 @@ const Dungeon={
   BOSS_CHEST_SCALE:1.8,          // peti boss jauh lebih besar dari peti biasa
   /* RARE_CHANCE 40%: peluang peti boss dungeon memberi SATU item langka
      (termasuk 4 bahan ritual Altar: insect_leg/hard_shell/green_blood/toxic_venom). */
-  RARE_CHANCE:0.40,
+  RARE_CHANCE:0.32,
   /* Item langka: normalnya sangat sulit didapat. Bahan ritual Altar
      (insect_leg/hard_shell/green_blood/toxic_venom) biasanya hanya 1% drop dari
      mob Redlands, jadi menemukannya di sini adalah jalan pintas berharga. */

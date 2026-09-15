@@ -280,6 +280,24 @@
 
 <div id="levelup">LEVEL UP!</div>
 
+<!-- ================= MINIGAME MEMANCING (TENGAH LAYAR) ================= -->
+<div id="fishing-minigame" class="hidden">
+  <div id="fm-card">
+    <div class="fm-title">🎣 IKAN TERKAIL!</div>
+    <div class="fm-sub">Tahan <b>KLIK / SPASI / 🎣</b> untuk melawan tarikan ikan!</div>
+    <div class="fm-name" id="fish-target-name">Ikan Segar</div>
+    <div class="fm-track">
+      <div class="fm-water-bg"></div>
+      <div class="fm-bar" id="fish-catch-bar"></div>
+      <div class="fm-fish" id="fish-icon-target">🐟</div>
+    </div>
+    <div class="fm-pbar">
+      <div class="fm-pfill" id="fish-progress-fill" style="height:30%"></div>
+    </div>
+    <div class="fm-tip">Jaga ikan tetap di dalam bar hijau!</div>
+  </div>
+</div>
+
 <script src="js/three.min.js"></script>
 <script src="js/save_restore.js"></script>
 <script src="js/config.js"></script>
@@ -396,6 +414,8 @@
 <script src="js/furni_workstation.js"></script>
 <!-- Smelter Industri (port NEW MODEL/Smelter, Rod.html): peleburan ore & ingot -->
 <script src="js/smelter.js"></script>
+<!-- Sistem Memancing (port joran & animasi dari NEW MODEL/Smelter, Rod.html) -->
+<script src="js/fishing.js"></script>
 <script src="js/furni.js"></script>
 <!-- Landasan Tempa: panel enchant equipment (butuh UI/RPG/ITEMS di atas). -->
 <script src="js/anvil.js"></script>

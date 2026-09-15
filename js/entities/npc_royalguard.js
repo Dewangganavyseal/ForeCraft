@@ -274,7 +274,7 @@ const NPC_RoyalGuard={
            1.6) jatuh tepat di kepalan foreR, bilah menghadap +Z (depan),
            persis konvensi buildSword file asli. */
         w.position.set(0,0,0);
-        w.rotation.set(0,Math.PI/4,0); // Putar 45° kesamping agar mata bilah menghadap atas/bawah
+        w.rotation.set(0,Math.PI/2,0); // Putar 90° kesamping pada sumbu panjang bilah agar mata bilah menghadap lurus atas/bawah
         w.scale.setScalar(SWORD_SCALE_D);
         sw.add(w);
       }
