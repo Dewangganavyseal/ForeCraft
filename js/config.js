@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.21',
+  VERSION:'0.2.22',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -297,6 +297,15 @@ const BLOCK_INFO={
   [B.FARM] :{name:'Ladang',hp:2.0,drop:null,color:0x6f4a26},
   /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
   [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
+};
+/* pemetaan blok dunia ke ID item voxel di tas (hanya blok biome alami) */
+const BLOCK_TO_ITEM={
+  [B.GRASS]:'blk_grass',
+  [B.DIRT]:'blk_dirt',
+  [B.STONE]:'blk_stone',
+  [B.SAND]:'blk_sand',
+  [B.SNOW]:'blk_snow',
+  [B.RED_SOIL]:'blk_red_soil',
 };
 /* blok bijih → dipakai worldgen & UI penambangan. */
 const ORE_BLOCKS=[B.ORE_STONE,B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
@@ -611,6 +620,19 @@ L.i=function(key,args){return L(key,args);};
 
 
 const ITEMS={
+  /* ---------- BLOK BANGUNAN (Voxel Blocks) ---------- */
+  blk_grass:   {n:'Blok Rumput',     e:'🟩', isBlock:true, blockId:B.GRASS,    rarity:'common', desc:'Blok rumput alami. Bisa dipasang dan ditata di dunia.'},
+  blk_dirt:    {n:'Blok Tanah',      e:'🟫', isBlock:true, blockId:B.DIRT,     rarity:'common', desc:'Blok tanah subur. Bisa dipasang dan ditata di dunia.'},
+  blk_stone:   {n:'Blok Batu',       e:'⬜', isBlock:true, blockId:B.STONE,    rarity:'common', desc:'Blok batu keras. Bisa dipasang dan ditata di dunia.'},
+  blk_wood:    {n:'Blok Kayu',       e:'🪵', isBlock:true, blockId:B.WOOD,     rarity:'common', desc:'Batang kayu kokoh. Bisa dipasang dan ditata di dunia.'},
+  blk_leaf:    {n:'Blok Daun',       e:'🍃', isBlock:true, blockId:B.LEAF,     rarity:'common', desc:'Blok dedaunan hijau. Bisa dipasang dan ditata di dunia.'},
+  blk_sand:    {n:'Blok Pasir',      e:'🟨', isBlock:true, blockId:B.SAND,     rarity:'common', desc:'Blok pasir pantai. Bisa dipasang dan ditata di dunia.'},
+  blk_snow:    {n:'Blok Salju',      e:'❄️', isBlock:true, blockId:B.SNOW,     rarity:'common', desc:'Blok salju beku. Bisa dipasang dan ditata di dunia.'},
+  blk_plank:   {n:'Blok Papan',      e:'📦', isBlock:true, blockId:B.PLANK,    rarity:'common', desc:'Papan kayu olahan. Cocok untuk lantai & dinding rumah.'},
+  blk_roof:    {n:'Blok Atap',       e:'🏠', isBlock:true, blockId:B.ROOF,     rarity:'common', desc:'Blok genteng atap bangunan.'},
+  blk_red_soil:{n:'Blok Tanah Merah',e:'🟥', isBlock:true, blockId:B.RED_SOIL, rarity:'common', desc:'Tanah merah beracun dari biome Redlands.'},
+  blk_farm:    {n:'Blok Ladang',     e:'🌾', isBlock:true, blockId:B.FARM,     rarity:'common', desc:'Blok tanah ladang siap tanam bibit.'},
+
   /* CATATAN EMOJI: seluruh ikon item memakai Unicode ≤6.0. Emoji baru seperti
      🪵 🪨 🫐 🟫 🟡 🦺 🦿 🪖 🩹 belum tersedia di font sistem Android lama,
      sehingga sebelumnya beberapa item (mis. kayu) tampil sebagai kotak kosong. */
@@ -638,6 +660,7 @@ const ITEMS={
   leather:{n:'Kulit',e:'📜',rarity:'uncommon'},
   /* ---------- pertanian ---------- */
   hoe:{n:'Cangkul',e:'⛏️',tool:'hoe',rarity:'common'},
+  fishing_rod:{n:'Pancing',e:'🎣',tool:'rod',rarity:'common',desc:'Alat pancing ikan di sungai dan laut.'},
   /* ---------- LOG PASS: penanda lokasi pribadi ----------
      `tool` membuatnya TIDAK BISA di-stack (stackCap → 1) sehingga setiap Log
      Pass menempati slotnya sendiri dan bisa menyimpan tandanya masing-masing
@@ -932,13 +955,17 @@ function stackCap(id){
   return (it&&(it.weapon||it.armor||it.tool))?1:64;
 }
 
-const DROP_COLOR={wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
+const DROP_COLOR={
+  blk_grass:0x5d9e3f, blk_dirt:0x7a5a3a, blk_stone:0x8a8f98, blk_wood:0x6e4f2f,
+  blk_leaf:0x3f7d2f, blk_sand:0xe3d29a, blk_snow:0xe8f2fa, blk_plank:0xb98a55,
+  blk_roof:0x9c5a3c, blk_red_soil:0x9e3b2c, blk_farm:0x6f4a26,
+  wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
   rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,
   meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,potion_stam:0xffd24d,
   sugar_cane:0xc9c157,sugar:0xf2ecdf,cake:0xf5d9a8,
   fish:0x93adc0,cfish:0xd98a4d,
   resin:0xd9a13c,leather:0x8a5f35,
-  hoe:0x8a5f35,
+  hoe:0x8a5f35,fishing_rod:0x9c7848,
   log_pass:0xd94a4a,
   seed_wheat:0xd4a431,seed_carrot:0xe07f1d,seed_cabbage:0x5f9e30,
   seed_tomato:0xe2451e,seed_watermelon:0x3a7d23,

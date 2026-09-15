@@ -17,6 +17,17 @@
 
 /* ---------------------------------------------------------------- ITEM NAMES */
 const I18N_ITEMS={
+  blk_grass:{en:'Grass Block',zh:'草方块',ja:'草ブロック'},
+  blk_dirt:{en:'Dirt Block',zh:'泥土方块',ja:'土ブロック'},
+  blk_stone:{en:'Stone Block',zh:'石方块',ja:'丸石ブロック'},
+  blk_wood:{en:'Wood Block',zh:'原木方块',ja:'原木ブロック'},
+  blk_leaf:{en:'Leaf Block',zh:'树叶方块',ja:'葉ブロック'},
+  blk_sand:{en:'Sand Block',zh:'沙子方块',ja:'砂ブロック'},
+  blk_snow:{en:'Snow Block',zh:'雪方块',ja:'雪ブロック'},
+  blk_plank:{en:'Plank Block',zh:'木板方块',ja:'木板ブロック'},
+  blk_roof:{en:'Roof Block',zh:'屋顶方块',ja:'屋根ブロック'},
+  blk_red_soil:{en:'Red Soil Block',zh:'红土方块',ja:'赤土ブロック'},
+  blk_farm:{en:'Farmland Block',zh:'耕地方块',ja:'耕地ブロック'},
   wood:{en:'Wood',zh:'木头',ja:'木材'},
   stone:{en:'Stone',zh:'石头',ja:'石'},
   fiber:{en:'Fiber',zh:'纤维',ja:'繊維'},
@@ -38,6 +49,7 @@ const I18N_ITEMS={
   resin:{en:'Tree Resin',zh:'树脂',ja:'樹脂'},
   leather:{en:'Leather',zh:'皮革',ja:'革'},
   hoe:{en:'Hoe',zh:'锄头',ja:'クワ'},
+  fishing_rod:{en:'Fishing Rod',zh:'钓鱼竿',ja:'釣り竿'},
   log_pass:{en:'Log Pass',zh:'定位牌',ja:'ログパス'},
   rope:{en:'Rope',zh:'绳子',ja:'ロープ'},
   saddle:{en:'Saddle',zh:'鞍',ja:'サドル'},

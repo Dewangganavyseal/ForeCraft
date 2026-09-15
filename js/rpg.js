@@ -7,6 +7,9 @@ const RPG={
   activeCD:{slam:0,whirl:0,roar:0,herb:0},
   roarT:0,                       // sisa durasi buff damage Teriakan Perang
   hotbar:new Array(7).fill(null),bag:new Array(14).fill(null),
+  /* slot khusus blok voxel bangunan (tab terpisah di tas) */
+  blockBag:new Array(21).fill(null),
+  selectedBlockSlot:-1,
   /* slot khusus mob hasil tangkapan (bukan item biasa; tidak bisa di-drop) */
   mobSlots:new Array(4).fill(null),
   deployedPet:-1,
@@ -696,6 +699,19 @@ const RPG={
      total lewat flag `done`. */
   addItem(id,n,lvl,mark){
     n=n||1;
+    /* Blok bangunan (voxel) diarahkan khusus ke tab penampungan blok (blockBag) */
+    if((typeof ITEMS!=='undefined'&&ITEMS[id]&&ITEMS[id].isBlock)||(typeof id==='string'&&id.startsWith('blk_'))){
+      const left=this.addBlockItem(id,n);
+      if(left<(n||1)){
+        if(this.selectedBlockSlot===-1||!this.blockBag[this.selectedBlockSlot]){
+          const idx=this.blockBag.findIndex(s=>s&&s.id===id);
+          if(idx>=0)this.selectedBlockSlot=idx;
+        }
+        if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+        if(typeof BuildSys!=='undefined'&&BuildSys.active)BuildSys.updateHUD();
+      }
+      return left;
+    }
     const before=n;
     /* equipment (pedang/armor/tameng) maks 1 per slot — tidak pernah ditumpuk */
     const cap=(typeof stackCap==='function')?stackCap(id):64;
@@ -728,6 +744,50 @@ const RPG={
     }
     if(before>0&&n<before&&typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
     return n;
+  },
+  /* ---------- penampung khusus blok bangunan ---------- */
+  addBlockItem(id,n){
+    n=n||1;
+    const cap=64;
+    for(let i=0;i<this.blockBag.length;i++){
+      const s=this.blockBag[i];
+      if(s&&s.id===id&&s.n<cap){
+        const add=Math.min(n,cap-s.n);s.n+=add;n-=add;
+        if(n<=0)break;
+      }
+    }
+    if(n>0){
+      for(let i=0;i<this.blockBag.length;i++){
+        if(!this.blockBag[i]){
+          const add=Math.min(n,cap);
+          this.blockBag[i]={id,n:add};
+          n-=add;
+          if(n<=0)break;
+        }
+      }
+    }
+    return n;
+  },
+  countBlock(id){
+    let c=0;
+    for(const s of this.blockBag)if(s&&s.id===id)c+=s.n;
+    return c;
+  },
+  removeBlock(id,qty){
+    qty=qty||1;
+    for(let i=0;i<this.blockBag.length;i++){
+      const s=this.blockBag[i];
+      if(s&&s.id===id){
+        const take=Math.min(qty,s.n);s.n-=take;qty-=take;
+        if(s.n<=0){
+          this.blockBag[i]=null;
+          if(this.selectedBlockSlot===i)this.selectedBlockSlot=-1;
+        }
+        if(qty<=0)break;
+      }
+    }
+    if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    return qty<=0;
   },
   countItem(id){
     let c=0;
@@ -919,6 +979,7 @@ const RPG={
         hp:Player.hp,hunger:Player.hunger,level:Player.level,xp:Player.xp,kills:Player.kills,
         pos:[Player.pos.x,Player.pos.y,Player.pos.z],
         sp:this.sp,skills:this.skills,hotbar:this.hotbar,bag:this.bag,
+        blockBag:this.blockBag,selectedBlockSlot:this.selectedBlockSlot,
         equip:this.equip,coin:this.coin,bagTier:this.bagTier,
         mobSlots:(typeof Capture!=='undefined'&&Capture.serialize)?Capture.serialize():this.mobSlots,
         deployedPet:(typeof Capture!=='undefined'&&typeof Capture.deployedSlot==='number')?Capture.deployedSlot:this.deployedPet,

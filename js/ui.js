@@ -1552,6 +1552,7 @@ const UI={
     this.setButtonImage(document.getElementById('m-craft'),'buttons/craft.png');
     this.setButtonImage(document.getElementById('m-skill'),'buttons/skills.png');
     this.setButtonImage(document.getElementById('m-party'),'buttons/ui_party.png');
+    this.setButtonImage(document.getElementById('m-build'),'buttons/build.png');
     this.setButtonImage(document.getElementById('m-chat'),'buttons/chat.png');
     this.setButtonImage(document.getElementById('btn-gear'),'buttons/gear.png');
     this.setButtonImage(document.getElementById('chat-send'),'buttons/talk.png');
@@ -1897,7 +1898,7 @@ const UI={
       if(this.open!=='bag')return;
       const r=panel.getBoundingClientRect();
       const mw=menu.offsetWidth||58;
-      const mh=menu.offsetHeight||130;
+      const mh=menu.offsetHeight||190;
       let left=r.left-mw-10;
       /* layar sempit: tetap tempel sedekat mungkin ke panel */
       if(left<4)left=Math.max(4,r.left-mw*0.55);
@@ -2002,6 +2003,7 @@ const UI={
     mk(RPG.hotbar,0,document.getElementById('bag-hotbar'));
     mk(RPG.bag,1,document.getElementById('bag-grid'));
     this.renderEquip();
+    if(this.bagPage==='blocks')this.renderBlockBag();
     if(typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
     if(this.open==='bag')this.positionBagMenu();
   },
@@ -2023,18 +2025,80 @@ const UI={
     });
   },
 
-  /* ---------- halaman kiri panel tas: Bag / Pet ---------- */
+  /* ---------- halaman kiri panel tas: Bag / Block / Pet ---------- */
   bagPage:'bag',
   setBagPage(page){
-    this.bagPage=(page==='pet')?'pet':'bag';
+    this.bagPage=(page==='pet')?'pet':(page==='blocks'?'blocks':'bag');
     const bag=document.getElementById('bag-page-bag');
     const pet=document.getElementById('bag-page-pet');
+    const blk=document.getElementById('bag-page-blocks');
     if(bag)bag.style.display=(this.bagPage==='bag')?'':'none';
     if(pet)pet.style.display=(this.bagPage==='pet')?'':'none';
+    if(blk)blk.style.display=(this.bagPage==='blocks')?'':'none';
     document.querySelectorAll('.bag-menu-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.bagpage===this.bagPage);
     });
+    if(this.bagPage==='blocks')this.renderBlockBag();
     if(this.bagPage==='pet'&&typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
+  },
+  renderBlockBag(){
+    const gEl=document.getElementById('block-grid');
+    const cntEl=document.getElementById('block-bag-count');
+    const descIcon=document.getElementById('block-sel-icon');
+    const descName=document.getElementById('block-sel-name');
+    const btnBuild=document.getElementById('btn-toggle-build');
+
+    if(!gEl||!RPG.blockBag)return;
+    const used=RPG.blockBag.filter(s=>s&&s.n>0).length;
+    if(cntEl)cntEl.textContent=`${used}/${RPG.blockBag.length}`;
+
+    if(RPG.selectedBlockSlot>=0&&(!RPG.blockBag[RPG.selectedBlockSlot]||RPG.blockBag[RPG.selectedBlockSlot].n<=0)){
+      RPG.selectedBlockSlot=-1;
+    }
+    if(RPG.selectedBlockSlot===-1){
+      const firstIdx=RPG.blockBag.findIndex(s=>s&&s.n>0);
+      if(firstIdx>=0)RPG.selectedBlockSlot=firstIdx;
+    }
+
+    const curSel=(RPG.selectedBlockSlot>=0)?RPG.blockBag[RPG.selectedBlockSlot]:null;
+    if(curSel&&ITEMS[curSel.id]){
+      const it=ITEMS[curSel.id];
+      if(descIcon)descIcon.innerHTML=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(curSel.id):it.e;
+      if(descName)descName.innerHTML=`Blok Aktif: <b>${it.n}</b> (×${curSel.n})`;
+    }else{
+      if(descIcon)descIcon.textContent='🧱';
+      if(descName)descName.textContent='Belum ada blok dipilih';
+    }
+
+    if(btnBuild){
+      btnBuild.onclick=()=>{
+        this.closeAll();
+        if(typeof BuildSys!=='undefined')BuildSys.toggle(true);
+      };
+    }
+
+    gEl.innerHTML='';
+    RPG.blockBag.forEach((s,i)=>{
+      const d=document.createElement('div');
+      d.className='slot block-slot';
+      d.dataset.bi=i;
+      if(RPG.selectedBlockSlot===i&&s)d.classList.add('picked');
+      if(s&&s.n>0){
+        const it=ITEMS[s.id];
+        d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`;
+        d.title=`${it?it.n:s.id} (×${s.n})\nKlik untuk memilih blok ini`;
+        d.addEventListener('click',()=>{
+          RPG.selectedBlockSlot=i;
+          this.renderBlockBag();
+          if(typeof BuildSys!=='undefined')BuildSys.updateHUD();
+          if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+        });
+      }else{
+        d.classList.add('empty');
+      }
+      gEl.appendChild(d);
+    });
+    this.applyItemIcons(gEl);
   },
   /* ================= PANEL PETI =================
      Dua grid: isi peti & isi tas pemain. Item bisa DIKLIK (pindah seluruh

@@ -71,6 +71,18 @@ const HeldModels={
     return true;
   },
 
+  _buildFishingRod(g){
+    this.box(g,0.045,0.045,0.36,0xb08a5a,0,0,-0.05);
+    this.box(g,0.052,0.052,0.04,0x6e5232,0,0,0.06);
+    this.box(g,0.04,0.09,0.08,0x3a4149,0,-0.06,0.06);
+    this.box(g,0.08,0.045,0.045,0x9aa3ad,0.035,-0.06,0.06);
+    this.box(g,0.035,0.035,0.45,0x1f6f63,0,0,0.32);
+    this.box(g,0.026,0.026,0.45,0x2a8a78,0,0,0.72);
+    this.box(g,0.018,0.018,0.45,0x3fac99,0,0,1.12);
+    this.box(g,0.022,0.028,0.03,0xd4af37,0,0.02,1.34);
+    g.userData.hold={pos:[0,-0.29,0.04],rot:[-0.05,0,0],scale:0.95};
+  },
+
   MODELS:{
     berry(g){
       this.box(g,0.12,0.12,0.12,0x4d6bd6,-0.05,0,0);
@@ -181,6 +193,13 @@ const HeldModels={
     hoe(g){
       this.box(g,0.05,0.46,0.05,0x8a5f35,0,-0.05,0);
       this.box(g,0.16,0.10,0.04,0x9aa2ac,0,0.20,0.04,0.5,0,0);
+    },
+    /* alat: pancing (joran memanjang lurus ke depan seperti pedang) */
+    fishing_rod(g){
+      this._buildFishingRod(g);
+    },
+    pancing(g){
+      this._buildFishingRod(g);
     },
     /* item 3D khusus untuk drop & held */
     boss_core(g){

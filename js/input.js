@@ -38,6 +38,14 @@ const Input={
         else if(PANEL_KEY[k])UI.toggle(PANEL_KEY[k]);
         return;
       }
+      /* V: toggle mode bangun voxel */
+      if(k==='KeyV'){
+        if(typeof BuildSys!=='undefined')BuildSys.toggle();
+      }
+      if(k==='Escape'&&typeof BuildSys!=='undefined'&&BuildSys.active){
+        BuildSys.toggle(false);
+        return;
+      }
       /* MODE PENEMPATAN: R memutar ghost 90°, Escape membatalkan. Tombol gerak
          tetap aktif supaya pemain bisa berpindah posisi untuk mengarahkan. */
       if(typeof Furni!=='undefined'&&Furni.placing){
@@ -123,7 +131,7 @@ const Input={
     window.addEventListener('mousedown',e=>{
       if(!Game.started)return;
       const el=e.target;
-      const isUI=!!(el&&el.closest&&el.closest('#modal-ov,#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu,#chat'));
+      const isUI=!!(el&&el.closest&&el.closest('#modal-ov,#catchbtn,#catch-ui,#actbtn,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu,#chat,#build-hud'));
       if(isUI||UI.open||(typeof Chat!=='undefined'&&Chat.active)){
         if(this.pointerLocked&&document.exitPointerLock)document.exitPointerLock();
         return;
@@ -138,6 +146,14 @@ const Input={
       }
 
       if(e.button===0){
+        /* saat mode bangun aktif, mulai seleksi pasang / drag blok */
+        if(typeof BuildSys!=='undefined'&&BuildSys.active){
+          const isBuildUI=!!(el&&el.closest&&el.closest('#build-hud,#modal-ov,#mobile,.panel,#team,#hotbar,#toast,#actbtn,#bag-float-menu'));
+          if(!isBuildUI){
+            BuildSys.onPointerDown(e.clientX,e.clientY);
+            return;
+          }
+        }
         /* saat mode penempatan / atur pintu, klik kiri menunjuk sasaran —
            tapi klik pada elemen UI (bar pasang, hotbar, panel) diabaikan */
         if(typeof Furni!=='undefined'&&(Furni.placing||Furni.doorEdit)){
@@ -151,9 +167,17 @@ const Input={
       }
       if(e.button===2){this.rmb=true;this.lastMX=e.clientX;this.lastMY=e.clientY;}
     });
-    window.addEventListener('mouseup',e=>{if(e.button===2)this.rmb=false;});
+    window.addEventListener('mouseup',e=>{
+      if(e.button===2)this.rmb=false;
+      if(e.button===0&&typeof BuildSys!=='undefined'&&BuildSys.active&&BuildSys.isDragging){
+        BuildSys.onPointerUp(e.clientX,e.clientY);
+      }
+    });
     window.addEventListener('mousemove',e=>{
       this.mouseX=e.clientX;this.mouseY=e.clientY;   // utk bidikan slam (PC)
+      if(typeof BuildSys!=='undefined'&&BuildSys.active&&BuildSys.isDragging){
+        BuildSys.onPointerMove(e.clientX,e.clientY);
+      }
       if(this.inMenu())return;
 
       if(this.pointerLocked){
@@ -265,6 +289,13 @@ const Input={
     };
 
     window.addEventListener('touchmove',e=>{
+      if(typeof BuildSys!=='undefined'&&BuildSys.active&&BuildSys.isDragging){
+        for(const t of e.changedTouches){
+          BuildSys.onPointerMove(t.clientX,t.clientY);
+        }
+        if(e.cancelable)e.preventDefault();
+        return;
+      }
       for(const t of e.changedTouches){
         if(t.identifier===jid)applyJoy(t.clientX,t.clientY);
         if(pos[t.identifier])pos[t.identifier]={x:t.clientX,y:t.clientY};
@@ -283,6 +314,11 @@ const Input={
       }
     },{passive:false});
     const end=e=>{
+      if(typeof BuildSys!=='undefined'&&BuildSys.active&&BuildSys.isDragging){
+        for(const t of e.changedTouches){
+          BuildSys.onPointerUp(t.clientX,t.clientY);
+        }
+      }
       for(const t of e.changedTouches){
         if(t.identifier===jid){jid=null;this.joyX=0;this.joyY=0;
           zone.classList.remove('active');
@@ -313,6 +349,15 @@ const Input={
         }
       }
     },{passive:true});
+    /* MODE BANGUN (mobile): sentuhan di area dunia menata/memasang/drag blok */
+    window.addEventListener('touchstart',e=>{
+      if(typeof BuildSys==='undefined'||!BuildSys.active)return;
+      const t=e.changedTouches[0];
+      const el=t.target;
+      if(el&&el.closest&&el.closest('#build-hud,#modal-ov,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu,#joy-zone'))return;
+      BuildSys.onPointerDown(t.clientX,t.clientY);
+    },{passive:true});
+
     /* MODE PENEMPATAN / ATUR PINTU (mobile): satu ketukan di area dunia
        menunjuk sasaran. Ketukan di UI (bar/tombol/panel) diabaikan.
        Satu ketuk dipilih (bukan seret/gestur) karena di mobile jempol menutupi
@@ -345,6 +390,7 @@ const Input={
     bind('m-craft',()=>UI.toggle('craft'));
     bind('m-skill',()=>UI.toggle('skills'));
     bind('m-party',()=>UI.toggle('party'));
+    bind('m-build',()=>{if(typeof BuildSys!=='undefined')BuildSys.toggle();});
     /* tombol 🤝: interaksi kontekstual (bicara / perabot / mengisi altar /
        meletakkan). Membuka panel Party dilakukan lewat tombol/ikon terpisah. */
     bind('m-talk',()=>{

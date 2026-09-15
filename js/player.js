@@ -222,9 +222,9 @@ const Player={
       WeaponManager.attachToCharacterHand(this.parts,id);
       const sw=this.parts.sword;
       if(sw){
-        /* Normalisasi posisi grip di kepalan & rotasi forward 90 derajat */
+        /* Normalisasi posisi grip di kepalan: bilah forward 90° & putar 45° kesamping agar mata bilah menghadap atas/bawah */
         sw.position.set(0,-0.29,0.02);
-        sw.rotation.set(Math.PI/2,0,0);
+        sw.rotation.set(Math.PI/2,Math.PI/4,0);
         /* kompatibilitas nyala combo (updateSwordGlow): kumpulkan material
            ber-emissive sebagai glowMats + warna dasarnya. Grup aura (userData.fx)
            dianimasikan builder sendiri via tick(), jadi dilewati agar tidak

@@ -2370,6 +2370,194 @@ body.touch #portrait{width:58px;height:58px}
 .altar-go{width:100%;font-size:13px;padding:12px;border-radius:10px}
 .altar-go:disabled{opacity:.5;cursor:not-allowed}
 
+/* ================= BUILD MODE & BLOCKS TAB ================= */
+#bag-page-blocks {
+  display: flex;
+  flex-direction: column;
+}
+
+#block-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 44px);
+  gap: 6px;
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+
+.slot.block-slot.picked {
+  border-color: #58b868 !important;
+  box-shadow: 0 0 12px rgba(88, 184, 104, 0.7), inset 0 0 8px rgba(88, 184, 104, 0.35) !important;
+}
+
+.slot.block-slot.empty {
+  opacity: 0.35;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* HUD Mode Bangun (di atas tengah layar) */
+#build-hud {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 38;
+  pointer-events: auto;
+  user-select: none;
+  font-family: inherit;
+}
+
+.bh-container {
+  background: rgba(14, 20, 16, 0.94);
+  border: 2px solid #58b868;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(88, 184, 104, 0.25);
+  border-radius: 12px;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.bh-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(88, 184, 104, 0.25);
+  padding-bottom: 4px;
+}
+
+.bh-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #7de08c;
+  letter-spacing: 0.05em;
+}
+
+.bh-btn-x {
+  background: transparent;
+  border: none;
+  color: #b8c0cc;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.bh-btn-x:hover {
+  color: #ff6b6b;
+}
+
+.bh-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bh-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(88, 184, 104, 0.4);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+.bh-ico {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.bh-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.bh-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.bh-cnt {
+  font-size: 11px;
+  color: #ffd24d;
+  font-weight: 700;
+}
+
+.bh-bag-btn {
+  background: rgba(88, 184, 104, 0.2);
+  border: 1px solid #58b868;
+  color: #d8f5d0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bh-bag-btn:hover {
+  background: #58b868;
+  color: #0d160c;
+}
+
+.bh-tip {
+  font-size: 10px;
+  color: #8da294;
+  text-align: center;
+}
+
+/* Tombol mobile mode bangun */
+#m-build {
+  background-image: url('../buttons/build.png');
+}
+
+#m-build.active {
+  border: 2px solid #58b868 !important;
+  box-shadow: 0 0 14px #58b868, inset 0 0 8px rgba(88, 184, 104, 0.5) !important;
+  background-color: rgba(40, 90, 50, 0.6) !important;
+  animation: pulse-build 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-build {
+  0% { transform: scale(1); box-shadow: 0 0 8px #58b868; }
+  50% { transform: scale(1.08); box-shadow: 0 0 18px #7de08c; }
+  100% { transform: scale(1); box-shadow: 0 0 8px #58b868; }
+}
+
+@media (max-width: 640px) {
+  #build-hud {
+    top: 10px;
+    width: 90vw;
+    max-width: 320px;
+  }
+  .bh-container {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  .bh-name {
+    font-size: 11px;
+  }
+  .bh-cnt {
+    font-size: 10px;
+  }
+  .bh-bag-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  .bh-tip {
+    font-size: 9px;
+  }
+  body.touch #block-grid {
+    grid-template-columns: repeat(auto-fill, 38px);
+    gap: 4px;
+  }
+}
+
+
 
 
 

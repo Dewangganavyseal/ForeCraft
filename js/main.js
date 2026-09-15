@@ -355,6 +355,9 @@ const Game={
       RPG.hotbar=save.hotbar||new Array(7).fill(null);
       RPG.bag=save.bag||new Array(RPG.BAG_BASE).fill(null);
       while(RPG.bag.length<RPG.bagMax())RPG.bag.push(null);
+      RPG.blockBag=(save&&Array.isArray(save.blockBag))?save.blockBag:new Array(21).fill(null);
+      while(RPG.blockBag.length<21)RPG.blockBag.push(null);
+      RPG.selectedBlockSlot=(save&&typeof save.selectedBlockSlot==='number')?save.selectedBlockSlot:-1;
       RPG.mobSlots=save.mobSlots||new Array(4).fill(null);
       RPG.deployedPet=(typeof save.deployedPet==='number')?save.deployedPet:-1;
 
@@ -373,6 +376,8 @@ const Game={
       Player.hairColor=(RPG.customPlayer&&RPG.customPlayer.hairColor!==undefined)?RPG.customPlayer.hairColor:0x2c1f14;
       RPG.addItem('bread',2);
       RPG.addItem(RPG.START_WEAPON,1);
+      RPG.blockBag=new Array(21).fill(null);
+      RPG.selectedBlockSlot=-1;
       RPG.mobSlots=new Array(4).fill(null);
       RPG.deployedPet=-1;
     }
@@ -404,6 +409,7 @@ const Game={
       if(save)Farming.load();else Farming.clear();
     }
     if(typeof Capture!=='undefined')Capture.load(save?save.mobSlots:null,save?save.deployedPet:-1);
+    if(typeof BuildSys!=='undefined')BuildSys.init();
 
     this.started=true;
 
@@ -478,6 +484,7 @@ const Game={
       if(typeof FishSys!=='undefined'){try{FishSys.update(dt);}catch(e){console.error('[FishSys error]',e);}}
       if(typeof PortFX!=='undefined'){try{PortFX.update(dt);}catch(e){console.error('[PortFX error]',e);}}
       try{Furni.update(dt);}catch(e){console.error('[Furni error]',e);}
+      if(typeof BuildSys!=='undefined'){try{BuildSys.update(dt);}catch(e){console.error('[BuildSys error]',e);}}
       if(typeof Altar!=='undefined'){try{Altar.update(dt);}catch(e){console.error('[Altar error]',e);}}
       try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
       if(UI.hudExtra){try{UI.hudExtra(dt);}catch(e){console.error('[hudExtra error]',e);}}

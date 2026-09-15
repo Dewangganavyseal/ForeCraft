@@ -1085,6 +1085,8 @@ const World={
       FX.debris(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),info0.color,8,2.4);
       if((id===B.GRASS)&&Math.random()<0.3+RPG.harvestBonus())
         FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),'fiber',1);
+      /* jatuhkan item blok rumput agar bisa diambil dan ditata kembali */
+      FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),'blk_grass',1);
       Player.addXP(1);Prof.gainBlock(B.GRASS);
       this.regrow.push({x:wx,y:wy,z:wz,t:this.REGROW_T});
       if(typeof Sfx!=='undefined'&&Sfx.chop)Sfx.chop();
@@ -1138,6 +1140,11 @@ const World={
     }
     else if((id===B.GRASS||id===B.DIRT)&&Math.random()<0.3+bonus)
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),'fiber',1);
+    /* jatuhkan item blok voxel khusus blok dari biome */
+    const blockItem = (typeof BLOCK_TO_ITEM!=='undefined') ? BLOCK_TO_ITEM[id] : null;
+    if(blockItem){
+      FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),blockItem,1);
+    }
     Player.addXP(1);
     /* proficiency: jenis blok menentukan sub-skill yang naik (ala Durango) */
     Prof.gainBlock(id);
