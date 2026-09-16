@@ -370,6 +370,7 @@ const Player={
   },
   tryDodge(){
     if(this.dead||this.dodge.active||this.dodge.cd>0)return;
+    if((this.stunT||0)>0)return;               // kena jaring tarantula: tidak bisa dodge
     if(this.slamQuick)return;                    // sedang Hantam Bumi
     const cost=20*RPG.stamCostMult();
     if(this.stamina<cost){UI.toast('⚡ Stamina kurang!');Sfx.noStamina();return;}
@@ -475,6 +476,7 @@ const Player={
    },
    tryAttack(){
      if(this.dead||this.dodge.active)return;
+     if((this.stunT||0)>0)return;               // kena jaring tarantula: tidak bisa menyerang
      if(this.slamQuick)return;                    // sedang melakukan Hantam Bumi
      if(typeof Capture!=='undefined'){
        if(Capture.active)return;                     // sedang minigame tangkap
@@ -1024,6 +1026,20 @@ const Player={
   /* ---------- update ---------- */
   update(dt){
     if(this.dead)return;
+    /* JARING TARANTULA: korban stun total 5 detik — tidak bisa gerak/serang.
+       Hanya input yang dikunci; fisika & gravitasi di bawah tetap jalan. */
+    this._webStunned=(this.stunT||0)>0;
+    if(this._webStunned){
+      this.stunT-=dt;
+      if(this.stunT<=0){this.stunT=0;this._webStunned=false;}
+      else{
+        this.vel.x*=Math.exp(-6*dt);this.vel.z*=Math.exp(-6*dt);
+        this.attack.active=false;this.attack.queued=false;
+        if(this.dodge)this.dodge.active=false;
+        if(Math.random()<dt*3&&typeof FX!=='undefined')
+          FX.text(this.pos.clone().add(new THREE.Vector3(0,2.3,0)),'🕸️','#e0f2fe');
+      }
+    }
     /* Timer pose menahan tameng (diisi takeDamage saat tangkisan berhasil).
        Ditempatkan PALING ATAS supaya tetap menyusut di semua jalur — termasuk
        saat menunggangi mob atau lompatan Hantam Bumi, yang keluar dari update()
@@ -1100,6 +1116,8 @@ const Player={
     /* HANTAM BUMI cepat: loncat DI TEMPAT — input gerak diabaikan sampai
        mendarat, jadi pemain tidak bisa "menggeser" titik hantamannya */
     if(this.slamQuick&&this.slamQuick.phase!=='land')spd=0;
+    /* JARING TARANTULA: korban stun tidak bisa digerakkan */
+    if(this._webStunned)spd=0;
     const acc=this.onGround?30:9;
     if(sailing){
       this.vel.set(0,0,0);

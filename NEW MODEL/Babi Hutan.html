@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Babi Hutan — Voxel Three.js (2-Sendi Lutut & Seruduk Lari)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐗</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Titan+One&family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#221b16; --paper:#ffffff; --accent:#b33820; --soft:#887c70; --gold:#d19d38;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%; overflow:hidden; background:#fbf9f6;
+    font-family:'Chakra Petch',sans-serif; color:var(--ink); user-select:none}
+  canvas{display:block}
+
+  .hud{position:fixed; inset:0; pointer-events:none; z-index:10}
+
+  .brand{position:absolute; top:22px; left:24px; max-width:440px}
+  .tag{font-size:11px; font-weight:700; letter-spacing:.38em; color:var(--soft)}
+  .brand h1{font-family:'Titan One'; font-size:clamp(30px,5.2vw,52px); line-height:.95;
+    margin:8px 0 10px; text-shadow:4px 4px 0 rgba(34,27,22,.08)}
+  .brand h1 span{color:var(--accent); -webkit-text-stroke:2px var(--ink)}
+  .sub{font-size:12.5px; line-height:1.55; color:#6b6055}
+
+  .side{position:absolute; top:24px; right:24px; display:flex; flex-direction:column; gap:8px; align-items:flex-end}
+  .chip{pointer-events:auto; display:flex; align-items:center; gap:9px;
+    background:#fff; border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink);
+    padding:8px 14px; font-size:12px; font-weight:700; letter-spacing:.14em; cursor:default}
+  button.chip{cursor:pointer; font-family:inherit; color:var(--ink); transition:transform .15s, box-shadow .15s}
+  button.chip:hover{transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--ink)}
+  button.chip.on{background:var(--accent); color:#fff}
+  .dot{width:10px; height:10px; background:var(--accent); animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.55);opacity:.45}}
+  .phase-badge{pointer-events:auto; background:#fff; border:2px solid var(--ink);
+    box-shadow:3px 3px 0 var(--ink); padding:5px 12px; font-size:11px; font-weight:700;
+    letter-spacing:.12em; color:var(--accent); min-height:24px; display:flex; align-items:center}
+
+  .dock{position:absolute; left:50%; bottom:24px; transform:translateX(-50%);
+    display:flex; gap:10px; flex-wrap:wrap; justify-content:center; pointer-events:auto}
+  .btn{position:relative; font-family:inherit; font-weight:700; font-size:12px; letter-spacing:.06em;
+    background:#fff; color:var(--ink); border:3px solid var(--ink); box-shadow:5px 5px 0 var(--ink);
+    padding:9px 15px 10px; min-width:105px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition:transform .12s, box-shadow .12s, background .12s, color .12s}
+  .btn .ico{font-size:20px; line-height:1}
+  .btn kbd{position:absolute; top:-10px; right:-8px; background:var(--ink); color:#fff;
+    font-family:inherit; font-size:9.5px; padding:2px 5px}
+  .btn:hover{transform:translate(-2px,-3px); box-shadow:8px 8px 0 var(--ink)}
+  .btn:active{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink)}
+  .btn.active{background:var(--accent); color:#fff}
+  .btn.active kbd{background:#fff; color:var(--ink)}
+
+  .hint{position:absolute; right:24px; bottom:26px; text-align:right;
+    font-size:11px; letter-spacing:.1em; line-height:2; color:var(--soft)}
+
+  .bubble{position:fixed; z-index:20; pointer-events:none; font-family:'Titan One';
+    transform:translate(-50%,-100%); animation:rise 1.8s ease-out forwards}
+  .bubble.grook{font-size:28px; color:#fff; -webkit-text-stroke:2px var(--ink);
+    text-shadow:4px 4px 0 var(--accent); rotate:-5deg}
+  .bubble.snort{font-size:22px; color:#fff; -webkit-text-stroke:1.6px var(--ink);
+    text-shadow:3px 3px 0 var(--gold)}
+  .bubble.charge{font-size:26px; color:#fff; -webkit-text-stroke:2px var(--ink);
+    text-shadow:4px 4px 0 var(--accent); animation:chargeRise 1.4s ease-out forwards}
+  @keyframes rise{
+    0%{opacity:0; transform:translate(-50%,-60%) scale(.6)}
+    15%{opacity:1}
+    100%{opacity:0; transform:translate(-50%,-260%) scale(1.15)}
+  }
+  @keyframes chargeRise{
+    0%{opacity:0; transform:translate(-50%,-40%) scale(.8)}
+    20%{opacity:1; transform:translate(-50%,-90%) scale(1.25)}
+    100%{opacity:0; transform:translate(-50%,-240%) scale(1.4)}
+  }
+
+  #loader{position:fixed; inset:0; background:#fbf9f6; z-index:50; display:grid; place-items:center;
+    transition:opacity .5s; font-weight:700; letter-spacing:.25em; color:var(--soft); font-size:13px}
+  #loader .pig{font-size:44px; display:block; text-align:center; margin-bottom:14px; animation:hop .7s infinite alternate ease-in-out}
+  @keyframes hop{from{transform:translateY(0)}to{transform:translateY(-12px)}}
+  #loader.done{opacity:0; visibility:hidden}
+
+  @media (max-width:760px){
+    .sub,.hint{display:none}
+    .btn{min-width:68px; padding:7px 9px 8px; font-size:10px}
+    .btn .ico{font-size:16px}
+  }
+</style>
+</head>
+<body>
+
+<div id="loader"><div><span class="pig">🐗</span>MEMASANG ANATOMI 2-SENDI LUTUT…</div></div>
+
+<div class="hud">
+  <div class="brand">
+    <div class="tag">THREE.JS · KNEE RIG & CHARGE RUN</div>
+    <h1>BABI <span>HUTAN</span> v3</h1>
+    <p class="sub">Model babi hutan voxel anatomi 2-sendi: paha & lutut/betis menekuk natural (bukan 1 engsel kaku).
+      Animasi seruduk kini <b>sambil lari kencang ke depan</b> diiringi kepulan debu tanah,
+      didahului <b>ancang-ancang kaki mengais tanah 3 kali</b>.</p>
+  </div>
+
+  <div class="side">
+    <div class="chip"><i class="dot"></i><b id="stateName">JALAN</b></div>
+    <div class="phase-badge" id="phaseBadge">NORMAL</div>
+    <button class="chip on" id="orbitBtn">ORBIT OTOMATIS ✦</button>
+  </div>
+
+  <nav class="dock" id="dock">
+    <button class="btn" data-s="idle"><kbd>1</kbd><span class="ico">🐗</span>DIAM</button>
+    <button class="btn active" data-s="walk"><kbd>2</kbd><span class="ico">🚶</span>JALAN</button>
+    <button class="btn" data-s="run"><kbd>3</kbd><span class="ico">💨</span>LARI</button>
+    <button class="btn" data-s="punch"><kbd>4</kbd><span class="ico">⬆️</span>PUKUL ATAS</button>
+    <button class="btn" data-s="gore"><kbd>5</kbd><span class="ico">🎯</span>SERUDUK</button>
+  </nav>
+
+  <div class="hint">SERET putar kamera · SCROLL zoom<br>KLIK babi = GROOOK! · TOMBOL 1–5 / SPASI</div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================= RENDERER & SCENE ================= */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xfbf9f6);
+scene.fog = new THREE.Fog(0xfbf9f6, 18, 48);
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, .1, 100);
+const camA = new THREE.Vector3(10, 5.2, 11.5), camB = new THREE.Vector3(5.8, 3.2, 8.2);
+camera.position.copy(camA);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.95, 0);
+controls.enableDamping = true; controls.dampingFactor = .06;
+controls.minDistance = 4.2; controls.maxDistance = 16;
+controls.minPolarAngle = .25; controls.maxPolarAngle = 1.48;
+controls.enablePan = false;
+controls.autoRotate = true; controls.autoRotateSpeed = .8;
+
+/* Pencahayaan */
+scene.add(new THREE.HemisphereLight(0xfffdfa, 0xd8cfc4, 1.25));
+const key = new THREE.DirectionalLight(0xfff7ea, 1.85); key.position.set(6, 12, 8); scene.add(key);
+const fill = new THREE.DirectionalLight(0xdce7f0, .6); fill.position.set(-7, 5, -8); scene.add(fill);
+
+/* Lantai netral + bayangan blob */
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240),
+  new THREE.MeshBasicMaterial({ color:0xfbf9f6 }));
+ground.rotation.x = -Math.PI/2; scene.add(ground);
+
+const sc = document.createElement('canvas'); sc.width = sc.height = 128;
+const gx = sc.getContext('2d');
+const gr = gx.createRadialGradient(64,64,4,64,64,60);
+gr.addColorStop(0,'rgba(36,28,20,.38)'); gr.addColorStop(1,'rgba(36,28,20,0)');
+gx.fillStyle = gr; gx.fillRect(0,0,128,128);
+const blob = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 4.8),
+  new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(sc), transparent:true, depthWrite:false }));
+blob.rotation.x = -Math.PI/2; blob.position.y = .02; scene.add(blob);
+
+/* ================= BUILDER VOXEL SOLID ================= */
+const MAT = new THREE.MeshLambertMaterial({ vertexColors:true });
+const C = {
+  FUR_MAIN:  0x463022,
+  FUR_DARK:  0x322016,
+  FUR_DEEP:  0x20140c,
+  FUR_WARM:  0x5a3e2c,
+  HUMP_DARK: 0x2e1c12,
+  SNOUT_BASE:0x684632,
+  SNOUT_PAD: 0x865842,
+  NOSTRIL:   0x1b110b,
+  MOUTH_IN:  0x84362d,
+  TUSK_ROOT: 0x6e6353,
+  TUSK_IVORY:0xfcf8ee,
+  HOOF:      0x18110d,
+  EAR_OUTER: 0x3e281c,
+  EAR_INNER: 0xa86e60,
+  EYE_RED:   0xeb2618,
+  EYE_GLINT: 0xffffff,
+};
+
+class Part {
+  constructor(){ this.list = []; }
+  box(w, h, d, x, y, z, hex, jit=0, rot=null){
+    const g = new THREE.BoxGeometry(w, h, d);
+    if(rot){
+      if(rot[0]) g.rotateX(rot[0]);
+      if(rot[1]) g.rotateY(rot[1]);
+      if(rot[2]) g.rotateZ(rot[2]);
+    }
+    g.translate(x, y, z);
+    const c = new THREE.Color(hex);
+    if(jit){
+      const j = 1 + (Math.random()*2 - 1)*jit;
+      c.r = Math.min(1, c.r*j); c.g = Math.min(1, c.g*j); c.b = Math.min(1, c.b*j);
+    }
+    const n = g.attributes.position.count, a = new Float32Array(n*3);
+    for(let i=0; i<n; i++){ a[i*3]=c.r; a[i*3+1]=c.g; a[i*3+2]=c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    this.list.push(g);
+    return this;
+  }
+  mesh(px=0, py=0, pz=0){
+    const geo = mergeGeometries(this.list);
+    this.list.forEach(g=>g.dispose());
+    const m = new THREE.Mesh(geo, MAT);
+    m.position.set(-px, -py, -pz);
+    return m;
+  }
+}
+
+/* ================= SKALA & PIVOT ANATOMIS ================= */
+const S = 0.115;
+const HP = [0, 8.6, 5.8];            // Pivot leher/kepala
+const JP = [0, 7.3, 10.4];           // Pivot rahang bawah
+const EL = [ 2.1, 10.8, 7.8], ER = [-2.1, 10.8, 7.8];
+
+/* ================= 1. BADAN & PUNUK PUNDAK (NO GAPS) ================= */
+const body = new Part();
+body.box(5.6, 5.0, 12.8, 0, 7.6, -0.2, C.FUR_MAIN, .015);
+body.box(5.8, 1.4, 12.4, 0, 5.6, -0.2, C.FUR_DARK);
+body.box(5.4, 4.4, 2.6, 0, 7.2, 5.4, C.FUR_DARK);
+
+// Punuk pundak
+body.box(5.2, 2.8, 5.6, 0, 9.8, 2.8, C.HUMP_DARK, .02);
+body.box(4.4, 1.4, 4.2, 0, 11.2, 2.6, C.FUR_DEEP);
+
+// Leher soket
+body.box(5.0, 4.6, 3.4, 0, 8.4, 5.5, C.FUR_MAIN);
+body.box(4.6, 4.2, 2.4, 0, 8.6, 6.6, C.HUMP_DARK);
+
+// Dinding penopang tulang punggung
+body.box(2.2, 1.4, 11.6, 0, 9.8, -0.8, C.HUMP_DARK);
+
+// Otot bahu depan kiri-kanan tempat pangkal paha menancap
+body.box(1.1, 4.2, 4.0,  2.75, 7.2, 3.4, C.FUR_DARK);
+body.box(1.1, 4.2, 4.0, -2.75, 7.2, 3.4, C.FUR_DARK);
+
+// Otot pinggul belakang kiri-kanan
+body.box(1.1, 4.2, 4.0,  2.75, 7.0, -3.8, C.FUR_DARK);
+body.box(1.1, 4.2, 4.0, -2.75, 7.0, -3.8, C.FUR_DARK);
+
+// Surai punggung tertanam dalam
+for(let i=0; i<11; i++){
+  const z = 4.8 - i*1.05;
+  const isHump = z >= 0.8;
+  const baseY = isHump ? 10.6 : 9.5;
+  const hh = 1.3 + ((i%3===0)?0.6:0.2);
+  body.box(0.55, hh + 0.8, 0.55, (i%2?0.24:-0.24), baseY + hh*0.4, z,
+    (i%2?C.FUR_DEEP:C.HUMP_DARK), .03, [-0.18 + i*0.015, 0, (i%2?0.05:-0.05)]);
+  body.box(0.4, hh*0.65 + 0.6, 0.45, (i%2?-0.48:0.48), baseY + hh*0.25, z - 0.15,
+    C.FUR_DEEP, .03, [-0.20 + i*0.015, 0, 0]);
+}
+
+/* ================= 2. KEPALA, MONCONG & GADING ================= */
+const head = new Part();
+head.box(4.5, 4.3, 3.8, 0, 8.4, 6.2, C.FUR_MAIN);
+head.box(4.3, 3.8, 3.2, 0, 8.5, 5.0, C.FUR_DARK);
+
+head.box(4.6, 4.4, 4.6, 0, 9.1, 8.8, C.FUR_MAIN, .015);
+head.box(4.8, 1.2, 1.8, 0, 10.6, 9.4, C.FUR_DEEP);
+head.box(4.2, 0.9, 1.4, 0, 11.0, 8.1, C.HUMP_DARK);
+
+head.box(3.2, 2.7, 3.4, 0, 8.5, 11.2, C.SNOUT_BASE);
+head.box(0.85, 2.6, 3.2,  2.4, 8.8, 9.8, C.FUR_DARK);
+head.box(0.85, 2.6, 3.2, -2.4, 8.8, 9.8, C.FUR_DARK);
+head.box(0.7,  2.0, 2.4,  1.7, 8.2, 11.4, C.SNOUT_BASE);
+head.box(0.7,  2.0, 2.4, -1.7, 8.2, 11.4, C.SNOUT_BASE);
+
+head.box(2.8, 2.3, 0.9, 0, 8.2, 12.9, C.SNOUT_PAD);
+head.box(0.65, 0.75, 0.35,  0.70, 8.5, 13.35, C.NOSTRIL);
+head.box(0.65, 0.75, 0.35, -0.70, 8.5, 13.35, C.NOSTRIL);
+head.box(2.6, 0.5, 2.6, 0, 7.6, 11.3, C.MOUTH_IN);
+
+// Gading atas penajam
+head.box(0.42, 0.8, 0.42,  1.52, 7.8, 12.0, C.TUSK_ROOT);
+head.box(0.35, 1.1, 0.35,  1.75, 8.1, 12.2, C.TUSK_IVORY, 0, [-0.2, 0, -0.45]);
+head.box(0.42, 0.8, 0.42, -1.52, 7.8, 12.0, C.TUSK_ROOT);
+head.box(0.35, 1.1, 0.35, -1.75, 8.1, 12.2, C.TUSK_IVORY, 0, [-0.2, 0,  0.45]);
+
+/* Mata */
+const eyesO = new Part();
+eyesO.box(0.85, 1.1, 0.45,  2.34, 9.8, 9.9, C.EYE_RED);
+eyesO.box(0.85, 1.1, 0.45, -2.34, 9.8, 9.9, C.EYE_RED);
+eyesO.box(0.32, 0.38, 0.50,  2.48, 10.02, 9.96, C.EYE_GLINT);
+eyesO.box(0.32, 0.38, 0.50, -2.48, 10.02, 9.96, C.EYE_GLINT);
+
+const eyesC = new Part();
+eyesC.box(1.15, 0.30, 0.45,  2.34, 9.8, 9.9, C.FUR_DEEP);
+eyesC.box(1.15, 0.30, 0.45, -2.34, 9.8, 9.9, C.FUR_DEEP);
+
+/* Telinga */
+const earLP = new Part();
+earLP.box(1.6, 2.2, 0.65,  2.2, 11.1, 7.8, C.EAR_OUTER, .02, [0, 0, -0.28]);
+earLP.box(1.0, 1.5, 0.35,  2.35, 11.0, 8.12, C.EAR_INNER, 0, [0, 0, -0.28]);
+const earRP = new Part();
+earRP.box(1.6, 2.2, 0.65, -2.2, 11.1, 7.8, C.EAR_OUTER, .02, [0, 0,  0.28]);
+earRP.box(1.0, 1.5, 0.35, -2.35, 11.0, 8.12, C.EAR_INNER, 0, [0, 0,  0.28]);
+
+/* ================= 3. RAHANG BAWAH & GADING UTAMA BESAR ================= */
+const jawP = new Part();
+jawP.box(3.0, 1.2, 3.2, 0, 7.0, 11.8, C.SNOUT_PAD);
+jawP.box(2.8, 0.4, 2.4, 0, 7.4, 11.6, C.MOUTH_IN);
+jawP.box(0.9, 1.3, 0.7, 0, 6.4, 12.8, C.FUR_DARK);
+
+// Gading Bawah Kiri
+jawP.box(0.55, 0.9, 0.55,  1.45, 7.25, 12.7, C.TUSK_ROOT);
+jawP.box(0.48, 1.6, 0.48,  1.75, 8.15, 12.95, C.TUSK_IVORY, 0, [0.24, 0, -0.42]);
+jawP.box(0.35, 1.0, 0.35,  1.98, 9.05, 13.15, 0xffffff,     0, [0.35, 0, -0.72]);
+
+// Gading Bawah Kanan
+jawP.box(0.55, 0.9, 0.55, -1.45, 7.25, 12.7, C.TUSK_ROOT);
+jawP.box(0.48, 1.6, 0.48, -1.75, 8.15, 12.95, C.TUSK_IVORY, 0, [0.24, 0,  0.42]);
+jawP.box(0.35, 1.0, 0.35, -1.98, 9.05, 13.15, 0xffffff,     0, [0.35, 0,  0.72]);
+
+/* ================= 4. EKOR ================= */
+const tailP = new Part();
+tailP.box(0.7, 2.4, 0.7, 0, 9.2, -6.6, C.FUR_DARK, 0, [0.38, 0, 0]);
+tailP.box(0.5, 2.0, 0.5, 0, 7.6, -7.2, C.FUR_MAIN, 0, [0.38, 0, 0]);
+tailP.box(1.0, 1.1, 1.0, 0, 6.4, -7.7, C.FUR_DEEP);
+
+/* ================= 5. ANATOMI KAKI 2-SENDI (PAHA + LUTUT/BETIS) ================= */
+// Thigh (Paha): pivot di pinggul/bahu (y = 5.8). Memanjang dari y = 0 down to -3.0
+function buildThighMesh(isFront, isRight){
+  const p = new Part();
+  // Soket paha bulat tertanam di otot badan (y = 0.0 to 0.7)
+  p.box(2.2, 1.2, 2.2, 0, 0.4, 0, C.FUR_DARK);
+  // Otot paha tebal (y = 0 to -2.8)
+  p.box(2.1, 2.8, 2.1, 0, -1.4, isFront ? 0.05 : -0.05, isRight ? C.FUR_MAIN : C.FUR_WARM, .02);
+  // Bulatan sendi lutut di ujung bawah (y = -2.6 to -3.2)
+  p.box(1.85, 1.0, 1.85, 0, -2.95, 0, C.FUR_DARK);
+  return p.mesh(0, 0, 0);
+}
+
+// Shin (Lutut & Betis): pivot di lutut (y = -3.0 dalam Thigh). Memanjang down to -2.8 (menyentuh tanah!)
+function buildShinMesh(isFront, isRight){
+  const p = new Part();
+  // Mangkok sendi lutut atas membungkus bulatan paha (y = 0.5 to -0.6)
+  p.box(1.95, 1.1, 1.95, 0, 0.0, 0, C.FUR_DARK);
+  // Tulang betis / shin (y = -0.5 to -2.2)
+  p.box(1.65, 1.9, 1.65, 0, -1.2, 0, C.FUR_MAIN, .02);
+  // Kuku belah hitam keras menapak tanah (y = -2.2 to -2.8)
+  p.box(1.9, 0.9, 2.1, 0, -2.4, 0.15, C.HOOF);
+  // Taji kuku belakang (dewclaw)
+  p.box(0.8, 0.45, 0.55, 0, -2.1, -0.85, C.HOOF);
+  return p.mesh(0, 0, 0);
+}
+
+/* ================= HIERARKI RIG SOLID & 2-SENDI LUTUT ================= */
+const boarRoot = new THREE.Group(); boarRoot.scale.setScalar(S); scene.add(boarRoot);
+const rig = new THREE.Group(); boarRoot.add(rig);
+
+const bodyGrp = new THREE.Group(); rig.add(bodyGrp);
+bodyGrp.add(body.mesh());
+
+const headGrp = new THREE.Group(); headGrp.position.set(...HP); bodyGrp.add(headGrp);
+headGrp.add(head.mesh(...HP));
+const eyesOM = eyesO.mesh(...HP), eyesCM = eyesC.mesh(...HP);
+headGrp.add(eyesOM, eyesCM);
+
+const earL = new THREE.Group(); earL.position.set(EL[0]-HP[0], EL[1]-HP[1], EL[2]-HP[2]);
+earL.add(earLP.mesh(...EL)); headGrp.add(earL);
+const earR = new THREE.Group(); earR.position.set(ER[0]-HP[0], ER[1]-HP[1], ER[2]-HP[2]);
+earR.add(earRP.mesh(...ER)); headGrp.add(earR);
+
+const jawGrp = new THREE.Group(); jawGrp.position.set(JP[0]-HP[0], JP[1]-HP[1], JP[2]-HP[2]);
+jawGrp.add(jawP.mesh(...JP)); headGrp.add(jawGrp);
+
+const tail = new THREE.Group(); tail.position.set(0, 9.4, -6.4);
+tail.add(tailP.mesh(0, 9.4, -6.4)); bodyGrp.add(tail);
+
+// Struktur 2-sendi per kaki: Thigh -> Knee -> Shin
+function createLimb(x, z, isFront, isRight){
+  const thigh = new THREE.Group();
+  thigh.position.set(x, 5.8, z);
+  thigh.add(buildThighMesh(isFront, isRight));
+
+  const knee = new THREE.Group();
+  knee.position.set(0, -3.0, 0);
+  thigh.add(knee);
+
+  const shin = buildShinMesh(isFront, isRight);
+  knee.add(shin);
+
+  bodyGrp.add(thigh);
+  return { thigh, knee };
+}
+
+const legFL = createLimb(-2.5,  3.4, true,  false);
+const legFR = createLimb( 2.5,  3.4, true,  true);
+const legBL = createLimb(-2.5, -3.8, false, false);
+const legBR = createLimb( 2.5, -3.8, false, true);
+
+const boarMeshes = []; boarRoot.traverse(o=>{ if(o.isMesh) boarMeshes.push(o); });
+
+/* ================= ENGINE ANIMASI KEYFRAME & PROSEDURAL ================= */
+const smooth5 = x => {
+  x = Math.max(0, Math.min(1, x));
+  return x * x * x * (x * (x * 6 - 15) + 10);
+};
+
+const PF = [
+  'rigY', 'bodyPitch', 'bodyRoll', 'bodyYaw',
+  'headPitch', 'headYaw', 'headRoll',
+  'jaw', 'earL', 'earR', 'earF', 'tailX', 'tailZ',
+  'fl', 'fl_k', 'fr', 'fr_k',
+  'bl', 'bl_k', 'br', 'br_k',
+  'breathe', 'eye'
+];
+function zeroPose(){
+  const o = {};
+  PF.forEach(k => o[k] = 0);
+  o.breathe = 0.005; o.jaw = 0.02;
+  return o;
+}
+function mkPose(o){ const p = zeroPose(); Object.assign(p, o); return p; }
+
+function sampleTrack(keys, ct){
+  const T = keys[keys.length-1].t;
+  const c = ((ct % T) + T) % T;
+  let i = 0;
+  while(i < keys.length-2 && c > keys[i+1].t) i++;
+  const a = keys[i], b = keys[i+1];
+  const span = Math.max(1e-6, b.t - a.t);
+  const u = smooth5((c - a.t) / span);
+  const o = zeroPose();
+  PF.forEach(k=>{
+    const av = (a[k]!==undefined?a[k]:0), bv = (b[k]!==undefined?b[k]:0);
+    o[k] = av + (bv - av)*u;
+  });
+  return o;
+}
+
+/* ================= SIKLUS JALAN 2-SENDI LUTUT (QUADRUPED TROT) ================= */
+// Fungsi langkah kaki babi: mengangkat lutut saat mengayun ke depan, melurus saat menapak
+function stepCycle(phase, isFront){
+  const p = ((phase % 1) + 1) % 1;
+  let thigh, knee;
+  if(p < 0.45){
+    // Mengangkat kaki dan mengayun ke depan
+    const u = p / 0.45;
+    thigh = 0.32 - 0.64 * smooth5(u);
+    // Lutut menekuk mengangkat kuku melewati tanah
+    knee = (isFront ? 0.52 : 0.45) * Math.sin(u * Math.PI);
+  } else {
+    // Menapak dan mendorong tanah ke belakang
+    const u = (p - 0.45) / 0.55;
+    thigh = -0.32 + 0.64 * smooth5(u);
+    // Lutut hampir lurus menopang bobot badan
+    knee = 0.06 * Math.sin(u * Math.PI);
+  }
+  return { thigh, knee };
+}
+
+/* ================= SIKLUS DERAP / GALLOP 2-SENDI LUTUT ================= */
+function gallopCycle(phase, isFront){
+  const p = ((phase % 1) + 1) % 1;
+  let thigh, knee;
+  if(p < 0.50){
+    const u = p / 0.50;
+    thigh = (isFront ? 0.50 : -0.35) - (isFront ? 1.05 : -0.95) * smooth5(u);
+    // Lutut menekuk dalam saat kaki melipat di bawah dada
+    knee = (isFront ? 0.78 : 0.68) * Math.sin(u * Math.PI);
+  } else {
+    const u = (p - 0.50) / 0.50;
+    thigh = (isFront ? -0.55 : 0.60) + (isFront ? 1.05 : -0.95) * smooth5(u);
+    // Mendorong lurus penuh
+    knee = 0.10 * Math.sin(u * Math.PI);
+  }
+  return { thigh, knee };
+}
+
+/* ================= 1. IDLE (NAFAS, LIRIKAN, KUPING & EKOR) ================= */
+const P = {
+  idle(t){
+    const br = Math.sin(t * 1.8);
+    return mkPose({
+      rigY: 0,
+      bodyPitch: br * 0.012,
+      bodyRoll: Math.sin(t * 0.6) * 0.014,
+      headPitch: 0.04 + Math.sin(t * 0.9) * 0.035,
+      headYaw: Math.sin(t * 0.35) * 0.12,
+      headRoll: Math.sin(t * 0.25) * 0.025,
+      jaw: 0.02 + Math.max(0, Math.sin(t * 1.8)) * 0.04,
+      earL: Math.max(0, Math.sin(t * 0.8)) ** 8 * 0.35,
+      earR: Math.max(0, Math.sin(t * 0.8 + 2.2)) ** 8 * 0.35,
+      earF: Math.sin(t * 1.4) * 0.06,
+      tailX: 0.08,
+      tailZ: Math.sin(t * 3.2) * 0.35 + Math.sin(t * 6.4) * 0.15,
+      // Sedikit tekukan alami pada sendi lutut saat berdiri santai
+      fl: 0.02, fl_k: 0.08,
+      fr: -0.02, fr_k: 0.08,
+      bl: -0.02, bl_k: 0.10,
+      br: 0.02, br_k: 0.10,
+      breathe: 0.006 + 0.005 * br,
+      eye: 0
+    });
+  },
+
+  /* ================= 2. WALK (JALAN TROT HARMONIS DENGAN LUTUT MENYAPU) ================= */
+  walk(t){
+    const f = t * 5.6;
+    const s = Math.sin(f), c = Math.cos(f);
+    const pBase = f / (Math.PI * 2);
+
+    const flL = stepCycle(pBase, true);
+    const frL = stepCycle(pBase + 0.50, true);
+    const blL = stepCycle(pBase + 0.55, false);
+    const brL = stepCycle(pBase + 0.05, false);
+
+    return mkPose({
+      rigY: Math.abs(c) * 0.12,
+      bodyPitch: 0.02 + Math.sin(2 * f) * 0.015,
+      bodyRoll: s * 0.028,
+      bodyYaw: s * 0.018,
+      headPitch: 0.05 - Math.sin(2 * f) * 0.035,
+      headYaw: Math.sin(f * 0.5 + 1.2) * 0.06 + s * 0.03,
+      headRoll: s * 0.015,
+      jaw: 0.02,
+      earL: Math.max(0, Math.sin(t * 1.1)) ** 8 * 0.25,
+      earR: Math.max(0, Math.sin(t * 1.1 + 1.8)) ** 8 * 0.25,
+      earF: Math.sin(f * 2) * 0.08,
+      tailX: 0.08,
+      tailZ: Math.sin(t * 4.0) * 0.45,
+      fl:   flL.thigh, fl_k: flL.knee,
+      fr:   frL.thigh, fr_k: frL.knee,
+      bl:   blL.thigh, bl_k: blL.knee,
+      br:   brL.thigh, br_k: brL.knee,
+      breathe: 0.005,
+      eye: 0
+    });
+  },
+
+  /* ================= 3. RUN (DERAP KENCANG DENGAN LUTUT MELIPAT ELASTIS) ================= */
+  run(t){
+    const f = t * 12.5;
+    const s = Math.sin(f);
+    const pBase = f / (Math.PI * 2);
+
+    const flL = gallopCycle(pBase, true);
+    const frL = gallopCycle(pBase + 0.35, true);
+    const blL = gallopCycle(pBase + 0.55, false);
+    const brL = gallopCycle(pBase + 0.90, false);
+
+    return mkPose({
+      rigY: Math.abs(s) * 0.36 + 0.04,
+      bodyPitch: 0.08 + Math.sin(f + 0.9) * 0.05,
+      bodyRoll: Math.sin(f) * 0.02,
+      bodyYaw: Math.sin(f * 0.5) * 0.015,
+      headPitch: 0.14 + Math.sin(f + 0.9) * 0.06,
+      headYaw: Math.sin(f * 0.5) * 0.025,
+      headRoll: Math.sin(f) * 0.012,
+      jaw: 0.05,
+      earL: 0.12, earR: 0.12, earF: 0.30 + Math.sin(f * 2) * 0.10,
+      tailX: 1.1 + Math.sin(f) * 0.08,
+      tailZ: Math.sin(t * 7.0) * 0.25,
+      fl:   flL.thigh, fl_k: flL.knee,
+      fr:   frL.thigh, fr_k: frL.knee,
+      bl:   blL.thigh, bl_k: blL.knee,
+      br:   brL.thigh, br_k: brL.knee,
+      breathe: 0.012,
+      eye: 0
+    });
+  }
+};
+
+/* ================= 4. PUKULAN KEPALA KE ATAS (UPWARD TUSK SLASH) ================= */
+const PUNCH_T = 1.90;
+const PUNCH_KEYS = [
+  { t:0.00, rigY:0.00, bodyPitch:0.00, headPitch:0.04, jaw:0.02, tailX:0.08,
+    fl:0.02, fl_k:0.08, fr:-0.02, fr_k:0.08, bl:-0.02, bl_k:0.10, br:0.02, br_k:0.10 },
+  // Ancang turun memampatkan kedua lutut depan
+  { t:0.25, rigY:-0.20, bodyPitch:0.06, headPitch:0.42, jaw:0.04, tailX:0.16, earF:-0.20,
+    fl:0.22, fl_k:0.62, fr:0.22, fr_k:0.62, bl:-0.18, bl_k:0.35, br:-0.18, br_k:0.35 },
+  // Hentakan meledak ke atas, lutut melurus seketika!
+  { t:0.42, rigY:0.36, bodyPitch:-0.18, headPitch:-0.95, jaw:0.58, tailX:0.55, earF:0.55,
+    fl:-0.10, fl_k:0.02, fr:-0.10, fr_k:0.02, bl:0.05, bl_k:0.05, br:0.05, br_k:0.05 },
+  // Puncak ayunan gading di udara
+  { t:0.62, rigY:0.10, bodyPitch:-0.05, headPitch:-0.35, jaw:0.22, tailX:0.28, earF:0.20,
+    fl:0.05, fl_k:0.15, fr:0.05, fr_k:0.15, bl:-0.05, bl_k:0.10, br:-0.05, br_k:0.10 },
+  // Mendarat dengan lutut meredam benturan
+  { t:1.00, rigY:-0.06, bodyPitch:0.02, headPitch:0.10, jaw:0.05, tailX:0.12,
+    fl:0.10, fl_k:0.30, fr:0.10, fr_k:0.30, bl:-0.05, bl_k:0.15, br:-0.05, br_k:0.15 },
+  { t:1.90, rigY:0.00, bodyPitch:0.00, headPitch:0.04, jaw:0.02, tailX:0.08,
+    fl:0.02, fl_k:0.08, fr:-0.02, fr_k:0.08, bl:-0.02, bl_k:0.10, br:0.02, br_k:0.10 }
+];
+function punchPose(t){ return sampleTrack(PUNCH_KEYS, t); }
+
+/* ================= 5. SERUDUK DENGAN ANCANG-ANCANG KAKI & SPRINT KENCANG ================= */
+const GORE_T = 4.20; // Siklus utuh seruduk (Ancang -> Lari Seruduk Kencang -> Mengerem)
+
+function gorePose(t){
+  const c = ((t % GORE_T) + GORE_T) % GORE_T;
+
+  // FASE 1: ANCANG-ANCANG KAKI MENGAIS TANAH (t = 0.0 s/d 1.35s)
+  if(c < 1.35){
+    const u = Math.min(1, c / 0.35);
+    const crouchY = -0.22 * u;
+    const p = mkPose({
+      rigY: crouchY,
+      bodyPitch: -0.07 * u,
+      headPitch: 0.10 + 0.42 * u, // Menunduk tajam mengarahkan gading
+      tailX: 0.15 + 0.25 * u,
+      jaw: 0.04 + 0.08 * u,
+      earF: -0.30 * u,
+      // Kaki kanan depan bertumpu kokoh
+      fr: -0.15, fr_k: 0.25,
+      // Kedua kaki belakang menekuk bersiap melompat
+      bl: 0.25, bl_k: 0.42,
+      br: 0.25, br_k: 0.42,
+      breathe: 0.015,
+      eye: 0
+    });
+
+    // KAKI DEPAN KIRI MENGAIS TANAH 3 KALI BERIRAMA
+    if(c >= 0.25 && c < 1.25){
+      const pawTime = (c - 0.25) * 18.85; // 3 siklus mengais penuh
+      const scrape = Math.sin(pawTime);
+      if(scrape > 0){
+        // Mengangkat kaki ke depan (lutut menekuk tajam ke atas)
+        p.fl = -0.20 - 0.35 * scrape;
+        p.fl_k = 0.25 + 0.65 * scrape; // Lutut terangkat 0.9 rad!
+      } else {
+        // Menggaruk mundur ke belakang tanah
+        p.fl = -0.20 - 0.42 * scrape;
+        p.fl_k = 0.25 + 0.15 * Math.abs(scrape);
+      }
+      p.bodyRoll += Math.sin(t * 26.0) * 0.025; // Getar badan tegang
+      p.headYaw  += Math.sin(t * 22.0) * 0.035;
+    }
+    return p;
+  }
+
+  // FASE 2: SERUDUKAN SAMBIL LARI KENCANG KE DEPAN! (t = 1.35 s/d 3.20s)
+  if(c < 3.20){
+    // Derap gallop sprint super cepat (4.2 langkah per detik)
+    const gallopPhase = (c - 1.35) * 4.2;
+    const f = gallopPhase * Math.PI * 2;
+
+    const flL = gallopCycle(gallopPhase, true);
+    const frL = gallopCycle(gallopPhase + 0.35, true);
+    const blL = gallopCycle(gallopPhase + 0.55, false);
+    const brL = gallopCycle(gallopPhase + 0.90, false);
+
+    return mkPose({
+      rigY: Math.abs(Math.sin(f)) * 0.32 + 0.04,
+      bodyPitch: 0.12 + Math.sin(f) * 0.06,
+      bodyRoll: Math.sin(f) * 0.03,
+      bodyYaw: Math.sin(f * 0.5) * 0.02,
+      // Kepala terkunci menusuk lurus ke depan dengan gading terhunus
+      headPitch: -0.20 + Math.sin(f) * 0.05,
+      headYaw: Math.sin(f * 0.5) * 0.02,
+      headRoll: Math.sin(f) * 0.015,
+      jaw: 0.48, // Mulut menganga buas
+      earL: 0.15, earR: 0.15, earF: 0.50,
+      tailX: 1.25, // Ekor tegak mengancam
+      tailZ: Math.sin(t * 8.0) * 0.25,
+      fl:   flL.thigh, fl_k: flL.knee,
+      fr:   frL.thigh, fr_k: frL.knee,
+      bl:   blL.thigh, bl_k: blL.knee,
+      br:   brL.thigh, br_k: brL.knee,
+      breathe: 0.020,
+      eye: 0
+    });
+  }
+
+  // FASE 3: MENGEREM MENANCAPKAN KUKU & PULIH (t = 3.20 s/d 4.20s)
+  const uBrake = smooth5((c - 3.20) / 1.0);
+  return mkPose({
+    rigY: -0.15 * (1 - uBrake),
+    bodyPitch: 0.10 * (1 - uBrake),
+    headPitch: -0.10 + 0.14 * uBrake,
+    tailX: 0.40 * (1 - uBrake) + 0.08 * uBrake,
+    jaw: 0.20 * (1 - uBrake) + 0.02 * uBrake,
+    // Kaki depan menahan luncuran
+    fl:   -0.45 * (1 - uBrake) + 0.02 * uBrake, fl_k: 0.35 * (1 - uBrake) + 0.08 * uBrake,
+    fr:   -0.45 * (1 - uBrake) - 0.02 * uBrake, fr_k: 0.35 * (1 - uBrake) + 0.08 * uBrake,
+    bl:    0.35 * (1 - uBrake) - 0.02 * uBrake, bl_k: 0.35 * (1 - uBrake) + 0.10 * uBrake,
+    br:    0.35 * (1 - uBrake) + 0.02 * uBrake, br_k: 0.35 * (1 - uBrake) + 0.10 * uBrake,
+    breathe: 0.015 * (1 - uBrake) + 0.005 * uBrake,
+    eye: 0
+  });
+}
+
+/* ================= SERBUK DEBU TANAH ================= */
+const puffs = [];
+function spawnPuff(x, y, z, n=6, spread=.50, hex=0xb8a792){
+  for(let i=0; i<n; i++){
+    const sz = .045 + Math.random()*.08;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz),
+      new THREE.MeshLambertMaterial({ color:hex, transparent:true, opacity:.88 }));
+    m.position.set(x + (Math.random()-.5)*spread, y + Math.random()*.06, z + (Math.random()-.5)*spread);
+    m.userData = { vx:(Math.random()-.5)*.8, vy:.6 + Math.random()*.9, vz:(Math.random()-.5)*.8,
+                   life:.55 + Math.random()*.3, max:.85 };
+    scene.add(m); puffs.push(m);
+  }
+}
+function stepPuffs(dt){
+  for(let i=puffs.length-1; i>=0; i--){
+    const p = puffs[i], u = p.userData;
+    u.life -= dt;
+    if(u.life <= 0){ scene.remove(p); p.geometry.dispose(); p.material.dispose(); puffs.splice(i,1); continue; }
+    u.vy -= 2.4 * dt;
+    p.position.x += u.vx * dt; p.position.y += u.vy * dt; p.position.z += u.vz * dt;
+    p.rotation.x += dt * 3; p.rotation.z += dt * 2;
+    p.material.opacity = Math.max(0, .88 * (u.life / u.max));
+    p.scale.setScalar(1 + (1 - u.life / u.max) * 1.3);
+  }
+}
+
+/* ================= APLIKASI POSE ANATOMIS LENGKAP ================= */
+function applyPose(p){
+  rig.position.y = p.rigY;
+  rig.rotation.x = p.bodyPitch;
+  rig.rotation.z = p.bodyRoll;
+  rig.rotation.y = p.bodyYaw;
+
+  headGrp.position.set(...HP);
+  headGrp.rotation.set(p.headPitch, p.headYaw, p.headRoll);
+
+  jawGrp.rotation.x = p.jaw;
+  earL.rotation.z =  (p.earL + p.earF);
+  earR.rotation.z = -(p.earR + p.earF);
+
+  tail.rotation.x = p.tailX;
+  tail.rotation.z = p.tailZ;
+
+  // 4 Kaki 2-Sendi: Paha (thigh) + Lutut (knee)
+  legFL.thigh.rotation.x = p.fl;
+  legFL.knee.rotation.x  = p.fl_k;
+
+  legFR.thigh.rotation.x = p.fr;
+  legFR.knee.rotation.x  = p.fr_k;
+
+  legBL.thigh.rotation.x = p.bl;
+  legBL.knee.rotation.x  = p.bl_k;
+
+  legBR.thigh.rotation.x = p.br;
+  legBR.knee.rotation.x  = p.br_k;
+
+  const b = 1 + p.breathe;
+  bodyGrp.scale.set(1 + (b-1)*.6, b, 1 + (b-1)*.3);
+
+  const closed = p.eye > .5;
+  eyesOM.visible = !closed; eyesCM.visible = closed;
+}
+
+/* ================= STATE MACHINE & KONTROL ================= */
+const SPEED_BASE = { idle:0, walk:1.6, run:4.6, punch:0, gore:0 };
+const LABEL      = { idle:'DIAM', walk:'JALAN', run:'LARI', punch:'PUKUL ATAS', gore:'SERUDUK' };
+const ORDER      = ['idle','walk','run','punch','gore'];
+
+let state='walk', fromPose=null, blend=1, elapsed=0, last=performance.now();
+let lastPose = P.walk(0);
+let nextBlink=2.5, blinkUntil=-1, stateStart=0, lastPawDust=0, lastTrailDust=0, brakeDustDone=false;
+let speed=0, angle=0; const R=3.2;
+let introT=0, userTouched=false, autoOn=true, rt=0;
+
+const stateName  = document.getElementById('stateName');
+const phaseBadge = document.getElementById('phaseBadge');
+const orbitBtn   = document.getElementById('orbitBtn');
+
+function setState(s){
+  if(s===state) return;
+  fromPose = Object.assign({}, lastPose);
+  blend = 0; state = s; stateStart = elapsed;
+  lastPawDust = 0; lastTrailDust = 0; brakeDustDone = false;
+  document.querySelectorAll('.btn').forEach(b=>b.classList.toggle('active', b.dataset.s===s));
+  stateName.textContent = LABEL[s];
+  phaseBadge.textContent = (s==='gore'||s==='punch') ? 'MEMULAI' : 'NORMAL';
+}
+document.getElementById('dock').addEventListener('click', e=>{
+  const b = e.target.closest('.btn'); if(b) setState(b.dataset.s);
+});
+addEventListener('keydown', e=>{
+  const map={'1':'idle','2':'walk','3':'run','4':'punch','5':'gore'};
+  if(map[e.key]) setState(map[e.key]);
+  else if(e.key===' '){ setState(ORDER[(ORDER.indexOf(state)+1)%ORDER.length]); e.preventDefault(); }
+});
+orbitBtn.onclick = ()=>{ autoOn=!autoOn; controls.autoRotate=autoOn; orbitBtn.classList.toggle('on',autoOn); };
+controls.addEventListener('start', ()=>{ userTouched=true; controls.autoRotate=false; clearTimeout(rt); });
+controls.addEventListener('end',   ()=>{ if(autoOn) rt=setTimeout(()=>controls.autoRotate=true, 2600); });
+
+/* ================= KLIK BABI = GROOOK! ================= */
+const ray = new THREE.Raycaster(), ndcV = new THREE.Vector2();
+let dX=0, dY=0;
+renderer.domElement.addEventListener('pointerdown', e=>{ dX=e.clientX; dY=e.clientY; });
+renderer.domElement.addEventListener('pointerup', e=>{
+  if(Math.hypot(e.clientX-dX, e.clientY-dY) > 6) return;
+  ndcV.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(ndcV, camera);
+  if(ray.intersectObjects(boarMeshes, false).length){ bubble('GROOOK!','grook'); }
+});
+let hoverBusy=false;
+renderer.domElement.addEventListener('pointermove', e=>{
+  if(hoverBusy) return; hoverBusy=true;
+  requestAnimationFrame(()=>{
+    ndcV.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    ray.setFromCamera(ndcV, camera);
+    renderer.domElement.style.cursor =
+      ray.intersectObjects(boarMeshes, false).length ? 'pointer' : 'grab';
+    hoverBusy=false;
+  });
+});
+
+const wv = new THREE.Vector3();
+function bubble(txt, cls){
+  headGrp.getWorldPosition(wv); wv.y += 1.0; wv.project(camera);
+  if(wv.z > 1) return;
+  const el = document.createElement('div');
+  el.className = 'bubble '+cls; el.textContent = txt;
+  el.style.left = ((wv.x*.5+.5)*innerWidth)+'px';
+  el.style.top  = ((-wv.y*.5+.5)*innerHeight)+'px';
+  document.body.appendChild(el); setTimeout(()=>el.remove(), 1800);
+}
+
+/* ================= LOOP UTAMA ================= */
+let shScale=1, loaded=false;
+function tick(now){
+  requestAnimationFrame(tick);
+  const dt = Math.min(.05, (now-last)/1000); last = now; elapsed += dt;
+
+  if(introT < 1 && !userTouched){
+    introT = Math.min(1, introT + dt/1.8);
+    camera.position.lerpVectors(camA, camB, smooth5(introT));
+  }
+
+  /* 1. Ambil pose target */
+  let tp;
+  if(state==='punch')      tp = punchPose(elapsed - stateStart);
+  else if(state==='gore')  tp = gorePose(elapsed - stateStart);
+  else                     tp = P[state](elapsed);
+
+  /* 2. Target kecepatan & pergerakan seruduk maju */
+  let targetSpeed = SPEED_BASE[state];
+
+  if(state==='gore'){
+    const c = ((elapsed - stateStart) % GORE_T + GORE_T) % GORE_T;
+
+    if(c < 1.35){
+      // FASE 1: ANCANG-ANCANG KAKI (DIAM DI TEMPAT)
+      targetSpeed = 0;
+      phaseBadge.textContent = 'ANCANG-ANCANG KAKI 🦶';
+
+      // Efek semprotan debu saat kaki depan mengais ke belakang
+      if(c >= 0.25 && c < 1.25){
+        const pawTime = (c - 0.25) * 18.85;
+        const scrape = Math.sin(pawTime);
+        if(scrape < -0.75 && elapsed - lastPawDust > 0.18){
+          lastPawDust = elapsed;
+          const wxp = boarRoot.position.x, wzp = boarRoot.position.z;
+          spawnPuff(wxp, 0.04, wzp, 4, 0.35, 0x9c8b76);
+        }
+      }
+      if(c > 0.65 && c < 0.72 && elapsed - stateStart < 1.0){
+        bubble('SNORT!','snort');
+      }
+    } else if(c < 3.20){
+      // FASE 2: SERUDUK LARI KENCANG KE DEPAN! (Kecepatan tinggi 8.8)
+      targetSpeed = 8.8;
+      phaseBadge.textContent = 'SERUDUK LARI KENCANG! 💨';
+
+      if(elapsed - lastTrailDust > 0.09){
+        lastTrailDust = elapsed;
+        const wxp = boarRoot.position.x, wzp = boarRoot.position.z;
+        spawnPuff(wxp, 0.05, wzp, 3, 0.45, 0xb8a792);
+      }
+      if(c > 1.40 && c < 1.48){
+        bubble('SERUDUK!','charge');
+      }
+      brakeDustDone = false;
+    } else {
+      // FASE 3: MENGEREM & MEMULIHKAN DIRI
+      targetSpeed = 0;
+      phaseBadge.textContent = 'MENGEREM & PULIH';
+
+      if(!brakeDustDone){
+        brakeDustDone = true;
+        const wxp = boarRoot.position.x, wzp = boarRoot.position.z;
+        spawnPuff(wxp, 0.06, wzp, 12, 0.75, 0xc2b19b);
+      }
+    }
+  } else if(state==='punch'){
+    const c = ((elapsed - stateStart) % PUNCH_T + PUNCH_T) % PUNCH_T;
+    phaseBadge.textContent = c < 0.35 ? 'ANCANG MERUNDUK'
+                           : (c < 0.65 ? 'UPPERCUT GADING!' : 'PULIH');
+  } else {
+    phaseBadge.textContent = 'NORMAL';
+  }
+
+  /* 3. Smooth Hermite State Blending */
+  blend = Math.min(1, blend + dt / 0.28);
+  const p = (blend >= 1 || !fromPose) ? tp
+          : Object.fromEntries(Object.keys(tp).map(k=>[k, fromPose[k] + (tp[k] - fromPose[k]) * smooth5(blend)]));
+
+  /* 4. Kedip */
+  if(state!=='punch' && state!=='gore'){
+    if(elapsed > nextBlink){ blinkUntil = elapsed + .12; nextBlink = elapsed + 2.2 + Math.random()*3.2; }
+    if(elapsed < blinkUntil) p.eye = 1;
+  }
+
+  applyPose(p); lastPose = p;
+
+  /* 5. Pergerakan maju di dunia (responsif seketika saat seruduk) */
+  const accelRate = (state === 'gore' && targetSpeed > 5) ? 5.5 : 1.8;
+  speed += (targetSpeed - speed) * (1 - Math.exp(-dt * accelRate));
+  angle += (speed / R) * dt;
+  if(speed > .02){
+    boarRoot.position.set(Math.sin(angle)*R, 0, Math.cos(angle)*R);
+    const na = angle + .05;
+    boarRoot.lookAt(Math.sin(na)*R, 0, Math.cos(na)*R);
+  }
+
+  /* 6. Bayangan blob */
+  blob.position.set(boarRoot.position.x, .02, boarRoot.position.z);
+  blob.rotation.y = boarRoot.rotation.y;
+  const targetSh = 1 + Math.max(0, -Math.min(0, p.rigY)) * .35;
+  shScale += (targetSh - shScale) * (1 - Math.exp(-dt * 4));
+  blob.scale.set(shScale, shScale * (1 - Math.max(0, p.rigY)*.08), 1);
+
+  stepPuffs(dt);
+
+  controls.update();
+  renderer.render(scene, camera);
+  if(!loaded){ loaded=true; document.getElementById('loader').classList.add('done'); }
+}
+requestAnimationFrame(tick);
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

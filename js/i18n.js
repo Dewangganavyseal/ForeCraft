@@ -229,6 +229,7 @@ const I18N_MOBS={
   semut:{en:'Giant Ant',zh:'巨蚁',ja:'大アリ'},
   /* penjaga hantu bersabit khas reruntuhan/dungeon */
   reaper:{en:'Reaper',zh:'死神',ja:'リーパー'},
+  tarantula:{en:'Giant Tarantula',zh:'巨型捕鸟蛛',ja:'オオタランチュラ'},
 };
 
 /* --------------------------------------------------------------- BIOME NAMES */

@@ -464,6 +464,22 @@ const UI={
     const l=document.getElementById('levelup');
     l.classList.remove('show');void l.offsetWidth;l.classList.add('show');
   },
+  centerAlert(msg){
+    let el=document.getElementById('center-alert');
+    if(!el){
+      el=document.createElement('div');
+      el.id='center-alert';
+      document.body.appendChild(el);
+    }
+    el.innerHTML=msg;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    if(this._centerAlertTimer)clearTimeout(this._centerAlertTimer);
+    this._centerAlertTimer=setTimeout(()=>{
+      el.classList.remove('show');
+    },1800);
+  },
   /* =========================================================================
      BANNER DUNGEON — tulisan besar di tengah layar saat memasuki dungeon
      -------------------------------------------------------------------------
