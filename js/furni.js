@@ -1768,21 +1768,26 @@ const Furni={
   sit(f){
     if(this.sitting===f){this.stand();return;}
     this.sitting=f;
-    Player.pos.x=f.x;Player.pos.z=f.z;
-    /* dudukkan di atas dudukan kursi & hadapkan ke arah kursi (kursi menghadap +z
-       lokal → sudut hadap = f.yaw), sehingga punggung pas di sandaran & wajah ke depan */
-    const seatY=f.y+0.5;
-    if(typeof World!=='undefined'&&World.groundAt)
-      Player.pos.y=Math.max(seatY,World.groundAt(f.x,f.z,f.y+2));
+    const targetX=f.x+Math.sin(f.yaw||0)*(-0.04);
+    const targetZ=f.z+Math.cos(f.yaw||0)*(-0.04);
+    Player.pos.x=targetX;Player.pos.z=targetZ;
+    Player.pos.y=f.y-0.10; // Bokong menempel pas di atas dudukan kursi
     Player.onGround=true;
-    Player.facing=(typeof f.yaw==='number')?f.yaw:Player.facing;
     Player.vel.set(0,0,0);
+    if(typeof f.yaw==='number')Player.facing=f.yaw;
+    if(Player.animator)Player.animator.setAnimation('sit');
     UI.toast('💺 Duduk — stamina pulih lebih cepat. Bergerak untuk berdiri.');
     Sfx.click();
   },
   stand(){
     if(!this.sitting)return;
+    const f=this.sitting;
     this.sitting=null;
+    Player.pos.y=f.y+0.05;
+    if(typeof World!=='undefined'&&World.groundAt)
+      Player.pos.y=Math.max(Player.pos.y,World.groundAt(Player.pos.x,Player.pos.z,f.y+2));
+    Player.onGround=true;
+    if(Player.animator)Player.animator.setAnimation('idle');
     UI.toast('🧍 Berdiri');
   },
 
@@ -2325,9 +2330,13 @@ const Furni={
          `v:3` menandai format yang MENCATAT UKURAN MODUL (`s`), diperlukan sejak
          HOUSE_SIZE bisa berubah (5 → 7). `v:2` = koordinat blok dunia tanpa
          ukuran (dianggap LEGACY_SIZE=5); `v:1` = indeks grid 5×5. */
-      const houses=this.houses.map(h=>({v:3,s:this.recSize(h),
-        cells:h.cells.map(c=>[c.bx,c.bz]),
-        door:[h.door.x,h.door.z,h.door.side],y:h.y}));
+      const houses=(this.houses||[]).map(h=>({
+        v:3,
+        s:this.recSize(h),
+        cells:(h.cells||[]).map(c=>[c.bx,c.bz]),
+        door:(h.door&&typeof h.door.x==='number')?[h.door.x,h.door.z,h.door.side]:null,
+        y:(typeof h.y==='number')?h.y:CFG.SEA
+      }));
 
       /* isi peti desa yang masih dimuat ikut disegarkan sebelum ditulis */
       for(const f of this.list)

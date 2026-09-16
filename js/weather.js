@@ -128,23 +128,26 @@ const Weather={
        zoom seperti dulu: dengan begitu proporsi "area bersih di sekitar pemain"
        tetap sama di semua tingkat zoom. */
     const D=Cam.DIST;
-    const isoNear=D*0.92-this.rain*3;
-    const isoFar =D*1.55+8-this.rain*4;
-    /* Pada mode TPP, kamera berada dekat di belakang karakter (jarak ~3.4 blok), jadi jarak kabut
-       dialihkan ke rentang dunia terbuka (42-110 blok) agar jalan terlihat jelas dan tidak tertutup kabut tebal */
-    const tppNear=42-this.rain*10;
-    const tppFar =110-this.rain*20;
+    /* Kabut malam hari: kabut tipis lembut di kejauhan tanpa menghalangi pandangan sekitar */
+    const nFogNear=this.nightF*12;
+    const nFogFar =this.nightF*26;
+    const isoNear=D*0.92-this.rain*3-this.nightF*D*0.14;
+    const isoFar =D*1.55+8-this.rain*4-this.nightF*D*0.22;
+    /* Pada mode TPP, jarak kabut dialihkan ke rentang dunia terbuka.
+       Saat malam hari terdapat sedikit kabut lembut (near ~30, far ~84 blok) agar suasana malam terasa nyata tapi jalan tetap jelas */
+    const tppNear=42-this.rain*10-nFogNear;
+    const tppFar =110-this.rain*20-nFogFar;
     const w=(typeof Cam!=='undefined'&&(Cam.tppWeight!==undefined||Cam.fppWeight!==undefined))
       ? Math.max(Cam.tppWeight||0, Cam.fppWeight||0) : 0;
     Game.scene.fog.near=lerp(isoNear,tppNear,w);
     Game.scene.fog.far =lerp(isoFar,tppFar,w);
 
-    /* lampu */
-    let inten=(0.15+dayF*1.05)*(1-this.rain*0.22)+this.flash*1.5;
+    /* lampu: cahaya malam dibuat sedikit lebih gelap & remang lembut */
+    let inten=(0.08+dayF*1.12)*(1-this.rain*0.22)+this.flash*1.5;
     this.sun.intensity=inten;
-    this.sun.color.setHex(isDay?(duskF>0.4?0xffb37a:0xfff2d8):0x7a8ec9);
-    /* ambient dinaikkan saat hujan supaya bayangan tidak pekat */
-    this.hemi.intensity=(0.22+dayF*0.5)*(1-this.rain*0.1)+this.rain*0.18+this.flash*0.4;
+    this.sun.color.setHex(isDay?(duskF>0.4?0xffb37a:0xfff2d8):0x5d75a8);
+    /* ambient cahaya malam disesuaikan agar bayangan & lampu obor lebih berkesan */
+    this.hemi.intensity=(0.14+dayF*0.58)*(1-this.rain*0.1)+this.rain*0.18+this.flash*0.4;
     this.sun.position.copy(Player.pos).addScaledVector(this.sunDir,60);
     this.sun.target.position.copy(Player.pos);
     this.stars.material.opacity=(1-dayF)*(1-this.rain)*0.9;

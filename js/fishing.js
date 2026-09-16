@@ -680,20 +680,20 @@ const Fishing = {
     const mg = this.minigame;
     if (!mg.active) return;
 
-    // Gerak target ikan (bervariasi naik-turun)
+    // Gerak target ikan (bervariasi naik-turun halus & alami)
     mg.fishTimer -= dt;
     if (mg.fishTimer <= 0) {
-      mg.fishTimer = 0.5 + Math.random() * 1.2;
-      mg.fishTargetY = clamp(mg.fishY + (Math.random() - 0.5) * 0.65, 0.08, 0.92);
-      mg.fishSpeed = 1.2 + Math.random() * 1.8;
+      mg.fishTimer = 0.8 + Math.random() * 1.4;
+      mg.fishTargetY = clamp(mg.fishY + (Math.random() - 0.5) * 0.55, 0.08, 0.92);
+      mg.fishSpeed = 0.85 + Math.random() * 0.9;
     }
-    mg.fishY = lerp(mg.fishY, mg.fishTargetY, clamp(dt * mg.fishSpeed * 3.5, 0, 1));
+    mg.fishY = lerp(mg.fishY, mg.fishTargetY, clamp(dt * mg.fishSpeed * 2.2, 0, 1));
 
-    // Kontrol Bar Penangkap oleh Pemain (Pulling vs Gravity)
+    // Kontrol Bar Penangkap oleh Pemain (Pulling vs Gravity - kecepatan lincah & halus)
     if (mg.pulling) {
-      mg.barVy = lerp(mg.barVy, 2.2, clamp(16 * dt, 0, 1));
+      mg.barVy = lerp(mg.barVy, 1.15, clamp(8 * dt, 0, 1));
     } else {
-      mg.barVy = lerp(mg.barVy, -1.8, clamp(12 * dt, 0, 1));
+      mg.barVy = lerp(mg.barVy, -0.95, clamp(7 * dt, 0, 1));
     }
     mg.barY = clamp(mg.barY + mg.barVy * dt, 0, 1 - mg.barHeight);
 

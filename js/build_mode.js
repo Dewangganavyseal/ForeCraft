@@ -24,8 +24,38 @@ const BuildSys = {
   dragSelection: [],   // Array of { px, py, pz, valid }
   isConfirming: false, // Flag saat modal konfirmasi sedang terbuka
 
+  SAVE_KEY: 'forecraft_custom_blocks_v1',
+  customBlocks: {},
+
+  saveBlocks() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.SAVE_KEY, JSON.stringify(this.customBlocks));
+      }
+    } catch (e) {}
+  },
+  loadBlocks() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(this.SAVE_KEY);
+        if (raw) this.customBlocks = JSON.parse(raw) || {};
+      }
+    } catch (e) {}
+  },
+  restoreBlocks() {
+    this.loadBlocks();
+    if (!this.customBlocks) return;
+    for (const key in this.customBlocks) {
+      const p = key.split(',').map(Number);
+      if (p.length === 3 && typeof World !== 'undefined' && World.setBlock) {
+        World.setBlock(p[0], p[1], p[2], this.customBlocks[key]);
+      }
+    }
+  },
+
   init() {
     if (this.initialized || typeof THREE === 'undefined' || !Game.scene) return;
+    this.loadBlocks();
 
     // 1. Single ghost group
     this.ghostGroup = new THREE.Group();
@@ -527,6 +557,8 @@ const BuildSys = {
     const blockId = (it && it.blockId !== undefined) ? it.blockId : B.DIRT;
 
     World.setBlock(px, py, pz, blockId);
+    this.customBlocks[px + ',' + py + ',' + pz] = blockId;
+    this.saveBlocks();
 
     held.n--;
     if (held.n <= 0) {
@@ -558,10 +590,12 @@ const BuildSys = {
 
     for (const b of blocks) {
       World.setBlock(b.px, b.py, b.pz, blockId);
+      this.customBlocks[b.px + ',' + b.py + ',' + b.pz] = blockId;
       if (typeof FX !== 'undefined' && FX.debris) {
         FX.debris(new THREE.Vector3(b.px + 0.5, b.py + 0.5, b.pz + 0.5), col, 4, 1.4);
       }
     }
+    this.saveBlocks();
 
     if (typeof RPG !== 'undefined' && RPG.removeBlock) {
       RPG.removeBlock(itemId, blocks.length);

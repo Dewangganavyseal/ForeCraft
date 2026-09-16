@@ -932,6 +932,9 @@ const World={
         const y=top-k;
         if(y<1)break;
         if(this.hasOreAboveOrSelf(wx,y,wz))continue; // Kebal dari kehancuran mob bila memuat ore!
+        /* Rumah modular & blok bangunan pemain kebal dari kehancuran serangan mob/naga */
+        if(typeof Furni!=='undefined'&&Furni.houses&&Furni.houses.length&&Furni.houseNear({x:wx,z:wz}))continue;
+        if(typeof BuildSys!=='undefined'&&BuildSys.customBlocks&&BuildSys.customBlocks[wx+','+y+','+wz])continue;
         this.pending.push({x:wx,y,z:wz,t:d*0.09+k*0.06+Math.random()*0.04});
       }
     }
@@ -1074,6 +1077,13 @@ const World={
   breakBlock(wx,wy,wz){
     const id=this.getBlock(wx,wy,wz);
     if(id===B.AIR||id===B.WATER)return;
+    if(typeof BuildSys!=='undefined'&&BuildSys.customBlocks){
+      const k=wx+','+wy+','+wz;
+      if(BuildSys.customBlocks[k]){
+        delete BuildSys.customBlocks[k];
+        BuildSys.saveBlocks();
+      }
+    }
     /* ---------- GRASS BLOCK HANCUR → DIRT, lalu tumbuh lagi ----------
        Saat blok GRASS permukaan (ada udara di atasnya) dihancurkan, ia TIDAK
        lenyap jadi lubang: berubah jadi DIRT, dan dijadwalkan kembali menjadi

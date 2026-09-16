@@ -199,11 +199,11 @@ const Farming={
   saveT:10,restoreT:1,
 
   CROPS:{
-    wheat:{seed:'seed_wheat',crop:'wheat',grow:[25,40]},
-    carrot:{seed:'seed_carrot',crop:'carrot',grow:[22,36]},
-    cabbage:{seed:'seed_cabbage',crop:'cabbage',grow:[26,42]},
-    tomato:{seed:'seed_tomato',crop:'tomato',grow:[28,45]},
-    watermelon:{seed:'seed_watermelon',crop:'watermelon',grow:[32,52]},
+    wheat:{seed:'seed_wheat',crop:'wheat',grow:[38,60]},
+    carrot:{seed:'seed_carrot',crop:'carrot',grow:[33,54]},
+    cabbage:{seed:'seed_cabbage',crop:'cabbage',grow:[39,63]},
+    tomato:{seed:'seed_tomato',crop:'tomato',grow:[42,68]},
+    watermelon:{seed:'seed_watermelon',crop:'watermelon',grow:[48,78]},
   },
   SEED_TO_CROP:{
     seed_wheat:'wheat',seed_carrot:'carrot',seed_cabbage:'cabbage',

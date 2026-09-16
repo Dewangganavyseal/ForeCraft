@@ -1404,53 +1404,111 @@ const NPCS={
     const span=b.ds<2?b.w:b.d;
     const dc2=b.dc+1<=span-2?b.dc+1:(b.dc-1>=1?b.dc-1:b.dc);
     const mid=(b.dc+dc2)/2;
-    let dx,dz,ox,oz,ix,iz;
-    if(b.ds===0){        // pintu di sisi z maksimum (depan)
+    let dx,dz,ox,oz,ix,iz,cx,cz,cix,ciz;
+    if(b.ds===0){        // pintu di sisi z maksimum (depan / south)
       dx=b.x+mid; dz=b.z+b.d-0.5;
-      ox=dx; oz=b.z+b.d+0.7;
-      ix=dx; iz=b.z+b.d-2.5;
-    }else if(b.ds===1){  // pintu di sisi z minimum (belakang)
+      ox=dx; oz=b.z+b.d+0.8;
+      ix=dx; iz=b.z+b.d-2.0;
+      cx=dx; cz=b.z+b.d+2.6;
+      cix=dx; ciz=b.z+b.d-3.2;
+    }else if(b.ds===1){  // pintu di sisi z minimum (belakang / north)
       dx=b.x+mid; dz=b.z+0.5;
-      ox=dx; oz=b.z-0.7;
-      ix=dx; iz=b.z+2.5;
-    }else if(b.ds===2){  // pintu di sisi x maksimum (kanan)
+      ox=dx; oz=b.z-0.8;
+      ix=dx; iz=b.z+2.0;
+      cx=dx; cz=b.z-2.6;
+      cix=dx; ciz=b.z+3.2;
+    }else if(b.ds===2){  // pintu di sisi x maksimum (kanan / east)
       dx=b.x+b.w-0.5; dz=b.z+mid;
-      ox=b.x+b.w+0.7; oz=dz;
-      ix=b.x+b.w-2.5; iz=dz;
-    }else{               // pintu di sisi x minimum (kiri)
+      ox=b.x+b.w+0.8; oz=dz;
+      ix=b.x+b.w-2.0; iz=dz;
+      cx=b.x+b.w+2.6; cz=dz;
+      cix=b.x+b.w-3.2; ciz=dz;
+    }else{               // pintu di sisi x minimum (kiri / west)
       dx=b.x+0.5; dz=b.z+mid;
-      ox=b.x-0.7; oz=dz;
-      ix=b.x+2.5; iz=dz;
+      ox=b.x-0.8; oz=dz;
+      ix=b.x+2.0; iz=dz;
+      cx=b.x-2.6; cz=dz;
+      cix=b.x+3.2; ciz=dz;
     }
-    return {x:dx,z:dz,ox,oz,ix,iz};
+    return {x:dx,z:dz,ox,oz,ix,iz,cx,cz,cix,ciz};
   },
-  /* ---------- RUTE PINTU TERPUSTAKAKAN ----------
+  /* ---------- RUTE PINTU TERPUSTAKAKAN (ANTI-JITTER BERTAHAP) ----------
      Dipakai SEMUA NPC (bukan hanya tim) agar bisa keluar-masuk bangunan lewat
-     pintu, bukan menabrak tembok. Bila tujuan (gx,gz) berada DI DALAM sebuah
-     bangunan sementara NPC belum di dalam bangunan yang sama, arah diarahkan ke
-     mulut luar pintu lebih dulu; begitu dekat pintu, diarahkan ke titik dalam.
-     Mengembalikan {gx,gz} yang sudah disesuaikan (sama dengan argumen bila tidak
-     ada bangunan di tujuan). */
+     pintu secara mulus tanpa jitter atau tersangkut di kusen pintu.
+     Memakai mesin transit bertahap (ix -> ox -> cx bebas di luar) sehingga arah
+     tujuan tidak melompat-lompat di batas ambang pintu. */
   doorRoute(n,gx,gz){
     if(typeof WGEN==='undefined'||!WGEN.buildingAt)return{gx,gz};
     const gb=WGEN.buildingAt(gx,gz,0);
     const nb=WGEN.buildingAt(n.pos.x,n.pos.z,0);
-    if(gb&&gb!==nb){
-      /* tujuan di dalam bangunan lain -> masuk lewat pintu (luar dulu, lalu dalam) */
-      const dr=this.doorOf(gb);
-      const dOut=Math.hypot(dr.ox-n.pos.x,dr.oz-n.pos.z);
-      if(dOut>1.15)return{gx:dr.ox,gz:dr.oz};   // masih jauh -> menuju mulut luar pintu
-      return{gx:dr.ix,gz:dr.iz};                // sudah dekat -> masuk lewat pintu
+
+    // 1. Sedang dalam transit keluar pintu (sampai aman di halaman bebas di luar)
+    if(n._doorExitStage){
+      const dr=n._doorExitDr;
+      if(!dr){n._doorExitStage=0;return{gx,gz};}
+      n._doorTimeout=(n._doorTimeout||0)-0.016;
+      if(n._doorTimeout<=0){n._doorExitStage=0;n._doorExitDr=null;return{gx,gz};}
+
+      if(n._doorExitStage===1){ // Menuju titik dalam pintu
+        const d=Math.hypot(dr.ix-n.pos.x,dr.iz-n.pos.z);
+        if(d<1.0) n._doorExitStage=2;
+        return {gx:dr.ix,gz:dr.iz};
+      }
+      if(n._doorExitStage===2){ // Menyeberang ke titik luar pintu
+        const d=Math.hypot(dr.ox-n.pos.x,dr.oz-n.pos.z);
+        if(d<0.9) n._doorExitStage=3;
+        return {gx:dr.ox,gz:dr.oz};
+      }
+      if(n._doorExitStage===3){ // Menjauh ke halaman bebas (cx,cz)
+        const d=Math.hypot(dr.cx-n.pos.x,dr.cz-n.pos.z);
+        if(d<1.1||!nb){n._doorExitStage=0;n._doorExitDr=null;}
+        return {gx:dr.cx,gz:dr.cz};
+      }
     }
+
+    // 2. Sedang dalam transit masuk pintu (sampai aman di dalam ruangan)
+    if(n._doorEnterStage){
+      const dr=n._doorEnterDr;
+      if(!dr){n._doorEnterStage=0;return{gx,gz};}
+      n._doorTimeout=(n._doorTimeout||0)-0.016;
+      if(n._doorTimeout<=0){n._doorEnterStage=0;n._doorEnterDr=null;return{gx,gz};}
+
+      if(n._doorEnterStage===1){ // Menuju titik luar pintu
+        const d=Math.hypot(dr.ox-n.pos.x,dr.oz-n.pos.z);
+        if(d<1.0) n._doorEnterStage=2;
+        return {gx:dr.ox,gz:dr.oz};
+      }
+      if(n._doorEnterStage===2){ // Masuk melewati ambang pintu
+        const d=Math.hypot(dr.ix-n.pos.x,dr.iz-n.pos.z);
+        if(d<0.9) n._doorEnterStage=3;
+        return {gx:dr.ix,gz:dr.iz};
+      }
+      if(n._doorEnterStage===3){ // Maju ke dalam ruangan (cix,ciz)
+        const d=Math.hypot(dr.cix-n.pos.x,dr.ciz-n.pos.z);
+        if(d<1.1||(nb&&nb===gb)){n._doorEnterStage=0;n._doorEnterDr=null;}
+        return {gx:dr.cix,gz:dr.ciz};
+      }
+    }
+
+    // 3. Picu transit keluar: NPC di dalam bangunan, tujuan di luar
     if(nb&&!gb){
-      /* KEBALIKNYA: NPC sedang DI DALAM bangunan (mis. tavern) sementara tujuan
-         di luar -> ia harus KELUAR lewat pintu lebih dulu, bukan menabrak dinding. */
       const dr=this.doorOf(nb);
-      const dIn=Math.hypot(dr.ix-n.pos.x,dr.iz-n.pos.z);
-      if(dIn>1.15)return{gx:dr.ix,gz:dr.iz};    // menuju titik dalam pintu
-      return{gx:dr.ox,gz:dr.oz};                 // lalu keluar ke sisi luar pintu
+      n._doorExitStage=1;
+      n._doorExitDr=dr;
+      n._doorTimeout=6.0;
+      return {gx:dr.ix,gz:dr.iz};
     }
-    return{gx,gz};
+
+    // 4. Picu transit masuk: Tujuan di dalam bangunan, NPC di luar
+    if(gb&&gb!==nb){
+      const dr=this.doorOf(gb);
+      n._doorEnterStage=1;
+      n._doorEnterDr=dr;
+      n._doorTimeout=6.0;
+      return {gx:dr.ox,gz:dr.oz};
+    }
+
+    return {gx,gz};
   },
   /* =========================================================================
      TABRAKAN ANTAR-NPC
@@ -2377,11 +2435,21 @@ const NPCS={
       /* TUJUAN: pulang ke home (rute pintu) bila terlalu jauh, else langkah acak
          yang juga dirutekan lewat pintu bila menembus bangunan. */
       let gx,gz;
-      if(dh>R){gx=n.home.x;gz=n.home.z;}
-      else{
-        const step=4;
-        gx=n.pos.x+Math.sin(n.dir)*step;
-        gz=n.pos.z+Math.cos(n.dir)*step;
+      if(dh>R){
+        gx=n.home.x;gz=n.home.z;
+      }else{
+        const nb=(typeof WGEN!=='undefined'&&WGEN.buildingAt)?WGEN.buildingAt(n.pos.x,n.pos.z,0):null;
+        if(nb){
+          /* Sedang berada di dalam gedung (mis. tavern): batasi jalan santai tetap
+             di dalam ruangan agar tidak mondar-mandir menabrak kusen pintu/dinding */
+          const curW=n.dir||0;
+          gx=clamp(n.pos.x+Math.sin(curW)*2.4, nb.x+1.2, nb.x+nb.w-1.2);
+          gz=clamp(n.pos.z+Math.cos(curW)*2.4, nb.z+1.2, nb.z+nb.d-1.2);
+        }else{
+          const step=4;
+          gx=n.pos.x+Math.sin(n.dir)*step;
+          gz=n.pos.z+Math.cos(n.dir)*step;
+        }
       }
       const rt=this.doorRoute(n,gx,gz);
       const ang=this.steer(n,Math.atan2(rt.gx-n.pos.x,rt.gz-n.pos.z));

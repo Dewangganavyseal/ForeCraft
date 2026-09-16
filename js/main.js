@@ -401,6 +401,7 @@ const Game={
        keluar-masuk game (record-nya tetap ada, jadi bloknya seolah "hantu":
        tak terlihat & tak bisa disentuh sampai pintu dipindah). */
     if(typeof Furni!=='undefined'&&Furni.restoreHouses)Furni.restoreHouses();
+    if(typeof BuildSys!=='undefined'&&BuildSys.restoreBlocks)BuildSys.restoreBlocks();
 
     UI.renderHotbar();
     RPG.renderCoin();

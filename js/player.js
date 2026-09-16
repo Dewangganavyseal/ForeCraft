@@ -1141,6 +1141,42 @@ const Player={
     if(this.hp<=0){this.hp=0;this.die();return;}
 
     /* --- fisika --- */
+    /* --- duduk di kursi: posisi bokong menempel pas di dudukan kursi, hadap depan --- */
+    const sitting=typeof Furni!=='undefined'&&Furni.sitting;
+    if(sitting){
+      const f=Furni.sitting;
+      if(this.dead||Math.hypot(this.pos.x-f.x,this.pos.z-f.z)>1.6){
+        Furni.stand();
+      }else{
+        const mv=Input.moveVec();
+        if(mv.x||mv.z){
+          Furni.stand();
+        }else{
+          this.inWater=false;this.onGround=true;this.airJumped=false;
+          /* Dudukan kursi di f.y + 0.56; bokong di pos.y + 0.66 -> pos.y = f.y - 0.10 */
+          const seatY=f.y-0.10;
+          const targetX=f.x+Math.sin(f.yaw||0)*(-0.04);
+          const targetZ=f.z+Math.cos(f.yaw||0)*(-0.04);
+          this.pos.x=lerp(this.pos.x,targetX,clamp(14*dt,0,1));
+          this.pos.z=lerp(this.pos.z,targetZ,clamp(14*dt,0,1));
+          this.pos.y=lerp(this.pos.y,seatY,clamp(14*dt,0,1));
+          this.vel.set(0,0,0);
+          if(typeof f.yaw==='number')
+            this.facing=angLerp(this.facing,f.yaw,clamp(12*dt,0,1));
+          this.stamina=Math.min(this.maxStamina(),this.stamina+22*dt);
+          this.hp=Math.min(this.maxHp(),this.hp+1.2*dt);
+
+          if(this.animator&&this.animator.currentAnim!=='sit')
+            this.animator.setAnimation('sit');
+          this.animate(dt,false,0,false);
+          this.updateSwordGlow(dt);
+          this.mesh.position.copy(this.pos);
+          this.mesh.rotation.y=this.facing;
+          if(this.mesh)this.mesh.visible=true;
+          return;
+        }
+      }
+    }
     if(sailing){
       /* perahu yang menopang pemain: tidak jatuh, tidak berenang.
          Arah hadap mengikuti haluan perahu supaya badan tidak menyamping. */
