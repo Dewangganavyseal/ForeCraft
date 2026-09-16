@@ -809,8 +809,82 @@ const RPG={
     }
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
   },
-  /* craft `count` item sekaligus (default 1). Hasil MASUK TAS; bila tas penuh
-     sisanya dijatuhkan ke tanah (tidak hilang). Berhenti bila bahan habis. */
+  /* Cek apakah tas sanggup menampung hasil crafting sejumlah count.
+     Mensimulasikan pemotongan bahan r.need * count dan penambahan hasil r.out * count.
+     Bila bahan berkurang sampai 0, slot menjadi kosong. Tetapi bila bahan masih
+     bersisa (misal meat 60 dikurangi 5 = 55), slot TETAP terisi.
+     Jika tas tidak cukup, kembalikan false. */
+  canFitCraft(r, count){
+    const cap = (typeof stackCap === 'function') ? stackCap(r.out) : 64;
+    // Blok bangunan diarahkan ke blockBag
+    if((typeof ITEMS !== 'undefined' && ITEMS[r.out] && ITEMS[r.out].isBlock) || (typeof r.out === 'string' && r.out.startsWith('blk_'))){
+      let freeCount = 0;
+      for(let i = 0; i < this.blockBag.length; i++){
+        const s = this.blockBag[i];
+        if(!s) freeCount += cap;
+        else if(s.id === r.out) freeCount += Math.max(0, cap - s.n);
+      }
+      return freeCount >= count;
+    }
+
+    // Clone virtual hotbar dan bag
+    const vHot = this.hotbar.map(s => s ? {id: s.id, n: s.n, lvl: s.lvl, mark: s.mark} : null);
+    const vBag = this.bag.map(s => s ? {id: s.id, n: s.n, lvl: s.lvl, mark: s.mark} : null);
+
+    // 1. Simulasikan pemotongan bahan
+    for(const id in r.need){
+      let needed = r.need[id] * count;
+      for(const arr of [vHot, vBag]){
+        if(needed <= 0) break;
+        for(let i = arr.length - 1; i >= 0; i--){
+          const s = arr[i];
+          if(s && s.id === id){
+            const take = Math.min(s.n, needed);
+            s.n -= take;
+            needed -= take;
+            if(s.n <= 0) arr[i] = null; // Slot jadi null HANYA jika bahan habis
+            if(needed <= 0) break;
+          }
+        }
+      }
+      if(needed > 0) return true; // Biarkan logika canRecipe yang menangani kekurangan bahan
+    }
+
+    // 2. Simulasikan penampungan produk r.out * count
+    let toAdd = count;
+    // Coba tumpuk ke slot yang sudah ada produk sejenis
+    for(const arr of [vHot, vBag]){
+      if(toAdd <= 0) break;
+      for(let i = 0; i < arr.length; i++){
+        const s = arr[i];
+        if(s && s.id === r.out && !s.lvl && !s.mark && s.n < cap){
+          const add = Math.min(toAdd, cap - s.n);
+          s.n += add;
+          toAdd -= add;
+          if(toAdd <= 0) break;
+        }
+      }
+    }
+    // Jika masih ada sisa, coba masukkan ke slot kosong (null)
+    if(toAdd > 0){
+      for(const arr of [vHot, vBag]){
+        if(toAdd <= 0) break;
+        for(let i = 0; i < arr.length; i++){
+          if(!arr[i]){
+            const add = Math.min(toAdd, cap);
+            arr[i] = {id: r.out, n: add};
+            toAdd -= add;
+            if(toAdd <= 0) break;
+          }
+        }
+      }
+    }
+
+    return toAdd <= 0; // true jika seluruh produk muat di tas
+  },
+
+  /* craft `count` item sekaligus (default 1). Hasil MASUK TAS.
+     Jika tas penuh, crafting DIBATALKAN dan muncul notif di tengah layar. */
   craft(r,count){
     /* penjaga awal: pesan jelas bila resep masih terkunci skill/proficiency atau butuh stasiun */
     if(!this.isLearned(r)){UI.toast('🔒 Belum terbuka — butuh '+this.recipeReqText(r));return 0;}
@@ -823,6 +897,21 @@ const RPG={
       return 0;
     }
     count=Math.max(1,Math.floor(count)||1);
+    if(!this.canRecipe(r)){
+      const craftIco=(typeof UI!=='undefined'&&UI.ITEM_IMG&&UI.ITEM_IMG.craft)?`<img class="iico" src="${UI.ITEM_IMG.craft}"> `:'';
+      UI.toast(`${craftIco}Bahan tidak cukup`);
+      return 0;
+    }
+
+    // PENJAGA KAPASITAS TAS: Cek apakah tas penuh untuk menampung produk hasil crafting
+    if(!this.canFitCraft(r, count)){
+      if(typeof UI !== 'undefined' && UI.centerAlert){
+        UI.centerAlert('🎒 TAS PENUH!');
+      }
+      if(typeof Sfx !== 'undefined' && Sfx.noStamina) Sfx.noStamina();
+      return 0; // TIDAK melakukan crafting sama sekali, bahan utuh!
+    }
+
     let made=0,dropped=0;
     for(let k=0;k<count;k++){
       if(!this.canRecipe(r))break;

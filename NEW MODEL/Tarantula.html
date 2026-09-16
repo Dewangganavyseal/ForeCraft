@@ -62,13 +62,13 @@
     display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; pointer-events: auto;
   }
   .btn {
-    position: relative; font-family: inherit; font-weight: 700; font-size: 12px; letter-spacing: .06em;
-    background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
-    padding: 9px 15px 10px; min-width: 105px; cursor: pointer;
+    position: relative; font-family: inherit; font-weight: 700; font-size: 11px; letter-spacing: .05em;
+    background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+    padding: 8px 11px 9px; min-width: 92px; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     transition: transform .12s, box-shadow .12s, background .12s, color .12s;
   }
-  .btn .ico { font-size: 20px; line-height: 1; }
+  .btn .ico { font-size: 18px; line-height: 1; }
   .btn kbd {
     position: absolute; top: -10px; right: -8px; background: var(--ink); color: #fff;
     font-family: inherit; font-size: 9.5px; padding: 2px 5px;
@@ -95,6 +95,14 @@
   .bubble.strike {
     font-size: 26px; color: #fff; -webkit-text-stroke: 2px var(--ink);
     text-shadow: 4px 4px 0 var(--gold); animation: strikeRise 1.3s ease-out forwards;
+  }
+  .bubble.chomp {
+    font-size: 28px; color: #fff; -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 4px 4px 0 var(--accent); animation: strikeRise 1.2s ease-out forwards; rotate: -3deg;
+  }
+  .bubble.web {
+    font-size: 26px; color: #fff; -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 4px 4px 0 #0284c7; animation: strikeRise 1.4s ease-out forwards; rotate: 4deg;
   }
   .bubble.skitter {
     font-size: 20px; color: #fff; -webkit-text-stroke: 1.6px var(--ink);
@@ -138,10 +146,10 @@
   <div class="brand">
     <div class="tag">THREE.JS · 3D INVERSE KINEMATICS (IK)</div>
     <h1>TARANTULA <span>RAKSASA</span></h1>
-    <p class="sub">Tarantula cokelat berbulu dengan proporsi kaki ramping & karapas kokoh.
+    <p class="sub">Tarantula cokelat berbulu dengan proporsi kaki kekar &amp; karapas bulky kokoh.
       Seluruh 8 kaki dikendalikan oleh <b>Inverse Kinematics (IK) analitis 3D</b> yang dikombinasikan dengan
       <b>Gait Cadence Clock</b>: langkah tetrapod sinkron sempurna dengan gerakan badan,
-      lutut melengkung tinggi di udara, postur ancaman menengadah, dan terkam racun.</p>
+      lutut melengkung tinggi di udara, gigitan taring mematikan, lompatan sergap dinamis, dan semburan jaring sutra.</p>
   </div>
 
   <div class="side">
@@ -155,13 +163,14 @@
     <button class="btn" data-s="idle"><kbd>1</kbd><span class="ico">🕷️</span>DIAM</button>
     <button class="btn active" data-s="walk"><kbd>2</kbd><span class="ico">🚶</span>JALAN IK</button>
     <button class="btn" data-s="run"><kbd>3</kbd><span class="ico">💨</span>LARI IK</button>
-    <button class="btn" data-s="threat"><kbd>4</kbd><span class="ico">⚠️</span>ANCAMAN</button>
-    <button class="btn" data-s="strike"><kbd>5</kbd><span class="ico">🩸</span>TERKAM</button>
+    <button class="btn" data-s="bite"><kbd>4</kbd><span class="ico">🦷</span>GIGIT MULUT</button>
+    <button class="btn" data-s="leap"><kbd>5</kbd><span class="ico">🦘</span>LOMPAT IK</button>
+    <button class="btn" data-s="web"><kbd>6</kbd><span class="ico">🕸️</span>SEMBUR JARING</button>
   </nav>
 
   <div class="hint">
     SERET putar kamera &bull; SCROLL zoom<br>
-    TOMBOL 1–5 / SPASI ganti animasi<br>
+    TOMBOL 1–6 / SPASI ganti aksi / skill<br>
     KENDALI: <b>W A S D</b> arahkan laba-laba<br>
     <b>TEKAN &amp; TAHAN</b> badan/kaki = ANGKAT &bull; LEPASKAN = jatuh &amp; mendarat mulus dengan IK
   </div>
@@ -216,7 +225,7 @@ const gx = sc.getContext('2d');
 const gr = gx.createRadialGradient(64, 64, 6, 64, 64, 60);
 gr.addColorStop(0, 'rgba(28, 16, 10, .42)'); gr.addColorStop(1, 'rgba(28, 16, 10, 0)');
 gx.fillStyle = gr; gx.fillRect(0, 0, 128, 128);
-const blob = new THREE.Mesh(new THREE.PlaneGeometry(11.5, 12.5),
+const blob = new THREE.Mesh(new THREE.PlaneGeometry(13.2, 14.8),
   new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
 blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; scene.add(blob);
 
@@ -278,31 +287,33 @@ scene.add(spiderRoot);
 const bodyRig = new THREE.Group();
 spiderRoot.add(bodyRig);
 
-/* 1. Cephalothorax (Prosoma / Karapas Kepala-Dada) */
+/* 1. Cephalothorax (Prosoma / Karapas Kepala-Dada Bulky) */
 const prosomaPart = new VoxelPart();
-// Pelindung karapas utama (bentuk perisai heksagonal melebar)
-prosomaPart.box(3.4, 1.5, 4.0, 0, 1.15, 0.4, C.CARAPACE, 0.015);
-prosomaPart.box(3.6, 0.9, 4.2, 0, 0.85, 0.4, C.CARAPACE_M);
+// Pelindung karapas utama (bentuk perisai heksagonal kekar melebar)
+prosomaPart.box(4.1, 1.65, 4.4, 0, 1.15, 0.35, C.CARAPACE, 0.015);
+prosomaPart.box(4.4, 1.05, 4.7, 0, 0.82, 0.35, C.CARAPACE_M);
 // Fovea (lekukan sentral dorsal tempat otot menempel)
-prosomaPart.box(0.9, 0.35, 1.3, 0, 1.80, 0.2, C.CARAPACE_M);
-prosomaPart.box(3.0, 0.55, 3.4, 0, 1.65, 0.3, C.CARAPACE, 0.02);
+prosomaPart.box(1.2, 0.40, 1.5, 0, 1.88, 0.2, C.CARAPACE_M);
+prosomaPart.box(3.6, 0.65, 3.8, 0, 1.68, 0.3, C.CARAPACE, 0.02);
 // Garis alur radial (striae) dari fovea ke pinggiran karapas
-prosomaPart.box(3.1, 0.3, 0.4, 0, 1.75, 1.0, C.HAIR_RUST, 0.04);
-prosomaPart.box(3.1, 0.3, 0.4, 0, 1.75, -0.4, C.HAIR_RUST, 0.04);
+prosomaPart.box(3.8, 0.32, 0.48, 0, 1.80, 1.0, C.HAIR_RUST, 0.04);
+prosomaPart.box(3.8, 0.32, 0.48, 0, 1.80, -0.4, C.HAIR_RUST, 0.04);
+prosomaPart.box(3.6, 0.32, 0.48, 0, 1.80, 0.3, C.HAIR_RUST, 0.04);
 
 // Tuberkel okular (gundukan mata di ujung anterior dahi)
-prosomaPart.box(1.3, 0.5, 1.0, 0, 2.00, 1.95, C.CARAPACE_M);
+prosomaPart.box(1.5, 0.55, 1.1, 0, 2.05, 1.95, C.CARAPACE_M);
 
-// Sternum (pelat pelindung dada bawah tempat tumpuan kaki)
-prosomaPart.box(2.8, 0.65, 3.6, 0, 0.4, 0.3, C.CARAPACE_M);
+// Sternum (pelat pelindung dada bawah tempat tumpuan kaki kokoh)
+prosomaPart.box(3.4, 0.75, 4.0, 0, 0.38, 0.3, C.CARAPACE_M);
 
 // 8 Soket Coxa di pinggiran karapas tempat kaki menancap kokoh tanpa celah
 const coxaPositions = [
-  [ 1.45, 0.75,  1.4], [ 1.60, 0.75,  0.5], [ 1.60, 0.75, -0.5], [ 1.45, 0.75, -1.4],
-  [-1.45, 0.75,  1.4], [-1.60, 0.75,  0.5], [-1.60, 0.75, -0.5], [-1.45, 0.75, -1.4],
+  [ 1.40, 0.75,  1.4], [ 1.55, 0.75,  0.5], [ 1.55, 0.75, -0.5], [ 1.40, 0.75, -1.4],
+  [-1.40, 0.75,  1.4], [-1.55, 0.75,  0.5], [-1.55, 0.75, -0.5], [-1.40, 0.75, -1.4],
 ];
 for(const cp of coxaPositions){
-  prosomaPart.box(0.55, 0.45, 0.55, cp[0], cp[1], cp[2], C.CARAPACE_M, 0.02);
+  prosomaPart.box(0.85, 0.70, 0.85, cp[0], cp[1], cp[2], C.CARAPACE_M, 0.02);
+  prosomaPart.box(0.72, 0.58, 0.72, cp[0], cp[1], cp[2], C.LEG_DARK, 0.02);
 }
 
 const prosomaMesh = prosomaPart.mesh();
@@ -310,7 +321,7 @@ bodyRig.add(prosomaMesh);
 
 /* 2. 8 Mata Merah Menyala (Ocular Turret) */
 const eyesGrp = new THREE.Group();
-eyesGrp.position.set(0, 2.00, 1.95);
+eyesGrp.position.set(0, 2.05, 1.95);
 bodyRig.add(eyesGrp);
 
 function addEye(x, y, z, size, isMain = false) {
@@ -327,49 +338,68 @@ function addEye(x, y, z, size, isMain = false) {
 }
 
 // 2 Mata Utama Anterior Tengah (AME) - Besar menghadap lurus ke depan
-addEye( 0.25, 0.22, 0.45, 0.32, true);
-addEye(-0.25, 0.22, 0.45, 0.32, true);
+addEye( 0.28, 0.24, 0.48, 0.36, true);
+addEye(-0.28, 0.24, 0.48, 0.36, true);
 // 2 Mata Lateral Anterior (ALE) - Menghadap depan-luar
-addEye( 0.55, 0.18, 0.35, 0.24);
-addEye(-0.55, 0.18, 0.35, 0.24);
+addEye( 0.60, 0.20, 0.38, 0.26);
+addEye(-0.60, 0.20, 0.38, 0.26);
 // 2 Mata Median Posterior (PME) - Menghadap atas-luar
-addEye( 0.26, 0.30, 0.05, 0.22);
-addEye(-0.26, 0.30, 0.05, 0.22);
+addEye( 0.30, 0.32, 0.06, 0.24);
+addEye(-0.30, 0.32, 0.06, 0.24);
 // 2 Mata Lateral Posterior (PLE) - Menghadap samping-belakang
-addEye( 0.56, 0.24, -0.05, 0.22);
-addEye(-0.56, 0.24, -0.05, 0.22);
+addEye( 0.62, 0.26, -0.06, 0.24);
+addEye(-0.62, 0.26, -0.06, 0.24);
 
 // Soft PointLight merah di tengah klaster mata
 const eyeLight = new THREE.PointLight(0xff2222, 1.4, 11);
 eyeLight.position.set(0, 2.5, 2.6);
 bodyRig.add(eyeLight);
 
-/* 3. Chelicerae & Gading Berbisa (Fangs) */
+/* 3. Chelicerae & Gading Berbisa (Fangs Bulky & Mulut Terintegrasi Rapi) */
 const cheliceraGrp = new THREE.Group();
 cheliceraGrp.position.set(0, 0.9, 2.4);
 bodyRig.add(cheliceraGrp);
 
+// Pelat dasar mulut tengah (Labium & Maxilla) yang menutup rongga mulut dengan rapi
+const mouthPart = new VoxelPart();
+mouthPart.box(1.20, 0.90, 1.40, 0, -0.75, 0.45, C.CARAPACE_M, 0.02);
+mouthPart.box(0.90, 0.50, 1.10, 0, -1.00, 0.55, 0x160a06, 0.02);
+cheliceraGrp.add(mouthPart.mesh());
+
 function buildChelicera(side) {
   const cg = new THREE.Group();
-  cg.position.set(side * 0.62, 0, 0);
+  cg.position.set(side * 0.72, 0, 0);
 
   const cp = new VoxelPart();
-  // Pangkal rahang besar berbulu
-  cp.box(1.05, 1.5, 1.6, 0, -0.4, 0.5, C.CHELICERA, 0.02);
-  cp.box(0.9, 0.8, 1.4, 0, -0.9, 0.6, C.CARAPACE_M);
-  // Bulu merah di sekitar mulut
-  cp.box(1.08, 0.4, 0.6, 0, -1.0, 1.2, C.HAIR_RUST);
+  // Pangkal rahang besar kekar berbulu cokelat tua menyatu kokoh dengan karapas
+  cp.box(1.26, 1.65, 1.85, 0, -0.38, 0.50, C.CHELICERA, 0.02);
+  cp.box(1.32, 1.10, 1.65, side * 0.04, -0.75, 0.52, C.CARAPACE_M, 0.02);
+  cp.box(0.95, 0.40, 1.40, 0, 0.22, 0.45, C.CARAPACE, 0.02);
+  cp.box(0.25, 1.20, 1.30, side * 0.54, -0.45, 0.50, C.CHELICERA, 0.025);
+  // Sisi dalam medial sikat bulu mulut gelap alami (menutup rongga rapi tanpa balok merah terpisah)
+  cp.box(0.25, 0.85, 1.10, -side * 0.45, -0.65, 0.50, 0x1f0f08);
+
+  // Mangkok soket engsel taring (kondilus kokoh di dasar depan rahang)
+  cp.box(0.68, 0.45, 0.68, side * 0.12, -1.05, 1.05, C.CARAPACE_M, 0.02);
   cg.add(cp.mesh());
 
-  // Gading (Fang) yang bisa melipat / membuka
+  // Gading (Fang) tajam berbisa yang melipat / mencengkeram — kurva menyatu utuh kontinu
   const fangPivot = new THREE.Group();
-  fangPivot.position.set(0, -1.1, 1.1);
+  fangPivot.position.set(side * 0.12, -1.15, 1.05);
 
   const fp = new VoxelPart();
-  // Segmen gading lengkung tajam hitam ke merah darah
-  fp.box(0.32, 0.8, 0.32, 0, -0.35, 0.1, C.FANG_ROOT, 0, [0.4, 0, 0]);
-  fp.box(0.24, 0.9, 0.24, 0, -0.85, 0.45, C.FANG_TIP, 0, [0.8, 0, 0]);
-  fp.box(0.14, 0.5, 0.14, 0, -1.3, 0.85, 0xff2222, 0, [1.1, 0, 0]); // Ujung racun tajam
+  // Taring satu bilah utuh: semua segmen SEJAJAR (tanpa rotasi per-box) dan
+  // saling overlap ~50% sehingga hasil merge terlihat sebagai satu bilah padu.
+  // Lengkung kait dibentuk dari offset pusat z yang progresif, bukan rotasi.
+  fp.box(0.56, 0.50, 0.56, 0, 0.05, 0.02, C.FANG_ROOT);
+  fp.box(0.48, 0.55, 0.48, 0, -0.20, 0.06, C.FANG_ROOT);
+  fp.box(0.42, 0.55, 0.42, 0, -0.46, 0.14, C.FANG_ROOT);
+  fp.box(0.36, 0.55, 0.36, 0, -0.72, 0.26, C.FANG_ROOT);
+  fp.box(0.30, 0.55, 0.30, 0, -0.98, 0.42, C.FANG_ROOT);
+  fp.box(0.24, 0.50, 0.24, 0, -1.22, 0.60, C.FANG_ROOT);
+  fp.box(0.16, 0.45, 0.16, 0, -1.43, 0.78, 0x2e0606);
+  fp.box(0.10, 0.32, 0.10, 0, -1.60, 0.92, 0x1a0404);
+
   fangPivot.add(fp.mesh());
 
   cg.add(fangPivot);
@@ -380,19 +410,21 @@ const cheliceraL = buildChelicera(1);
 const cheliceraR = buildChelicera(-1);
 cheliceraGrp.add(cheliceraL, cheliceraR);
 
-/* 4. Pedipalps (Dua Tangan Peraba Sensorik Ramping di Depan) */
+/* 4. Pedipalps (Dua Tangan Peraba Sensorik Depan Bulky) */
 function buildPedipalp(side) {
   const g = new THREE.Group();
-  g.position.set(side * 1.25, 0.6, 2.1);
+  g.position.set(side * 1.35, 0.6, 2.1);
 
   const p = new VoxelPart();
-  // Coxa pedipalp ramping
-  p.box(0.35, 0.35, 0.45, 0, 0, 0.2, C.CARAPACE_M);
-  // Femur pedipalp terangkat
-  p.box(0.25, 0.25, 1.3, side * 0.10, 0.20, 0.85, C.LEG_DARK, 0.02, [-0.25, side * 0.12, 0]);
+  // Coxa pedipalp kokoh
+  p.box(0.50, 0.50, 0.60, 0, 0, 0.25, C.CARAPACE_M);
+  // Femur pedipalp terangkat kekar
+  p.box(0.42, 0.42, 1.40, side * 0.10, 0.20, 0.85, C.LEG_DARK, 0.02, [-0.25, side * 0.12, 0]);
+  // Patella cincin bulu merah
+  p.box(0.46, 0.46, 0.35, side * 0.12, 0.28, 1.40, C.HAIR_RUST);
   // Tibia & tarsus (ujung pad peraba)
-  p.box(0.20, 0.20, 1.2, side * 0.18, -0.05, 1.95, C.LEG_DARK, 0.02, [0.30, -side * 0.08, 0]);
-  p.box(0.24, 0.22, 0.45, side * 0.18, -0.20, 2.60, C.SCOPULA);
+  p.box(0.36, 0.36, 1.25, side * 0.18, -0.05, 2.05, C.LEG_DARK, 0.02, [0.30, -side * 0.08, 0]);
+  p.box(0.42, 0.34, 0.55, side * 0.18, -0.20, 2.75, C.SCOPULA);
   g.add(p.mesh());
   bodyRig.add(g);
   return g;
@@ -400,63 +432,88 @@ function buildPedipalp(side) {
 const pedipalpL = buildPedipalp(1);
 const pedipalpR = buildPedipalp(-1);
 
-/* 5. Opisthosoma (Abdomen / Perut Besar Berbulu) */
+/* 5. Opisthosoma (Abdomen / Perut Besar Berbulu Bulky) */
 const abdomenGrp = new THREE.Group();
 abdomenGrp.position.set(0, 1.35, -1.8);
 bodyRig.add(abdomenGrp);
 
 const abdomenPart = new VoxelPart();
 // Pinggang penghubung (pedicel)
-abdomenPart.box(1.4, 1.0, 1.2, 0, 0, 0.5, C.CARAPACE_M);
-// Perut telur tarantula raksasa (Panjang 5.6, Tinggi 3.4, Lebar 4.4)
-abdomenPart.box(4.4, 3.4, 5.6, 0, 0.4, -2.5, C.ABDOMEN, 0.02);
-abdomenPart.box(4.0, 3.6, 5.2, 0, 0.5, -2.5, C.ABDOMEN, 0.02);
+abdomenPart.box(1.7, 1.15, 1.3, 0, 0, 0.5, C.CARAPACE_M);
+// Perut telur tarantula raksasa bulky (Panjang 6.4, Tinggi 4.2, Lebar 5.4)
+abdomenPart.box(5.4, 4.0, 6.4, 0, 0.45, -2.8, C.ABDOMEN, 0.02);
+abdomenPart.box(4.9, 4.3, 5.9, 0, 0.55, -2.8, C.ABDOMEN, 0.02);
+abdomenPart.box(5.6, 3.5, 5.5, 0, 0.35, -2.8, C.ABDOMEN, 0.02);
 // Lapisan bercak bulu keemasan (urticating mirror patch)
-abdomenPart.box(2.3, 0.4, 3.0, 0, 2.25, -2.6, C.HAIR_GOLD, 0.04);
-abdomenPart.box(2.7, 0.3, 3.4, 0, 2.15, -2.6, C.HAIR_RUST, 0.04);
+abdomenPart.box(2.9, 0.45, 3.6, 0, 2.50, -2.9, C.HAIR_GOLD, 0.04);
+abdomenPart.box(3.4, 0.35, 4.1, 0, 2.40, -2.9, C.HAIR_RUST, 0.04);
 
 // Spineret (2 pemintal jaring artikulasi panjang di ujung belakang)
-abdomenPart.box(0.45, 0.45, 1.3,  0.65, -0.6, -5.5, C.CHELICERA, 0, [0.3,  0.2, 0]);
-abdomenPart.box(0.45, 0.45, 1.3, -0.65, -0.6, -5.5, C.CHELICERA, 0, [0.3, -0.2, 0]);
-abdomenPart.box(0.35, 0.35, 0.9,  0.80, -0.4, -6.2, C.HAIR_RUST, 0, [0.6,  0.3, 0]);
-abdomenPart.box(0.35, 0.35, 0.9, -0.80, -0.4, -6.2, C.HAIR_RUST, 0, [0.6, -0.3, 0]);
+abdomenPart.box(0.55, 0.55, 1.5,  0.75, -0.65, -6.1, C.CHELICERA, 0, [0.3,  0.2, 0]);
+abdomenPart.box(0.55, 0.55, 1.5, -0.75, -0.65, -6.1, C.CHELICERA, 0, [0.3, -0.2, 0]);
+abdomenPart.box(0.42, 0.42, 1.0,  0.92, -0.45, -6.9, C.HAIR_RUST, 0, [0.6,  0.3, 0]);
+abdomenPart.box(0.42, 0.42, 1.0, -0.92, -0.45, -6.9, C.HAIR_RUST, 0, [0.6, -0.3, 0]);
 
 const abdomenMesh = abdomenPart.mesh();
 abdomenGrp.add(abdomenMesh);
 
-/* ================= 6. PEMBUATAN MESH 8 KAKI RAMPING PROPORSIONAL ================= */
-// Panjang segmen kaki IK — dipangkas agar lutut hanya melengkung sedikit di atas karapas
+// Titik jangkar spineret (lubang jaring di ujung ekor)
+const spinneretAnchor = new THREE.Group();
+spinneretAnchor.position.set(0, -0.45, -6.6);
+abdomenGrp.add(spinneretAnchor);
+
+/* ================= 6. PEMBUATAN MESH 8 KAKI BULKY PROPORSIONAL ================= */
+// Panjang segmen kaki IK tetap konsisten agar solver IK presisi dan stabil tanpa bergeser
 const LEG_L1 = 2.9; // Femur / Paha atas
 const LEG_L2 = 3.5; // Tibia + Metatarsus / Betis ke bawah
 
-// Mesh Femur ramping proporsional (0.32 x 0.32, bukan 0.78 log kayu!)
+// Mesh Femur bulky, kekar, dan berbulu tebal
 function buildFemurMesh() {
   const p = new VoxelPart();
-  // Pangkal sendi trochanter
-  p.box(0.38, 0.38, 0.40, 0, 0, 0.20, C.CARAPACE_M);
-  // Batang paha berbulu kekar memanjang sepanjang +Z dari 0 ke L1
-  p.box(0.32, 0.32, LEG_L1 * 0.90, 0, 0, LEG_L1 * 0.48, C.LEG_DARK, 0.02);
-  // Garis rambut berduri tipis di atas paha
-  p.box(0.16, 0.12, LEG_L1 * 0.85, 0, 0.18, LEG_L1 * 0.48, C.CARAPACE);
-  // Sendi lutut patella berambut merah karat cerah di ujung (Z = L1)
-  p.box(0.38, 0.38, 0.42, 0, 0, LEG_L1, C.HAIR_RUST, 0.03);
-  p.box(0.28, 0.28, 0.25, 0, 0.10, LEG_L1, C.HAIR_GOLD);
+  // 1. Pangkal sendi trochanter / sleeve coxa tebal di hip
+  p.box(0.74, 0.70, 0.55, 0, 0, 0.22, C.CARAPACE_M, 0.02);
+  p.box(0.62, 0.60, 0.50, 0, 0, 0.26, C.LEG_DARK);
+
+  // 2. Batang paha utama berotot memanjang sepanjang +Z dari 0 ke L1
+  p.box(0.62, 0.58, LEG_L1 * 0.88, 0, 0, LEG_L1 * 0.46, C.LEG_DARK, 0.02);
+  // Lapisan bulu samping tebal (lateral muscular fluff)
+  p.box(0.72, 0.48, LEG_L1 * 0.72, 0, 0, LEG_L1 * 0.46, C.CARAPACE, 0.025);
+  // Punggungan dorsal atas berotot (dorsal muscular crest)
+  p.box(0.44, 0.26, LEG_L1 * 0.80, 0, 0.28, LEG_L1 * 0.48, C.CARAPACE, 0.02);
+  // Lapisan bulu merah tembaga / karat tebal di dorsal
+  p.box(0.50, 0.22, LEG_L1 * 0.52, 0, 0.26, LEG_L1 * 0.55, C.HAIR_RUST, 0.04);
+  // Lapisan bantalan otot bawah paha (ventral bulk)
+  p.box(0.48, 0.22, LEG_L1 * 0.74, 0, -0.25, LEG_L1 * 0.46, C.CARAPACE_M);
+
+  // 3. Sendi Tempurung Lutut (Patella) Raksasa di Ujung Femur (Z = LEG_L1)
+  p.box(0.76, 0.72, 0.65, 0, 0, LEG_L1 - 0.05, C.CARAPACE_M, 0.02);
+  p.box(0.82, 0.76, 0.45, 0, 0, LEG_L1, C.HAIR_RUST, 0.03);
+  p.box(0.58, 0.30, 0.40, 0, 0.32, LEG_L1, C.HAIR_GOLD, 0.04);
   return p.mesh();
 }
 
-// Mesh Tibia ramping meruncing
+// Mesh Tibia bulky meruncing kekar
 function buildTibiaMesh() {
   const p = new VoxelPart();
-  // Mangkok sendi lutut atas
-  p.box(0.36, 0.36, 0.32, 0, 0, 0.10, C.HAIR_RUST);
-  // Batang tibia atas
-  p.box(0.26, 0.26, LEG_L2 * 0.55, 0, 0, LEG_L2 * 0.30, C.LEG_DARK, 0.02);
-  // Metatarsus bawah meruncing
-  p.box(0.20, 0.20, LEG_L2 * 0.40, 0, 0, LEG_L2 * 0.75, C.CARAPACE);
-  // Bantalan kuku kaki scopula beludru hitam & cakar mikro di ujung (Z = L2)
-  p.box(0.26, 0.16, 0.35, 0, -0.05, LEG_L2, C.SCOPULA);
-  p.box(0.06, 0.08, 0.14,  0.06, -0.12, LEG_L2 + 0.12, 0x050505, 0, [0.3, 0, 0]);
-  p.box(0.06, 0.08, 0.14, -0.06, -0.12, LEG_L2 + 0.12, 0x050505, 0, [0.3, 0, 0]);
+  // 1. Mangkok sendi lutut atas di Z = 0 sampai 0.35
+  p.box(0.78, 0.74, 0.52, 0, 0, 0.16, C.HAIR_RUST, 0.02);
+  p.box(0.68, 0.64, 0.35, 0, 0, 0.30, C.CARAPACE_M);
+
+  // 2. Batang tibia atas kekar berbulu tebal
+  p.box(0.56, 0.52, LEG_L2 * 0.50, 0, 0, LEG_L2 * 0.28, C.LEG_DARK, 0.02);
+  p.box(0.66, 0.42, LEG_L2 * 0.44, 0, 0, LEG_L2 * 0.28, C.CARAPACE, 0.03);
+  p.box(0.40, 0.20, LEG_L2 * 0.46, 0, -0.22, LEG_L2 * 0.30, C.HAIR_RUST, 0.03);
+
+  // 3. Metatarsus bawah kokoh dan padat
+  p.box(0.46, 0.44, LEG_L2 * 0.45, 0, 0, LEG_L2 * 0.70, C.LEG_DARK, 0.02);
+  p.box(0.52, 0.34, LEG_L2 * 0.38, 0, -0.08, LEG_L2 * 0.70, C.HAIR_RUST, 0.03);
+  p.box(0.50, 0.46, 0.28, 0, 0, LEG_L2 * 0.88, C.CARAPACE_M);
+
+  // 4. Bantalan kuku kaki scopula beludru hitam & cakar ganda kokoh di ujung (Z = LEG_L2)
+  p.box(0.54, 0.30, 0.55, 0, -0.06, LEG_L2, C.SCOPULA);
+  p.box(0.42, 0.22, 0.45, 0, 0.08, LEG_L2 - 0.06, C.CARAPACE_M);
+  p.box(0.10, 0.12, 0.22,  0.12, -0.10, LEG_L2 + 0.14, 0x0a0a0a, 0, [0.35, 0, 0]);
+  p.box(0.10, 0.12, 0.22, -0.12, -0.10, LEG_L2 + 0.14, 0x0a0a0a, 0, [0.35, 0, 0]);
   return p.mesh();
 }
 
@@ -624,6 +681,103 @@ function spawnLandingDust() {
   }
 }
 
+/* ================= 3D WEB SYSTEM & SPRAY ================= */
+const webTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = '#93c5fd';
+  ctx.shadowBlur = 8;
+
+  const cx = 128, cy = 128, rays = 12, maxR = 118;
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * maxR, cy + Math.sin(a) * maxR);
+    ctx.stroke();
+  }
+  const rings = 6;
+  for (let r = 1; r <= rings; r++) {
+    const rad = (r / rings) * maxR;
+    ctx.beginPath();
+    for (let i = 0; i <= rays; i++) {
+      const a = (i / rays) * Math.PI * 2;
+      const sag = (i % 2 === 0 ? 0.95 : 1.0);
+      const px = cx + Math.cos(a) * rad * sag;
+      const py = cy + Math.sin(a) * rad * sag;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+})();
+
+const webGeo = new THREE.PlaneGeometry(3.6, 3.6);
+const activeWebs = [];
+
+function shootWeb(origin, targetDir) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: webTex, transparent: true, opacity: 0.96,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  const m = new THREE.Mesh(webGeo, mat);
+  m.position.copy(origin);
+  m.scale.setScalar(0.4);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
+  scene.add(m);
+
+  activeWebs.push({
+    mesh: m,
+    pos: origin.clone(),
+    vel: targetDir.clone().multiplyScalar(18.0),
+    life: 0,
+    maxLife: 4.5,
+    stuck: false,
+    rotSpd: (Math.random() - 0.5) * 6
+  });
+
+  // Hamburan benang sutra putih halus
+  for (let i = 0; i < 14; i++) {
+    spawnVfx(origin.x, origin.y, origin.z, 1, 0xffffff, 2.2, false);
+  }
+}
+
+function updateWebs(dt) {
+  for (let i = activeWebs.length - 1; i >= 0; i--) {
+    const w = activeWebs[i];
+    w.life += dt;
+    if (w.life > w.maxLife) {
+      scene.remove(w.mesh);
+      w.mesh.material.dispose();
+      activeWebs.splice(i, 1);
+      continue;
+    }
+    if (!w.stuck) {
+      w.pos.addScaledVector(w.vel, dt);
+      w.vel.y -= 9.8 * dt;
+      w.mesh.position.copy(w.pos);
+      w.mesh.rotation.z += w.rotSpd * dt;
+      const sc = Math.min(3.4, 0.4 + w.life * 4.5);
+      w.mesh.scale.setScalar(sc);
+
+      if (w.pos.y <= 0.04) {
+        w.pos.y = 0.04;
+        w.stuck = true;
+        w.mesh.position.copy(w.pos);
+        w.mesh.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
+        spawnVfx(w.pos.x, 0.08, w.pos.z, 6, 0xf1f5f9, 1.0);
+      }
+    } else {
+      const fade = Math.max(0, 1 - (w.life - 1.2) / (w.maxLife - 1.2));
+      w.mesh.material.opacity = fade * 0.95;
+    }
+  }
+}
+
 /* ================= HERMITE SMOOTH CURVE ================= */
 const smooth5 = x => {
   x = Math.max(0, Math.min(1, x));
@@ -632,11 +786,12 @@ const smooth5 = x => {
 
 /* ================= STATE MACHINE & KONTROL INTERAKTIF ================= */
 const STATE_INFO = {
-  idle:   { label: 'DIAM WASPADA', speed: 0.0 },
-  walk:   { label: 'JALAN SINKRON IK', speed: 1.8 },
-  run:    { label: 'LARI KENCANG (SCUTTLE)', speed: 4.6 },
-  threat: { label: 'POSTUR ANCAMAN', speed: 0.0 },
-  strike: { label: 'TERKAM & GIGIT', speed: 0.0 }
+  idle: { label: 'DIAM WASPADA', speed: 0.0 },
+  walk: { label: 'JALAN SINKRON IK', speed: 1.8 },
+  run:  { label: 'LARI KENCANG (SCUTTLE)', speed: 4.6 },
+  bite: { label: 'GIGITAN MANDIBEL KE DEPAN', speed: 0.0 },
+  leap: { label: 'LOMPAT SERGAP DINAMIS (SMOOTH)', speed: 0.0 },
+  web:  { label: 'PUTAR BADAN & SEMBUR JARING', speed: 0.0 }
 };
 
 let state = 'walk';
@@ -646,6 +801,10 @@ let elapsed = 0, last = performance.now();
 let autoRotate = true;
 let debugIK = false;
 let userSteering = false;
+
+let leapLanded = false;
+let webBurstsDone = 0;
+let baseYaw = 0;
 
 // Posisi & orientasi virtual tarantula di dunia
 let spiderPos = new THREE.Vector3(0, 0.48, 0);
@@ -665,10 +824,13 @@ const holdPoint = new THREE.Vector2();
 
 window.addEventListener('keydown', e => {
   if (keys[e.code] !== undefined) { keys[e.code] = true; userSteering = true; }
-  const map = { Digit1: 'idle', Digit2: 'walk', Digit3: 'run', Digit4: 'threat', Digit5: 'strike' };
+  const map = {
+    Digit1: 'idle', Digit2: 'walk', Digit3: 'run',
+    Digit4: 'bite', Digit5: 'leap', Digit6: 'web'
+  };
   if (map[e.code]) switchState(map[e.code]);
   if (e.code === 'Space') {
-    const arr = ['idle', 'walk', 'run', 'threat', 'strike'];
+    const arr = ['idle', 'walk', 'run', 'bite', 'leap', 'web'];
     switchState(arr[(arr.indexOf(state) + 1) % arr.length]);
   }
 });
@@ -685,13 +847,27 @@ function switchState(s) {
   if (state === s) return;
   state = s;
   stateStart = elapsed;
-  document.querySelectorAll('.btn').forEach(b => b.classList.toggle('active', b.dataset.s === s));
-  stateNameEl.textContent = STATE_INFO[s].label;
+  leapLanded = false;
+  webBurstsDone = 0;
+  baseYaw = spiderYaw;
 
-  if (s === 'threat') {
-    bubble('HISS!', 'hiss');
-  } else if (s === 'strike') {
-    bubble('TERKAM!', 'strike');
+  // Reset transform rahang & mulut ke posisi netral
+  cheliceraGrp.position.set(0, 0.9, 2.4);
+  cheliceraL.rotation.set(0, 0, 0);
+  cheliceraR.rotation.set(0, 0, 0);
+  cheliceraL.userData.fang.rotation.set(0, 0, 0);
+  cheliceraR.userData.fang.rotation.set(0, 0, 0);
+  abdomenGrp.rotation.set(0, 0, 0);
+
+  document.querySelectorAll('.btn').forEach(b => b.classList.toggle('active', b.dataset.s === s));
+  stateNameEl.textContent = STATE_INFO[s] ? STATE_INFO[s].label : s.toUpperCase();
+
+  if (s === 'bite') {
+    bubble('CHOMP! 🦷', 'chomp');
+  } else if (s === 'leap') {
+    bubble('POUNCE! 🦘', 'strike');
+  } else if (s === 'web') {
+    bubble('SPRAY WEB! 🕸️', 'web');
   }
 }
 
@@ -826,7 +1002,7 @@ function tick(now) {
         spawnLandingDust();
       }
     }
-  } else if (state === 'threat' || state === 'strike') {
+  } else if (state === 'threat' || state === 'bite' || state === 'leap' || state === 'web') {
     spiderVel.set(0, 0, 0);
   } else if (userSteering && hasManualInput) {
     spiderYaw += turn;
@@ -887,49 +1063,181 @@ function tick(now) {
     pedipalpR.rotation.x = 0.55;
     cheliceraL.userData.fang.rotation.x = -0.5;
     cheliceraR.userData.fang.rotation.x = -0.5;
-  } else if (state === 'threat') {
-    // POSTUR ANCAMAN: Rears up di atas 4 kaki belakang!
-    const u = smooth5(Math.min(1, stateTime / 0.35));
-    bodyPitch = -0.45 * u;
-    bodyOffsetY = 0.48 + 0.55 * u;
-    phaseBadgeEl.textContent = 'POSTUR ANCAMAN MENENGADAH! ⚠️';
-
-    // Kaki belakang menjangkau lebih lebar agar tetap menapak saat badan tegak
-    spiderLegs.forEach(l => l.stepReach = (l.index >= 2) ? 1.0 + 0.32 * u : 1.0);
-
-    // Pedipalps terangkat tinggi ke langit
-    pedipalpL.rotation.x = -0.9 * u + Math.sin(elapsed * 8) * 0.08;
-    pedipalpR.rotation.x = -0.9 * u - Math.sin(elapsed * 8) * 0.08;
-
-    // Gading berbisa membuka siap menusuk
-    cheliceraL.userData.fang.rotation.x = -0.85 * u;
-    cheliceraR.userData.fang.rotation.x = -0.85 * u;
-  } else if (state === 'strike') {
-    // TERKAM & GIGIT: Tarikan pegas -> Lompat sergap ke depan -> Gigitan taring
+  } else if (state === 'bite') {
+    // SERANGAN MULUT KEDEPAN SEPERTI MENGGIGIT (BITE ATTACK)
     spiderLegs.forEach(l => l.stepReach = 1.0);
-    const cycle = stateTime % 2.0;
-    if (cycle < 0.35) {
-      const u = smooth5(cycle / 0.35);
-      bodyPitch = -0.42 * u;
-      bodyOffsetY = 0.48 + 0.28 * u;
-      phaseBadgeEl.textContent = 'MENGUNCI SASARAN';
-    } else if (cycle < 0.85) {
-      const u = smooth5((cycle - 0.35) / 0.5);
-      bodyPitch = 0.30 * Math.sin(u * Math.PI);
-      bodyOffsetY = 0.48 + Math.sin(u * Math.PI) * 0.45;
-      spiderPos.addScaledVector(new THREE.Vector3(Math.sin(spiderYaw), 0, Math.cos(spiderYaw)), dt * 4.2 * (1 - u));
-      phaseBadgeEl.textContent = 'SERGAP TERKAMAN! 🩸';
+    const fwd = new THREE.Vector3(Math.sin(spiderYaw), 0, Math.cos(spiderYaw));
 
-      cheliceraL.userData.fang.rotation.x = Math.sin(u * Math.PI) * -1.2;
-      cheliceraR.userData.fang.rotation.x = Math.sin(u * Math.PI) * -1.2;
+    if (stateTime < 0.22) {
+      // Wind-up: kepala recoil ke belakang, rahang membuka ke samping, taring mendongak
+      const u = smooth5(stateTime / 0.22);
+      bodyPitch = -0.24 * u;
+      bodyOffsetY = 0.48 + 0.12 * u;
+      cheliceraL.rotation.y = 0.35 * u;
+      cheliceraR.rotation.y = -0.35 * u;
+      cheliceraL.userData.fang.rotation.x = -0.85 * u;
+      cheliceraR.userData.fang.rotation.x = -0.85 * u;
+      pedipalpL.rotation.set(0.35 * u, 0.40 * u, 0);
+      pedipalpR.rotation.set(0.35 * u, -0.40 * u, 0);
+      phaseBadgeEl.textContent = 'ANCANG-ANCANG GIGITAN';
+    } else if (stateTime < 0.52) {
+      // Chomp Strike: Sentakan cepat maju ke depan, rahang maju menusuk, mengatup ke tengah, taring mencabik
+      const sub = smooth5((stateTime - 0.22) / 0.30);
+      const wave = Math.sin(sub * Math.PI);
+      bodyPitch = 0.34 * wave;
+      bodyOffsetY = 0.48 - 0.14 * wave;
+      spiderPos.addScaledVector(fwd, dt * 5.8 * (1 - sub));
 
-      if (cycle > 0.45 && cycle < 0.55) {
-        spawnVfx(spiderPos.x, 0.6, spiderPos.z, 8, 0x16a34a, 1.6, true);
+      cheliceraGrp.position.z = 2.4 + 0.48 * wave;
+      cheliceraGrp.position.y = 0.9 - 0.16 * wave;
+
+      cheliceraL.rotation.y = -0.24 * wave;
+      cheliceraR.rotation.y = 0.24 * wave;
+      cheliceraL.userData.fang.rotation.x = 0.85 * wave;
+      cheliceraR.userData.fang.rotation.x = 0.85 * wave;
+
+      pedipalpL.rotation.set(-0.65 * wave, 0.12, 0);
+      pedipalpR.rotation.set(-0.65 * wave, -0.12, 0);
+
+      phaseBadgeEl.textContent = 'GIGITAN MANDIBEL KE DEPAN! 🩸';
+
+      if (stateTime > 0.26 && stateTime < 0.38) {
+        spawnVfx(spiderPos.x + fwd.x * 2.2, 0.7, spiderPos.z + fwd.z * 2.2, 3, 0x16a34a, 1.8, true);
+        spawnVfx(spiderPos.x + fwd.x * 2.2, 0.7, spiderPos.z + fwd.z * 2.2, 2, 0x7f1d1d, 1.4, false);
       }
+    } else if (stateTime < 0.72) {
+      // Kunyahan kedua (secondary crunch)
+      const nib = Math.sin((stateTime - 0.52) * Math.PI * 10);
+      cheliceraL.userData.fang.rotation.x = 0.32 + nib * 0.26;
+      cheliceraR.userData.fang.rotation.x = 0.32 + nib * 0.26;
+      cheliceraGrp.position.z = 2.4 + 0.18;
+      bodyPitch = 0.10;
+      phaseBadgeEl.textContent = 'MENCABIK MANGSA 🦷';
+    } else if (stateTime <= 0.88) {
+      const rec = smooth5((stateTime - 0.72) / 0.16);
+      bodyPitch = 0.10 * (1 - rec);
+      bodyOffsetY = 0.48;
+      cheliceraGrp.position.set(0, 0.9, 2.4);
+      cheliceraL.rotation.set(0, 0, 0);
+      cheliceraR.rotation.set(0, 0, 0);
+      cheliceraL.userData.fang.rotation.set(0, 0, 0);
+      cheliceraR.userData.fang.rotation.set(0, 0, 0);
+      pedipalpL.rotation.set(0, 0, 0);
+      pedipalpR.rotation.set(0, 0, 0);
+      phaseBadgeEl.textContent = 'SELESAI GIGITAN';
     } else {
-      phaseBadgeEl.textContent = 'MENENANGKAN DIRI';
+      switchState('idle');
+    }
+  } else if (state === 'leap') {
+    // SKILL LOMPAT DINAMIS KEDEPAN SECARA SMOOTH (DYNAMIC LEAP)
+    spiderLegs.forEach(l => l.stepReach = 1.0);
+    const fwd = new THREE.Vector3(Math.sin(spiderYaw), 0, Math.cos(spiderYaw));
+
+    if (stateTime < 0.28) {
+      // Crouch / Mengompresi pegas kaki
+      const u = smooth5(stateTime / 0.28);
+      bodyOffsetY = 0.48 - 0.30 * u;
+      bodyPitch = -0.24 * u;
+      flyY = 0;
+      cheliceraL.userData.fang.rotation.x = -0.45 * u;
+      cheliceraR.userData.fang.rotation.x = -0.45 * u;
+      pedipalpL.rotation.x = 0.35 * u;
+      pedipalpR.rotation.x = 0.35 * u;
+      phaseBadgeEl.textContent = 'MENGOMPRESI PEGAS KAKI 🦘';
+    } else if (stateTime < 0.90) {
+      // Melayang di udara (Parabola Flight)
+      const sub = (stateTime - 0.28) / 0.62;
+      flyY = Math.sin(sub * Math.PI) * 2.85;
+      bodyOffsetY = 0.48;
+      spiderPos.addScaledVector(fwd, dt * 11.5 * Math.sin(sub * Math.PI));
+
+      // Pitch: mendongak saat menanjak, menukik saat menurun
+      bodyPitch = (sub < 0.48) ? (0.42 * (1 - sub / 0.48)) : (-0.38 * ((sub - 0.48) / 0.52));
+
+      cheliceraL.userData.fang.rotation.x = -0.80;
+      cheliceraR.userData.fang.rotation.x = -0.80;
+      pedipalpL.rotation.x = 0.65;
+      pedipalpR.rotation.x = 0.65;
+
+      phaseBadgeEl.textContent = 'MELOMPAT SERGAP KE DEPAN! ✈️';
+    } else if (stateTime < 1.18) {
+      // Pendaratan & Shock Absorption
+      flyY = 0;
+      bodyOffsetY = 0.48;
+      bodyPitch = 0;
+      if (!leapLanded) {
+        leapLanded = true;
+        spawnLandingDust();
+        bubble('SLAM!', 'strike');
+        spiderLegs.forEach(l => l.planted = true);
+      }
       cheliceraL.userData.fang.rotation.x = 0;
       cheliceraR.userData.fang.rotation.x = 0;
+      pedipalpL.rotation.x = -0.20;
+      pedipalpR.rotation.x = -0.20;
+      phaseBadgeEl.textContent = 'PENDARATAN & PEREDAM KEJUT 💥';
+    } else if (stateTime <= 1.42) {
+      flyY = 0;
+      bodyOffsetY = 0.48;
+      bodyPitch = 0;
+      phaseBadgeEl.textContent = 'TEGAK KEMBALI';
+    } else {
+      switchState('walk');
+    }
+  } else if (state === 'web') {
+    // MEMUTAR BADAN MENYEMBURKAN JARING KEDEPAN DARI LUBANG JARING (WEB SHOT)
+    spiderLegs.forEach(l => l.stepReach = 1.0);
+
+    if (stateTime < 0.35) {
+      // Putar badan 180° cepat (pantat kini mengarah ke depan)
+      const u = smooth5(stateTime / 0.35);
+      spiderYaw = baseYaw + Math.PI * u;
+      bodyOffsetY = 0.48;
+      bodyPitch = 0.05 * u;
+      phaseBadgeEl.textContent = 'MEMUTAR 180° KE SPINERET 🔄';
+    } else if (stateTime < 1.25) {
+      spiderYaw = baseYaw + Math.PI;
+      const tWeb = stateTime - 0.35;
+      // Perut terangkat mendongak dan bergetar cepat menenun jaring
+      abdomenGrp.rotation.x = -0.58 + Math.sin(tWeb * 22) * 0.07;
+      bodyPitch = 0.12;
+
+      const origin = new THREE.Vector3();
+      spinneretAnchor.getWorldPosition(origin);
+      const targetDir = new THREE.Vector3(Math.sin(baseYaw), -0.10, Math.cos(baseYaw)).normalize();
+
+      // Semburan partikel sutra putih lebat
+      spawnVfx(origin.x, origin.y, origin.z, 2, 0xffffff, 3.2, false);
+
+      // Tembakkan 3 proyektil jaring laba-laba bertubi-tubi
+      if (tWeb >= 0.08 && webBurstsDone === 0) {
+        shootWeb(origin, targetDir);
+        bubble('🕸️ JARING 1!', 'web');
+        webBurstsDone = 1;
+      } else if (tWeb >= 0.35 && webBurstsDone === 1) {
+        shootWeb(origin, targetDir);
+        bubble('🕸️ JARING 2!', 'web');
+        webBurstsDone = 2;
+      } else if (tWeb >= 0.62 && webBurstsDone === 2) {
+        shootWeb(origin, targetDir);
+        bubble('🕸️ JARING 3!', 'web');
+        webBurstsDone = 3;
+      }
+
+      phaseBadgeEl.textContent = 'MENYEMBURKAN JARING SUTRA! 🕸️';
+    } else if (stateTime < 1.60) {
+      // Putar kembali 180° menghadap depan
+      const u = smooth5((stateTime - 1.25) / 0.35);
+      spiderYaw = baseYaw + Math.PI * (1 - u);
+      abdomenGrp.rotation.x = -0.58 * (1 - u);
+      bodyPitch = 0.12 * (1 - u);
+      phaseBadgeEl.textContent = 'KEMBALI MENGHADAP DEPAN 🎯';
+    } else if (stateTime <= 1.85) {
+      abdomenGrp.rotation.x = 0;
+      bodyPitch = 0;
+      phaseBadgeEl.textContent = 'SIAGA SETELAH MENENUN';
+    } else {
+      switchState('idle');
     }
   } else {
     spiderLegs.forEach(l => l.stepReach = 1.0);
@@ -963,7 +1271,7 @@ function tick(now) {
   // Bayangan blob mengecil saat tarantula melayang di udara
   blob.position.set(spiderPos.x, 0.02, spiderPos.z);
   blob.rotation.y = spiderYaw;
-  const blobBase = state === 'threat' ? 0.85 : 1.0;
+  const blobBase = 1.0;
   blob.scale.setScalar(Math.max(0.45, blobBase * (1 - flyY * 0.12)));
 
   // Kamera mengikuti posisi tarantula saat diangkat / dijatuhkan
@@ -972,9 +1280,10 @@ function tick(now) {
   /* -------------------------------------------------------------
      3. PROCEDURAL STEPPING ENGINE (SINKRON CADENCE CLOCK)
      ------------------------------------------------------------- */
-  const stepThreshold = state === 'run' ? 0.45 : 0.35;
-  const stepDur = state === 'run' ? 0.12 : 0.20;
-  const stepLift = state === 'run' ? 1.0 : 0.65;
+  const isWebSpinning = (state === 'web' && (stateTime < 0.35 || (stateTime >= 1.25 && stateTime < 1.60)));
+  const stepThreshold = (state === 'run') ? 0.45 : (isWebSpinning ? 0.20 : 0.35);
+  const stepDur = (state === 'run') ? 0.12 : (isWebSpinning ? 0.10 : 0.20);
+  const stepLift = (state === 'run') ? 1.0 : (isWebSpinning ? 0.45 : 0.65);
 
   spiderLegs.forEach(leg => {
     leg.stepDuration = stepDur;
@@ -1009,17 +1318,18 @@ function tick(now) {
       return;
     }
 
-    // KASUS KHUSUS POSTUR ANCAMAN: Kaki depan (L1, R1, L2, R2) terangkat di udara
-    if (state === 'threat' && leg.index <= 1) {
+    // KASUS KHUSUS LOMPAT DI UDARA (AERODYNAMIC POUNCE POSE)
+    if (state === 'leap' && stateTime >= 0.28 && stateTime < 0.90) {
       leg.isStepping = false;
-      const u = smooth5(Math.min(1, stateTime / 0.35));
-      const airTarget = leg.getIdealFootPos(bodyPos, bodyQuat);
-      airTarget.y = 2.2 + (leg.index === 0 ? 1.4 : 0.6) * u + Math.sin(elapsed * 6 + leg.side) * 0.12;
-      airTarget.x += leg.side * 0.45 * u;
-      airTarget.z += (leg.index === 0 ? 0.9 : 0.25) * u;
-
-      leg.currentFoot.lerp(airTarget, 0.25);
+      const sub = (stateTime - 0.28) / 0.62;
       const hipW = leg.getHipWorldPos(bodyPos, bodyQuat);
+      const rel = new THREE.Vector3(leg.restLocal.x - leg.hipLocal.x, 0, leg.restLocal.z - leg.hipLocal.z);
+      const stretchZ = (leg.index <= 1) ? 0.9 : -1.0;
+      rel.z += stretchZ * Math.sin(sub * Math.PI);
+      rel.y = -Math.max(0.4, 2.2 - flyY * 0.35);
+      rel.applyQuaternion(bodyQuat).add(hipW);
+      rel.y = Math.max(0, rel.y);
+      leg.currentFoot.lerp(rel, 1 - Math.exp(-dt * 12));
       leg.solveIK(hipW, leg.currentFoot);
       return;
     }
@@ -1044,9 +1354,9 @@ function tick(now) {
     } else {
       // Menapak tanah: Cek apakah giliran grupnya tiba & jarak offset melampaui batas
       const drift = leg.currentFoot.distanceTo(idealFoot);
-      const isAllowedGait = (leg.group === activeGaitGroup) || (drift > 1.2); // Overstretch safety
+      const isAllowedGait = (leg.group === activeGaitGroup) || (drift > 1.2) || isWebSpinning;
 
-      if (isAllowedGait && drift > stepThreshold && (currentSpeed > 0.05 || hasManualInput)) {
+      if (isAllowedGait && drift > stepThreshold && (currentSpeed > 0.05 || hasManualInput || isWebSpinning)) {
         leg.isStepping = true;
         leg.stepProgress = 0.0;
         leg.stepStartFoot.copy(leg.currentFoot);
@@ -1069,6 +1379,7 @@ function tick(now) {
      4. UPDATE PARTIKEL & KONTROL
      ------------------------------------------------------------- */
   updateVfx(dt);
+  updateWebs(dt);
 
   controls.update();
   renderer.render(scene, camera);

@@ -873,7 +873,7 @@ const FX={
       if(d.t>waitT&&hd<1.65&&Math.abs(Player.pos.y-d.mesh.position.y)<3.5){
         /* data per-instance (level tempa & tanda Log Pass) ikut dipulihkan */
         const left=RPG.addItem(d.id,d.n,d.lvl,d.mark);
-        if(left>0){d.n=left;d.t=0;UI.toast('🎒 Tas penuh!');}
+        if(left>0){d.n=left;d.t=0;}
         else{
           const mk=d.mark&&d.mark.name?` · 🧭 ${d.mark.name}`:'';
           const it=ITEMS[d.id];

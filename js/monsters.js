@@ -5,7 +5,7 @@ const MOB_NAME={slime:'Slime',boar:'Babi Hutan',golem:'Golem',
   wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',
   lizard:'Lizard Rawa',cow:'Sapi',horse:'Kuda',
   kelabang:'Kelabang',kelabang_part:'Ruas Kelabang',kumbang:'Kumbang Tanduk',
-  yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper'};
+  yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper',tarantula:'Tarantula Raksasa'};
 const Monsters={
 
   list:[],timer:0,
@@ -61,6 +61,11 @@ const Monsters={
        Cepat & agresif tapi tidak terlalu tebal; dua serangan (gigit & terjang).
        `bossScale` proporsional dengan skala boss kumbang yang dikecilkan 30%. */
     semut:{hp:95,dmg:14,xp:42,speed:4.2,r:0.55,aggro:17,bossScale:0.408},
+    /* TARANTULA RAKSASA: predator puncak biome TANAH MERAH (REDLANDS), port dari
+       NEW MODEL/Tarantula.html dengan IK analitis 3D tetap dipakai (8 kaki).
+       LEBIH KUAT dari kumbang & semut: tiga aksi (gigitan mandibel jarak dekat,
+       lompat sergap AoE, semburan 3 proyektil jaring dengan STUN 5 detik). */
+    tarantula:{hp:165,dmg:20,xp:62,speed:3.8,r:0.8,aggro:18,bossScale:0.68},
     /* REAPER: hantu hitam bersabit, KHUSUS PENJAGA DUNGEON. Tidak pernah ikut
        undian mob biome (namanya tidak ada di BIOME_INFO.mobs) — hanya dipanggil
        Dungeon.update. Menggantikan wujud "Wraith" lama yang cuma skin.
@@ -1058,8 +1063,10 @@ const Monsters={
        m.type==='kumbang'?[['centipede_shell',1+(Math.random()<0.4?1:0)],['fiber',Math.random()<0.5?1:0],['hard_shell',Math.random()<0.16?1:0],['insect_leg',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
        /* yeti: bulu tebal (dipakai armor kulit) + daging besar */
        m.type==='yeti'?[['pelt',2],['meat',2]]:
-       /* semut raksasa: cangkang + bahan altar 16% (kaki serangga, darah hijau, racun berbisa) */
-       m.type==='semut'?[['centipede_shell',1],['fiber',Math.random()<0.5?1:0],['insect_leg',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0],['toxic_venom',Math.random()<0.16?1:0]]:
+        /* semut raksasa: cangkang + bahan altar 16% (kaki serangga, darah hijau, racun berbisa) */
+        m.type==='semut'?[['centipede_shell',1],['fiber',Math.random()<0.5?1:0],['insect_leg',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0],['toxic_venom',Math.random()<0.16?1:0]]:
+        /* tarantula raksasa: cangkang + sutra jaring + bahan altar (lebih royal dari kumbang/semut) */
+        m.type==='tarantula'?[['centipede_shell',2],['fiber',1+(Math.random()<0.5?1:0)],['insect_leg',Math.random()<0.32?1:0],['hard_shell',Math.random()<0.32?1:0],['green_blood',Math.random()<0.32?1:0],['toxic_venom',Math.random()<0.32?1:0]]:
        /* REAPER (penjaga dungeon): pecahan jiwa + kristal */
        m.type==='reaper'?[['soul_shard',1+(Math.random()<0.45?1:0)],
                           ['crystal',Math.random()<0.35?1:0]]:
@@ -1106,6 +1113,7 @@ const Monsters={
       m.type==='wolf'?0x6f7480:m.type==='scorpion'?0x8a5a2b:
       m.type==='lizard'?0x4e8f3a:m.type==='kumbang'?0x7a4f24:
       m.type==='yeti'?0xcfe0f2:m.type==='semut'?0x8a3b1f:
+      m.type==='tarantula'?0x2e1910:
       m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:0x8a8f98;
     FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.8,0)),
       m.boss?0xff6bd6:dustColor,m.boss?32:16,m.boss?5:3.5);
@@ -1127,6 +1135,7 @@ const Monsters={
       trex:[0x5f7f4c,0x3f5a37,0xd9c9a2],
       yeti:[0xeaf1f8,0xcfe0f2,0xa6c0db],
       semut:[0x8a3b1f,0x5e2412,0xa5502a],
+      tarantula:[0x2e1910,0x9e4b1e,0xb3772a],
       /* reaper: serpihan jubah hitam + kilau ungu rune */
       reaper:[0x15151d,0x2a2140,0x7b4fd6],
     };
@@ -1458,6 +1467,8 @@ const Monsters={
     if(typeof Mob_Kumbang!=='undefined'&&Mob_Kumbang.updateBlocks)Mob_Kumbang.updateBlocks(dt);
     /* arwah pemburu reaper (skill 3 arwah): update global sekali per frame */
     if(typeof Mob_Reaper!=='undefined'&&Mob_Reaper.updateSpirits)Mob_Reaper.updateSpirits(dt);
+    /* proyektil jaring tarantula (damage + stun 5 detik): update global */
+    if(typeof Mob_Tarantula!=='undefined'&&Mob_Tarantula.updateWebs)Mob_Tarantula.updateWebs(dt);
   },
 
   ai(m,dt,dp){
@@ -1500,6 +1511,13 @@ const Monsters={
     /* ---------- REAPER (penjaga dungeon): 2 tebasan, hempasan, 3 arwah ---------- */
     if(m.type==='reaper'){
       this.aiReaper(m,dt,dp,angP);
+      return;
+    }
+
+    /* ---------- TARANTULA RAKSASA: gigit (dekat), lompat sergap (menengah),
+       sembur jaring + STUN 5 detik (jauh) ---------- */
+    if(m.type==='tarantula'){
+      this.aiTarantula(m,dt,dp,angP);
       return;
     }
 
@@ -2578,6 +2596,183 @@ const Monsters={
   },
 
   /* =========================================================================
+     AI TARANTULA RAKSASA — 3 aksi tempur (port dari Tarantula.html)
+     -------------------------------------------------------------------------
+     'bite' (Gigitan Mandibel) : windup 0.22s → sentak maju + rahang menutup.
+     'leap' (Lompat Sergap)    : crouch 0.28s → parabola smooth → hantam tanah
+                                 (AoE + shake). Lompatan memakai FISIKA mob
+                                 (vel.y + dorong maju) supaya posisi visual =
+                                 posisi tabrakan.
+     'web'  (Sembur Jaring)    : putar 180° → 3 proyektil jaring bertubi-tubi
+                                 (damage kecil + STUN 5 DETIK ke pemain/NPC/pet)
+                                 → putar kembali. Arah tembak mengunci sasaran
+                                 lewat battleTarget di Mob_Tarantula.webBurst.
+     Pemilihan DIUNDI dengan jarak sebagai pemiring peluang (pola kumbang/
+     semut): menempel → gigit, menengah → lompat, jauh → jaring.
+     ========================================================================= */
+  pickTarantulaAtk(d, targetStunned){
+    if(targetStunned){
+      // Mangsa sedang terikat jaring tak berdaya: langsung terkam tanpa basa-basi!
+      if(d>2.2)return 'leap';
+      return 'bite';
+    }
+    const r=Math.random();
+    if(d<1.8)return r<0.85?'bite':'leap';
+    if(d<3.2)return r<0.55?'bite':(r<0.80?'leap':'web');
+    if(d<7.5)return r<0.45?'leap':(r<0.85?'web':'bite');
+    return r<0.60?'web':'leap';
+  },
+  aiTarantula(m,dt,dp,angP){
+    this.pickFoe(m,dt);
+    const tgt=this.aimTarget(m);
+    const tpos=tgt?tgt.pos:Player.pos;
+    const dT=tgt?Math.hypot(tpos.x-m.pos.x,tpos.z-m.pos.z):999;
+    const angT=Math.atan2(tpos.x-m.pos.x,tpos.z-m.pos.z);
+
+    if(m.tAct){this.tarantulaAct(m,dt,dT,angT,tgt);return;}
+
+    const MB=CFG.MOB;
+    const sight=Math.min(this.TYPES.tarantula.aggro,MB.SIGHT);
+    m.seeT=Math.max(0,(m.seeT||0)-dt);
+    m.alert=Math.max(0,(m.alert||0)-dt);
+    if(tgt&&dT<sight)m.seeT=MB.MEM;
+    const active=!!tgt&&(m.seeT>0||m.alert>0);
+    m.state=active?'chase':'wander';
+
+    const targetStunned=(tgt===Player && ((Player.stunT||0)>0 || Player._webStunned)) || (tgt && (tgt.stunT||0)>0);
+    const stopDist=targetStunned?1.35:1.6;
+
+    if(active){
+      if(dT>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*(targetStunned?9:6));
+      let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+      if(targetStunned)sp*=1.25; // berlari kencang menerjang mangsa yang terikat jaring!
+      if(dT>stopDist){
+        m.vel.x=lerp(m.vel.x,Math.sin(angT)*sp,clamp(7*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(angT)*sp,clamp(7*dt,0,1));
+      }else{
+        const damp=Math.exp(-9*dt);
+        m.vel.x*=damp;m.vel.z*=damp;
+      }
+      if(m.atkCd<=0)this.startTarantulaAtk(m,this.pickTarantulaAtk(dT,targetStunned),tgt);
+    }else{
+      m.t-=dt;
+      if(m.t<=0){m.t=rand(1.5,4);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
+      if(m.walking){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*3);
+        const sp=m.speed*0.4;
+        m.vel.x=lerp(m.vel.x,Math.sin(m.dir)*sp,clamp(4*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(m.dir)*sp,clamp(4*dt,0,1));
+      }else{m.vel.x*=0.85;m.vel.z*=0.85;}
+    }
+  },
+  startTarantulaAtk(m,name,target){
+    const A=(typeof Mob_Tarantula!=='undefined')?Mob_Tarantula:null;
+    m.tAct=name;m.tActT=0;
+    m.tActDur=(A&&A.DUR[name])||0.9;
+    m.tTarget=(target&&target!==Player)?target:null;
+    m._tHit=false;m._tFired=[false,false,false];m._tLaunched=false;
+    m._tYaw=m.mesh.rotation.y;
+    m._tBaseYaw=m.mesh.rotation.y;
+    if(name==='leap'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'smash',0.5);
+    if(name==='web'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'cast',0.6);
+  },
+  tarantulaAct(m,dt,dp,angP,tgtIn){
+    const A=(typeof Mob_Tarantula!=='undefined')?Mob_Tarantula:null;
+    m.tActT+=dt;
+    const tA=m.tActT,name=m.tAct;
+    const tgt=(m.tTarget&&!m.tTarget.dead)?m.tTarget:
+              (tgtIn||(m.pet?null:this.aimTarget(m)));
+    const HIT=(A&&A.HIT)||{bite:0.34,leapLand:0.90,web:[0.43,0.70,0.97]};
+
+    if(name==='bite'){
+      /* GIGITAN MANDIBEL: ancang-ancang membidik, sentak maju, damage saat
+         rahang menutup. */
+      if(tA<0.22){
+        if(dp>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*9);
+        m._tYaw=m.mesh.rotation.y;
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else if(tA<0.52){
+        const yaw=m._tYaw!==undefined?m._tYaw:m.mesh.rotation.y;
+        m.vel.x=lerp(m.vel.x,Math.sin(yaw)*6.5,clamp(12*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(yaw)*6.5,clamp(12*dt,0,1));
+      }else{m.vel.x*=0.86;m.vel.z*=0.86;}
+      if(!m._tHit&&tA>=HIT.bite){
+        m._tHit=true;
+        if(A)A.biteFX(m);
+        const yaw=m.mesh.rotation.y;
+        const hx=m.pos.x+Math.sin(yaw)*1.6,hz=m.pos.z+Math.cos(yaw)*1.6;
+        this.hitTarget(m,tgt,Math.round(m.dmg*1.25),2.4,hx,hz,6);
+      }
+    }
+
+    else if(name==='leap'){
+      /* LOMPAT SERGAP: crouch → tolak fisika sungguhan → hantam saat mendarat. */
+      if(tA<0.28){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
+        m._tYaw=m.mesh.rotation.y;
+        m.vel.x*=0.82;m.vel.z*=0.82;
+      }else if(!m._tLaunched){
+        m._tLaunched=true;
+        const reach=clamp(dp,2.0,7.0);
+        m.vel.y=Math.max(m.vel.y,8.6);
+        m.vel.x=Math.sin(m._tYaw)*reach*1.45;
+        m.vel.z=Math.cos(m._tYaw)*reach*1.45;
+        if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'swing',0.7);
+      }else if(tA<0.90){
+        /* di udara: dorong maju dipertahankan supaya parabola smooth & jauh */
+        m.mesh.rotation.y=m._tYaw;
+        const hold=10*(1-Math.abs(tA-0.59)/0.6);
+        m.vel.x=Math.sin(m._tYaw)*Math.max(4,hold);
+        m.vel.z=Math.cos(m._tYaw)*Math.max(4,hold);
+      }
+      const landed=(m._tLaunched&&m.onGround&&tA>0.55)||tA>=HIT.leapLand;
+      if(m._tLaunched&&!m._tHit&&landed){
+        m._tHit=true;
+        if(A)A.leapLandFX(m);
+        this.areaHit(m,m.pos.x,m.pos.z,3.2,Math.round(m.dmg*1.5),9);
+      }
+      if(m._tHit){m.vel.x*=0.86;m.vel.z*=0.86;}
+    }
+
+    else{
+      /* SEMBUR JARING: putar 180° → 3 tembakan → putar kembali.
+         Mesh diputar visual; arah tembakan dikunci ke sasaran via webBurst. */
+      const u1=Math.min(1,tA/0.35);
+      if(tA<0.35){
+        const e=u1*u1*(3-2*u1);
+        m.mesh.rotation.y=m._tBaseYaw+Math.PI*e;
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else if(tA<1.25){
+        m.mesh.rotation.y=m._tBaseYaw+Math.PI;
+        m.vel.x*=0.85;m.vel.z*=0.85;
+        const times=HIT.web;
+        for(let i=0;i<3;i++){
+          if(!m._tFired[i]&&tA>=times[i]){
+            m._tFired[i]=true;
+            if(A)A.webBurst(m,tgt);
+          }
+        }
+      }else if(tA<1.60){
+        const u=Math.min(1,(tA-1.25)/0.35), e=u*u*(3-2*u);
+        m.mesh.rotation.y=m._tBaseYaw+Math.PI*(1-e);
+        m.vel.x*=0.85;m.vel.z*=0.85;
+      }
+    }
+
+    if(m.tActT>=m.tActDur){
+      if(name==='web')m.mesh.rotation.y=m._tBaseYaw;
+      m.tAct=null;m.tTarget=null;
+      const targetStunned=(tgt===Player && ((Player.stunT||0)>0 || Player._webStunned)) || (tgt && (tgt.stunT||0)>0);
+      if(targetStunned){
+        // MANGSA SEDANG TERIKAT: Cooldown sangat cepat agar langsung menyergap/menghabisi!
+        m.atkCd=rand(0.25,0.45);
+      }else{
+        m.atkCd=(name==='web')?rand(0.5,0.9):(name==='leap'?rand(1.8,2.8):rand(1.2,2.0));
+      }
+    }
+  },
+
+  /* =========================================================================
      SERANGAN MOB SEDERHANA — SATU JALUR UNTUK SEMUA SASARAN
      -------------------------------------------------------------------------
      Dipakai oleh ai() (lawan pemain), aiVsNpc() (lawan rekan NPC/pet), dan
@@ -3000,6 +3195,10 @@ const Monsters={
       else if(m.type==='semut'){
         if(!m.aAct)this.startSemutAtk(m,this.pickSemutAtk(d),target);
       }
+      /* ---------- TARANTULA PET: gigitan, lompat sergap & sembur jaring ---------- */
+      else if(m.type==='tarantula'){
+        if(!m.tAct)this.startTarantulaAtk(m,this.pickTarantulaAtk(d),target);
+      }
       /* ---------- REAPER PET: keempat aksinya dipakai ----------
          Timeline dijalankan reaperAct() (dipanggil dari Capture.petAI) dengan
          m.rTarget = monster musuh, sehingga tebasan, hempasan, dan ketiga arwah
@@ -3253,6 +3452,7 @@ function meshHeight(type){
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:
     type==='yeti'?2.6:type==='semut'?1.5:
+    type==='tarantula'?2.2:
     type==='reaper'?2.9:
     type==='wolf'?1.35:type==='scorpion'?0.85:type==='rabbit'?0.7:type==='fish'?1.8:0.9;
 }

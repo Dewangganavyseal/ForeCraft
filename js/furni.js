@@ -2557,6 +2557,19 @@ const Action={
       return candidates[0].action;
     }
     const s=RPG.hotbar[RPG.sel];
+    /* ---------- TANGKAP MOB (saat memegang Tali 🪢 & target sekarat) ---------- */
+    if(s&&s.id==='rope'&&typeof Capture!=='undefined'){
+      const cm=Capture.catchable();
+      if(cm){
+        const isFull=(typeof RPG!=='undefined'&&RPG.mobSlots)&&RPG.mobSlots.every(st=>st!==null);
+        if(isFull){
+          return {kind:'catch',mob:cm,label:`🚫 Full (Pet Penuh)`,
+            pos:cm.pos.clone().add(new THREE.Vector3(0,meshHeight(cm.type)*(cm.sizeMul||1)+0.8,0))};
+        }
+        return {kind:'catch',mob:cm,label:`🪢 Tangkap ${Capture.mobName(cm.type)}${cm.boss?' Raksasa':''}`,
+          pos:cm.pos.clone().add(new THREE.Vector3(0,meshHeight(cm.type)*(cm.sizeMul||1)+0.8,0))};
+      }
+    }
     if(s&&ITEMS[s.id].place)
       return {kind:'place',label:`📦 Pasang ${ITEMS[s.id].n}`};
     /* ---------- AKSI MEMANCING (saat memegang Alat Pancing 🎣) ---------- */
@@ -2597,6 +2610,7 @@ const Action={
     if(!a){UI.toast('Tidak ada yang bisa diinteraksi di sini');return;}
     if(a.kind==='disembark')Furni.disembark();
     else if(a.kind==='stand')Furni.stand();
+    else if(a.kind==='catch'&&typeof Capture!=='undefined'&&a.mob)Capture.start(a.mob);
     else if(a.kind==='pet-ride'&&typeof Capture!=='undefined')Capture.startRide();
     else if(a.kind==='pet-dismount'&&typeof Capture!=='undefined')Capture.stopRide();
     else if(a.kind==='talk')NPCS.talk(a.npc);

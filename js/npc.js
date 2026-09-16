@@ -1188,6 +1188,18 @@ const NPCS={
   },
 
   ai(n,dt){
+    /* JARING TARANTULA: NPC kena stun total 5 detik — tidak bisa gerak/serang. */
+    if((n.stunT||0)>0){
+      n.stunT-=dt;
+      if(n.stunT<=0)n.stunT=0;
+      else{
+        n.vel.x*=Math.exp(-6*dt);n.vel.z*=Math.exp(-6*dt);
+        n.walking=false;
+        if(Math.random()<dt*3&&typeof FX!=='undefined')
+          FX.text(n.pos.clone().add(new THREE.Vector3(0,2.1,0)),'🕸️','#e0f2fe');
+        return;
+      }
+    }
     /* NPC non-tim yang sedang diajak bicara berhenti total dan memperhatikan pemain */
     if(!this.isTeam(n)&&(n.talking||(n.talkT||0)>0)){
       if((n.talkT||0)>0)n.talkT-=dt;

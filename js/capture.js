@@ -14,22 +14,23 @@
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
   scorpion:'🦂',lizard:'🦎',dragon:'🐉',trex:'🦖',cow:'🐄',horse:'🐎',
-  kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️'};
+  kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
   rabbit:'carrot',scorpion:'meat',lizard:'meat',cow:'wheat',horse:'wheat',
-  dragon:'cmeat',trex:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard'};
+  dragon:'cmeat',trex:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard',
+  tarantula:'meat'};
 
 /* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
    reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
   scorpion:180,lizard:220,golem:320,dragon:520,trex:480,
-  kumbang:240,yeti:300,semut:150,reaper:360};
+  kumbang:240,yeti:300,semut:150,reaper:360,tarantula:280};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
   scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,trex:2.1,
-  kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45};
+  kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45,tarantula:1.5};
 
 /* panjang maksimum tali saat tarik-tarikan.
    Dikurangi 11 -> 8 supaya mob tidak menjauh terlalu jauh saat meronta;
@@ -54,23 +55,24 @@ const Capture={
      bawah skala boss (1.75+). Lihat catatan di deploy(). */
   PET_BOSS_SCALE:1.18,
 
-  /* Keseimbangan stat dasar pet (seimbang & adil antar tier) */
+  /* Keseimbangan stat dasar pet (damage ditingkatkan 1.5x lipat sesuai permintaan) */
   PET_BASE_STATS:{
-    rabbit:   { baseHp:45,   baseDmg:10 },
-    slime:    { baseHp:70,   baseDmg:14 },
-    boar:     { baseHp:110,  baseDmg:18 },
-    cow:      { baseHp:140,  baseDmg:14 },
-    horse:    { baseHp:160,  baseDmg:16 },
-    wolf:     { baseHp:150,  baseDmg:24 },
-    scorpion: { baseHp:180,  baseDmg:26 },
-    lizard:   { baseHp:220,  baseDmg:28 },
-    semut:    { baseHp:200,  baseDmg:26 },
-    kumbang:  { baseHp:320,  baseDmg:34 },
-    golem:    { baseHp:420,  baseDmg:38 },
-    reaper:   { baseHp:380,  baseDmg:42 },
-    yeti:     { baseHp:450,  baseDmg:44 },
-    dragon:   { baseHp:580,  baseDmg:52 },
-    trex:     { baseHp:550,  baseDmg:54 }
+    rabbit:   { baseHp:45,   baseDmg:15 },
+    slime:    { baseHp:70,   baseDmg:21 },
+    boar:     { baseHp:110,  baseDmg:27 },
+    cow:      { baseHp:140,  baseDmg:21 },
+    horse:    { baseHp:160,  baseDmg:24 },
+    wolf:     { baseHp:150,  baseDmg:36 },
+    scorpion: { baseHp:180,  baseDmg:39 },
+    lizard:   { baseHp:220,  baseDmg:42 },
+    semut:    { baseHp:200,  baseDmg:39 },
+    kumbang:  { baseHp:320,  baseDmg:51 },
+    tarantula:{ baseHp:340,  baseDmg:57 },
+    golem:    { baseHp:420,  baseDmg:57 },
+    reaper:   { baseHp:380,  baseDmg:63 },
+    yeti:     { baseHp:450,  baseDmg:66 },
+    dragon:   { baseHp:580,  baseDmg:78 },
+    trex:     { baseHp:550,  baseDmg:81 }
   },
 
   /* ---------- init DOM & rope ---------- */
@@ -216,11 +218,12 @@ const Capture={
     if(typeof Furni!=='undefined'&&Furni.placing)return null;
     const slot=RPG.hotbar[RPG.sel];
     if(!slot||slot.id!=='rope')return null;
-    let best=null,bd=10;
+    let best=null,bd=12;
     for(const m of Monsters.list){
-      if(m.dead||m.pet||m.catchFailed||m.catchActive)continue;
+      if(m.dead||m.pet||(m.catchCooldown||0)>0||m.catchActive)continue;
       if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part')continue; // kelabang tidak bisa ditangkap
-      if(m.hp/m.maxhp>0.2001)continue;
+      const hpLimit = m.boss ? 0.26 : 0.2001; // Mini boss HP tebal: beri toleransi wajar 26%
+      if(m.hp/m.maxhp > hpLimit)continue;
       const d=m.pos.distanceTo(Player.pos);
       if(d<bd){best=m;bd=d;}
     }
@@ -233,7 +236,11 @@ const Capture={
     if(!m||m.dead)return;
     if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part'){UI.toast('🚫 Kelabang tidak bisa ditangkap!');return;}
     if(!this.canCatch()){UI.toast('🪢 Pelajari skill Pawang Pemula dulu!');return;}
-    if(RPG.mobSlots.findIndex(s=>!s)<0){UI.toast('🐾 Slot mob penuh — jual/lepaskan dulu');return;}
+    if(RPG.mobSlots.findIndex(s=>!s)<0){
+      UI.toast('🐾 Slot pet penuh! Jual atau lepaskan pet terlebih dahulu.');
+      if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
+      return;
+    }
     const slot=RPG.hotbar[RPG.sel];
     if(!slot||slot.id!=='rope'){UI.toast('🪢 Pegang Tali di hotbar!');return;}
     /* Tali sekali pakai: langsung dikonsumsi saat minigame dimulai.
@@ -243,7 +250,7 @@ const Capture={
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
 
     const base=CATCH_DIFF[m.type]||70;
-    const diff=Math.round(base*(m.boss?2.3:1));
+    const diff=Math.round(base*(m.boss?1.55:1));
     this.active={m,stam:diff,max:diff,tension:0,t:0,surge:0,
       surgeT:rand(m.type==='dragon'?1.6:2.8,m.type==='dragon'?3.0:4.8)};
     m.catchActive=true;
@@ -251,10 +258,15 @@ const Capture={
     m.alert=Math.max(m.alert||0,8);
     m.windup=0;
     m.foe=null;
+    if(m.tAct)m.tAct=null;
+    if(m.kumAtk)m.kumAtk=null;
+    if(m.yAct)m.yAct=null;
+    if(m.aAct)m.aAct=null;
+    if(m.rAct)m.rAct=null;
     /* langsung berlari menjauh dari pemain begitu ditangkap dimulai */
     const away=new THREE.Vector3().subVectors(m.pos,Player.pos).setY(0);
     const ang=Math.atan2(away.x,away.z);
-    const burst=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].speed:3)*(CATCH_FLEE[m.type]||1)*1.1;
+    const burst=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].speed:3)*(CATCH_FLEE[m.type]||1)*(m.boss?0.72:1.1);
     m.mesh.rotation.y=ang;
     m.vel.x=Math.sin(ang)*burst;
     m.vel.z=Math.cos(ang)*burst;
@@ -270,8 +282,20 @@ const Capture={
     if(!this.btn)return;
     const m=this.catchable();
     if(!m||typeof Cam==='undefined'||!Cam.cam){this.btn.style.display='none';return;}
-    const h=(typeof meshHeight==='function')?meshHeight(m.type):1;
-    const v=m.pos.clone().add(new THREE.Vector3(0,h+0.9,0)).project(Cam.cam);
+    const isFull=(typeof RPG!=='undefined'&&RPG.mobSlots)&&RPG.mobSlots.every(s=>s!==null);
+    if(isFull){
+      this.btn.textContent='🚫 Full';
+      this.btn.style.borderColor='#ef4444';
+      this.btn.style.color='#fca5a5';
+      this.btn.style.background='rgba(40,12,12,.92)';
+    }else{
+      this.btn.textContent='🪢 Tangkap';
+      this.btn.style.borderColor='#ffd24d';
+      this.btn.style.color='#ffd24d';
+      this.btn.style.background='rgba(20,16,10,.86)';
+    }
+    const h=(typeof meshHeight==='function')?meshHeight(m.type)*(m.sizeMul||1):1;
+    const v=m.pos.clone().add(new THREE.Vector3(0,h+0.85,0)).project(Cam.cam);
     if(v.z>1){this.btn.style.display='none';return;}
     this._btnTarget=m;
     this.btn.style.display='block';
@@ -286,14 +310,15 @@ const Capture={
     const m=a.m;
     if(!m||m.dead){this.failCatch('Monster tidak valid');return;}
 
+    const maxLen=CATCH_MAX_LEN+(m.boss?4.5:0);
     let dist=m.pos.distanceTo(Player.pos);
-    if(dist>CATCH_MAX_LEN+4){this.breakRope();return;}
+    if(dist>maxLen+4){this.breakRope();return;}
 
     /* ---------- batas panjang tali ----------
        Mob tetap berlari, tetapi pada jarak maksimum ia tertahan. */
-    if(dist>CATCH_MAX_LEN){
+    if(dist>maxLen){
       const hold=new THREE.Vector3().subVectors(m.pos,Player.pos).setY(0);
-      hold.multiplyScalar(CATCH_MAX_LEN/Math.max(0.001,hold.length()));
+      hold.multiplyScalar(maxLen/Math.max(0.001,hold.length()));
       m.pos.copy(Player.pos).add(hold);
       m.vel.x*=0.15;
       m.vel.z*=0.15;
@@ -320,11 +345,11 @@ const Capture={
     /* ketegangan naik saat tali meregang / pemain menarik menjauh.
        Mendekati monster akan mengurangi ketegangan. */
     let dT=-7.5*dt;
-    const softLen=CATCH_MAX_LEN*0.82;
+    const softLen=maxLen*0.82;
     if(dist>softLen)dT+=(dist-softLen)*22*dt;
     if(pull)dT+=42*dt;
     if(pull&&dist>3.6)dT+=18*dt;
-    if(dist>=CATCH_MAX_LEN-0.35)dT+=16*dt;
+    if(dist>=maxLen-0.35)dT+=16*dt;
     if(a.surge>0)dT+=20*dt;
     if(approach)dT-=30*dt;
     /* patch keseimbangan: kenaikan tension dikurangi 20% */
@@ -367,7 +392,8 @@ const Capture={
     const base=(Monsters.TYPES[m.type]?Monsters.TYPES[m.type].speed:3);
     const flee=CATCH_FLEE[m.type]||1.0;
     let spd=base*flee*0.82*this.calmMult();
-    if(this.active.surge>0)spd*=m.type==='dragon'?1.85:1.4;
+    if(m.boss)spd*=0.80; // Boss lebih terkendali saat meronta agar tidak memutus tali secara instan
+    if(this.active.surge>0)spd*=m.type==='dragon'?1.85:1.35;
 
     m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(7*dt,0,1));
     m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(7*dt,0,1));
@@ -399,13 +425,13 @@ const Capture={
     this.active=null;
     if(m){
       m.catchActive=false;
-      m.catchFailed=true;
+      m.catchCooldown=8.5; // Mengamuk 8.5 detik sebelum bisa ditangkap lagi dengan tali baru
       m.alert=12;
       m.state='chase';
     }
     this.ui.style.display='none';
     this.updateRope();
-    UI.toast('❌ Tali putus! Monster mengamuk dan tidak bisa ditangkap lagi.');
+    UI.toast('❌ Tali putus! Monster mengamuk sejenak (coba lagi dengan tali baru).');
     if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit();
   },
 
@@ -439,7 +465,7 @@ const Capture={
        Semakin tinggi bintang, semakin tinggi stat pet. */
     let stars=this.rollStars(!!m.boss);
     const starMult = 1 + (stars - 1) * 0.15 + (m.boss ? 0.15 : 0);
-    const statDef = this.PET_BASE_STATS[m.type] || { baseHp: 100, baseDmg: 20 };
+    const statDef = this.PET_BASE_STATS[m.type] || { baseHp: 100, baseDmg: 30 };
     const maxhp = Math.round(statDef.baseHp * starMult);
     const dmg = Math.round(statDef.baseDmg * starMult);
 
@@ -528,7 +554,7 @@ const Capture={
     if(!p.stars){
       p.stars=this.rollStars(!!p.boss);
     }
-    const statDef = this.PET_BASE_STATS[p.type] || { baseHp: 100, baseDmg: 20 };
+    const statDef = this.PET_BASE_STATS[p.type] || { baseHp: 100, baseDmg: 30 };
     const starMult = 1 + ((p.stars || 1) - 1) * 0.15 + (p.boss ? 0.15 : 0);
     p.power = starMult;
     p.lvl = Math.max(1, p.lvl || 1);
@@ -662,6 +688,21 @@ const Capture={
      Monsters.petAttack(). Serangan ditargetkan ke monster musuh terdekat,
      tidak pernah ke pemain. */
   petAI(m,dt,dp){
+    /* JARING TARANTULA: pet kena stun total 5 detik — tidak bisa gerak/serang.
+       Fisika tetap jalan; update() mob tidak dipanggil untuk pet sehingga
+       fisika dijalankan manual di sini supaya tidak melayang. */
+    if((m.stunT||0)>0){
+      m.stunT-=dt;
+      if(m.stunT<=0)m.stunT=0;
+      else{
+        m.vel.x*=0.5;m.vel.z*=0.5;
+        if(typeof Monsters!=='undefined'&&Monsters.physics)Monsters.physics(m,dt);
+        if(m.mesh)m.mesh.position.copy(m.pos);
+        if(Math.random()<dt*3&&typeof FX!=='undefined')
+          FX.text(m.pos.clone().add(new THREE.Vector3(0,2.0,0)),'🕸️','#e0f2fe');
+        return;
+      }
+    }
     /* ---------- PET TELEPORT SAAT TERTINGGAL ----------
        Rekan tim NPC punya NPC.TELEPORT_R (34 blok) — bila tertinggal lebih jauh
        dari itu, mereka dipanggil ulang ke belakang pemain. Pet tidak punya
@@ -758,7 +799,7 @@ const Capture={
        aiSemut/aiReaper). Tanpa cabang ini, jurus yang dimulai petAttack() tidak
        pernah maju sehingga pet hanya mematung setelah serangan pertama. */
     {
-      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget;
+      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget;
       const live=(foe&&!foe.dead)?foe:(target&&!target.dead?target:null);
       const ang=live?Math.atan2(live.pos.x-m.pos.x,live.pos.z-m.pos.z):(m.mesh?m.mesh.rotation.y:0);
       const d=live?live.pos.distanceTo(m.pos):dp;
@@ -774,6 +815,9 @@ const Capture={
       if(m.rAct&&typeof Monsters.reaperAct==='function'){
         Monsters.reaperAct(m,dt,d,ang,live);return;
       }
+      if(m.tAct&&typeof Monsters.tarantulaAct==='function'){
+        Monsters.tarantulaAct(m,dt,d,ang,live);return;
+      }
     }
 
     if(target&&dp<20){
@@ -785,7 +829,9 @@ const Capture={
          punya peluang dipakai — merapat seperti pet lain membuat seruduk saja
          yang keluar. Yeti sama: lompat+hantam butuh ruang ancang-ancang, dan
          semut butuh jarak untuk terjangan cepatnya. Reaper juga: panggilan 3
-         arwahnya hanya berguna bila ia menjaga jarak menengah.
+         arwahnya hanya berguna bila ia menjaga jarak menengah. Tarantula juga:
+         semburan jaringnya butuh jarak menengah-jauh (hold 5.2) supaya ketiga
+         jurusnya (gigit/lompat/jaring) bergantian keluar.
          Naga, golem, dan lizard ikut ditambahkan: semburan api, hantaman tanah,
          serta sapuan ekor & semburan asam semuanya punya jangkauan sendiri —
          kalau pet merapat sampai 1.8 blok seperti dulu, jurus-jurus itu tidak
@@ -794,6 +840,7 @@ const Capture={
                   (m.type==='yeti')?3.6:
                   (m.type==='semut')?3.2:
                   (m.type==='reaper')?3.4:
+                  (m.type==='tarantula')?5.2:
                   (m.type==='dragon')?3.4:
                   (m.type==='golem')?3.0:
                   (m.type==='lizard')?2.6:1.8;
@@ -895,37 +942,79 @@ const Capture={
 
   /* ---------- saddle / ride ---------- */
   onJumpInput(){
-    // Hanya picu terbang bila pemain SEDANG MENUNGGANGI pet naga miliknya
-    if(!this.riding||!this.pet||this.pet.type!=='dragon'||this.pet.dead)return false;
+    if(!this.riding||!this.pet||this.pet.dead)return false;
 
     const m=this.pet;
-    const petSlotData=(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot])?RPG.mobSlots[m.petSlot]:null;
-    const currentCd=Math.max(m.flyCd||0, petSlotData?petSlotData.flyCd||0:0);
-
     const now=performance.now();
     const dt=now-(this._lastJumpTime||0);
     this._lastJumpTime=now;
 
-    if(dt<400){ // Double space saat menunggangi pet naga!
-      if(currentCd<=0 && (m.flyT||0)<=0 && !m.flying){
-        m.flyT=10.0;
-        m.flyDur=10.0;
-        m.flying=true;
-        m.noFire=true;
-        m.flyCd=0;
-        m.takeoffY=m.pos.y;
-        m.flyAlt=m.pos.y+4.5;
-        m.landStartY=undefined;
-        if(petSlotData)petSlotData.flyCd=0;
-        if(typeof UI!=='undefined'&&UI.toast)
-          UI.toast('🐉 Naga terbang ke angkasa! (10 detik)');
-        if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
-        return true;
-      }else if(currentCd>0){
-        if(typeof UI!=='undefined'&&UI.toast)
-          UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(currentCd)}s)`);
+    /* ---- 1. KEMAMPUAN TERBANG PET NAGA ---- */
+    if(m.type==='dragon'){
+      const petSlotData=(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot])?RPG.mobSlots[m.petSlot]:null;
+      const currentCd=Math.max(m.flyCd||0, petSlotData?petSlotData.flyCd||0:0);
+      if(dt<400){ // Double space saat menunggangi pet naga!
+        if(currentCd<=0 && (m.flyT||0)<=0 && !m.flying){
+          m.flyT=10.0;
+          m.flyDur=10.0;
+          m.flying=true;
+          m.noFire=true;
+          m.flyCd=0;
+          m.takeoffY=m.pos.y;
+          m.flyAlt=m.pos.y+4.5;
+          m.landStartY=undefined;
+          if(petSlotData)petSlotData.flyCd=0;
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast('🐉 Naga terbang ke angkasa! (10 detik)');
+          if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+          return true;
+        }else if(currentCd>0){
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast(`⏳ Sayap naga masih lelah (cooldown ${Math.ceil(currentCd)}s)`);
+        }
       }
+      return false;
     }
+
+    /* ---- 2. KEMAMPUAN LOMPAT SUPER 6 BLOK PET TARANTULA (DOUBLE JUMP) ---- */
+    if(m.type==='tarantula'){
+      if((m.stunT||0)>0||(Player.stunT||0)>0||Player._webStunned)return false;
+      const cd=m.leapCd||0;
+      if(dt<480){ // Double space tarantula instan cepat seperti naga!
+        if(cd<=0){
+          // Kecepatan awal vertikal untuk mencapai 6 blok: sqrt(2 * 26 * 6) = 17.66
+          m.vel.y=17.7;
+          m.onGround=false;
+          m.tSuperLeap=true;
+          m.leapCd=3.0; // Cooldown tepat 3.0 detik
+          m.leapTakeoffY=m.pos.y;
+
+          // Dorongan horizontal dinamis sesuai arah gerak joystick/WASD atau arah hadap
+          const mv=Input.moveVec();
+          const mvLen=Math.hypot(mv.x,mv.z);
+          const fwdAngle=(mvLen>0.1)?Math.atan2(mv.x,mv.z):m.mesh.rotation.y;
+          const boost=(mvLen>0.1)?9.2:6.8;
+          m.vel.x=Math.sin(fwdAngle)*boost;
+          m.vel.z=Math.cos(fwdAngle)*boost;
+
+          // Efek hentakan tolak landas
+          if(typeof FX!=='undefined'){
+            FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.2,0)),0xb8a68e,16,3.2);
+            FX.ring(m.pos.x,m.pos.y+0.1,m.pos.z,0xff7a3c,0.5,3.6);
+            FX.addShake(0.3);
+          }
+          if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast('🕷️ Lompatan Super Tarantula! (Setinggi 6 Blok)');
+          return true;
+        }else if(cd>0){
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast(`⏳ Kaki tarantula masih istirahat (cooldown ${Math.ceil(cd)}s)`);
+        }
+      }
+      return false;
+    }
+
     return false;
   },
 
@@ -1012,7 +1101,36 @@ const Capture={
     const m=this.pet;
     if(!m||m.dead){this.stopRide(true);return;}
 
-    const seat=(typeof meshHeight==='function')?meshHeight(m.type)*0.72:1.2;
+    // Update super leap & spring bounce tarantula
+    if(m.type==='tarantula'){
+      if((m.leapCd||0)>0) m.leapCd = Math.max(0, m.leapCd - dt);
+
+      // Deteksi pendaratan tarantula setelah lompatan super 6 blok
+      if(m.tSuperLeap){
+        if(m.onGround || (m.vel.y<=0 && m.pos.y <= (m.leapTakeoffY||m.pos.y)+0.4)){
+          m.tSuperLeap=false;
+          m.landSpringT=0.45; // durasi 0.45 detik elastisitas pegas
+          if(typeof FX!=='undefined'){
+            FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.2,0)),0x9c8570,22,3.8);
+            FX.ring(m.pos.x,m.pos.y+0.08,m.pos.z,0xffa53d,0.6,4.4);
+            FX.addShake(0.42);
+          }
+          if(typeof Sfx!=='undefined'&&Sfx.smash) Sfx.smash();
+        }
+      }
+
+      // Kurva pantulan elastis (tension & spring absorption saat mendarat)
+      let springSink=0;
+      if((m.landSpringT||0)>0){
+        m.landSpringT-=dt;
+        const prog=1-Math.max(0,m.landSpringT)/0.45;
+        springSink=Math.sin(prog*Math.PI)*Math.exp(-prog*3.2)*0.52;
+      }
+      m.tSpringSink=springSink;
+    }
+
+    const seatBase=(typeof meshHeight==='function')?meshHeight(m.type)*0.72:1.2;
+    const seat=seatBase-(m.tSpringSink||0);
 
     /* ---- transisi TURUN: lompat ke samping mount lalu mendarat ---- */
     if(this.dismounting){
@@ -1035,6 +1153,34 @@ const Capture={
         p.onGround=true;
       }
       return;
+    }
+
+    /* =========================================================================
+       PET / PENUNGGANG TERKENA STUN (JARING TARANTULA / SHIELD BASH)
+       -------------------------------------------------------------------------
+       Bila mount atau pemain terkena stun:
+       - Pet & pemain berhenti total (kecepatan horizontal direm keras / dinolkan).
+       - Input joystick / WASD diblokir penuh (tidak bisa meluncur/bergerak).
+       - Lompatan dibatalkan.
+       - Kunci posisi duduk di atas sadel mount.
+       ========================================================================= */
+    const isMountStunned=(m.stunT>0)||(p.stunT>0)||(p._webStunned);
+    if(isMountStunned){
+      m.vel.x*=Math.exp(-24*dt);
+      m.vel.z*=Math.exp(-24*dt);
+      if(Math.hypot(m.vel.x,m.vel.z)<0.05){m.vel.x=0;m.vel.z=0;}
+      this.jumpQ=false;
+
+      p.pos.set(m.pos.x,m.pos.y+seat,m.pos.z);
+      p.mesh.position.copy(p.pos);
+      p.vel.set(0,0,0);
+      p.onGround=true;
+      p.inWater=false;
+
+      if(Math.random()<dt*4&&typeof FX!=='undefined'){
+        FX.text(m.pos.clone().add(new THREE.Vector3(0,seat+1.2,0)),'🕸️','#e0f2fe');
+      }
+      return; // SELESAI: input joystick / WASD diblokir penuh saat stun!
     }
 
     /* lompat saat menunggangi: 2 blok, naga 3 blok (nonaktif saat naik/turun/terbang) */
@@ -1298,7 +1444,7 @@ const Capture={
     if(Math.random()*100<rate){
       pet.lvl=(pet.lvl||1)+1;
       pet.xp=0;
-      const statDef = this.PET_BASE_STATS[pet.type] || { baseHp: 100, baseDmg: 20 };
+      const statDef = this.PET_BASE_STATS[pet.type] || { baseHp: 100, baseDmg: 30 };
       const starMult = 1 + ((pet.stars || 1) - 1) * 0.15 + (pet.boss ? 0.15 : 0);
       pet.power = starMult;
       pet.maxhp += Math.round(statDef.baseHp * 0.08 * starMult);
@@ -1441,6 +1587,13 @@ const Capture={
     else this.updateBtn();
 
     if(!this.active)this.updateRope();
+
+    /* update cooldown mengamuk mob setelah tali putus */
+    if(typeof Monsters!=='undefined'&&Monsters.list){
+      for(const m of Monsters.list){
+        if((m.catchCooldown||0)>0) m.catchCooldown-=dt;
+      }
+    }
 
     /* ikon pet di HUD team perlu refresh berkala (HP/XP berubah) */
     if(this.pet){

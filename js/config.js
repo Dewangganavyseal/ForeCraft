@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.24',
+  VERSION:'0.2.25',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -323,7 +323,7 @@ const ORE_BLOCKS=[B.ORE_STONE,B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
    ========================================================================= */
 const ORE_INFO={
   [B.ORE_STONE]        :{req:1, chance:0.95},
-  [B.ORE_COAL]         :{req:4, chance:0.85},
+  [B.ORE_COAL]         :{req:2, chance:0.85},
   [B.ORE_COPPER]       :{req:7, chance:0.75},
   [B.ORE_IRON]         :{req:12,chance:0.65},
   [B.ORE_STEEL]        :{req:18,chance:0.58},
@@ -402,12 +402,13 @@ const BIOME_INFO={
     mobW:{slime:3.0,boar:2.0}},
   /* ---------- REDLANDS (Tanah Merah) ----------
      Biome LANGKA (~10% dari daratan) bertanah merah dengan tumbuhan merah.
-     Dua mob biasa dengan peluang SAMA 50:50 — KUMBANG TANDUK & SEMUT RAKSASA.
+     Tiga mob biasa: KUMBANG & SEMUT 40:40, TARANTULA RAKSASA 20% (lebih kuat
+     dari keduanya, dengan gigitan, lompat sergap & jaring stun 5 detik).
      Kelabang Raksasa TIDAK muncul liar di sini; ia hanya bisa dipanggil lewat
      ritual Altar memakai 4 ingredient langka (1% drop) dari mob di biome ini. */
   [BIOME.REDLANDS]:{name:'Tanah Merah',e:'🩸',surface:B.RED_SOIL,sub:B.RED_SOIL,
-    fog:0xc85436,tree:0.10,ore:B.ORE_IRON,mobs:['kumbang','semut'],
-    mobW:{kumbang:1,semut:1}},
+    fog:0xc85436,tree:0.10,ore:B.ORE_IRON,mobs:['kumbang','semut','tarantula'],
+    mobW:{kumbang:2,semut:2,tarantula:1}},
 };
 
 
