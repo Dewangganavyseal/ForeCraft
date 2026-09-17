@@ -27,15 +27,24 @@
       <span id="portrait-lv">1</span>
     </button>
     <div id="stats-bars">
-      <div class="bar hp"><span class="ico"><img class="hud-ico" src="buttons/ui_hp.png" alt="" onerror="this.outerHTML='❤️'"></span><div class="track"><div id="hp-fill"></div></div><b id="hp-num">100</b></div>
-      <div class="bar st"><span class="ico"><img class="hud-ico" src="buttons/ui_stam.png" alt="" onerror="this.outerHTML='⚡'"></span><div class="track"><div id="st-fill"></div></div><b id="st-num">100</b></div>
-      <div class="bar hu"><span class="ico"><img class="hud-ico" src="buttons/ui_hunger.png" alt="" onerror="this.outerHTML='🍖'"></span><div class="track"><div id="hu-fill"></div></div><b id="hu-num">100</b></div>
-      <div id="xpwrap"><div id="xp-fill"></div><span id="lvl">⭐ Lv 1</span></div>
+      <div class="bar hp"><span class="ico"><img class="hud-ico" src="buttons/ui_hp.png" alt="" onerror="this.outerHTML='❤️'"></span><div class="track"><div id="hp-fill"></div><span class="bar-num" id="hp-num">100</span></div></div>
+      <div class="bar st"><span class="ico"><img class="hud-ico" src="buttons/ui_stam.png" alt="" onerror="this.outerHTML='⚡'"></span><div class="track"><div id="st-fill"></div><span class="bar-num" id="st-num">100</span></div></div>
+      <div class="bar hu"><span class="ico"><img class="hud-ico" src="buttons/ui_hunger.png" alt="" onerror="this.outerHTML='🍖'"></span><div class="track"><div id="hu-fill"></div><span class="bar-num" id="hu-num">100</span></div></div>
     </div>
   </div>
-  <!-- ============ CHAT: buka dengan ENTER, persis di bawah bar Lv ============ -->
+  <!-- Garis bar EXP kuning tipis full ujung ke ujung di bagian paling bawah layar + persentase di kiri bawah -->
+  <div id="xp-bar-bottom">
+    <div id="xp-fill"></div>
+    <span id="xp-pct">0%</span>
+  </div>
+  <!-- ============ CHAT & NOTIFIKASI: buka dengan ENTER, persis di bawah bar Lv ============ -->
   <div id="chat">
+    <div id="chat-tabs">
+      <button type="button" class="chat-tab active" data-tab="chat">💬 Chat</button>
+      <button type="button" class="chat-tab" data-tab="notif">🔔 Notif</button>
+    </div>
     <div id="chat-log"></div>
+    <div id="notif-log" style="display:none"></div>
     <div id="chat-row"><span class="cico"><img class="hud-ico" src="buttons/chat.png" alt="" onerror="this.outerHTML='💬'"></span>
       <input id="chat-input" type="text" maxlength="80" autocomplete="off"
         placeholder="Ketik pesan...">

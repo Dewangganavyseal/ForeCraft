@@ -209,9 +209,10 @@ const World={
     });
   },
   inWaterAt(x,y,z){
-    /* kolom air membentang y=0..SEA-1; clamp mengikuti CFG.SEA supaya tetap
-        benar setelah kedalaman sungai dinaikkan (SEA=6) */
-    return this.getBlock(Math.floor(x),clamp(Math.floor(y),0,CFG.SEA-1),Math.floor(z))===B.WATER;
+    const wy = Math.floor(y);
+    const seaTop = (typeof CFG!=='undefined'&&CFG.WATER_Y)?CFG.WATER_Y:((typeof CFG!=='undefined'&&CFG.SEA)?CFG.SEA:6);
+    if(wy >= seaTop || wy < 0) return false;
+    return this.getBlock(Math.floor(x), wy, Math.floor(z)) === B.WATER;
   },
 
   /* =========================================================================
@@ -1093,9 +1094,7 @@ const World={
       this.setBlock(wx,wy,wz,B.DIRT);
       const info0=BLOCK_INFO[B.GRASS];
       FX.debris(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),info0.color,8,2.4);
-      if((id===B.GRASS)&&Math.random()<0.3+RPG.harvestBonus())
-        FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),'fiber',1);
-      /* jatuhkan item blok rumput agar bisa diambil dan ditata kembali */
+      /* jatuhkan HANYA item blok rumput murni untuk build mode (tanpa fiber) */
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.9,wz+0.5),'blk_grass',1);
       Player.addXP(1);Prof.gainBlock(B.GRASS);
       this.regrow.push({x:wx,y:wy,z:wz,t:this.REGROW_T});
@@ -1124,36 +1123,29 @@ const World={
       else if(typeof OreFX!=='undefined')OreFX.burst(wx+0.5,wy,wz+0.5,id,10,1.5);
       if(this.oreStg)delete this.oreStg[`${wx},${wy},${wz}`];
     }
-    /* bonus hasil: skill Pemanen + proficiency sub-skill blok + skill GATHER per jenis drop */
-    const dropId=info.drop||((id===B.GRASS||id===B.DIRT)?'fiber':null);
-    let bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
-    /* SKILL PENEBANG (axe): peluang kayu ekstra, di atas cabang GATHER.
-       Lihat RPG.woodBonus() — skill ini sebelumnya tidak berefek apa pun. */
-    if(id===B.WOOD&&RPG.woodBonus)bonus+=RPG.woodBonus();
-    if(info.drop){
-      /* ---------- HASIL PANEN ORE BERDASARKAN CHANCE (rentang acak) ----------
-         Ore KECIL memakai rentang `s`, ore BESAR rentang `b` (lihat ORE_LOOT):
-           Batu 3-7 / besar 7-13 · Tungsten & B.Tungsten 1-3 / besar 3-6 · dst.
-         Peluang hasil ekstra dari skill "Penambang Terampil" (minm) +
-         proficiency + Pemanen menambahkan +1 drop DI ATAS roll rentang. */
-      let n=1;
-      const loot=isOre&&(typeof ORE_LOOT!=='undefined')?ORE_LOOT[id]:null;
-      if(loot){
-        const r=this.oreNodeBig(wx,wy,wz)?loot.b:loot.s;
-        n=r[0]+Math.floor(Math.random()*(r[1]-r[0]+1));
-        /* SKILL PENAMBANG TERAMPIL (minm): pengali hasil +5%/rank —
-           membuat investasi skill tree terasa jelas pada hasil panen ore */
-        if(RPG.minerMult)n=Math.max(1,Math.round(n*RPG.minerMult()));
-      }
-      if(bonus>0&&Math.random()<bonus)n++;
-      FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,n);
-    }
-    else if((id===B.GRASS||id===B.DIRT)&&Math.random()<0.3+bonus)
-      FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),'fiber',1);
-    /* jatuhkan item blok voxel khusus blok dari biome */
-    const blockItem = (typeof BLOCK_TO_ITEM!=='undefined') ? BLOCK_TO_ITEM[id] : null;
-    if(blockItem){
+    /* ---------- CEK BLOK BIOME ALAMI (build mode) ----------
+       Blok biome (batu, rumput, tanah, pasir, salju, tanah merah) yang dihancurkan
+       pemain PURE HANYA menjatuhkan blok bangunan (blk_*) tanpa menjatuhkan resource biasa. */
+    const isBiomeBlock = !!(typeof BLOCK_TO_ITEM!=='undefined' && BLOCK_TO_ITEM[id]);
+    if(isBiomeBlock){
+      const blockItem = BLOCK_TO_ITEM[id];
       FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),blockItem,1);
+    }else{
+      /* non-biome: pohon (B.WOOD -> wood), bongkahan ore (B.ORE_* -> ore/stone resource), papan/atap */
+      const dropId=info.drop;
+      let bonus=RPG.harvestBonus()+Prof.yieldForBlock(id)+(dropId?RPG.gatherBonus(dropId):0);
+      if(id===B.WOOD&&RPG.woodBonus)bonus+=RPG.woodBonus();
+      if(info.drop){
+        let n=1;
+        const loot=isOre&&(typeof ORE_LOOT!=='undefined')?ORE_LOOT[id]:null;
+        if(loot){
+          const r=this.oreNodeBig(wx,wy,wz)?loot.b:loot.s;
+          n=r[0]+Math.floor(Math.random()*(r[1]-r[0]+1));
+          if(RPG.minerMult)n=Math.max(1,Math.round(n*RPG.minerMult()));
+        }
+        if(bonus>0&&Math.random()<bonus)n++;
+        FX.spawnDrop(new THREE.Vector3(wx+0.5,wy+0.6,wz+0.5),info.drop,n);
+      }
     }
     Player.addXP(1);
     /* proficiency: jenis blok menentukan sub-skill yang naik (ala Durango) */
