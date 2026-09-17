@@ -355,7 +355,7 @@ const UI={
      supaya deretannya tidak pernah memanjang sampai menutupi hotbar atau
      tombol kendali. */
   TOAST_MAX:IS_MOBILE?4:7,
-  toast(msg){
+  toast(msg,itemId){
     const t=document.getElementById('toast');
     const d=document.createElement('div');d.className='toast-item';
     const isHtml=/<[a-z][\s\S]*>/i.test(msg);
@@ -370,6 +370,11 @@ const UI={
     t.appendChild(d);
     while(t.childElementCount>this.TOAST_MAX)t.firstElementChild.remove();
     setTimeout(()=>d.remove(),2600);
+
+    /* Seluruh notifikasi masuk ke tab notif chat */
+    if(typeof Chat!=='undefined'&&Chat.pushNotification){
+      Chat.pushNotification(msg,itemId);
+    }
   },
   /* ---------- modal konfirmasi generik ----------
      opt: {icon, text, count, input:{value,min,max}, textInput:{value,placeholder,
@@ -570,16 +575,27 @@ const UI={
     /* bar dinormalisasi ke stat maksimum sekarang, karena kapasitas HP &
        stamina bertambah setiap naik level */
     const mHp=Player.maxHp(),mSt=Player.maxStamina();
-    document.getElementById('hp-fill').style.width=(Player.hp/mHp*100)+'%';
-    document.getElementById('st-fill').style.width=(Player.stamina/mSt*100)+'%';
-    document.getElementById('hu-fill').style.width=Player.hunger+'%';
-    document.getElementById('hp-num').textContent=Math.ceil(Player.hp)+'/'+mHp;
-    document.getElementById('st-num').textContent=Math.ceil(Player.stamina)+'/'+mSt;
+    const hpFillEl=document.getElementById('hp-fill');
+    if(hpFillEl)hpFillEl.style.width=(Player.hp/mHp*100)+'%';
+    const stFillEl=document.getElementById('st-fill');
+    if(stFillEl)stFillEl.style.width=(Player.stamina/mSt*100)+'%';
+    const huFillEl=document.getElementById('hu-fill');
+    if(huFillEl)huFillEl.style.width=Player.hunger+'%';
+    const hpNumEl=document.getElementById('hp-num');
+    if(hpNumEl)hpNumEl.textContent=Math.ceil(Player.hp)+'/'+mHp;
+    const stNumEl=document.getElementById('st-num');
+    if(stNumEl)stNumEl.textContent=Math.ceil(Player.stamina)+'/'+mSt;
+    const huNumEl=document.getElementById('hu-num');
+    if(huNumEl)huNumEl.textContent=Math.ceil(Player.hunger);
 
-    document.getElementById('hu-num').textContent=Math.ceil(Player.hunger);
     const need=CFG.playerXpNeed(Player.level);
-    document.getElementById('xp-fill').style.width=(Player.xp/need*100)+'%';
-    document.getElementById('lvl').textContent=`⭐ Lv ${Player.level}`;
+    const xpPercent=clamp(Math.floor((Player.xp/need)*100),0,100);
+    const xpFillEl=document.getElementById('xp-fill');
+    if(xpFillEl)xpFillEl.style.width=xpPercent+'%';
+    const xpPctEl=document.getElementById('xp-pct');
+    if(xpPctEl)xpPctEl.textContent=xpPercent+'%';
+    const lvlEl=document.getElementById('lvl');
+    if(lvlEl)lvlEl.textContent=`⭐ Lv ${Player.level}`;
     const mins=Math.floor(Weather.time*1440);
     const hh=String(Math.floor(mins/60)).padStart(2,'0'),mm=String(mins%60).padStart(2,'0');
     /* ikon matahari/bulan memakai PNG kustom; jam dirender ulang tiap frame,
@@ -1797,10 +1813,130 @@ const UI={
     ui_moon:'buttons/ui_moon.png',
   },
 
-  /* HTML ikon satu item: <img> bila ada PNG, emoji bila tidak */
+  /* Cache Data URL gambar 3D blok isometrik */
+  _blockIconCache:{},
+  blockIconUrl(id){
+    if(this._blockIconCache[id])return this._blockIconCache[id];
+    const cv=document.createElement('canvas');
+    cv.width=64;cv.height=64;
+    const ctx=cv.getContext('2d');
+
+    const PAL={
+      blk_grass:   {top:'#5d9e3f', left:'#7a5a3a', right:'#65482d', cap:'#5d9e3f'},
+      blk_dirt:    {top:'#8c6742', left:'#7a5a3a', right:'#5f452a'},
+      blk_stone:   {top:'#9aa0a8', left:'#858a92', right:'#6c7178'},
+      blk_wood:    {top:'#c4995f', left:'#6e4f2f', right:'#553c23', rings:true},
+      blk_leaf:    {top:'#488b37', left:'#3d762e', right:'#2f5e23'},
+      blk_sand:    {top:'#ecdca8', left:'#ddcc95', right:'#c5b47d'},
+      blk_snow:    {top:'#f2f8fc', left:'#dbe7f2', right:'#c3d4e2'},
+      blk_plank:   {top:'#c89b5d', left:'#b4884c', right:'#976f38', planks:true},
+      blk_roof:    {top:'#b46543', left:'#9c5334', right:'#7e3e23'},
+      blk_red_soil:{top:'#b44534', left:'#9c3b2c', right:'#7d2b1e'},
+      blk_farm:    {top:'#5a3d1e', left:'#6f4a26', right:'#4e3318'}
+    };
+
+    const p=PAL[id]||{top:'#9aa0a8', left:'#858a92', right:'#6c7178'};
+    const cx=32, cy=33;
+    const r=22, h=18;
+
+    const xT=cx, yT=cy-h-r*0.5;
+    const xR=cx+r*0.866, yR=cy-h;
+    const xB=cx, yB=cy-h+r*0.5;
+    const xL=cx-r*0.866, yL=cy-h;
+
+    const yBL=yL+h;
+    const yBR=yR+h;
+    const yBC=yB+h;
+
+    // 1. Sisi Kiri
+    ctx.fillStyle=p.left;
+    ctx.beginPath();
+    ctx.moveTo(xL,yL);
+    ctx.lineTo(xB,yB);
+    ctx.lineTo(xB,yBC);
+    ctx.lineTo(xL,yBL);
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Sisi Kanan
+    ctx.fillStyle=p.right;
+    ctx.beginPath();
+    ctx.moveTo(xB,yB);
+    ctx.lineTo(xR,yR);
+    ctx.lineTo(xR,yBR);
+    ctx.lineTo(xB,yBC);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cap rumput
+    if(p.cap){
+      ctx.fillStyle=p.cap;
+      ctx.beginPath();
+      ctx.moveTo(xL,yL);ctx.lineTo(xB,yB);ctx.lineTo(xB,yB+5);ctx.lineTo(xL,yL+5);
+      ctx.closePath();ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(xB,yB);ctx.lineTo(xR,yR);ctx.lineTo(xR,yR+5);ctx.lineTo(xB,yB+5);
+      ctx.closePath();ctx.fill();
+    }
+
+    // Garis bilah papan
+    if(p.planks){
+      ctx.strokeStyle='rgba(0,0,0,0.22)';
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(xL,yL+6);ctx.lineTo(xB,yB+6);
+      ctx.moveTo(xL,yL+12);ctx.lineTo(xB,yB+12);
+      ctx.moveTo(xB,yB+6);ctx.lineTo(xR,yR+6);
+      ctx.moveTo(xB,yB+12);ctx.lineTo(xR,yR+12);
+      ctx.stroke();
+    }
+
+    // 3. Sisi Atas
+    ctx.fillStyle=p.top;
+    ctx.beginPath();
+    ctx.moveTo(xT,yT);
+    ctx.lineTo(xR,yR);
+    ctx.lineTo(xB,yB);
+    ctx.lineTo(xL,yL);
+    ctx.closePath();
+    ctx.fill();
+
+    if(p.rings){
+      ctx.strokeStyle='rgba(80,50,20,0.35)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.ellipse(cx, (yT+yB)*0.5, r*0.42, r*0.24, 0, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    // Garis outline luar halus
+    ctx.strokeStyle='rgba(0,0,0,0.32)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath();
+    ctx.moveTo(xT,yT);ctx.lineTo(xR,yR);ctx.lineTo(xR,yBR);
+    ctx.lineTo(xB,yBC);ctx.lineTo(xL,yBL);ctx.lineTo(xL,yL);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(xB,yB);ctx.lineTo(xB,yBC);
+    ctx.moveTo(xL,yL);ctx.lineTo(xB,yB);ctx.lineTo(xR,yR);
+    ctx.stroke();
+
+    const dataUrl=cv.toDataURL('image/png');
+    this._blockIconCache[id]=dataUrl;
+    return dataUrl;
+  },
+
+  /* HTML ikon satu item: <img> bila ada PNG/3D Block, emoji bila tidak */
   itemIcon(id){
     const it=ITEMS[id];
     if(!it)return '';
+    if(it.isBlock || (typeof id==='string'&&id.startsWith('blk_'))){
+      const bUrl = this.blockIconUrl(id);
+      return `<img class="iico block-3d-ico" src="${bUrl}" alt="" onerror="this.outerHTML='${it.e||'🧱'}'">`;
+    }
     let src=this.ITEM_IMG[id];
     if(!src&&id){
       src='buttons/'+id+'.png';
@@ -2087,7 +2223,7 @@ const UI={
     const curSel=(RPG.selectedBlockSlot>=0)?RPG.blockBag[RPG.selectedBlockSlot]:null;
     if(curSel&&ITEMS[curSel.id]){
       const it=ITEMS[curSel.id];
-      if(descIcon)descIcon.textContent=it.e||'🧱';
+      if(descIcon)descIcon.innerHTML=this.itemIcon(curSel.id);
       if(descName)descName.innerHTML=`Blok Aktif: <b>${it.n}</b> (×${curSel.n})`;
     }else{
       if(descIcon)descIcon.textContent='🧱';
@@ -2109,9 +2245,8 @@ const UI={
       if(RPG.selectedBlockSlot===i&&s)d.classList.add('picked');
       if(s&&s.n>0){
         const it=ITEMS[s.id];
-        /* Blok belum punya file PNG ikon tersendiri → pakai emoji langsung
-           agar tidak berkedip "gambar rusak" saat slot di-render ulang. */
-        d.innerHTML=`<span class="emo">${(it&&it.e)?it.e:'🧱'}</span><span class="cnt">${s.n>1?s.n:''}</span>`;
+        /* Render icon model 1 blok 3D aslinya */
+        d.innerHTML=`<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span>`;
         d.title=`${it?it.n:s.id} (×${s.n})\nKlik untuk memilih blok ini`;
         /* bingkai slot memakai warna rarity agar konsisten dengan tas biasa */
         if(it&&it.rarity&&RARITY[it.rarity]){

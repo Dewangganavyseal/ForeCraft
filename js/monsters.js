@@ -3352,7 +3352,7 @@ const Monsters={
     }
     m._stepCd=Math.max(0,(m._stepCd||0)-dt);
     m.detourT=Math.max(0,(m.detourT||0)-dt);
-    m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
+    m.inWater=(m.pos.y<CFG.WATER_Y)&&World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
     m.vel.y-=CFG.GRAV*(m.inWater?0.3:1)*dt;
     if(m.inWater){
       if(m.pos.y<CFG.WATER_Y-0.5)m.vel.y+=18*dt;

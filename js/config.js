@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.25',
+  VERSION:'0.2.26',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -274,10 +274,10 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
-  [B.STONE]:{name:'Batu',  hp:6.0,drop:'stone',color:0x8a8f98},
+  [B.STONE]:{name:'Batu',  hp:6.0,drop:null,color:0x8a8f98},
   [B.WOOD] :{name:'Kayu',  hp:4.0,drop:'wood',color:0x6e4f2f},
   [B.LEAF] :{name:'Daun',  hp:0.6,drop:null,color:0x3f7d2f},
-  [B.SAND] :{name:'Pasir', hp:1.6,drop:'sand',color:0xe3d29a},
+  [B.SAND] :{name:'Pasir', hp:1.6,drop:null,color:0xe3d29a},
   [B.SNOW] :{name:'Salju', hp:1.4,drop:null,color:0xe8f2fa},
   /* bijih: makin langka makin keras ditambang. HP dikalibrasi ulang karena
      roll GAGAL per pukulan (ORE_INFO) sudah menambah resistensi — tanpa ini

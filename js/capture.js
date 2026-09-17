@@ -1288,8 +1288,9 @@ const Capture={
     if(m.type==='dragon'&&(m.flying||(m.flyT||0)>0)){
       spd=run*1.5; // Kecepatan terbang naga dibuat sama dengan lari naga
     }
-    /* Semua pet pergerakannya melambat saat melintasi air */
-    m.inWater=World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
+    /* Kecepatan pet hanya berkurang jika kakinya benar-benar menyentuh air (pos.y < WATER_Y).
+       Bila sedang melompat di atas permukaan air / tidak menyentuh air, kecepatan penuh 100%. */
+    m.inWater=(m.pos.y<CFG.WATER_Y)&&World.inWaterAt(m.pos.x,m.pos.y+0.3,m.pos.z);
     if(m.inWater&&(m.type!=='dragon'||((m.flyT||0)<=0&&!m.flying))){
       spd*=0.55;
     }

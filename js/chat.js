@@ -27,13 +27,27 @@ const Chat={
   SECRET:'/280195',          // kode pembuka terminal — jangan disebar!
   MAX_LOG:7,                 // baris log chat yang ditampilkan sekaligus
   _termBuilt:false,
+  tab:'chat',
+  maxNotifLog:18,
+  maxRaritySeen:2,           // minimal tier rare (2) agar notifikasi item sampah tidak muncul
 
   /* ------------------------------ inisialisasi --------------------------- */
   init(){
     this.box=document.getElementById('chat');
     this.logEl=document.getElementById('chat-log');
+    this.notifEl=document.getElementById('notif-log');
     this.input=document.getElementById('chat-input');
     if(!this.box||!this.input)return;
+
+    /* tab chat / notif */
+    this.tabBtns=this.box.querySelectorAll('.chat-tab');
+    this.tabBtns.forEach(btn=>{
+      btn.addEventListener('mousedown',e=>{e.preventDefault();e.stopPropagation();});
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        this.setTab(btn.dataset.tab);
+      });
+    });
 
     /* tombol di kolom chat ditangani sendiri; stopPropagation agar tidak
        bocor ke handler keyboard/mouse game */
@@ -62,6 +76,64 @@ const Chat={
         e.stopPropagation();this.send();
       });
     }
+  },
+
+  setTab(tab){
+    this.tab=tab;
+    if(this.tabBtns){
+      this.tabBtns.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+    }
+    if(tab==='notif'){
+      if(this.logEl)this.logEl.style.display='none';
+      if(this.notifEl){this.notifEl.style.display='flex';this.notifEl.scrollTop=this.notifEl.scrollHeight;}
+    }else{
+      if(this.notifEl)this.notifEl.style.display='none';
+      if(this.logEl){this.logEl.style.display='flex';this.logEl.scrollTop=this.logEl.scrollHeight;}
+      if(this.input&&this.active)this.input.focus();
+    }
+  },
+
+  /* Masukkan seluruh notifikasi game ke tab Notif dengan saringan rarity tertinggi untuk item */
+  pushNotification(text,itemId){
+    if(!this.notifEl)this.notifEl=document.getElementById('notif-log');
+    if(!this.notifEl)return;
+
+    let itemRarity=null;
+    const RARITY_MAP={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5};
+
+    if(itemId&&typeof ITEMS!=='undefined'&&ITEMS[itemId]){
+      itemRarity=ITEMS[itemId].rarity||'common';
+    }else if(typeof ITEMS!=='undefined'){
+      let highestFound=-1;
+      for(const id in ITEMS){
+        const it=ITEMS[id];
+        if(it&&it.n&&text.includes(it.n)){
+          const r=it.rarity||'common';
+          const sc=RARITY_MAP[r]||0;
+          if(sc>highestFound){
+            highestFound=sc;
+            itemRarity=r;
+          }
+        }
+      }
+    }
+
+    if(itemRarity!==null){
+      const sc=RARITY_MAP[itemRarity]||0;
+      if(sc>this.maxRaritySeen)this.maxRaritySeen=sc;
+      // HANYA tampilkan notifikasi item dengan rarity paling tinggi yang pernah ditemukan
+      if(sc<this.maxRaritySeen)return;
+    }
+
+    const d=document.createElement('div');
+    d.className='notif-line'+(itemRarity?(' r-'+itemRarity):'');
+    d.innerHTML=text;
+    if(typeof UI!=='undefined'&&UI.applyItemIcons)UI.applyItemIcons(d);
+    this.notifEl.appendChild(d);
+    while(this.notifEl.childElementCount>this.maxNotifLog){
+      this.notifEl.firstElementChild.remove();
+    }
+    this.notifEl.scrollTop=this.notifEl.scrollHeight;
   },
 
   /* ------------------------------ buka / tutup --------------------------- */
