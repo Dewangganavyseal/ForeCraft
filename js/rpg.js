@@ -931,7 +931,7 @@ const RPG={
       Sfx.craft();
       const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.out):(ITEMS[r.out]?ITEMS[r.out].e:'');
       UI.toast(`${craftIco}${itemIco} Membuat ${ITEMS[r.out].n} ×${made}`+
-        (dropped?` (${dropped} jatuh, tas penuh)`:''));
+        (dropped?` (${dropped} jatuh, tas penuh)`:''), r.out);
       if(typeof FX!=='undefined'&&FX.text){
         const rar=(ITEMS[r.out]&&ITEMS[r.out].rarity)||'common';
         const rarColor=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].css:'#8fe07a';

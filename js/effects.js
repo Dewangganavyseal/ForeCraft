@@ -880,7 +880,7 @@ const FX={
           const rar=(it&&it.rarity)||'common';
           const rarColor=(typeof RARITY!=='undefined'&&RARITY[rar])?RARITY[rar].css:'#b8c0cc';
           const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(d.id):it.e;
-          UI.toast(`${ico} +${d.n} ${it.n}${mk}`);
+          UI.toast(`${ico} +${d.n} ${it.n}${mk}`, d.id);
           if(this.text)this.text(Player.pos.clone().add(new THREE.Vector3(0,2.0,0)),`+${d.n} ${it.n}`,rarColor,d.id);
           Sfx.pickup();
           this.disposeDrop(d.mesh,d.isModel);

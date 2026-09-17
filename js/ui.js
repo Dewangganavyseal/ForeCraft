@@ -354,23 +354,10 @@ const UI={
      antara bar HP dan hotbar sempit, jadi tumpukan lama dibuang lebih awal
      supaya deretannya tidak pernah memanjang sampai menutupi hotbar atau
      tombol kendali. */
+  /* ---------- notifikasi toast ----------
+     Diarahkan ke sistem notifikasi chat, tidak lagi memunculkan toast di kiri layar. */
   TOAST_MAX:IS_MOBILE?4:7,
   toast(msg,itemId){
-    const t=document.getElementById('toast');
-    const d=document.createElement('div');d.className='toast-item';
-    const isHtml=/<[a-z][\s\S]*>/i.test(msg);
-    if(isHtml){
-      d.innerHTML=msg;
-      this.applyItemIcons(d);
-      if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(d,I18N.lang);
-    }else{
-      d.textContent=(typeof I18N!=='undefined'&&I18N.lang!=='id')
-        ? I18N.translateText(msg,I18N.lang) : msg;
-    }
-    t.appendChild(d);
-    while(t.childElementCount>this.TOAST_MAX)t.firstElementChild.remove();
-    setTimeout(()=>d.remove(),2600);
-
     /* Seluruh notifikasi masuk ke tab notif chat */
     if(typeof Chat!=='undefined'&&Chat.pushNotification){
       Chat.pushNotification(msg,itemId);
@@ -1811,6 +1798,16 @@ const UI={
     ui_char:'buttons/ui_char.png',
     ui_sun:'buttons/ui_sun.png',
     ui_moon:'buttons/ui_moon.png',
+    copper_ore:'buttons/copper_ore.png',
+    steel_ore:'buttons/steel_ore.png',
+    tungsten_ore:'buttons/tungsten_ore.png',
+    tungstensteel_ore:'buttons/tungstensteel_ore.png',
+    copper_ingot:'buttons/copper_ingot.png',
+    steel_ingot:'buttons/steel_ingot.png',
+    tungsten_ingot:'buttons/tungsten_ingot.png',
+    tungstensteel_ingot:'buttons/tungstensteel_ingot.png',
+    fishing_rod:'buttons/fishing_rod.png',
+    rod:'buttons/rod.png',
   },
 
   /* Cache Data URL gambar 3D blok isometrik */

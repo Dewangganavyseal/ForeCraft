@@ -29,7 +29,7 @@ const Chat={
   _termBuilt:false,
   tab:'chat',
   maxNotifLog:18,
-  maxRaritySeen:2,           // minimal tier rare (2) agar notifikasi item sampah tidak muncul
+  MIN_NOTIF_RARITY:2,        // minimal tier rare (2: rare, epic, legendary, mythic) agar item sampah tidak membanjiri chat
 
   /* ------------------------------ inisialisasi --------------------------- */
   init(){
@@ -83,7 +83,9 @@ const Chat={
     if(this.tabBtns){
       this.tabBtns.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
     }
+    const badge=document.getElementById('notif-badge');
     if(tab==='notif'){
+      if(badge)badge.style.display='none';
       if(this.logEl)this.logEl.style.display='none';
       if(this.notifEl){this.notifEl.style.display='flex';this.notifEl.scrollTop=this.notifEl.scrollHeight;}
     }else{
@@ -93,36 +95,58 @@ const Chat={
     }
   },
 
+  /* Tampilkan preview singkat notifikasi di dalam kotak chat jika chat sedang tertutup */
+  showPreview(){
+    if(!this.box||this.active)return;
+    if(this.notifEl)this.notifEl.style.display='flex';
+    if(this.logEl)this.logEl.style.display='none';
+    this.box.classList.add('preview');
+    if(this.notifEl)this.notifEl.scrollTop=this.notifEl.scrollHeight;
+
+    clearTimeout(this._previewTimer);
+    this._previewTimer=setTimeout(()=>{
+      if(!this.active&&this.box){
+        this.box.classList.remove('preview');
+        if(this.tab==='chat'){
+          if(this.notifEl)this.notifEl.style.display='none';
+          if(this.logEl)this.logEl.style.display='flex';
+        }
+      }
+    },4000);
+  },
+
   /* Masukkan seluruh notifikasi game ke tab Notif dengan saringan rarity tertinggi untuk item */
   pushNotification(text,itemId){
     if(!this.notifEl)this.notifEl=document.getElementById('notif-log');
     if(!this.notifEl)return;
 
     let itemRarity=null;
+    let highestScore=-1;
+    let isItem=false;
     const RARITY_MAP={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5};
 
     if(itemId&&typeof ITEMS!=='undefined'&&ITEMS[itemId]){
+      isItem=true;
       itemRarity=ITEMS[itemId].rarity||'common';
+      highestScore=RARITY_MAP[itemRarity]||0;
     }else if(typeof ITEMS!=='undefined'){
-      let highestFound=-1;
       for(const id in ITEMS){
         const it=ITEMS[id];
         if(it&&it.n&&text.includes(it.n)){
+          isItem=true;
           const r=it.rarity||'common';
           const sc=RARITY_MAP[r]||0;
-          if(sc>highestFound){
-            highestFound=sc;
+          if(sc>highestScore){
+            highestScore=sc;
             itemRarity=r;
           }
         }
       }
     }
 
-    if(itemRarity!==null){
-      const sc=RARITY_MAP[itemRarity]||0;
-      if(sc>this.maxRaritySeen)this.maxRaritySeen=sc;
-      // HANYA tampilkan notifikasi item dengan rarity paling tinggi yang pernah ditemukan
-      if(sc<this.maxRaritySeen)return;
+    // Jika notifikasi terkait item, HANYA tampilkan item dengan rarity tertinggi / langka ke atas (rare, epic, legendary, mythic)
+    if(isItem&&highestScore<this.MIN_NOTIF_RARITY){
+      return;
     }
 
     const d=document.createElement('div');
@@ -134,6 +158,17 @@ const Chat={
       this.notifEl.firstElementChild.remove();
     }
     this.notifEl.scrollTop=this.notifEl.scrollHeight;
+
+    // Titik merah notifikasi di tab Notif jika sedang tidak di tab tersebut
+    const badge=document.getElementById('notif-badge');
+    if(badge&&(!this.active||this.tab!=='notif')){
+      badge.style.display='inline-block';
+    }
+
+    // Tampilkan preview singkat di dalam kotak chat jika chat sedang tertutup
+    if(!this.active){
+      this.showPreview();
+    }
   },
 
   /* ------------------------------ buka / tutup --------------------------- */
@@ -142,9 +177,12 @@ const Chat={
   open(){
     if(!this.canOpen()||this.active)return;
     if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
+    clearTimeout(this._previewTimer);
     this.active=true;
+    this.box.classList.remove('preview');
     this.box.classList.add('show');
     document.body.classList.add('chat-open');
+    this.setTab(this.tab||'chat');
     /* bersihkan tombol yang masih dianggap tertahan supaya karakter berhenti */
     if(typeof Input!=='undefined'){
       for(const k in Input.keys)Input.keys[k]=false;
@@ -156,11 +194,20 @@ const Chat={
   },
   close(){
     if(!this.active)return;
+    clearTimeout(this._previewTimer);
     this.active=false;
-    this.box.classList.remove('show');
+    this.box.classList.remove('show','preview');
     document.body.classList.remove('chat-open');
     this.input.blur();
     this.input.value='';
+    if(this.tab==='notif'){
+      if(this.notifEl)this.notifEl.style.display='none';
+      if(this.logEl)this.logEl.style.display='flex';
+      this.tab='chat';
+      if(this.tabBtns){
+        this.tabBtns.forEach(b=>b.classList.toggle('active',b.dataset.tab==='chat'));
+      }
+    }
   },
 
   /* ------------------------------ kirim pesan ---------------------------- */
@@ -217,16 +264,24 @@ const Chat={
   /* kelompokkan seluruh item dinamis dari tabel ITEMS supaya item baru di
      masa depan otomatis ikut muncul tanpa perlu mengubah terminal */
   itemGroups(){
-    const g={food:[],mat:[],weapon:[],armor:[],furni:[]};
+    const g={food:[],mat:[],block:[],weapon:[],armor:[],furni:[]};
     const legacyAliases=new Set([
+      // Weapon legacy aliases
       'sword_wood','sword_copper','sword_gold','sword_storm','sword_venom',
-      'sword_tungsten','sword_frost','sword_titan','cap_leather','vest_leather','boots_leather'
+      'sword_tungsten','sword_frost','sword_titan',
+      // Armor legacy aliases
+      'cap_leather','vest_leather','boots_leather',
+      // Shield legacy aliases (duplikat tameng otentik)
+      'shield_wood','shield_flame','shield_venom','shield_storm','shield_frost','shield_dark','shield_carapace',
+      // Tool duplicate
+      'rod'
     ]);
     for(const id in ITEMS){
       if(legacyAliases.has(id))continue;
       const it=ITEMS[id];
       if(!it)continue;
-      if(it.weapon)g.weapon.push(id);
+      if(it.isBlock||(typeof id==='string'&&id.startsWith('blk_')))g.block.push(id);
+      else if(it.weapon)g.weapon.push(id);
       else if(it.armor)g.armor.push(id);
       else if(it.food)g.food.push(id);
       else if(it.place)g.furni.push(id);
@@ -249,12 +304,14 @@ const Chat={
     }
     this._termBuilt=true;
 
-    /* --- baris kontrol: jumlah & varian boss --- */
+    /* --- baris kontrol: jumlah, level, bintang, varian boss --- */
     const ctl=document.createElement('div');
     ctl.className='term-ctl';
     ctl.innerHTML=
       '<label>🔢 Jumlah <input id="term-qty" type="number" min="1" max="64" value="1"></label>'+
-      '<label><input id="term-boss" type="checkbox"> 👹 Varian Boss (monster)</label>';
+      '<label>⭐ Level <input id="term-lvl" type="number" min="1" max="200" value="1"></label>'+
+      '<label>✨ Bintang <input id="term-stars" type="number" min="1" max="5" value="1"></label>'+
+      '<label><input id="term-boss" type="checkbox"> 👹 Varian Boss</label>';
 
     /* Tombol Toggle Mode TPP (Third Person Perspective di belakang karakter) */
     const tppBtn=document.createElement('button');
@@ -277,12 +334,52 @@ const Chat={
 
     body.appendChild(ctl);
 
-    /* --- helper pembuat kelompok tombol --- */
-    const section=(title)=>{
+    /* --- tab navigasi kategori --- */
+    const catBar=document.createElement('div');
+    catBar.className='term-tabs';
+    const CATS=[
+      {k:'all',    t:'🌐 Semua'},
+      {k:'food',   t:'🍖 Makanan'},
+      {k:'mat',    t:'🌲 Bahan'},
+      {k:'block',  t:'🧱 Blok'},
+      {k:'weapon', t:'⚔️ Senjata'},
+      {k:'armor',  t:'🛡️ Armor'},
+      {k:'furni',  t:'🪑 Furnitur'},
+      {k:'npc',    t:'🤝 NPC'},
+      {k:'animal', t:'🐄 Hewan'},
+      {k:'mob',    t:'👹 Monster'},
+    ];
+    const sections=[];
+    const updateCatFilter=(catKey)=>{
+      catBar.querySelectorAll('.term-tab').forEach(b=>{
+        b.classList.toggle('active',b.dataset.cat===catKey);
+      });
+      sections.forEach(w=>{
+        w.style.display=(catKey==='all'||w.dataset.cat===catKey)?'':'none';
+      });
+    };
+    CATS.forEach(c=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='term-tab'+(c.k==='all'?' active':'');
+      b.dataset.cat=c.k;
+      b.textContent=c.t;
+      b.addEventListener('click',()=>updateCatFilter(c.k));
+      catBar.appendChild(b);
+    });
+    body.appendChild(catBar);
+
+    /* --- helper pembuat kelompok tombol per kategori --- */
+    const section=(catKey,title)=>{
+      const wrap=document.createElement('div');
+      wrap.className='term-cat-wrap';
+      wrap.dataset.cat=catKey;
       const h=document.createElement('div');
-      h.className='term-sub';h.textContent=title;body.appendChild(h);
+      h.className='term-sub';h.textContent=title;wrap.appendChild(h);
       const grid=document.createElement('div');
-      grid.className='term-grid';body.appendChild(grid);
+      grid.className='term-grid';wrap.appendChild(grid);
+      body.appendChild(wrap);
+      sections.push(wrap);
       return grid;
     };
     const itemBtn=(grid,id)=>{
@@ -298,29 +395,32 @@ const Chat={
 
     /* --- kelompok item --- */
     const g=this.itemGroups();
-    let gr=section('🍖 Consumable — makanan & obat');
+    let gr=section('food','🍖 Consumable — makanan & obat ('+g.food.length+')');
     g.food.forEach(id=>itemBtn(gr,id));
-    gr=section('🌲 Bahan — resource');
+    gr=section('mat','🌲 Bahan — resource & drop ('+g.mat.length+')');
     g.mat.forEach(id=>itemBtn(gr,id));
-    gr=section('⚔️ Equipment — senjata');
+    gr=section('block','🧱 Blok — voxel bangunan ('+g.block.length+')');
+    g.block.forEach(id=>itemBtn(gr,id));
+    gr=section('weapon','⚔️ Equipment — senjata ('+g.weapon.length+')');
     g.weapon.forEach(id=>itemBtn(gr,id));
-    gr=section('🛡️ Armor — pelindung');
+    gr=section('armor','🛡️ Armor — pelindung & tameng ('+g.armor.length+')');
     g.armor.forEach(id=>itemBtn(gr,id));
-    gr=section('🪑 Furnitur — bisa dipasang');
+    gr=section('furni','🪑 Furnitur — bisa dipasang ('+g.furni.length+')');
     g.furni.forEach(id=>itemBtn(gr,id));
 
     /* --- kelompok NPC: semua arketipe NPC_ROLES --- */
-    gr=section('🤝 NPC — spawn di dekatmu');
+    gr=section('npc','🤝 NPC — spawn di dekatmu ('+NPC_ROLES.length+')');
     for(const role of NPC_ROLES){
       const b=document.createElement('button');
       b.className='tbtn';
+      const maxL=(role.rare)?(CFG.NPC_RARE_MAX_LEVEL||150):(CFG.NPC_MAX_LEVEL||100);
       b.innerHTML=`<span class="te">${role.e}</span>${role.name}`+
-        (role.rare?' <small>langka</small>':'');
+        ` <small>max Lv ${maxL}</small>`;
       b.addEventListener('click',()=>this.spawnNPC(role.id,this.qty()));
       gr.appendChild(b);
     }
 
-    /* --- kelompok ANIMAL: hewan pasif (sapi/kuda) --- */
+    /* --- kelompok ANIMAL: hewan pasif (sapi/kuda/kelinci) --- */
     const mobBtn=(grid,type)=>{
       const b=document.createElement('button');
       b.className='tbtn';
@@ -329,17 +429,21 @@ const Chat={
       b.addEventListener('click',()=>this.spawnMob(type,this.qty()));
       grid.appendChild(b);
     };
-    gr=section('🐄 Animal — hewan pasif');
+    const animals=[];
     for(const type in Monsters.TYPES){
-      if(Monsters.isAnimal&&Monsters.isAnimal({type}))mobBtn(gr,type);
+      if(Monsters.isAnimal&&Monsters.isAnimal({type}))animals.push(type);
     }
+    gr=section('animal','🐄 Animal — hewan pasif ('+animals.length+')');
+    animals.forEach(type=>mobBtn(gr,type));
 
     /* --- kelompok monster --- */
-    gr=section('👹 Monster — spawn di dekatmu');
+    const mobs=[];
     for(const type in Monsters.TYPES){
       if(Monsters.isAnimal&&Monsters.isAnimal({type}))continue;
-      mobBtn(gr,type);
+      mobs.push(type);
     }
+    gr=section('mob','👹 Monster — spawn di dekatmu ('+mobs.length+')');
+    mobs.forEach(type=>mobBtn(gr,type));
 
     /* --- log terminal --- */
     const log=document.createElement('div');
@@ -358,6 +462,16 @@ const Chat={
   qty(){
     const el=document.getElementById('term-qty');
     return clamp(Math.floor(+((el&&el.value)||1))||1,1,64);
+  },
+  /* level dari input terminal (1–200) */
+  lvl(){
+    const el=document.getElementById('term-lvl');
+    return clamp(Math.floor(+((el&&el.value)||1))||1,1,CFG.MAX_LEVEL||200);
+  },
+  /* bintang dari input terminal (1–5) */
+  stars(){
+    const el=document.getElementById('term-stars');
+    return clamp(Math.floor(+((el&&el.value)||1))||1,1,5);
   },
   bossMode(){
     const el=document.getElementById('term-boss');
@@ -404,18 +518,20 @@ const Chat={
   spawnNPC(roleId,n){
     const role=NPC_ROLES.find(r=>r.id===roleId);
     if(!role)return;
+    const maxLvl=(role.rare)?(CFG.NPC_RARE_MAX_LEVEL||150):(CFG.NPC_MAX_LEVEL||100);
+    const lvl=clamp(this.lvl(),1,maxLvl);
     let ok=0;
     for(let i=0;i<n;i++){
       const p=this.groundNear(2.5,6);
       if(!p)break;
-      const npc=NPCS.make(role,p.x,p.y,p.z,{x:p.x,z:p.z});
+      const npc=NPCS.make(role,p.x,p.y,p.z,{x:p.x,z:p.z},lvl);
       NPCS.list.push(npc);
       FX.debris(npc.pos.clone().add(new THREE.Vector3(0,1.4,0)),0xffe066,8,2);
       ok++;
     }
-    if(ok)UI.toast(`${role.e} ${role.name} ×${ok} muncul!`);
+    if(ok)UI.toast(`${role.e} ${role.name} Lv ${lvl} ×${ok} muncul!`);
     this.termLog(ok
-      ?`spawn ${role.e} ${role.name} ×${ok} — dekati & tekan G untuk bicara`
+      ?`spawn ${role.e} ${role.name} Lv ${lvl} (max ${maxLvl}) ×${ok} — dekati & tekan G untuk bicara`
       :'gagal spawn NPC: tidak ada tanah kosong di sekitar');
   },
 
@@ -423,20 +539,33 @@ const Chat={
   spawnMob(type,n){
     if(!Monsters.TYPES[type])return;
     const boss=this.bossMode();
+    const maxLvl=CFG.MAX_LEVEL||200;
+    const lvl=clamp(this.lvl(),1,maxLvl);
+    const stars=clamp(this.stars(),1,5);
+    const starStr='⭐'.repeat(stars);
     let ok=0;
     for(let i=0;i<n;i++){
       const p=this.groundNear(3.5,8);
       if(!p)break;
       const m=Monsters.make(type,p,boss);
+      // Terapkan level ke monster (HP, DMG, XP berskala)
+      Monsters.setLevel(m,lvl);
+      // Terapkan bintang & pengali stat bintang ke monster
+      m.stars=stars;
+      const starMult=1+(stars-1)*0.15+(boss?0.15:0);
+      m.maxhp=Math.round(m.maxhp*starMult);
+      m.hp=m.maxhp;
+      m.dmg=Math.round(m.dmg*starMult);
       Monsters.list.push(m);
       ok++;
     }
+    const bossTag=boss?' Raksasa':'';
     if(ok&&boss){
-      UI.toast(`☠️ ${MOB_NAME[type]} Raksasa ×${ok} muncul!`);
+      UI.toast(`☠️ ${MOB_NAME[type]}${bossTag} ${starStr} Lv ${lvl} ×${ok} muncul!`);
       FX.addShake(.5);
-    }else if(ok)UI.toast(`👹 ${MOB_NAME[type]} ×${ok} muncul!`);
+    }else if(ok)UI.toast(`👹 ${MOB_NAME[type]} ${starStr} Lv ${lvl} ×${ok} muncul!`);
     this.termLog(ok
-      ?`spawn ${boss?'BOSS ':''}${MOB_NAME[type]} ×${ok}`
+      ?`spawn ${boss?'BOSS ':''}${MOB_NAME[type]} ${starStr} Lv ${lvl} (max ${maxLvl}) ×${ok}`
       :'gagal spawn monster: tidak ada tanah kosong di sekitar');
   },
 };

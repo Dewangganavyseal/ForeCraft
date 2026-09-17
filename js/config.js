@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.26',
+  VERSION:'0.2.27',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -1022,7 +1022,6 @@ const RECIPES=[
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
   {out:'hoe',need:{wood:3,stone:2},name:'Cangkul'},
   {out:'fishing_rod',need:{wood:3,fiber:2},name:'Pancing'},
-  {out:'rod',need:{wood:3,fiber:2},name:'Pancing'},
   /* Log Pass: penanda lokasi. Murah & bisa dibuat berulang supaya pemain bisa
      menandai banyak tempat sekaligus (tiap Log Pass menyimpan 1 tanda). */
   {out:'log_pass',need:{wood:2,fiber:2,resin:1},name:'Log Pass'},

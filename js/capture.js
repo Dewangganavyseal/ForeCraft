@@ -463,17 +463,18 @@ const Capture={
 
     /* ---------- generasi bintang & kesulitan acak ----------
        Semakin tinggi bintang, semakin tinggi stat pet. */
-    let stars=this.rollStars(!!m.boss);
+    let stars=m.stars||this.rollStars(!!m.boss);
     const starMult = 1 + (stars - 1) * 0.15 + (m.boss ? 0.15 : 0);
     const statDef = this.PET_BASE_STATS[m.type] || { baseHp: 100, baseDmg: 30 };
-    const maxhp = Math.round(statDef.baseHp * starMult);
-    const dmg = Math.round(statDef.baseDmg * starMult);
+    const curLvl = clamp(m.lvl || 1, 1, CFG.PET_MAX_LEVEL || 60);
+    const maxhp = Math.round(statDef.baseHp * starMult + statDef.baseHp * 0.08 * starMult * (curLvl - 1));
+    const dmg = Math.round(statDef.baseDmg * starMult + statDef.baseDmg * 0.05 * starMult * (curLvl - 1));
 
     const pet={
       type:m.type,
       boss:!!m.boss,
       stars,
-      lvl:1,
+      lvl:curLvl,
       xp:0,
       power:starMult,
       hp:maxhp,
