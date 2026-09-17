@@ -220,7 +220,6 @@ const NPC_Stonegiant={
       n.stamina=(n.stamina||0)-qCost; n.stamRegenT=1.8;
       n.quake={t:0,hitDone:[false,false,false],target:n.target};
       n.quakeCd=14;
-      UI.toast(`🗿 ${n.name} mengguncang bumi!`);
       NPCS.say(n,'HANCUR!!',2);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${qCost} STAM`,'#ffd24d');
       return true;

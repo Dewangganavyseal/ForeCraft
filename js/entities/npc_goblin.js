@@ -242,7 +242,6 @@ const NPC_Goblin={
         arc:clamp(0.9+d*0.22,1.0,2.6)};
       gb.cd=GB.cd;
       NPCS.say(n,'BACKSTAB LEAP!',1.6);
-      UI.toast(`👺 ${n.name}: Backstab Leap!`);
       FX.ring(n.pos.x,n.pos.y+0.1,n.pos.z,0xffd24d,0.5,2);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${leapCost} STAM`,'#ffd24d');
       Sfx.at(n.pos,'dash');

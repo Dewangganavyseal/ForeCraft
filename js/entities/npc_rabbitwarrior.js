@@ -193,7 +193,6 @@ const NPC_Rabbitwarrior={
       rb.skillPos=n.pos.clone();
       n.rapidCd=12;
       NPCS.say(n,'RAPID CLAW!',1.6);
-      UI.toast(`🐰 ${n.name}: RAPID CLAW!`);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${rCost} STAM`,'#ffd24d');
       return true;
     }

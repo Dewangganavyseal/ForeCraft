@@ -202,7 +202,6 @@ const NPC_Elfmage={
     n.cast={type,t:0,acc:0,dmgT:0,x:p.x,z:p.z,
       y:Math.max(CFG.SEA,World.topY(Math.floor(p.x),Math.floor(p.z)))};
     if(type==='ice')n.elfIceCd=this.ELF.iceCd;else n.elfMetCd=this.ELF.meteorCd;
-    UI.toast(`${n.role.e} ${n.name} merapal ${type==='ice'?'❄️ Hujan Es':'☄️ Hujan Meteor'}!`);
     NPCS.say(n,type==='ice'?'Es dari langit!':'Meteor, jatuhlah!',2.5);
     Sfx.at(n.pos,'craft');
   },

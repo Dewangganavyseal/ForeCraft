@@ -30,6 +30,7 @@ const Chat={
   tab:'chat',
   maxNotifLog:18,
   MIN_NOTIF_RARITY:2,        // minimal tier rare (2: rare, epic, legendary, mythic) agar item sampah tidak membanjiri chat
+  _unreadNotif:false,
 
   /* ------------------------------ inisialisasi --------------------------- */
   init(){
@@ -85,6 +86,7 @@ const Chat={
     }
     const badge=document.getElementById('notif-badge');
     if(tab==='notif'){
+      this._unreadNotif=false;
       if(badge)badge.style.display='none';
       if(this.logEl)this.logEl.style.display='none';
       if(this.notifEl){this.notifEl.style.display='flex';this.notifEl.scrollTop=this.notifEl.scrollHeight;}
@@ -93,26 +95,6 @@ const Chat={
       if(this.logEl){this.logEl.style.display='flex';this.logEl.scrollTop=this.logEl.scrollHeight;}
       if(this.input&&this.active)this.input.focus();
     }
-  },
-
-  /* Tampilkan preview singkat notifikasi di dalam kotak chat jika chat sedang tertutup */
-  showPreview(){
-    if(!this.box||this.active)return;
-    if(this.notifEl)this.notifEl.style.display='flex';
-    if(this.logEl)this.logEl.style.display='none';
-    this.box.classList.add('preview');
-    if(this.notifEl)this.notifEl.scrollTop=this.notifEl.scrollHeight;
-
-    clearTimeout(this._previewTimer);
-    this._previewTimer=setTimeout(()=>{
-      if(!this.active&&this.box){
-        this.box.classList.remove('preview');
-        if(this.tab==='chat'){
-          if(this.notifEl)this.notifEl.style.display='none';
-          if(this.logEl)this.logEl.style.display='flex';
-        }
-      }
-    },4000);
   },
 
   /* Masukkan seluruh notifikasi game ke tab Notif dengan saringan rarity tertinggi untuk item */
@@ -159,15 +141,13 @@ const Chat={
     }
     this.notifEl.scrollTop=this.notifEl.scrollHeight;
 
-    // Titik merah notifikasi di tab Notif jika sedang tidak di tab tersebut
+    // Catat notifikasi belum dibaca jika chat sedang tertutup
+    if(!this.active){
+      this._unreadNotif=true;
+    }
     const badge=document.getElementById('notif-badge');
     if(badge&&(!this.active||this.tab!=='notif')){
       badge.style.display='inline-block';
-    }
-
-    // Tampilkan preview singkat di dalam kotak chat jika chat sedang tertutup
-    if(!this.active){
-      this.showPreview();
     }
   },
 
@@ -177,12 +157,14 @@ const Chat={
   open(){
     if(!this.canOpen()||this.active)return;
     if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
-    clearTimeout(this._previewTimer);
     this.active=true;
-    this.box.classList.remove('preview');
     this.box.classList.add('show');
     document.body.classList.add('chat-open');
-    this.setTab(this.tab||'chat');
+    if(this._unreadNotif){
+      this.setTab('notif');
+    }else{
+      this.setTab(this.tab||'chat');
+    }
     /* bersihkan tombol yang masih dianggap tertahan supaya karakter berhenti */
     if(typeof Input!=='undefined'){
       for(const k in Input.keys)Input.keys[k]=false;
@@ -194,20 +176,11 @@ const Chat={
   },
   close(){
     if(!this.active)return;
-    clearTimeout(this._previewTimer);
     this.active=false;
-    this.box.classList.remove('show','preview');
+    this.box.classList.remove('show');
     document.body.classList.remove('chat-open');
     this.input.blur();
     this.input.value='';
-    if(this.tab==='notif'){
-      if(this.notifEl)this.notifEl.style.display='none';
-      if(this.logEl)this.logEl.style.display='flex';
-      this.tab='chat';
-      if(this.tabBtns){
-        this.tabBtns.forEach(b=>b.classList.toggle('active',b.dataset.tab==='chat'));
-      }
-    }
   },
 
   /* ------------------------------ kirim pesan ---------------------------- */

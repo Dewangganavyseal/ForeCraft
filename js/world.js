@@ -976,14 +976,14 @@ const World={
     if(oreDef){
       const mLv=(typeof Prof!=='undefined')?Prof.level('mining'):1;
       if(mLv<oreDef.req){
-        /* anti-spam toast: cukup sekali per 0.9 detik per pukulan beruntun */
+        /* anti-spam pesan: cukup sekali per 0.9 detik per pukulan beruntun */
         const now=(typeof performance!=='undefined')?performance.now():Date.now();
         if(!this._oreDenyT||now-this._oreDenyT>900){
           this._oreDenyT=now;
-          UI.toast(`⛏️ ${BLOCK_INFO[id].name}: butuh Penambangan Lv ${oreDef.req}!`);
           Sfx.noStamina();
+          const oreName=(BLOCK_INFO[id]&&BLOCK_INFO[id].name)||'Ore';
           FX.text(new THREE.Vector3(wx+0.5,wy+1.4,wz+0.5),
-            `🔒 Lv ${oreDef.req}`,'#ff9d8a');
+            `🔒 ${oreName} Lv ${oreDef.req}`,'#ff9d8a');
         }
         /* getaran GAGAL pada bongkahan — umpan balik "terlalu keras untuk
            ditambang" walau level kurang (sama seperti gagal peluang). */

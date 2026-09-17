@@ -196,7 +196,6 @@ const NPC_Lionknight={
       n.roar={t:0,w1:false,w2:false};
       lk.roarCd=this.LK.cd;
       NPCS.say(n,'AUMAN SINGA!',1.8);
-      UI.toast(`🦁 ${n.name}: AUMAN SINGA!`);
       FX.ring(n.pos.x,n.pos.y+0.15,n.pos.z,0xffd24d,0.5,1.6);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2,0)),`-${roarCost} STAM`,'#ffd24d');
       PortFX.spark(n.pos.x,n.pos.y+1.2,n.pos.z,6,0xfff0a8,3);

@@ -407,15 +407,10 @@ const NPC_Magesupport={
       S.healCd=this.lvHealCd(n);
       S.cast={kind,t:0,dur:1.1,fireAt:0.7,fired:false};
       NPCS.say(n,'💚 Healing Aura!',1.8);
-      /* toast hanya untuk luka yang berarti (lihat SUP.healToastPct) supaya
-         layar tidak dibanjiri notifikasi saat heal dirapal untuk luka kecil */
-      if(this.teamLowPct()<SUP.healToastPct)
-        UI.toast(`🔯 ${n.name}: 💚 HEALING AURA!`);
     }else if(kind==='shield'){
       S.shCd=this.lvShCd(n);
       S.cast={kind,t:0,dur:1.1,fireAt:0.7,fired:false};
       NPCS.say(n,'🛡️ Aura Perisai!',1.8);
-      UI.toast(`🔯 ${n.name}: 🛡️ AURA PERISAI!`);
     }else{
       /* ULT : HUJAN BINTANG SPIRIT — linimasa persis prototipe (5 detik:
          naik 0-1.2s, melayang sampai 3.8s, turun sampai 5s). Bola cahaya
@@ -430,7 +425,6 @@ const NPC_Magesupport={
       /* cincin + cahaya area di tanah (areaRing & areaGlow prototipe) */
       S.cast.areaFx=this.spawnStarArea(S.cast.cx,gy,S.cast.cz,SUP.starDur);
       NPCS.say(n,'🌠 Hujan Bintang Spirit!',1.8);
-      UI.toast(`🔯 ${n.name}: 🌠 HUJAN BINTANG SPIRIT!`);
     }
     Sfx.at(n.pos,'craft');
   },
