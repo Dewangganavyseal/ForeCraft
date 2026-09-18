@@ -1345,9 +1345,8 @@ const FishSys={
         UI.toast('✨ Mendapatkan Sisik Ikan Emas langka dari Leviathan!');
     }
 
-    if(f.def.id==='leviathan'){
-      World.dropItem(pos.x,pos.y+0.4,pos.z,'boss_core',1);
-    }
+    /* Leviathan TIDAK lagi menjatuhkan inti boss — inti boss hanya dari
+       mob biasa 7%, mini boss 10%, peti boss dungeon 12%, dan boss altar 50%. */
 
     if(typeof FX!=='undefined'){
       if(FX.debris)FX.debris(pos,0x8fd8ff,12,3.0);

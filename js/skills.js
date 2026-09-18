@@ -103,8 +103,9 @@ const Prof={
   gain(id, baseXP, actionLevel){
     if(!SUBSKILLS[id]||baseXP<=0)return false;
     const s=SUBSKILLS[id];
-    /* Penyesuaian patch: proficiency mining dinaikkan +20% lagi (total +44%) agar progres tidak seret */
-    const profMult=(id==='mining')?1.44:1.0;
+    /* Semua proficiency disamakan seperti mining: total 2.16x (1.5 global x 1.44)
+       agar tidak ada yang terasa seret. */
+    const profMult=1.44;
     const amount=baseXP*this.gray(id, actionLevel)*this.XP_MULT*profMult;
     if(amount<=0)return false;
     this.xp[id]=(this.xp[id]||0)+amount;

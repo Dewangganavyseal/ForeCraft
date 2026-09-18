@@ -111,11 +111,15 @@ const Anvil={
     const c=this.cost(r.id,r.lvl);
     if(RPG.coin<c.coin){
       const coinIco=(typeof UI!=='undefined'&&UI.coinIcoHtml)?UI.coinIcoHtml(16):'🪙';
-      UI.toast(`${coinIco} Koin kurang — butuh ${c.coin}`);return;
+      UI.toast(`${coinIco} Koin kurang — butuh ${c.coin}`);
+      if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('⚠️ KOIN KURANG!');
+      return;
     }
     if(c.matId&&RPG.countItem(c.matId)<c.matN){
       const matIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(c.matId):(ITEMS[c.matId]?ITEMS[c.matId].e:'');
-      UI.toast(`${matIco} ${ITEMS[c.matId].n} kurang — butuh ${c.matN}`);return;
+      UI.toast(`${matIco} ${ITEMS[c.matId].n} kurang — butuh ${c.matN}`);
+      if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('⚠️ BAHAN KURANG!');
+      return;
     }
     RPG.spendCoin(c.coin);
     if(c.matId)RPG.removeItems({[c.matId]:c.matN});
@@ -136,6 +140,7 @@ const Anvil={
     if(typeof Prof!=='undefined')Prof.gain('crafting',20,2);
     const itemIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(r.id):(ITEMS[r.id]?ITEMS[r.id].e:'');
     UI.toast(`${anvilIco}${itemIco} ${ITEMS[r.id].n} → Level ${r.lvl+1}!`);
+    if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('🎉 LEVEL UP BERHASIL!');
     if(typeof FX!=='undefined'&&FX.text)
       FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.2,0)),`Lv ${r.lvl+1} ${ITEMS[r.id].n}`,'#ffd870',r.id);
     UI.renderAll();

@@ -1000,11 +1000,15 @@ const Player={
   },
   respawn(){
     this.dead=false;this.hp=this.maxHp()*0.7;this.hunger=60;this.stamina=this.maxStamina();
-    /* titik bangkit DIACAK (desa acak / daratan acak) — bukan lagi titik awal */
-    const p=this.randomRespawnPoint();
-    if(p){this.pos.set(p.x,p.y,p.z);if(UI.toast)UI.toast('🎲 Kau terbangun di tempat yang belum kau kenal...');}
-    else this.pos.copy(this.spawnP);
+    /* Kembalikan ke titik spawn semula tempat pertama kali pemain masuk game */
+    let gy=this.spawnP.y;
+    if(typeof World!=='undefined'&&World.groundAt){
+      gy=Math.max(CFG.SEA,World.groundAt(this.spawnP.x,this.spawnP.z,this.spawnP.y+3));
+    }
+    this.pos.set(this.spawnP.x,gy,this.spawnP.z);
     this.vel.set(0,0,0);
+    this.onGround=true;
+    if(UI.toast)UI.toast('✨ Kau terbangun kembali di titik awal petualanganmu.');
     document.getElementById('death').classList.add('hidden');
   },
   addXP(n){

@@ -10,6 +10,9 @@ if (fs.existsSync(wwwDir)) {
 fs.mkdirSync(wwwDir, { recursive: true });
 
 fs.copyFileSync(path.join(rootDir, 'index.html'), path.join(wwwDir, 'index.html'));
+if (fs.existsSync(path.join(rootDir, 'Walkthrough_Studio.html'))) {
+  fs.copyFileSync(path.join(rootDir, 'Walkthrough_Studio.html'), path.join(wwwDir, 'Walkthrough_Studio.html'));
+}
 fs.cpSync(path.join(rootDir, 'css'), path.join(wwwDir, 'css'), { recursive: true });
 fs.cpSync(path.join(rootDir, 'js'), path.join(wwwDir, 'js'), { recursive: true });
 /* folder buttons (gambar tombol UI dari "Button UI") ikut disalin bila ada */

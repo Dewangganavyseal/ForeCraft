@@ -246,12 +246,29 @@ const NPCS={
     if(here>=CFG.NPC.PER_VILLAGE)return;
 
     let x=0,z=0,y=0,ok=false;
-    for(let t=0;t<20&&!ok;t++){
-      const a=Math.random()*Math.PI*2,d=rand(3,v.r-3);
-      x=v.x+Math.cos(a)*d;z=v.z+Math.sin(a)*d;
-      y=World.topY(Math.floor(x),Math.floor(z));
+    for(let t=0;t<25&&!ok;t++){
+      const a=Math.random()*Math.PI*2,d=rand(4,v.r-3);
+      const candX=v.x+Math.cos(a)*d, candZ=v.z+Math.sin(a)*d;
+      // Jangan spawn terlalu dekat dengan mata pemain (minimal 18 blok bila memungkinkan)
+      const pDist=Math.hypot(candX-Player.pos.x,candZ-Player.pos.z);
+      if(pDist<18&&t<18)continue;
+
+      const bx=Math.floor(candX), bz=Math.floor(candZ);
+      let groundY=0;
+      for(let ly=CFG.WORLD_H-1;ly>=0;ly--){
+        const id=World.getBlock(bx,ly,bz);
+        if(World.isFloor(id)){ groundY=ly+1; break; }
+      }
       /* lantai desa diratakan ke CFG.SEA; beri toleransi ±2 blok */
-      if(y>=CFG.SEA&&y<=CFG.SEA+2)ok=true;
+      if(groundY>=CFG.SEA&&groundY<=CFG.SEA+3){
+        // Pastikan ruang di atas lantai bebas udara (bukan di dalam pohon atau atap)
+        let clear=true;
+        for(let cy=groundY;cy<=groundY+2;cy++){
+          const blk=World.getBlock(bx,cy,bz);
+          if(blk!==B.AIR){ clear=false; break; }
+        }
+        if(clear){ x=candX; z=candZ; y=groundY; ok=true; }
+      }
     }
     if(!ok)return;
     if(!here)UI.toast('🏘️ Ada penduduk desa di sekitar sini — dekati dan tekan F');
@@ -345,7 +362,7 @@ const NPCS={
       level:lvl,xp:0,baseDmg:role.dmg,speed:role.speed,
       target:null,atkCd:0,swing:0,flash:0,
       state:'patrol',order:'follow',dir:Math.random()*Math.PI*2,t:rand(0.5,2),
-      dead:false,deathT:0,onGround:false,inWater:false,
+      dead:false,deathT:0,onGround:true,inWater:false,
       bag:new Array(CFG.NPC.BAG).fill(null),
       gear:{weapon:null,helm:null,chest:null,boots:null},
       demand:this.rollDemand(role,lvl),
