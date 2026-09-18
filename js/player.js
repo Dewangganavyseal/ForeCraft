@@ -792,6 +792,7 @@ const Player={
       [B.ORE_TUNGSTEN]:-0.85,[B.ORE_TUNGSTENSTEEL]:-0.85,
       [B.WOOD]:-0.25,[B.STONE]:0,[B.PLANK]:0,[B.ROOF]:0,
       [B.SAND]:0.25,[B.SNOW]:0.25,[B.GRASS]:0.45,[B.DIRT]:0.45,
+      [B.RED_SOIL]:0.45,[B.FARM]:0.45,
     };
     const pcx=Math.floor(this.pos.x),pcz=Math.floor(this.pos.z);
     let blkHit=null,bestScore=Infinity;

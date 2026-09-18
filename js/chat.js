@@ -277,14 +277,15 @@ const Chat={
     }
     this._termBuilt=true;
 
-    /* --- baris kontrol: jumlah, level, bintang, varian boss --- */
+    /* --- baris kontrol: jumlah, level, bintang, varian boss, mode rekrut tim/pet --- */
     const ctl=document.createElement('div');
     ctl.className='term-ctl';
     ctl.innerHTML=
       '<label>🔢 Jumlah <input id="term-qty" type="number" min="1" max="64" value="1"></label>'+
       '<label>⭐ Level <input id="term-lvl" type="number" min="1" max="200" value="1"></label>'+
       '<label>✨ Bintang <input id="term-stars" type="number" min="1" max="5" value="1"></label>'+
-      '<label><input id="term-boss" type="checkbox"> 👹 Varian Boss</label>';
+      '<label><input id="term-boss" type="checkbox"> 👹 Varian Boss</label>'+
+      '<label style="color:#fdba74;font-weight:700;"><input id="term-direct-team" type="checkbox"> 👥 Mode Rekrut Tim / Pet</label>';
 
     /* Tombol Toggle Mode TPP (Third Person Perspective di belakang karakter) */
     const tppBtn=document.createElement('button');
@@ -382,31 +383,69 @@ const Chat={
     g.furni.forEach(id=>itemBtn(gr,id));
 
     /* --- kelompok NPC: semua arketipe NPC_ROLES --- */
-    gr=section('npc','🤝 NPC — spawn di dekatmu ('+NPC_ROLES.length+')');
+    gr=section('npc','🤝 NPC — spawn atau rekrut ke tim ('+NPC_ROLES.length+')');
     for(const role of NPC_ROLES){
+      const box=document.createElement('div');
+      box.className='tbtn-box';
+      box.style.cssText='display:inline-flex;gap:3px;align-items:center;';
+
       const b=document.createElement('button');
+      b.type='button';
       b.className='tbtn';
       const maxL=(role.rare)?(CFG.NPC_RARE_MAX_LEVEL||150):(CFG.NPC_MAX_LEVEL||100);
       b.innerHTML=`<span class="te">${role.e}</span>${role.name}`+
         ` <small>max Lv ${maxL}</small>`;
-      b.addEventListener('click',()=>this.spawnNPC(role.id,this.qty()));
-      gr.appendChild(b);
+      b.addEventListener('click',()=>{
+        if(this.directTeamMode())this.recruitNPC(role.id);
+        else this.spawnNPC(role.id,this.qty());
+      });
+      box.appendChild(b);
+
+      const bTeam=document.createElement('button');
+      bTeam.type='button';
+      bTeam.className='tbtn';
+      bTeam.style.cssText='padding:5px 8px;background-color:#c2410c;border:1.5px solid #7c2d12;color:#fff;font-weight:700;font-size:11px;';
+      bTeam.title='Rekrut langsung ke Tim';
+      bTeam.textContent='👥 Tim';
+      bTeam.addEventListener('click',()=>this.recruitNPC(role.id));
+      box.appendChild(bTeam);
+
+      gr.appendChild(box);
     }
 
     /* --- kelompok ANIMAL: hewan pasif (sapi/kuda/kelinci) --- */
     const mobBtn=(grid,type)=>{
+      const box=document.createElement('div');
+      box.className='tbtn-box';
+      box.style.cssText='display:inline-flex;gap:3px;align-items:center;';
+
       const b=document.createElement('button');
+      b.type='button';
       b.className='tbtn';
       b.innerHTML=`<span class="te">${this.MOB_E[type]||'👾'}</span>`+
         `${MOB_NAME[type]||type}`;
-      b.addEventListener('click',()=>this.spawnMob(type,this.qty()));
-      grid.appendChild(b);
+      b.addEventListener('click',()=>{
+        if(this.directTeamMode())this.addPet(type);
+        else this.spawnMob(type,this.qty());
+      });
+      box.appendChild(b);
+
+      const bPet=document.createElement('button');
+      bPet.type='button';
+      bPet.className='tbtn';
+      bPet.style.cssText='padding:5px 8px;background-color:#c2410c;border:1.5px solid #7c2d12;color:#fff;font-weight:700;font-size:11px;';
+      bPet.title='Tambahkan langsung sebagai Pet ke tim';
+      bPet.textContent='🐾 Pet';
+      bPet.addEventListener('click',()=>this.addPet(type));
+      box.appendChild(bPet);
+
+      grid.appendChild(box);
     };
     const animals=[];
     for(const type in Monsters.TYPES){
       if(Monsters.isAnimal&&Monsters.isAnimal({type}))animals.push(type);
     }
-    gr=section('animal','🐄 Animal — hewan pasif ('+animals.length+')');
+    gr=section('animal','🐄 Animal — hewan pasif / pet ('+animals.length+')');
     animals.forEach(type=>mobBtn(gr,type));
 
     /* --- kelompok monster --- */
@@ -415,7 +454,7 @@ const Chat={
       if(Monsters.isAnimal&&Monsters.isAnimal({type}))continue;
       mobs.push(type);
     }
-    gr=section('mob','👹 Monster — spawn di dekatmu ('+mobs.length+')');
+    gr=section('mob','👹 Monster — monster liar / pet ('+mobs.length+')');
     mobs.forEach(type=>mobBtn(gr,type));
 
     /* --- log terminal --- */
@@ -448,6 +487,10 @@ const Chat={
   },
   bossMode(){
     const el=document.getElementById('term-boss');
+    return !!(el&&el.checked);
+  },
+  directTeamMode(){
+    const el=document.getElementById('term-direct-team');
     return !!(el&&el.checked);
   },
   termLog(text){
@@ -543,6 +586,78 @@ const Chat={
     this.termLog(ok
       ?`spawn ${boss?'BOSS ':''}${MOB_NAME[type]} ${starStr} Lv ${lvl} (max ${maxLvl}) ×${ok}`
       :'gagal spawn monster: tidak ada tanah kosong di sekitar');
+  },
+
+  /* ---------------- rekrut NPC langsung ke tim ---------------- */
+  recruitNPC(roleId){
+    if(typeof NPCS==='undefined')return;
+    const maxTeam=(typeof CFG!=='undefined'&&CFG.NPC)?CFG.NPC.TEAM_MAX:3;
+    if(NPCS.teamFull()||NPCS.team.length>=maxTeam){
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('👥 TEAM PENUH!');
+      if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
+      this.termLog(`Gagal rekrut: Team sudah penuh (maks ${maxTeam} rekan)!`);
+      return;
+    }
+    const role=NPC_ROLES.find(r=>r.id===roleId);
+    if(!role)return;
+    const maxLvl=(role.rare)?(CFG.NPC_RARE_MAX_LEVEL||150):(CFG.NPC_MAX_LEVEL||100);
+    const lvl=clamp(this.lvl(),1,maxLvl);
+    const p=this.groundNear(1.5,3.5)||Player.pos.clone();
+    const npc=NPCS.make(role,p.x,p.y,p.z,{x:p.x,z:p.z},lvl);
+    NPCS.list.push(npc);
+    NPCS.recruit(npc);
+    this.termLog(`👥 ${role.e} ${npc.name} (Lv ${lvl}) langsung bergabung ke tim!`);
+  },
+
+  /* ---------------- tambah pet langsung ke tim / slot pet ---------------- */
+  addPet(type){
+    if(typeof RPG==='undefined'||!RPG.mobSlots)return;
+    const idx=RPG.mobSlots.findIndex(s=>!s);
+    if(idx<0){
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('🐾 PET PENUH!');
+      if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
+      this.termLog('Gagal tambah: Slot pet sudah penuh (maks 4 pet)!');
+      return;
+    }
+    const boss=this.bossMode();
+    const maxLvl=CFG.MAX_LEVEL||200;
+    const curLvl=clamp(this.lvl(),1,maxLvl);
+    const stars=clamp(this.stars(),1,5);
+    const starMult=1+(stars-1)*0.15+(boss?0.15:0);
+    const statDef=(typeof Capture!=='undefined'&&Capture.PET_BASE_STATS&&Capture.PET_BASE_STATS[type])||{baseHp:100,baseDmg:30};
+    const maxhp=Math.round(statDef.baseHp*starMult+statDef.baseHp*0.08*starMult*(curLvl-1));
+    const dmg=Math.round(statDef.baseDmg*starMult+statDef.baseDmg*0.05*starMult*(curLvl-1));
+    const mobName=(typeof Capture!=='undefined'&&Capture.mobName)?Capture.mobName(type):(MOB_NAME[type]||type);
+    const pet={
+      type,
+      boss,
+      stars,
+      lvl:curLvl,
+      xp:0,
+      power:starMult,
+      hp:maxhp,
+      maxhp,
+      dmg,
+      saddle:false,
+      name:mobName,
+    };
+    RPG.mobSlots[idx]=pet;
+    const starStr='⭐'.repeat(stars);
+    // Bila saat ini belum ada pet aktif di tim/lapangan, langsung deploy!
+    if(typeof Capture!=='undefined'&&!Capture.pet&&Capture.deploy){
+      Capture.deploy(idx);
+    }
+    if(typeof UI!=='undefined'){
+      if(UI.renderTeam)UI.renderTeam();
+      if(UI.renderBag)UI.renderBag();
+    }
+    UI.toast(`🐾 ${pet.name}${pet.boss?' Raksasa':''} ${starStr} Lv ${curLvl} masuk ke tim & slot pet!`);
+    this.termLog(`🐾 Pet ${pet.name}${pet.boss?' Raksasa':''} ${starStr} Lv ${curLvl} berhasil ditambahkan!`);
+    if(typeof FX!=='undefined'){
+      FX.debris(Player.pos.clone().add(new THREE.Vector3(0,0.5,0)),0xffa53d,12,2);
+      FX.ring(Player.pos.x,Player.pos.y+0.1,Player.pos.z,0xffa53d,0.5,2);
+    }
+    if(typeof Sfx!=='undefined'&&Sfx.levelup)Sfx.levelup();
   },
 };
 Chat.init();

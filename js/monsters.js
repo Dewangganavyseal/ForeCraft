@@ -324,7 +324,7 @@ const Monsters={
     return this.setLevel(m,this.rollLevel(biome,bx,bz));
   },
 
-  /* Cari ketinggian tanah datar bebas pohon & dedaunan untuk spawn mob */
+  /* Cari ketinggian tanah datar untuk spawn mob (bisa di bawah kanopi pohon hingga 4 blok) */
   findClearSpawnGround(x, z, r){
     const bx=Math.floor(x), bz=Math.floor(z);
     let groundY=-1;
@@ -334,16 +334,40 @@ const Monsters={
     }
     if(groundY<CFG.SEA) return null; // jangan di dalam/bawah air
 
-    // Periksa pohon: pohon tidak boleh ada di titik ini atau di sekitar tapak mob
-    const rad = Math.max(1, Math.ceil(r || 0.6));
-    for(let dx=-rad; dx<=rad; dx++){
-      for(let dz=-rad; dz<=rad; dz++){
-        const tx=bx+dx, tz=bz+dz;
-        if(typeof WGEN!=='undefined'&&WGEN.treeAt&&WGEN.treeAt(tx, tz, groundY)) return null;
-        // Cek ruang tubuh mob dari groundY sampai groundY+3: tidak boleh ada dedaunan atau batang kayu
-        for(let y=groundY; y<=groundY+3; y++){
-          const blk=World.getBlock(tx, y, tz);
-          if(blk===B.WOOD || blk===B.LEAF) return null;
+    // 1. Pengaman: Titik spawn TIDAK BOLEH di dalam batang pohon (B.WOOD)
+    if(typeof WGEN!=='undefined'&&WGEN.treeAt&&WGEN.treeAt(bx, bz, groundY-1)) return null;
+    const footBlk=World.getBlock(bx, groundY, bz);
+    if(footBlk===B.WOOD || footBlk===B.LEAF) return null;
+
+    // 2. Ruang berdiri mob: minimal 2 blok ke atas wajib AIR agar tidak stuck
+    // (Boleh di bawah daun pohon dengan ketinggian hingga 4 blok ruang kanopi)
+    const needH = (r && r>=0.8) ? 3 : 2;
+    for(let dy=0; dy<needH; dy++){
+      const y=groundY+dy;
+      if(y>=CFG.WORLD_H) return null;
+      const blk=World.getBlock(bx, y, bz);
+      if(blk!==B.AIR) return null; // Kaki dan kepala harus di ruang terbuka
+    }
+
+    // Periksa hingga ketinggian 4 blok dari tanah: tidak boleh ada batang kayu (B.WOOD)
+    for(let dy=needH; dy<4; dy++){
+      const y=groundY+dy;
+      if(y<CFG.WORLD_H){
+        const blk=World.getBlock(bx, y, bz);
+        if(blk===B.WOOD) return null; // hindari dahan kayu rendah menabrak kepala
+      }
+    }
+
+    // 3. Pengaman radius tapak: jangan menempel/overlap di dalam batang pohon di sebelahnya
+    const rad = (r && r>0.5) ? 1 : 0;
+    if(rad>0){
+      for(let dx=-1; dx<=1; dx++){
+        for(let dz=-1; dz<=1; dz++){
+          if(dx===0&&dz===0) continue;
+          const tx=bx+dx, tz=bz+dz;
+          const b0=World.getBlock(tx, groundY, tz);
+          const b1=World.getBlock(tx, groundY+1, tz);
+          if(b0===B.WOOD || b1===B.WOOD) return null;
         }
       }
     }
@@ -354,89 +378,94 @@ const Monsters={
     const night=Weather.nightF>0.5;
     const cap=night?13:9;
     if(this.list.length>=cap)return;
-    const a=Math.random()*Math.PI*2,d=rand(38,58); // Jarak dijauhkan (38-58 blok) agar tidak terlihat spawn/jatuh di depan mata pemain
-    const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
-    const h=this.findClearSpawnGround(x,z,0.7);
-    if(h===null)return; // hanya daratan terbuka bebas pohon
-    /* JANGAN spawn di dalam / menempel bangunan desa, dan REDAM spawn di
-       seluruh area desa (hanya 20% yang diterima) — lihat spawnAllowed. */
-    if(!this.spawnAllowed(x,z))return;
 
-    /* pilih monster dari daftar biome tempat spawn → tiap wilayah beda musuh */
-    const biome=WGEN.biomeAt(Math.floor(x),Math.floor(z));
-    let type=this.pickType(biome,night);
-    /* NAGA hanya boleh muncul di ALAM TERBUKA — tidak di dalam/dekat desa dan
-       tidak di dalam dungeon. Bila posisi spawn tak memenuhi, undi ulang sekali;
-       masih naga juga maka percobaan spawn ini dibatalkan. */
-    if(type==='dragon'){
-      const nv=WGEN.nearestVillage(x,z);
-      const nd=(typeof WGEN.nearestDungeon==='function')?WGEN.nearestDungeon(x,z):null;
-      const nearVillage=nv&&nv.dist<nv.v.r+6;
-      const inDungeon=nd&&nd.dist<=nd.d.r+6;
-      if(nearVillage||inDungeon){
-        type=this.pickType(biome,night);
-        if(type==='dragon')return;
+    // Coba hingga 8 kali titik acak agar peluang spawn sukses tinggi dan mob tidak sepi
+    for(let attempt=0; attempt<8; attempt++){
+      const a=Math.random()*Math.PI*2, d=rand(18,30); // Jarak pas: tidak di depan mata pemain & tidak langsung despawn
+      const x=Player.pos.x+Math.sin(a)*d, z=Player.pos.z+Math.cos(a)*d;
+      const h=this.findClearSpawnGround(x,z,0.7);
+      if(h===null)continue;
+      /* JANGAN spawn di dalam / menempel bangunan desa, dan REDAM spawn di
+         seluruh area desa (hanya 20% yang diterima) — lihat spawnAllowed. */
+      if(!this.spawnAllowed(x,z))continue;
+
+      /* pilih monster dari daftar biome tempat spawn → tiap wilayah beda musuh */
+      const biome=WGEN.biomeAt(Math.floor(x),Math.floor(z));
+      let type=this.pickType(biome,night);
+      /* NAGA hanya boleh muncul di ALAM TERBUKA — tidak di dalam/dekat desa dan
+         tidak di dalam dungeon. Bila posisi spawn tak memenuhi, undi ulang sekali;
+         masih naga juga maka percobaan spawn ini dibatalkan. */
+      if(type==='dragon'){
+        const nv=WGEN.nearestVillage(x,z);
+        const nd=(typeof WGEN.nearestDungeon==='function')?WGEN.nearestDungeon(x,z):null;
+        const nearVillage=nv&&nv.dist<nv.v.r+6;
+        const inDungeon=nd&&nd.dist<=nd.d.r+6;
+        if(nearVillage||inDungeon){
+          type=this.pickType(biome,night);
+          if(type==='dragon')continue;
+        }
       }
-    }
-    /* Kuota lunak per tipe: mencegah satu jenis (dulu slime) mendominasi
-       seluruh populasi sehingga jenis lain seperti serigala nyaris tak
-       pernah terlihat. Bila kuota penuh, undi ulang sekali. */
-    const quota=Math.max(3,Math.ceil(cap*0.45));
-    if(this.countType(type)>=quota){
-      const alt=this.pickType(biome,night);
-      if(this.countType(alt)<quota)type=alt;
-      else if(this.countType(type)>=quota+1)return;
-    }
-    /* peluang boss: naik seiring level pemain & malam hari, dibatasi BOSS_MAX.
-       Mob alwaysBoss (naga) SELALU boss bila slot boss masih tersedia. */
-    const bossChance=Math.min(0.16,0.02+Player.level*0.006)*(night?1.8:1);
-    let boss=this.bossCount()<CFG.BOSS_MAX&&Math.random()<bossChance;
-    if(this.TYPES[type].alwaysBoss&&this.bossCount()<CFG.BOSS_MAX)boss=true;
-    if(this.TYPES[type].passive||this.TYPES[type].animal)boss=false;
-    const m=this.make(type,new THREE.Vector3(x,h,z),boss);
-    /* LEVEL MENGIKUTI BIOME (redlands 30-50, gurun 20-30, sisanya 1-20) */
-    this.applyBiomeLevel(m,x,z);
-    this.list.push(m);
-    if(boss){
-      UI.toast(`☠️ ${MOB_NAME[type]||type} Raksasa Lv ${m.lvl} muncul!`);
-      FX.ring(x,h+0.1,z,0xff6bd6,1.2,5);
-      /* Mini boss tarantula ditemani 3 tarantula mini (ukuran 50%) */
-      if(type==='tarantula'){
-        this.spawnTarantulaMinions(m);
+      /* Kuota lunak per tipe: mencegah satu jenis (dulu slime) mendominasi
+         seluruh populasi sehingga jenis lain seperti serigala nyaris tak
+         pernah terlihat. Bila kuota penuh, undi ulang sekali. */
+      const quota=Math.max(3,Math.ceil(cap*0.45));
+      if(this.countType(type)>=quota){
+        const alt=this.pickType(biome,night);
+        if(this.countType(alt)<quota)type=alt;
+        else if(this.countType(type)>=quota+1)continue;
       }
-    }
-    /* ---------- KAWANAN SERIGALA ----------
-       Serigala berburu berkelompok, tapi jumlah kawan DIKURANGI (dulu 1-2
-       hampir selalu) supaya populasi serigala tidak berlebihan. Sekarang
-       hanya 30% peluang membawa 1 kawan (malam 45%).
-       Kawanan memakai LEVEL YANG SAMA dengan pemimpinnya: satu kawanan
-       seharusnya sepadan, bukan campuran Lv 3 dan Lv 19. */
-    if(type==='wolf'&&!boss){
-      const mates=(Math.random()<(night?0.45:0.30))?1:0;
-      for(let k=0;k<mates;k++){
-        if(this.list.length>=cap)break;
-        const px=x+rand(-3.5,3.5),pz=z+rand(-3.5,3.5);
-        const ph=this.findClearSpawnGround(px,pz,0.5);
-        if(ph===null||!this.spawnAllowed(px,pz))continue;
-        const w=this.make('wolf',new THREE.Vector3(px,ph,pz),false);
-        w.onGround=true;
-        this.setLevel(w,m.lvl);
-        this.list.push(w);
+      /* peluang boss: naik seiring level pemain & malam hari, dibatasi BOSS_MAX.
+         Mob alwaysBoss (naga) SELALU boss bila slot boss masih tersedia. */
+      const bossChance=Math.min(0.16,0.02+Player.level*0.006)*(night?1.8:1);
+      let boss=this.bossCount()<CFG.BOSS_MAX&&Math.random()<bossChance;
+      if(this.TYPES[type].alwaysBoss&&this.bossCount()<CFG.BOSS_MAX)boss=true;
+      if(this.TYPES[type].passive||this.TYPES[type].animal)boss=false;
+      const m=this.make(type,new THREE.Vector3(x,h,z),boss);
+      /* LEVEL MENGIKUTI BIOME (redlands 30-50, gurun 20-30, sisanya 1-20) */
+      this.applyBiomeLevel(m,x,z);
+      this.list.push(m);
+      if(boss){
+        UI.toast(`☠️ ${MOB_NAME[type]||type} Raksasa Lv ${m.lvl} muncul!`);
+        FX.ring(x,h+0.1,z,0xff6bd6,1.2,5);
+        /* Mini boss tarantula ditemani 3 tarantula mini (ukuran 50%) */
+        if(type==='tarantula'){
+          this.spawnTarantulaMinions(m);
+        }
       }
-    }
-    /* ---------- KAWANAN KELINCI: sering muncul berpasangan / 2 ekor ---------- */
-    if(type==='rabbit'){
-      const mates=(Math.random()<0.40)?1:0;
-      for(let k=0;k<mates;k++){
-        if(this.list.length>=cap)break;
-        const px=x+rand(-2.5,2.5),pz=z+rand(-2.5,2.5);
-        const ph=this.findClearSpawnGround(px,pz,0.35);
-        if(ph===null||!this.spawnAllowed(px,pz))continue;
-        const rb=this.make('rabbit',new THREE.Vector3(px,ph,pz),false);
-        rb.onGround=true;
-        this.setLevel(rb,m.lvl);
-        this.list.push(rb);
+      /* ---------- KAWANAN SERIGALA ----------
+         Serigala berburu berkelompok, tapi jumlah kawan DIKURANGI (dulu 1-2
+         hampir selalu) supaya populasi serigala tidak berlebihan. Sekarang
+         hanya 30% peluang membawa 1 kawan (malam 45%).
+         Kawanan memakai LEVEL YANG SAMA dengan pemimpinnya: satu kawanan
+         seharusnya sepadan, bukan campuran Lv 3 dan Lv 19. */
+      if(type==='wolf'&&!boss){
+        const mates=(Math.random()<(night?0.45:0.30))?1:0;
+        for(let k=0;k<mates;k++){
+          if(this.list.length>=cap)break;
+          const px=x+rand(-3.5,3.5),pz=z+rand(-3.5,3.5);
+          const ph=this.findClearSpawnGround(px,pz,0.5);
+          if(ph===null||!this.spawnAllowed(px,pz))continue;
+          const w=this.make('wolf',new THREE.Vector3(px,ph,pz),false);
+          w.onGround=true;
+          this.setLevel(w,m.lvl);
+          this.list.push(w);
+        }
       }
+      /* ---------- KAWANAN KELINCI: sering muncul berpasangan / 2 ekor ---------- */
+      if(type==='rabbit'){
+        const mates=(Math.random()<0.40)?1:0;
+        for(let k=0;k<mates;k++){
+          if(this.list.length>=cap)break;
+          const px=x+rand(-2.5,2.5),pz=z+rand(-2.5,2.5);
+          const ph=this.findClearSpawnGround(px,pz,0.35);
+          if(ph===null||!this.spawnAllowed(px,pz))continue;
+          const rb=this.make('rabbit',new THREE.Vector3(px,ph,pz),false);
+          rb.onGround=true;
+          this.setLevel(rb,m.lvl);
+          this.list.push(rb);
+        }
+      }
+      break; // Berhasil spawn 1 monster pada tick ini
     }
   },
 
@@ -454,7 +483,7 @@ const Monsters={
     if(this.countType('lizard')>=this.LIZARD_MAX)return;
     if(Math.random()>0.55)return;                       // tidak selalu spawn
     for(let t=0;t<14;t++){
-      const a=Math.random()*Math.PI*2,d=rand(36,54); // Jarak spawn dijauhkan
+      const a=Math.random()*Math.PI*2,d=rand(16,28);
       const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
       const bx=Math.floor(x),bz=Math.floor(z);
       const h=this.findClearSpawnGround(x,z,0.55);
@@ -522,7 +551,7 @@ const Monsters={
     const type=want[(Math.random()*want.length)|0];
     const okBiome=this.TAME_BIOME[type]||[BIOME.FOREST];
     for(let t=0;t<12;t++){
-      const a=Math.random()*Math.PI*2,d=rand(38,58); // Jarak spawn ternak dijauhkan
+      const a=Math.random()*Math.PI*2,d=rand(18,30);
       const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
       const bx=Math.floor(x),bz=Math.floor(z);
       const h=this.findClearSpawnGround(x,z,0.7);
@@ -3584,17 +3613,24 @@ const Monsters={
   /* ---------- apakah langkah ke (x,z) bisa dilewati? ----------
      Dipakai bersama oleh fisika dan penghindar rintangan. */
   canStand(m,x,z){
-    const hy=m.pos.y+1.8;
-    const gy=World.groundAt(x,z,hy);
+    const isTarantula = (m.type === 'tarantula');
+    const hy = m.pos.y + (isTarantula ? 3.2 : 1.8);
+    const gy = World.groundAt(x,z,hy);
     /* 1. Halangan 2+ blok ke ATAS dicegah jika tidak sedang melompat.
-       Jika sedang melompat (misal pet loncat 2 blok), diperbolehkan sampai 2.5 blok. */
-    const isJumping = (m.vel && m.vel.y > 1.5);
-    const maxUp = isJumping ? 2.5 : 1.25;
+       Jika sedang melompat (misal pet loncat 2 blok), diperbolehkan sampai 2.5 blok (tarantula 2.8 blok). */
+    const isJumping = (m.vel && m.vel.y > 1.5) || (isTarantula && (m._tJumping || (m.vel && m.vel.y > 0.5)));
+    const maxUp = isJumping ? (isTarantula ? 2.8 : 2.5) : (isTarantula ? 2.3 : 1.25);
     if(gy > m.pos.y + maxUp) return false;
 
     /* Cek blok penghalang fisik di tubuh */
     if(World.blockedAt(x,m.pos.y+0.2,z,m.r||0.4)){
-      if(World.blockedAt(x,m.pos.y+1.1,z,m.r||0.4)) return false;
+      if(World.blockedAt(x,m.pos.y+1.1,z,m.r||0.4)){
+        if(isTarantula && (isJumping || gy <= m.pos.y + 2.3)){
+          if(World.blockedAt(x,gy+0.2,z,m.r||0.4)) return false;
+        }else{
+          return false;
+        }
+      }
       if(gy > m.pos.y + maxUp) return false;
     }
 
@@ -3661,13 +3697,53 @@ const Monsters={
   tryStepUp(m,dt){
     if((m._stepCd||0)>0)return false;
     if(!m.onGround&&!m.inWater)return false;
-    const spd=Math.hypot(m.vel.x,m.vel.z);
-    if(spd<0.15)return false;
-    const want=Math.atan2(m.vel.x,m.vel.z);
-    const tx=m.pos.x+Math.sin(want)*0.8,tz=m.pos.z+Math.cos(want)*0.8;
-    const step=World.groundAt(tx,tz,m.pos.y+1.8);
-    if(step<=m.pos.y+0.12||step>m.pos.y+1.3)return false;
+    const isTarantula=(m.type==='tarantula');
+    let spd=Math.hypot(m.vel.x,m.vel.z);
+    let want;
+    if(spd<0.15){
+      if(isTarantula&&(m.state==='chase'||m.walking||m.foe||m.target||(m.pet&&m.order==='follow'))){
+        want=m.mesh?m.mesh.rotation.y:(m.dir||0);
+      }else{
+        return false;
+      }
+    }else{
+      want=Math.atan2(m.vel.x,m.vel.z);
+    }
+    const stepDist=isTarantula?0.95:0.8;
+    let tx=m.pos.x+Math.sin(want)*stepDist,tz=m.pos.z+Math.cos(want)*stepDist;
+    const checkH=isTarantula?(m.pos.y+3.2):(m.pos.y+1.8);
+    let step=World.groundAt(tx,tz,checkH);
+    const maxStep=isTarantula?(m.pos.y+2.3):(m.pos.y+1.3);
+
+    // Bila di jarak stepDist belum menemukan balok tinggi, cek jarak lebih dekat (menempel pada balok 2 blok)
+    if(isTarantula&&(step<=m.pos.y+0.12||step>maxStep)){
+      const tx2=m.pos.x+Math.sin(want)*0.55,tz2=m.pos.z+Math.cos(want)*0.55;
+      const step2=World.groundAt(tx2,tz2,checkH);
+      if(step2>m.pos.y+0.12&&step2<=maxStep){
+        tx=tx2;tz=tz2;step=step2;
+      }
+    }
+
+    if(step<=m.pos.y+0.12||step>maxStep)return false;
     if(World.blockedAt(tx,step+0.05,tz,m.r||0.4))return false;
+
+    const diff=step-m.pos.y;
+    if(isTarantula&&diff>1.25){
+      // Lompat tinggi melewati rintangan 2 blok dengan smooth
+      m.vel.y=m.inWater?9.5:11.2;
+      const push=m.inWater?5.0:3.8;
+      m.vel.x=Math.sin(want)*Math.max(spd*1.3,push);
+      m.vel.z=Math.cos(want)*Math.max(spd*1.3,push);
+      m.onGround=false;
+      m._tJumping=true;
+      m.tJumpTakeoffY=m.pos.y;
+      m._stepCd=0.48;
+      if(typeof FX!=='undefined'&&FX.debris)
+        FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.1,0)),0xb8a68e,4,1.4);
+      if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
+      return true;
+    }
+
     m.vel.y=m.inWater?5.4:6.2;
     /* dorongan mendatar: di air lebih kuat karena gerak vertikal dibatasi */
     const push=m.inWater?4.2:2.4;
@@ -3692,7 +3768,7 @@ const Monsters={
       if(m.pos.y<CFG.WATER_Y-0.5)m.vel.y+=18*dt;
       m.vel.y=clamp(m.vel.y,-3,3.5);
     }
-    /* NAIK SATU BLOK — dicoba LEBIH DULU daripada penghindar rintangan (lihat
+    /* NAIK SATU / DUA BLOK — dicoba LEBIH DULU daripada penghindar rintangan (lihat
        catatan di tryStepUp). Bila berhasil, penghindaran dilewati frame ini
        supaya arah lompatan tidak dibelokkan. */
     const stepped=this.tryStepUp(m,dt);
@@ -3741,18 +3817,35 @@ const Monsters={
        Pencarian lantai diukur dari py0 (sebelum gravitasi) agar konsisten &
        tidak terpotong saat mob sedang turun; pass unburyY menjamin mob tidak
        pernah tersisa DI DALAM blok padat. */
-    const mrefY=Math.max(py0,m.pos.y)+1.8;
+    const isTarantula=(m.type==='tarantula');
+    const mrefY=Math.max(py0,m.pos.y)+(isTarantula?3.2:1.8);
     let g=World.groundAt(m.pos.x,m.pos.z,mrefY);
-    const isJumping=(m.vel&&m.vel.y>1.5);
-    const maxG=isJumping?(m.pos.y+1.5):(py0+1.05);
+    const isJumping=(m.vel&&m.vel.y>1.5)||(isTarantula&&m._tJumping);
+    const maxG=isJumping?(m.pos.y+(isTarantula?2.7:1.5)):(py0+(isTarantula?2.3:1.05));
     if(g>maxG){
       m.pos.x=px0;m.pos.z=pz0;m.vel.x=0;m.vel.z=0;
       g=World.groundAt(px0,pz0,mrefY);
     }
     m.onGround=false;
-    if(m.pos.y<=g){m.pos.y=g;if(m.vel.y<0)m.vel.y=0;m.onGround=true;}
+    if(m.pos.y<=g){
+      m.pos.y=g;
+      if(m.vel.y<0)m.vel.y=0;
+      m.onGround=true;
+      if(m._tJumping){
+        m._tJumping=false;
+        m.landSpringT=0.25;
+      }
+    }
     const mub=World.unburyY(m.pos.x,m.pos.z,m.pos.y);
-    if(mub>m.pos.y){m.pos.y=mub;if(m.vel.y<0)m.vel.y=0;m.onGround=true;}
+    if(mub>m.pos.y){
+      m.pos.y=mub;
+      if(m.vel.y<0)m.vel.y=0;
+      m.onGround=true;
+      if(m._tJumping){
+        m._tJumping=false;
+        m.landSpringT=0.25;
+      }
+    }
     /* RIDE WAVE: monster yang berdiri di atas blok tanah yang sedang
        terangkat oleh gelombang ikut naik mengikuti collision bloknya */
     if(typeof FX!=='undefined'&&FX.waveHeightAt){

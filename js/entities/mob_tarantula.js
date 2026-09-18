@@ -347,6 +347,15 @@ const Mob_Tarantula=(()=>{
       P.abdomenGrp.scale.set(1+br*0.025,1+br*0.035,1+br*0.02);
       if(P.eyeMat&&m.flash<=0)P.eyeMat.emissiveIntensity=0.85+0.3*Math.sin(t*5);
 
+      /* peredaman pegas saat mendarat (spring absorption) */
+      if((m.landSpringT||0)>0){
+        m.landSpringT-=dt;
+        const prog=1-Math.max(0,m.landSpringT)/0.35;
+        m.tSpringSink=Math.sin(prog*Math.PI)*Math.exp(-prog*3.0)*0.38;
+      }else if(!m.tSuperLeap){
+        m.tSpringSink=0;
+      }
+
       bodyRig.position.set(0,bodyY+flyY-(m.tSpringSink||0),0);
       bodyRig.rotation.set(bodyPitch,0,bodyRoll);
       m.tFlyY=flyY;
@@ -388,8 +397,8 @@ const Mob_Tarantula=(()=>{
           leg.stepProgress=1.0;
         }
 
-        // KASUS KHUSUS LOMPAT DI UDARA (AERODYNAMIC POSE BAIK SKILL MAUPUN TUNGGANGAN)
-        const isSuperLeaping = m.tSuperLeap && !m.onGround;
+        // KASUS KHUSUS LOMPAT DI UDARA (AERODYNAMIC POSE BAIK SKILL MAUPUN TUNGGANGAN / LOMPAT OBSTACLE 2 BLOK)
+        const isSuperLeaping = (m.tSuperLeap || m._tJumping) && !m.onGround;
         if((act==='leap'&&tA>=0.28&&tA<0.90) || isSuperLeaping){
           leg.isStepping=false;
           const stretchZ=(leg.index<=1)?1.4:-1.5;
