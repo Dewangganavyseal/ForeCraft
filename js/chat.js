@@ -530,6 +530,9 @@ const Chat={
       m.hp=m.maxhp;
       m.dmg=Math.round(m.dmg*starMult);
       Monsters.list.push(m);
+      if(type==='tarantula'&&boss&&Monsters.spawnTarantulaMinions){
+        Monsters.spawnTarantulaMinions(m);
+      }
       ok++;
     }
     const bossTag=boss?' Raksasa':'';

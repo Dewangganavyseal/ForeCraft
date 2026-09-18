@@ -123,6 +123,23 @@ const Game={
   },
 
   findSpawn(){
+    // Cari titik spawn daratan yang aman secara acak di dunia (radius 60 - 450 blok)
+    for(let attempt=0;attempt<250;attempt++){
+      const ang=Math.random()*Math.PI*2;
+      const dist=60+Math.random()*390;
+      const x=Math.round(Math.cos(ang)*dist);
+      const z=Math.round(Math.sin(ang)*dist);
+      if(!WGEN.isLand(x,z))continue;
+      const h=WGEN.height(x,z);
+      if(h>=CFG.SEA&&!WGEN.treeAt(x,z,h)){
+        if(typeof WGEN.nearestDungeon==='function'){
+          const dg=WGEN.nearestDungeon(x,z);
+          if(dg&&dg.dist<=dg.d.r+8)continue;
+        }
+        return {x,z,y:h};
+      }
+    }
+    // Fallback jika belum ketemu di koordinat acak
     let sx=0,sz=0;
     for(let r=0;r<64;r++){
       let found=false;
@@ -339,8 +356,12 @@ const Game={
     this.clearWorldMeshes();
 
     /* spawn */
-    const sp=this.findSpawn();
-    Player.spawnP.set(sp.x+0.5,sp.y,sp.z+0.5);
+    if(save&&save.spawnP&&Array.isArray(save.spawnP)&&save.spawnP.length===3){
+      Player.spawnP.set(save.spawnP[0],save.spawnP[1],save.spawnP[2]);
+    }else{
+      const sp=this.findSpawn();
+      Player.spawnP.set(sp.x+0.5,sp.y,sp.z+0.5);
+    }
     Player.pos.copy(Player.spawnP);
 
     if(save){

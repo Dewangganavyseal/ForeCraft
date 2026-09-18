@@ -75,6 +75,37 @@ const Capture={
     trex:     { baseHp:550,  baseDmg:81 }
   },
 
+  /* Offset posisi duduk / sadel presisi (tinggi Y & maju-mundur FWD) untuk semua pet tunggangan */
+  PET_SEAT_OFFSETS:{
+    horse:     { y: 1.28, fwd: -0.12 },
+    cow:       { y: 1.38, fwd: -0.10 },
+    boar:      { y: 1.15, fwd: -0.15 },
+    wolf:      { y: 1.05, fwd: -0.08 },
+    dragon:    { y: 3.85, fwd:  0.30 },
+    trex:      { y: 2.42, fwd:  0.35 },
+    tarantula: { y: 0.82, fwd: -0.15 },
+    golem:     { y: 1.95, fwd: -0.12 },
+    yeti:      { y: 1.95, fwd: -0.10 },
+    kumbang:   { y: 1.36, fwd: -0.15 },
+    lizard:    { y: 0.82, fwd: -0.10 },
+    semut:     { y: 0.65, fwd:  0.00 },
+    slime:     { y: 0.62, fwd:  0.00 },
+    rabbit:    { y: 0.48, fwd: -0.05 },
+  },
+
+  getSeatPos(m){
+    const cfg = this.PET_SEAT_OFFSETS[m.type] || {
+      y: (typeof meshHeight==='function') ? meshHeight(m.type)*0.72 : 1.2,
+      fwd: 0
+    };
+    const size = m.sizeMul || 1;
+    const seatY = (cfg.y * size) - (m.tSpringSink || 0);
+    const yaw = m.mesh ? m.mesh.rotation.y : 0;
+    const seatX = m.pos.x + Math.sin(yaw) * (cfg.fwd * size);
+    const seatZ = m.pos.z + Math.cos(yaw) * (cfg.fwd * size);
+    return { x: seatX, y: m.pos.y + seatY, z: seatZ, seatY };
+  },
+
   /* ---------- init DOM & rope ---------- */
   init(){
     if(this._init)return;
@@ -221,7 +252,7 @@ const Capture={
     let best=null,bd=12;
     for(const m of Monsters.list){
       if(m.dead||m.pet||(m.catchCooldown||0)>0||m.catchActive)continue;
-      if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part')continue; // kelabang tidak bisa ditangkap
+      if(m.noCatch||m.isMini||m.type==='kelabang'||m.type==='kelabang_part')continue; // kelabang & tarantula mini tidak bisa ditangkap
       const hpLimit = m.boss ? 0.26 : 0.2001; // Mini boss HP tebal: beri toleransi wajar 26%
       if(m.hp/m.maxhp > hpLimit)continue;
       const d=m.pos.distanceTo(Player.pos);
@@ -234,7 +265,7 @@ const Capture={
   start(m){
     if(this.active)return;
     if(!m||m.dead)return;
-    if(m.noCatch||m.type==='kelabang'||m.type==='kelabang_part'){UI.toast('🚫 Kelabang tidak bisa ditangkap!');return;}
+    if(m.noCatch||m.isMini||m.type==='kelabang'||m.type==='kelabang_part'){UI.toast('🚫 Tidak bisa ditangkap!');return;}
     if(!this.canCatch()){UI.toast('🪢 Pelajari skill Pawang Pemula dulu!');return;}
     if(RPG.mobSlots.findIndex(s=>!s)<0){
       UI.toast('🐾 Slot pet penuh! Jual atau lepaskan pet terlebih dahulu.');
@@ -800,7 +831,7 @@ const Capture={
        aiSemut/aiReaper). Tanpa cabang ini, jurus yang dimulai petAttack() tidak
        pernah maju sehingga pet hanya mematung setelah serangan pertama. */
     {
-      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget;
+      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget;
       const live=(foe&&!foe.dead)?foe:(target&&!target.dead?target:null);
       const ang=live?Math.atan2(live.pos.x-m.pos.x,live.pos.z-m.pos.z):(m.mesh?m.mesh.rotation.y:0);
       const d=live?live.pos.distanceTo(m.pos):dp;
@@ -818,6 +849,9 @@ const Capture={
       }
       if(m.tAct&&typeof Monsters.tarantulaAct==='function'){
         Monsters.tarantulaAct(m,dt,d,ang,live);return;
+      }
+      if(m.bAct&&typeof Monsters.boarAtk==='function'){
+        Monsters.boarAtk(m,dt,d,ang,live);return;
       }
     }
 
@@ -842,6 +876,7 @@ const Capture={
                   (m.type==='semut')?3.2:
                   (m.type==='reaper')?3.4:
                   (m.type==='tarantula')?5.2:
+                  (m.type==='boar')?3.8:
                   (m.type==='dragon')?3.4:
                   (m.type==='golem')?3.0:
                   (m.type==='lizard')?2.6:1.8;
@@ -1016,6 +1051,44 @@ const Capture={
       return false;
     }
 
+    /* ---- 3. KEMAMPUAN SERUDUK LARI KENCANG PET BABI HUTAN (DOUBLE JUMP) ---- */
+    if(m.type==='boar'){
+      if((m.stunT||0)>0||(Player.stunT||0)>0||Player._webStunned)return false;
+      const cd=m.chargeCd||0;
+      if(dt<480){
+        if(cd<=0){
+          m.chargeCd=3.5;
+          m.bAct='gore';
+          m.bActT=1.10; // Langsung masuk fase sprint seruduk lari kencang saat ditunggangi
+          m.bActDur=2.50;
+
+          // Dorongan horizontal super kencang sesuai arah joystick atau hadap
+          const mv=Input.moveVec();
+          const mvLen=Math.hypot(mv.x,mv.z);
+          const fwdAngle=(mvLen>0.1)?Math.atan2(mv.x,mv.z):m.mesh.rotation.y;
+          const boost=16.5;
+          m.vel.x=Math.sin(fwdAngle)*boost;
+          m.vel.z=Math.cos(fwdAngle)*boost;
+          m.mesh.rotation.y=fwdAngle;
+
+          if(typeof FX!=='undefined'){
+            FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.2,0)),0xb8a792,18,3.5);
+            FX.ring(m.pos.x,m.pos.y+0.1,m.pos.z,0xd97706,0.5,3.8);
+            FX.text(m.pos.clone().add(new THREE.Vector3(0,1.5,0)),'🐗 SERUDUK KENCANG!','#f59e0b');
+            FX.addShake(0.35);
+          }
+          if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit(1.0);
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast('🐗 Seruduk Lari Kencang Babi Hutan!');
+          return true;
+        }else if(cd>0){
+          if(typeof UI!=='undefined'&&UI.toast)
+            UI.toast(`⏳ Kaki babi hutan masih memulihkan tenaga (${Math.ceil(cd)}s)`);
+        }
+      }
+      return false;
+    }
+
     return false;
   },
 
@@ -1130,8 +1203,22 @@ const Capture={
       m.tSpringSink=springSink;
     }
 
-    const seatBase=(typeof meshHeight==='function')?meshHeight(m.type)*0.72:1.2;
-    const seat=seatBase-(m.tSpringSink||0);
+    // Update seruduk babi hutan saat ditunggangi
+    if(m.type==='boar'){
+      if((m.chargeCd||0)>0) m.chargeCd = Math.max(0, m.chargeCd - dt);
+      if(m.bAct==='gore'){
+        m.bActT = (m.bActT || 0) + dt;
+        if(typeof Monsters!=='undefined'&&Monsters.areaHit){
+          Monsters.areaHit(m, m.pos.x, m.pos.z, 2.4, Math.round((m.dmg||27)*1.5), 14);
+        }
+        if(m.bActT >= (m.bActDur || 2.5)){
+          m.bAct = null;
+        }
+      }
+    }
+
+    const seatPos=this.getSeatPos(m);
+    const seat=seatPos.seatY;
 
     /* ---- transisi TURUN: lompat ke samping mount lalu mendarat ---- */
     if(this.dismounting){
@@ -1172,7 +1259,7 @@ const Capture={
       if(Math.hypot(m.vel.x,m.vel.z)<0.05){m.vel.x=0;m.vel.z=0;}
       this.jumpQ=false;
 
-      p.pos.set(m.pos.x,m.pos.y+seat,m.pos.z);
+      p.pos.set(seatPos.x,seatPos.y,seatPos.z);
       p.mesh.position.copy(p.pos);
       p.vel.set(0,0,0);
       p.onGround=true;
@@ -1255,7 +1342,8 @@ const Capture={
       this.mountT+=dt;
       const k=Math.min(1,this.mountT/this.mountDur);
       const from=this.mountStartPos;
-      const tx=m.pos.x,ty=m.pos.y+seat,tz=m.pos.z;
+      const curSeat=this.getSeatPos(m);
+      const tx=curSeat.x,ty=curSeat.y,tz=curSeat.z;
       p.pos.x=lerp(from.x,tx,k);
       p.pos.z=lerp(from.z,tz,k);
       /* lengkung parabola: melompat naik melewati puncak lalu mendarat di sadel */
@@ -1316,8 +1404,9 @@ const Capture={
       if(Math.hypot(m.vel.x,m.vel.z)<0.08){m.vel.x=0;m.vel.z=0;}
     }
 
-    /* posisi pemain mengikuti punggung mount */
-    p.pos.set(m.pos.x,m.pos.y+seat,m.pos.z);
+    /* posisi pemain mengikuti punggung mount secara presisi */
+    const curSeat=this.getSeatPos(m);
+    p.pos.set(curSeat.x,curSeat.y,curSeat.z);
     p.mesh.position.copy(p.pos);
     p.mesh.rotation.y=p.facing;
     p.vel.set(0,0,0);
@@ -1430,6 +1519,7 @@ const Capture={
     if(RPG.countItem(cost.food)<cost.n){
       const cIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(cost.food):ITEMS[cost.food].e;
       UI.toast(`${cIco} Butuh ${cost.n} ${ITEMS[cost.food].n} untuk naik level.`);
+      if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('⚠️ BAHAN KURANG!');
       return;
     }
 
@@ -1458,11 +1548,13 @@ const Capture={
         this.pet.dmg=pet.dmg;
       }
       UI.toast(`🎉 ${pet.name} naik ke Lv ${pet.lvl}! (+stat naik)`);
+      if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('🎉 LEVEL UP BERHASIL!');
       if(typeof Sfx!=='undefined'&&Sfx.levelup)Sfx.levelup();
     }else{
       /* Penalti kegagalan diringankan: XP hanya berkurang 15% (dulu 50%) */
       pet.xp=Math.floor((pet.xp||0)*0.85);
       UI.toast(`❌ Gagal menaikkan ${pet.name}. Bahan habis, XP berkurang sedikit.`);
+      if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('❌ LEVEL UP GAGAL!');
       if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
     }
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();

@@ -685,8 +685,8 @@ const Dungeon={
     /* lvl 6  */[['gold_ore',4,8],['crystal',3,5],['iron_ingot',2,4],['pelt',2,5]],
     /* lvl 7  */[['crystal',4,7],['gold_ingot',2,4],['iron_ingot',3,6],['venom',2,4]],
     /* lvl 8  */[['crystal',5,9],['gold_ingot',3,5],['soul_shard',1,2],['centipede_shell',3,6]],
-    /* lvl 9  */[['crystal',6,11],['gold_ingot',4,7],['soul_shard',2,4],['boss_core',1,1]],
-    /* lvl 10 */[['crystal',8,14],['gold_ingot',5,9],['soul_shard',3,5],['boss_core',1,2]],
+    /* lvl 9  */[['crystal',6,11],['gold_ingot',4,7],['soul_shard',2,4],['soul_shard',3,5]],
+    /* lvl 10 */[['crystal',8,14],['gold_ingot',5,9],['soul_shard',3,5],['soul_shard',4,6]],
   ],
   /* Tabel harta untuk level di luar 1..10 (11–100). Alih-alih menduplikasi 90
      baris, isi peti dihitung dari tabel level-10 yang diperbesar jumlahnya —
@@ -839,7 +839,8 @@ const Dungeon={
     for(const e of table)
       add(e[0],Math.max(1,Math.round(
         (e[1]+Math.floor(Math.random()*(e[2]-e[1]+1)))*mul)));
-    add('boss_core',1+Math.floor(lvl/3));
+    /* --- 1b. inti boss: peluang 12% dari peti boss dungeon (satu-satunya inti dari dungeon) --- */
+    if(Math.random()<0.12)add('boss_core',1);
     /* --- 2. item langka (10%) --- */
     let rareGot=null;
     if(Math.random()<this.RARE_CHANCE){
@@ -1378,7 +1379,8 @@ const Dungeon={
     for(const e of this.lootTableFor(lvl))add(e[0],Math.round(e[2]*(0.6+lvl*0.2)));
     add('bread',2+lvl);
     if(lvl>=5)add('crystal',lvl);
-    if(lvl>=8)add('boss_core',Math.floor(lvl/4));
+    /* inti boss TIDAK dari hadiah penaklukan — hanya dari peti boss dungeon (12%).
+       Inti boss hanya dari: mob biasa 7%, mini boss 10%, peti boss dungeon 12%, boss altar 50%. */
     /* XP penaklukan: 20% dari KEBUTUHAN XP LEVEL PEMAIN SAAT INI (dulu 25% dari
        level tengah band dungeon — dungeon D80 memberi 59% XP level Lv83 pemain,
        meleset jauh dari tujuan "lompatan besar"). Kini dungeon berapa pun

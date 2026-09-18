@@ -11,7 +11,7 @@ const Monsters={
   list:[],timer:0,
   TYPES:{
     slime:{hp:22,dmg:6,xp:14,speed:2.2,r:0.45,aggro:10},
-    boar:{hp:40,dmg:9,xp:22,speed:4.6,r:0.5,aggro:14},
+    boar:{hp:40,dmg:9,xp:22,speed:4.6,r:0.5,aggro:14,bossScale:0.201},
     golem:{hp:170,dmg:20,xp:90,speed:1.7,r:0.9,aggro:16},
     /* serigala: cepat, menggigit beruntun — ancaman utama di tundra & malam */
     wolf:{hp:52,dmg:11,xp:34,speed:5.6,r:0.5,aggro:18},
@@ -324,14 +324,40 @@ const Monsters={
     return this.setLevel(m,this.rollLevel(biome,bx,bz));
   },
 
+  /* Cari ketinggian tanah datar bebas pohon & dedaunan untuk spawn mob */
+  findClearSpawnGround(x, z, r){
+    const bx=Math.floor(x), bz=Math.floor(z);
+    let groundY=-1;
+    for(let y=CFG.WORLD_H-1; y>=0; y--){
+      const id=World.getBlock(bx, y, bz);
+      if(World.isFloor(id)){ groundY=y+1; break; }
+    }
+    if(groundY<CFG.SEA) return null; // jangan di dalam/bawah air
+
+    // Periksa pohon: pohon tidak boleh ada di titik ini atau di sekitar tapak mob
+    const rad = Math.max(1, Math.ceil(r || 0.6));
+    for(let dx=-rad; dx<=rad; dx++){
+      for(let dz=-rad; dz<=rad; dz++){
+        const tx=bx+dx, tz=bz+dz;
+        if(typeof WGEN!=='undefined'&&WGEN.treeAt&&WGEN.treeAt(tx, tz, groundY)) return null;
+        // Cek ruang tubuh mob dari groundY sampai groundY+3: tidak boleh ada dedaunan atau batang kayu
+        for(let y=groundY; y<=groundY+3; y++){
+          const blk=World.getBlock(tx, y, tz);
+          if(blk===B.WOOD || blk===B.LEAF) return null;
+        }
+      }
+    }
+    return groundY;
+  },
+
   spawn(){
     const night=Weather.nightF>0.5;
     const cap=night?13:9;
     if(this.list.length>=cap)return;
-    const a=Math.random()*Math.PI*2,d=rand(17,28);
+    const a=Math.random()*Math.PI*2,d=rand(38,58); // Jarak dijauhkan (38-58 blok) agar tidak terlihat spawn/jatuh di depan mata pemain
     const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
-    const h=World.topY(Math.floor(x),Math.floor(z));
-    if(h<CFG.SEA)return; // hanya daratan (di atas permukaan air)
+    const h=this.findClearSpawnGround(x,z,0.7);
+    if(h===null)return; // hanya daratan terbuka bebas pohon
     /* JANGAN spawn di dalam / menempel bangunan desa, dan REDAM spawn di
        seluruh area desa (hanya 20% yang diterima) — lihat spawnAllowed. */
     if(!this.spawnAllowed(x,z))return;
@@ -374,6 +400,10 @@ const Monsters={
     if(boss){
       UI.toast(`☠️ ${MOB_NAME[type]||type} Raksasa Lv ${m.lvl} muncul!`);
       FX.ring(x,h+0.1,z,0xff6bd6,1.2,5);
+      /* Mini boss tarantula ditemani 3 tarantula mini (ukuran 50%) */
+      if(type==='tarantula'){
+        this.spawnTarantulaMinions(m);
+      }
     }
     /* ---------- KAWANAN SERIGALA ----------
        Serigala berburu berkelompok, tapi jumlah kawan DIKURANGI (dulu 1-2
@@ -386,9 +416,10 @@ const Monsters={
       for(let k=0;k<mates;k++){
         if(this.list.length>=cap)break;
         const px=x+rand(-3.5,3.5),pz=z+rand(-3.5,3.5);
-        const ph=World.topY(Math.floor(px),Math.floor(pz));
-        if(ph<CFG.SEA||!this.spawnAllowed(px,pz))continue;
+        const ph=this.findClearSpawnGround(px,pz,0.5);
+        if(ph===null||!this.spawnAllowed(px,pz))continue;
         const w=this.make('wolf',new THREE.Vector3(px,ph,pz),false);
+        w.onGround=true;
         this.setLevel(w,m.lvl);
         this.list.push(w);
       }
@@ -399,9 +430,10 @@ const Monsters={
       for(let k=0;k<mates;k++){
         if(this.list.length>=cap)break;
         const px=x+rand(-2.5,2.5),pz=z+rand(-2.5,2.5);
-        const ph=World.topY(Math.floor(px),Math.floor(pz));
-        if(ph<CFG.SEA||!this.spawnAllowed(px,pz))continue;
+        const ph=this.findClearSpawnGround(px,pz,0.35);
+        if(ph===null||!this.spawnAllowed(px,pz))continue;
         const rb=this.make('rabbit',new THREE.Vector3(px,ph,pz),false);
+        rb.onGround=true;
         this.setLevel(rb,m.lvl);
         this.list.push(rb);
       }
@@ -422,11 +454,11 @@ const Monsters={
     if(this.countType('lizard')>=this.LIZARD_MAX)return;
     if(Math.random()>0.55)return;                       // tidak selalu spawn
     for(let t=0;t<14;t++){
-      const a=Math.random()*Math.PI*2,d=rand(16,34);
+      const a=Math.random()*Math.PI*2,d=rand(36,54); // Jarak spawn dijauhkan
       const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
       const bx=Math.floor(x),bz=Math.floor(z);
-      const h=World.topY(bx,bz);
-      if(h<CFG.SEA)continue;                       // harus daratan
+      const h=this.findClearSpawnGround(x,z,0.55);
+      if(h===null)continue;                        // harus daratan bebas pohon
       if(!this.spawnAllowed(bx,bz))continue;       // bukan di desa (redam 20%)
       /* wajib bersebelahan dengan air (tepi sungai/danau) */
       let nearWater=false;
@@ -442,6 +474,7 @@ const Monsters={
       }
       if(crowded)continue;
       const m=this.make('lizard',new THREE.Vector3(bx+0.5,h,bz+0.5),false);
+      m.onGround=true;
       this.applyBiomeLevel(m,bx,bz);
       this.list.push(m);
       return;
@@ -489,11 +522,11 @@ const Monsters={
     const type=want[(Math.random()*want.length)|0];
     const okBiome=this.TAME_BIOME[type]||[BIOME.FOREST];
     for(let t=0;t<12;t++){
-      const a=Math.random()*Math.PI*2,d=rand(18,32);
+      const a=Math.random()*Math.PI*2,d=rand(38,58); // Jarak spawn ternak dijauhkan
       const x=Player.pos.x+Math.sin(a)*d,z=Player.pos.z+Math.cos(a)*d;
       const bx=Math.floor(x),bz=Math.floor(z);
-      const h=World.topY(bx,bz);
-      if(h<CFG.SEA)continue;
+      const h=this.findClearSpawnGround(x,z,0.7);
+      if(h===null)continue;
       if(!this.spawnAllowed(bx,bz))continue;
       const biome=WGEN.biomeAt(bx,bz);
       if(okBiome.indexOf(biome)<0)continue;
@@ -503,9 +536,10 @@ const Monsters={
       const gl=this.rollLevel(biome,bx,bz);
       for(let k=0;k<n;k++){
         const px=x+rand(-2.5,2.5),pz=z+rand(-2.5,2.5);
-        const ph=World.topY(Math.floor(px),Math.floor(pz));
-        if(ph<CFG.SEA||!this.spawnAllowed(px,pz))continue;
+        const ph=this.findClearSpawnGround(px,pz,0.6);
+        if(ph===null||!this.spawnAllowed(px,pz))continue;
         const a2=this.make(type,new THREE.Vector3(px,ph,pz),false);
+        a2.onGround=true;
         this.setLevel(a2,gl);
         this.list.push(a2);
       }
@@ -630,7 +664,7 @@ const Monsters={
       dmg:Math.round(T.dmg*(boss?2.2:1)),
       xp:Math.round(T.xp*(boss?2:1)),
       r:T.r*(boss?(T.noBossScale?1.25:(type==='kumbang'?1.22:1.75)):1),
-      dead:false,deathT:0,flash:0,hopT:rand(0.5,1.5),onGround:false,inWater:false,
+      dead:false,deathT:0,flash:0,hopT:rand(0.5,1.5),onGround:true,inWater:false,
       windup:0,smashTarget:null,poisonHit:0,
       /* status dari efek senjata: pendarahan, racun bilah, perlambatan */
       bleedHit:0,bleedT:0,bleedDmg:0,
@@ -1043,6 +1077,11 @@ const Monsters={
       }
     }
 
+    /* Slime memecah tubuh menjadi 3 bagian kecil saat dibunuh (hanya slime induk) */
+    if(m.type==='slime'&&!m.isSplitSlime){
+      this.splitSlime(m);
+    }
+
     const d=
       m.type==='slime'?[['gel',1+(Math.random()<0.5?1:0)],['green_blood',Math.random()<0.16?1:0]]:
       m.type==='boar'?[['meat',1+(Math.random()<0.5?1:0)],['fiber',Math.random()<0.4?1:0]]:
@@ -1071,13 +1110,29 @@ const Monsters={
        m.type==='reaper'?[['soul_shard',1+(Math.random()<0.45?1:0)],
                           ['crystal',Math.random()<0.35?1:0]]:
        /* T-REX: daging melimpah + kulit keras purba (16% hard_shell, tidak 100%) */
-       m.type==='trex'?[['meat',4],['hard_shell',Math.random()<0.16?1:0],['boss_core',1]]:
+       m.type==='trex'?[['meat',4],['hard_shell',Math.random()<0.16?1:0]]:
        m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
-    /* boss selalu menjatuhkan inti boss (bahan set kristal) + drop ganda */
+    /* ---------- INTI BOSS (boss_core): SATU-SATUNYA dari jalur kill() ----------
+       - Mob BIASA (apa pun tipenya): peluang 7% menjatuhkan 1 inti boss.
+       - MINI BOSS (mob raksasa bertitik emas): peluang 10% menjatuhkan 1 inti boss.
+       Boss altar (kelabang) TIDAK lewat jalur ini — ia punya rate sendiri 50% 1-2.
+       Jalur drop ganda mini boss tetap berlaku untuk drop non-inti. */
+    if(m.type!=='kelabang'&&m.type!=='kelabang_part'){
+      if(m.boss){
+        if(Math.random()<0.10)d.push(['boss_core',1]);
+      }else{
+        if(Math.random()<0.07)d.push(['boss_core',1]);
+      }
+    }
+    /* mini boss: drop reguler digandakan (kecuali inti boss yang peluangnya tetap) */
     if(m.boss){
-      d.push(['boss_core',1]);
-      for(const e of d)e[1]*=2;
+      for(const e of d)if(e[0]!=='boss_core')e[1]*=2;
+    }
+    /* ---------- BOSS ALTAR (kelabang raksasa): peluang 50% menjatuhkan 1-2 inti boss ----------
+       Satu-satunya sumber inti boss dengan jumlah ganda. Ruas kelabang tidak ikut. */
+    if(m.type==='kelabang'&&m.boss){
+      if(Math.random()<0.50)d.push(['boss_core',1+(Math.random()<0.5?1:0)]);
     }
     /* ---------- 4 BAHAN RITUAL ALTAR: BONUS TANAH MERAH (16%) ----------
        Kaki Serangga, Kulit Keras, Darah Hijau, dan Racun Berbisa memiliki
@@ -1518,6 +1573,12 @@ const Monsters={
        sembur jaring + STUN 5 detik (jauh) ---------- */
     if(m.type==='tarantula'){
       this.aiTarantula(m,dt,dp,angP);
+      return;
+    }
+
+    /* ---------- BABI HUTAN: pukulan gading ke atas (dekat) & seruduk lari kencang (jauh) ---------- */
+    if(m.type==='boar'){
+      this.aiBoar(m,dt,dp,angP);
       return;
     }
 
@@ -2610,7 +2671,84 @@ const Monsters={
      Pemilihan DIUNDI dengan jarak sebagai pemiring peluang (pola kumbang/
      semut): menempel → gigit, menengah → lompat, jauh → jaring.
      ========================================================================= */
-  pickTarantulaAtk(d, targetStunned){
+  /* ---------- SLIME PECAH MENJADI 3 SLIME KECIL SAAT MATI ---------- */
+  splitSlime(parent){
+    if(parent.isSplitSlime)return;
+    const angles=[0,(Math.PI*2)/3,(Math.PI*4)/3];
+    for(let i=0;i<3;i++){
+      const a=angles[i]+(Math.random()-0.5)*0.5;
+      const dist=0.6+Math.random()*0.4;
+      const px=parent.pos.x+Math.sin(a)*dist;
+      const pz=parent.pos.z+Math.cos(a)*dist;
+      const py=parent.pos.y;
+      const baby=this.make('slime',new THREE.Vector3(px,py,pz),false);
+      baby.isSplitSlime=true; // Menandai slime kecil agar langsung mati saat dibunuh tanpa memecah lagi
+
+      const baseScale=baby.baseScale||1.0;
+      baby.mesh.scale.setScalar(baseScale*0.45);
+      baby.baseScale=baseScale*0.45;
+      baby.sizeMul=0.45;
+      baby.r=(this.TYPES.slime.r||0.45)*0.5;
+
+      baby.hp=8;
+      baby.maxhp=8;
+      baby.dmg=3;
+      baby.xp=4;
+      baby.speed=(this.TYPES.slime.speed||2.2)*1.15;
+      this.setLevel(baby,Math.max(1,parent.lvl||1));
+
+      baby.vel.y=4.2+Math.random()*1.5;
+      baby.vel.x=Math.sin(a)*(2.4+Math.random()*1.2);
+      baby.vel.z=Math.cos(a)*(2.4+Math.random()*1.2);
+      baby.onGround=false;
+
+      this.list.push(baby);
+    }
+    if(typeof FX!=='undefined'){
+      FX.debris(parent.pos.clone().add(new THREE.Vector3(0,0.4,0)),0x67c74f,16,3.0);
+      FX.ring(parent.pos.x,parent.pos.y+0.1,parent.pos.z,0x82e065,0.6,2.4);
+    }
+    if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit(0.8);
+  },
+
+  /* ---------- 3 TARANTULA MINI PENGAWAL MINI BOSS TARANTULA ---------- */
+  spawnTarantulaMinions(boss){
+    if(!boss||boss.dead)return;
+    const angles=[0,(Math.PI*2)/3,(Math.PI*4)/3];
+    for(let i=0;i<3;i++){
+      const a=angles[i]+(Math.random()-0.5)*0.4;
+      const dist=2.2+Math.random()*1.0;
+      const px=boss.pos.x+Math.sin(a)*dist;
+      const pz=boss.pos.z+Math.cos(a)*dist;
+      let py=boss.pos.y;
+      if(typeof World!=='undefined'&&World.groundAt){
+        py=Math.max(CFG.SEA,World.groundAt(px,pz,boss.pos.y+3));
+      }
+      const mini=this.make('tarantula',new THREE.Vector3(px,py,pz),false);
+      mini.isMini=true;
+      mini.noCatch=true; // Tidak bisa ditangkap!
+      mini.leader=boss;
+
+      // Ukuran 50% dari tarantula biasa
+      const baseScale=mini.baseScale||0.34;
+      mini.mesh.scale.setScalar(baseScale*0.5);
+      mini.baseScale=baseScale*0.5;
+      mini.sizeMul=0.5;
+      mini.r=(this.TYPES.tarantula.r||0.8)*0.5;
+
+      const T=this.TYPES.tarantula;
+      mini.hp=Math.round(T.hp*0.45);
+      mini.maxhp=mini.hp;
+      mini.dmg=Math.max(1,Math.round(T.dmg*0.5));
+      mini.speed=T.speed*1.05;
+      mini.onGround=true;
+      this.setLevel(mini,boss.lvl||1);
+      this.list.push(mini);
+    }
+  },
+
+  pickTarantulaAtk(d, targetStunned, isMini){
+    if(isMini)return 'bite'; // Tarantula mini hanya bisa menyerang gigitan, tidak bisa melompat dan jaring
     if(targetStunned){
       // Mangsa sedang terikat jaring tak berdaya: langsung terkam tanpa basa-basi!
       if(d>2.2)return 'leap';
@@ -2631,6 +2769,11 @@ const Monsters={
 
     if(m.tAct){this.tarantulaAct(m,dt,dT,angT,tgt);return;}
 
+    // Tarantula mini mengikuti komando & target induk jika ada
+    if(m.isMini&&m.leader&&!m.leader.dead){
+      if(m.leader.foe&&!m.foe)m.foe=m.leader.foe;
+    }
+
     const MB=CFG.MOB;
     const sight=Math.min(this.TYPES.tarantula.aggro,MB.SIGHT);
     m.seeT=Math.max(0,(m.seeT||0)-dt);
@@ -2640,7 +2783,7 @@ const Monsters={
     m.state=active?'chase':'wander';
 
     const targetStunned=(tgt===Player && ((Player.stunT||0)>0 || Player._webStunned)) || (tgt && (tgt.stunT||0)>0);
-    const stopDist=targetStunned?1.35:1.6;
+    const stopDist=m.isMini?1.2:(targetStunned?1.35:1.6);
 
     if(active){
       if(dT>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*(targetStunned?9:6));
@@ -2653,7 +2796,19 @@ const Monsters={
         const damp=Math.exp(-9*dt);
         m.vel.x*=damp;m.vel.z*=damp;
       }
-      if(m.atkCd<=0)this.startTarantulaAtk(m,this.pickTarantulaAtk(dT,targetStunned),tgt);
+      if(m.atkCd<=0)this.startTarantulaAtk(m,this.pickTarantulaAtk(dT,targetStunned,m.isMini),tgt);
+    }else if(m.isMini&&m.leader&&!m.leader.dead){
+      // Mini tarantula berkumpul di dekat mini boss jika tidak bertarung
+      const ldDist=Math.hypot(m.leader.pos.x-m.pos.x,m.leader.pos.z-m.pos.z);
+      if(ldDist>3.2){
+        const ldAng=Math.atan2(m.leader.pos.x-m.pos.x,m.leader.pos.z-m.pos.z);
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ldAng,dt*4);
+        const sp=m.speed*0.6;
+        m.vel.x=lerp(m.vel.x,Math.sin(ldAng)*sp,clamp(5*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(ldAng)*sp,clamp(5*dt,0,1));
+      }else{
+        m.vel.x*=0.85;m.vel.z*=0.85;
+      }
     }else{
       m.t-=dt;
       if(m.t<=0){m.t=rand(1.5,4);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
@@ -2773,6 +2928,182 @@ const Monsters={
   },
 
   /* =========================================================================
+     AI BABI HUTAN — 2 serangan anatomis (port dari Babi Hutan.html)
+     -------------------------------------------------------------------------
+     'punch' (Pukulan Gading ke Atas / Uppercut Tusk Slash) :
+             Merunduk memampatkan lutut 2-sendi lalu meledak menyabet ke atas
+             dengan gading tajam dan rahang menganga, melontarkan musuh ke atas.
+     'gore'  (Seruduk Lari Kencang / Gore Charge) :
+             Fase 1: Ancang-ancang mengais tanah 3 kali dengan kaki depan (debu tanah).
+             Fase 2: Lari kencang menerjang maju (kecepatan tinggi derap gallop)
+                     menabrak target dengan gading terhunus lurus (damage besar + knockback).
+             Fase 3: Mengerem menancapkan kuku depan diiringi debu pengereman.
+     ========================================================================= */
+  pickBoarAtk(d){
+    if(d<=1.8) return 'punch';
+    if(d>=7.0) return 'gore';
+    // Antara 1.8 - 7.0 blok: proporsional peluang uppercut vs seruduk
+    const pPunch = lerp(0.85, 0.15, (d - 1.8) / 5.2);
+    return Math.random() < pPunch ? 'punch' : 'gore';
+  },
+
+  aiBoar(m,dt,dp,angP){
+    this.pickFoe(m,dt);
+    const tgt=this.aimTarget(m);
+    const tpos=tgt?tgt.pos:Player.pos;
+    const dT=tgt?Math.hypot(tpos.x-m.pos.x,tpos.z-m.pos.z):999;
+    const angT=Math.atan2(tpos.x-m.pos.x,tpos.z-m.pos.z);
+
+    if(m.bAct){this.boarAtk(m,dt,dT,angT,tgt);return;}
+
+    const MB=CFG.MOB;
+    const sight=Math.min(this.TYPES.boar.aggro||14,MB.SIGHT);
+    m.seeT=Math.max(0,(m.seeT||0)-dt);
+    m.alert=Math.max(0,(m.alert||0)-dt);
+    if(tgt&&dT<sight)m.seeT=MB.MEM;
+    const active=!!tgt&&(m.seeT>0||m.alert>0);
+    m.state=active?'chase':'wander';
+
+    if(active){
+      if(dT>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*7);
+      let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+      // Jika jarak target jauh, babi hutan lari kencang (sprint gallop)
+      if(dT>3.8 && !m.inWater) sp *= 1.45;
+
+      if(dT>1.8){
+        m.vel.x=lerp(m.vel.x,Math.sin(angT)*sp,clamp(7*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(angT)*sp,clamp(7*dt,0,1));
+      }else{
+        const damp=Math.exp(-8*dt);
+        m.vel.x*=damp;m.vel.z*=damp;
+      }
+      if(m.atkCd<=0&&dT<=14) this.startBoarAtk(m,this.pickBoarAtk(dT),tgt);
+    }else{
+      m.t-=dt;
+      if(m.t<=0){m.t=rand(1.5,4.0);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.65;}
+      if(m.walking){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*3);
+        const sp=m.speed*0.4;
+        m.vel.x=lerp(m.vel.x,Math.sin(m.dir)*sp,clamp(4*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(m.dir)*sp,clamp(4*dt,0,1));
+      }else{m.vel.x*=0.85;m.vel.z*=0.85;}
+    }
+  },
+
+  startBoarAtk(m,name,target){
+    const B=(typeof Mob_Boar!=='undefined')?Mob_Boar:null;
+    m.bAct=name;m.bActT=0;
+    m.bActDur=(B&&B.DUR[name])||(name==='gore'?3.1:1.1);
+    m.bTarget=(target&&target!==Player)?target:null;
+    m._bHit=false;
+    m._bFired=[false,false,false];
+    m._bChargeYaw=undefined;
+    m._bBrakeFxDone=false;
+  },
+
+  boarAtk(m,dt,dp,angP,tgtIn){
+    const B=(typeof Mob_Boar!=='undefined')?Mob_Boar:null;
+    m.bActT+=dt;
+    const tA=m.bActT;
+    const tgt=(m.bTarget&&!m.bTarget.dead)?m.bTarget:
+              (tgtIn||(m.pet?null:this.aimTarget(m)));
+
+    if(m.bAct==='punch'){
+      /* PUKULAN ATAS GADING (UPPERCUT TUSK SLASH) */
+      if(tA<0.22){
+        // Ancang-ancang merunduk, kunci bidik ke sasaran
+        if(dp>0.4)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*10);
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else if(tA<0.48){
+        // Sentak maju eksplosif uppercut
+        const yaw=m.mesh.rotation.y;
+        m.vel.x=lerp(m.vel.x,Math.sin(yaw)*6.5,clamp(12*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(yaw)*6.5,clamp(12*dt,0,1));
+      }else{
+        m.vel.x*=0.86;m.vel.z*=0.86;
+      }
+
+      if(!m._bHit&&tA>=(B?B.HIT.punch:0.38)){
+        m._bHit=true;
+        if(B&&B.punchFX)B.punchFX(m);
+        const yaw=m.mesh.rotation.y;
+        const hx=m.pos.x+Math.sin(yaw)*1.3,hz=m.pos.z+Math.cos(yaw)*1.3;
+        // Pukulan gading melontarkan target ke udara (knockup vel.y)
+        const hit=this.hitTarget(m,tgt,Math.round(m.dmg*1.3),2.2,hx,hz,6);
+        if(hit&&tgt&&tgt.vel){
+          tgt.vel.y=Math.max(tgt.vel.y||0,6.5);
+          if(tgt===Player)Player.onGround=false;
+        }
+      }
+    }else{
+      /* SERUDUK LARI KENCANG (GORE CHARGE) */
+      // FASE 1: ANCANG-ANCANG MENGAIS TANAH (tA < 1.10s)
+      if(tA<1.10){
+        // Hadapkan badan tepat ke arah target
+        m._bChargeYaw=angP;
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,clamp(dt*12,0,1));
+        m.vel.x*=0.78;m.vel.z*=0.78;
+
+        // 3 kali mengais kaki depan kiri menghasilkan semprotan debu ke belakang
+        const pawTimes=[0.35, 0.65, 0.95];
+        for(let i=0;i<3;i++){
+          if(!m._bFired[i]&&tA>=pawTimes[i]){
+            m._bFired[i]=true;
+            if(B&&B.gorePawFX)B.gorePawFX(m);
+            if(i===0&&typeof FX!=='undefined'){
+              FX.text(m.pos.clone().add(new THREE.Vector3(0,1.2,0)),'😤 SNORT!','#f59e0b');
+            }
+          }
+        }
+      }
+      // FASE 2: SERUDUK LARI KENCANG MENERJANG MAJU (1.10s <= tA < 2.50s)
+      else if(tA<2.50){
+        const yaw=(m._bChargeYaw!==undefined)?m._bChargeYaw:m.mesh.rotation.y;
+        m.mesh.rotation.y=yaw;
+        const chargeSpeed=14.5;
+        m.vel.x=Math.sin(yaw)*chargeSpeed;
+        m.vel.z=Math.cos(yaw)*chargeSpeed;
+
+        if(Math.random()<dt*18&&B&&B.goreChargeFX)B.goreChargeFX(m);
+
+        if(tA>=1.15&&!m._bChargeNotif&&typeof FX!=='undefined'){
+          m._bChargeNotif=true;
+          FX.text(m.pos.clone().add(new THREE.Vector3(0,1.4,0)),'🐗 SERUDUK!','#ef4444');
+        }
+
+        // Tabrakan serudukan: bila dalam jarak kontak dengan sasaran
+        if(!m._bHit&&dp<2.2){
+          m._bHit=true;
+          if(B&&B.goreImpactFX)B.goreImpactFX(m,tgt||{pos:m.pos});
+          const yaw=m.mesh.rotation.y;
+          const hit=this.hitTarget(m,tgt,Math.round(m.dmg*1.65),2.4,m.pos.x,m.pos.z,12);
+          if(hit&&tgt&&tgt.vel){
+            tgt.vel.x+=Math.sin(yaw)*11.5;
+            tgt.vel.z+=Math.cos(yaw)*11.5;
+            tgt.vel.y=Math.max(tgt.vel.y||0,4.8);
+            if(tgt===Player)Player.onGround=false;
+          }
+        }
+      }
+      // FASE 3: MENGEREM MENANCAPKAN KUKU (2.50s <= tA)
+      else{
+        m.vel.x*=Math.exp(-12*dt);
+        m.vel.z*=Math.exp(-12*dt);
+        if(!m._bBrakeFxDone){
+          m._bBrakeFxDone=true;
+          if(B&&B.goreBrakeFX)B.goreBrakeFX(m);
+        }
+      }
+    }
+
+    if(m.bActT>=m.bActDur){
+      m.bAct=null;m.bTarget=null;
+      m._bChargeNotif=false;
+      m.atkCd=rand(1.5,2.8);
+    }
+  },
+
+  /* =========================================================================
      SERANGAN MOB SEDERHANA — SATU JALUR UNTUK SEMUA SASARAN
      -------------------------------------------------------------------------
      Dipakai oleh ai() (lawan pemain), aiVsNpc() (lawan rekan NPC/pet), dan
@@ -2804,9 +3135,8 @@ const Monsters={
         return true;
 
       case 'boar':
-        if(d>=1.5)return false;
-        strike(m.dmg);m.atkCd=1.2;
-        if(m.parts.head)m.parts.head.rotation.x=-0.6;
+        if(m.atkCd>0||m.bAct)return false;
+        this.startBoarAtk(m,this.pickBoarAtk(d),tgt);
         return true;
 
       case 'wolf':
@@ -3198,6 +3528,10 @@ const Monsters={
       /* ---------- TARANTULA PET: gigitan, lompat sergap & sembur jaring ---------- */
       else if(m.type==='tarantula'){
         if(!m.tAct)this.startTarantulaAtk(m,this.pickTarantulaAtk(d),target);
+      }
+      /* ---------- BABI HUTAN PET: pukulan atas gading & seruduk lari kencang ---------- */
+      else if(m.type==='boar'){
+        if(!m.bAct)this.startBoarAtk(m,this.pickBoarAtk(d),target);
       }
       /* ---------- REAPER PET: keempat aksinya dipakai ----------
          Timeline dijalankan reaperAct() (dipanggil dari Capture.petAI) dengan

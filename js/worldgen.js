@@ -362,15 +362,23 @@ const WGEN={
     const m=Noise.fbm(nM,wx*0.02,wz*0.02,2)*0.5+0.5;
     /* ---- PANTAI: selalu rata di permukaan air supaya jadi pita pasir ---- */
     if(b===BIOME.BEACH)return CFG.SEA;
-    /* ---- sungai/danau: kedalaman TEPAT 3-4 blok dari permukaan air (kecuali pegunungan agar bukit utuh) ---- */
-    if(m<0.30 && b!==BIOME.MOUNTAIN){
+    /* ---- sungai/danau: kedalaman TEPAT 3-4 blok dari permukaan air (kecuali pegunungan & gurun agar medan utuh) ---- */
+    if(m<0.30 && b!==BIOME.MOUNTAIN && b!==BIOME.DESERT){
       const deep=m<0.18;
       return deep?CFG.SEA-4:CFG.SEA-3;           // y=1 (dalam 4) atau y=2 (dalam 3)
+    }
+    /* ---- GURUN (DESERT): bukit pasir bergelombang naik-turun halus (smooth rolling sand dunes) ---- */
+    if(b===BIOME.DESERT){
+      const nx = wx * 0.022 + wz * 0.015;
+      const dune1 = Math.sin(nx * 1.5) * 0.5 + 0.5;
+      const duneNoise = Noise.fbm(nH, wx * 0.016 + 51.3, wz * 0.016 - 27.7, 2) * 0.5 + 0.5;
+      const duneBlend = Math.pow(dune1 * 0.6 + duneNoise * 0.4, 1.3);
+      const hDune = CFG.SEA + Math.round(duneBlend * 4.2); // rentang 5..9 dengan undakan luas landai tanpa bolong
+      return clamp(hDune, CFG.SEA, 9);
     }
     /* ---- daratan: SEA..7 (5..7) ---- */
     let h=CFG.SEA+Math.round(t*(7-CFG.SEA));     // 5..7
     if(m>0.75)h=Math.max(h,6);                   // dataran tinggi
-    if(b===BIOME.DESERT)h=clamp(h-(this.hash(wx,wz,21)<0.5?1:0),CFG.SEA,6);
     if(b===BIOME.TUNDRA&&m>0.55)h=Math.min(7,h+1);
     /* ---- PEGUNUNGAN: gundukan seperti bukit secara smooth (rentang 6..12) ---- */
     if(b===BIOME.MOUNTAIN){

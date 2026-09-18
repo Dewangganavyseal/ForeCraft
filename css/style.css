@@ -1139,10 +1139,15 @@ body.touch .bag-cat-tab{font-size:9.5px;padding:4px 7px}
    #hud memakai pointer-events:none, jadi tombolnya mengaktifkan kembali sendiri. */
 #btn-gear{position:absolute;left:100%;top:0;margin-left:8px;
   pointer-events:auto;z-index:26;width:34px;height:34px;border-radius:10px!important;
-  cursor:pointer;background:radial-gradient(circle at 35% 30%, rgba(32, 42, 36, 0.92), rgba(12, 18, 14, 0.96))!important;
-  border:2px solid #ffffff!important;color:#eaffd8;font-size:14px;
+  cursor:pointer;
+  background-color:rgba(18, 26, 22, 0.92)!important;
+  background-image:url("../buttons/gear.png"), radial-gradient(circle at 35% 30%, rgba(32, 42, 36, 0.92), rgba(12, 18, 14, 0.96))!important;
+  background-size:20px 20px, cover!important;
+  background-position:center, center!important;
+  background-repeat:no-repeat, no-repeat!important;
+  border:2.5px solid #ffffff!important;color:#eaffd8;font-size:14px;
   line-height:1;padding:0;backdrop-filter:blur(4px);box-shadow:0 3px 10px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.4)!important;
-  background-size:72% 72%!important;background-position:center!important;background-repeat:no-repeat!important;
+  display:flex;align-items:center;justify-content:center;
   transition:transform .12s,background .2s,border-color .2s,opacity .2s}
 #btn-gear:active{transform:scale(.88)}
 #btn-gear:hover{border-color:#ffffff!important;box-shadow:0 0 10px rgba(255,255,255,0.4)!important}

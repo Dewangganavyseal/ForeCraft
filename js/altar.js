@@ -81,15 +81,25 @@ const Altar={
     if(typeof WGEN==='undefined')return true;
     const land=(x,z)=>{
       if(WGEN.isLand&&!WGEN.isLand(x,z))return false;
-      if(WGEN.height&&WGEN.height(x,z)<CFG.SEA)return false;
+      const h=WGEN.height?WGEN.height(x,z):0;
+      if(h<CFG.SEA+1)return false;
       return true;
     };
     if(!land(bx,bz))return false;
     if(WGEN.buildingAt&&WGEN.buildingAt(bx,bz,3))return false;
-    /* keempat sudut platform (5x5 + margin) juga harus daratan supaya altar
-       tidak berdiri setengah tercelup di tepi air */
-    for(const[dx,dz]of[[-3,-3],[3,-3],[-3,3],[3,3]]){
-      if(!land(bx+dx,bz+dz))return false;
+
+    // Altar hanya boleh spawn di dataran biome yang relatif rata dan bebas pohon
+    const baseH=WGEN.height?WGEN.height(bx,bz):0;
+    for(let dx=-3;dx<=3;dx++){
+      for(let dz=-3;dz<=3;dz++){
+        const tx=bx+dx, tz=bz+dz;
+        if(!land(tx,tz))return false;
+        const th=WGEN.height?WGEN.height(tx,tz):baseH;
+        // Dataran biome harus relatif rata (selisih ketinggian maksimum 1.5 blok)
+        if(Math.abs(th-baseH)>1.5)return false;
+        // TIDAK BOLEH ada pohon di radius tapak altar
+        if(WGEN.treeAt&&WGEN.treeAt(tx,tz,th))return false;
+      }
     }
     return true;
   },
@@ -225,12 +235,50 @@ const Altar={
     return {mesh:g,parts};
   },
 
+  /* Cari ketinggian lantai dataran biome murni (bukan dedaunan / kayu pohon / air) */
+  getGroundY(bx, bz){
+    if(typeof World==='undefined')return 0;
+    for(let y=CFG.WORLD_H-1; y>=0; y--){
+      const id=World.getBlock(bx, y, bz);
+      if(World.isFloor(id)) return y+1;
+    }
+    return 0;
+  },
+
   /* ---------- bangun altar di titik (x,z) ---------- */
   spawn(cellKey,x,z){
     const bx=Math.floor(x),bz=Math.floor(z);
-    const gy=World.topY(bx,bz);
-    if(gy<CFG.SEA)return null;                       // jangan di air/laut
+    const gy=this.getGroundY(bx,bz);
+    if(gy<CFG.SEA+1)return null;                       // hanya di dataran di atas air
     if(typeof WGEN!=='undefined'&&WGEN.buildingAt&&WGEN.buildingAt(bx,bz,2))return null; // bukan di desa
+
+    // Pastikan tapak 5x5 sekitar altar berdiri di dataran yang rata
+    let minH=gy, maxH=gy;
+    for(let dx=-2;dx<=2;dx++){
+      for(let dz=-2;dz<=2;dz++){
+        const h=this.getGroundY(bx+dx, bz+dz);
+        if(h<CFG.SEA)return null;
+        if(h<minH)minH=h;
+        if(h>maxH)maxH=h;
+      }
+    }
+    if(maxH-minH>2)return null; // batalkan jika lereng curam / tebing
+
+    // Bersihkan dedaunan, batang kayu pohon, atau tanaman di ruang 5x5 altar dari gy s/d gy+8
+    // agar altar tidak menembus dedaunan atau ranting apa pun
+    if(typeof World!=='undefined'&&World.setBlock){
+      for(let dx=-2;dx<=2;dx++){
+        for(let dz=-2;dz<=2;dz++){
+          for(let y=gy; y<=gy+8; y++){
+            const id=World.getBlock(bx+dx, y, bz+dz);
+            if(id===B.WOOD || id===B.LEAF || (typeof PLANT_INFO!=='undefined'&&PLANT_INFO[id])){
+              World.setBlock(bx+dx, y, bz+dz, B.AIR);
+            }
+          }
+        }
+      }
+    }
+
     const built=this.buildMesh();
     built.mesh.position.set(bx+0.5,gy,bz+0.5);
     this.scene.add(built.mesh);

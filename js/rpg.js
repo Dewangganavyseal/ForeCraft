@@ -1067,6 +1067,7 @@ const RPG={
         seed:Game.seed,time:Weather.time,day:Weather.day,
         hp:Player.hp,hunger:Player.hunger,level:Player.level,xp:Player.xp,kills:Player.kills,
         pos:[Player.pos.x,Player.pos.y,Player.pos.z],
+        spawnP:[Player.spawnP.x,Player.spawnP.y,Player.spawnP.z],
         sp:this.sp,skills:this.skills,hotbar:this.hotbar,bag:this.bag,
         blockBag:this.blockBag,selectedBlockSlot:this.selectedBlockSlot,
         equip:this.equip,coin:this.coin,bagTier:this.bagTier,
