@@ -2244,13 +2244,14 @@ const UI={
         const it=ITEMS[s.id];
         /* Render icon model 1 blok 3D aslinya */
         d.innerHTML=`<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span>`;
-        d.title=`${it?it.n:s.id} (×${s.n})\nKlik untuk memilih blok ini`;
+        d.title=`${it?it.n:s.id} (×${s.n})\nKlik = pilih · Seret keluar panel = buang`;
         /* bingkai slot memakai warna rarity agar konsisten dengan tas biasa */
         if(it&&it.rarity&&RARITY[it.rarity]){
           d.classList.add('r-'+it.rarity);
           d.style.borderColor=RARITY[it.rarity].css;
         }
         d.addEventListener('click',()=>{
+          if(this._blockSkipClick){this._blockSkipClick=false;return;}
           RPG.selectedBlockSlot=i;
           this.renderBlockBag();
           if(typeof BuildSys!=='undefined')BuildSys.updateHUD();
@@ -2262,6 +2263,86 @@ const UI={
       gEl.appendChild(d);
     });
     this.applyItemIcons(gEl);
+    this.initBlockDrag();
+  },
+  /* konfirmasi membuang BLOK dari tas blok; sama seperti item biasa (jumlah bisa
+     diubah, blok jatuh ke dunia sebagai drop). */
+  confirmDropBlock(i,s){
+    const it=ITEMS[s.id];
+    this.modal({
+      icon:this.itemIcon(s.id),
+      text:`Buang <b>${it?it.n:s.id}</b> ke tanah?`,
+      input:{value:s.n,min:1,max:s.n},
+      okLabel:'✔ Buang',cancelLabel:'✖ Batal',
+      onOk:(n)=>{
+        if(n<=0)return;
+        const cur=RPG.blockBag[i];
+        if(!cur||cur.id!==s.id)return;
+        const take=Math.min(n,cur.n);
+        cur.n-=take;
+        if(cur.n<=0)RPG.blockBag[i]=null;
+        const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
+        const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
+        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,{owner:true});
+        this.toast(`🗑️ Membuang ${this.itemIcon(s.id)} ${it?it.n:s.id} ×${take}`);
+        if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+        if(RPG.selectedBlockSlot===i&&(!RPG.blockBag[i]||RPG.blockBag[i].n<=0))
+          RPG.selectedBlockSlot=-1;
+        this.renderBlockBag();
+        if(typeof BuildSys!=='undefined')BuildSys.updateHUD();
+      }
+    });
+  },
+  /* drag blok di tas blok: seret keluar panel = buang (pola sama seperti tas item). */
+  initBlockDrag(){
+    if(this._blockDragInit)return;
+    this._blockDragInit=true;
+    const DEAD=8;
+    let d=null;
+    const cleanup=()=>{
+      if(!d)return;
+      if(d.ghost)d.ghost.remove();
+      if(d.sl)d.sl.classList.remove('dragging');
+      d=null;
+    };
+    document.body.addEventListener('pointerdown',e=>{
+      if(this.open!=='bag'||this.bagPage!=='blocks')return;
+      if(e.button)return;
+      const sl=e.target.closest('.slot.block-slot');
+      if(!sl)return;
+      const s=RPG.blockBag[+sl.dataset.bi];
+      if(!s||!s.n)return;
+      d={sl,i:+sl.dataset.bi,x0:e.clientX,y0:e.clientY,moved:false,
+         ghost:null,pid:e.pointerId};
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!d||e.pointerId!==d.pid)return;
+      if(!d.moved){
+        if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)<DEAD)return;
+        d.moved=true;
+        const s=RPG.blockBag[d.i];
+        if(!s){cleanup();return;}
+        d.ghost=document.createElement('div');d.ghost.className='drag-ghost';
+        d.ghost.innerHTML=this.itemIcon(s.id);document.body.appendChild(d.ghost);
+        this.applyItemIcons(d.ghost);
+        d.sl.classList.add('dragging');
+        this._blockSkipClick=true;        // cegah click 'pilih' ikut jalan
+      }
+      d.ghost.style.left=e.clientX+'px';d.ghost.style.top=e.clientY+'px';
+    });
+    window.addEventListener('pointerup',e=>{
+      if(!d||e.pointerId!==d.pid)return;
+      if(d.moved){
+        const panelB=document.getElementById('panel-bag');
+        const under=document.elementFromPoint(e.clientX,e.clientY);
+        if(!under||!panelB.contains(under)){
+          const s=RPG.blockBag[d.i];
+          if(s)this.confirmDropBlock(d.i,s);
+        }
+      }
+      cleanup();
+    });
+    window.addEventListener('pointercancel',cleanup);
   },
   /* ================= PANEL PETI =================
      Dua grid: isi peti & isi tas pemain. Item bisa DIKLIK (pindah seluruh

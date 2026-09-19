@@ -136,6 +136,60 @@ const Settings={
     });
     syncSfx();
 
+    /* ===== CONTROLLER & PANDUAN KONTROL ===== */
+    const ctrlSec=document.createElement('div');
+    ctrlSec.className='set-sec';
+    ctrlSec.innerHTML=`
+      <div class="set-h">🎮 Menu Controller & Panduan Kontrol</div>
+      <p class="tip" style="margin-top:0">Lihat seluruh panduan tombol kontrol PC keyboard & mouse serta layar sentuh mobile.</p>
+      <button class="big" id="btn-toggle-ctrl" style="background:#202a24;border:1.5px solid #38bdf8;color:#e0f2fe;font-weight:700">🎮 Lihat Semua Kontrol (All Controllers)</button>
+      <div id="ctrl-guide-box" style="display:none;margin-top:10px;background:rgba(10,14,12,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:10px;padding:12px;max-height:360px;overflow-y:auto;">
+        <div style="font-weight:700;color:#38bdf8;margin-bottom:8px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">🖥️ KONTROL KEYBOARD & MOUSE (PC)</div>
+        <table class="help-t" style="width:100%;font-size:12px;line-height:1.6;border-collapse:collapse;">
+          <tr><td style="padding:4px 6px;color:#ffe08a;width:35%;"><b>W A S D</b> / Panah</td><td style="padding:4px 6px;">Bergerak maju, mundur, kiri, kanan</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>SHIFT</b> (Tahan)</td><td style="padding:4px 6px;">Berlari kencang (Sprint)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>SHIFT</b> (Tekan 2×)</td><td style="padding:4px 6px;">Mengelak cepat (Roll / Dodge)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>SPASI (SPACE)</b></td><td style="padding:4px 6px;">Melompat / Berenang naik / Double Jump pet</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Klik Kiri Mouse</b></td><td style="padding:4px 6px;">Serang kombo / Lempar Bom / Makan / Pancing</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Q / E / R / T</b></td><td style="padding:4px 6px;">Skill aktif slot 1–4 (Q tahan untuk bidik Hantam Bumi)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Angka 1 – 7</b></td><td style="padding:4px 6px;">Memilih slot hotbar (tekan lagi untuk lepas tangan)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>F</b></td><td style="padding:4px 6px;">Interaksi universal (Bicara, Rekrut, Perabot, Altar, Naik pet)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>B</b></td><td style="padding:4px 6px;">Membuka / menutup Tas & Perlengkapan</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>K</b></td><td style="padding:4px 6px;">Membuka / menutup Pohon Skill & Profisiensi</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>C</b></td><td style="padding:4px 6px;">Membuka / menutup Menu Crafting</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>G</b></td><td style="padding:4px 6px;">Membuka / menutup Panel Rekan Tim (Party)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>P</b></td><td style="padding:4px 6px;">Membuka / menutup Panel Karakter & Stat</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>V</b></td><td style="padding:4px 6px;">Mode Bangun Voxel (Build Mode)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>ENTER</b></td><td style="padding:4px 6px;">Membuka kotak obrolan Chat & Kirim pesan</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Panah ← →</b> / Klik Kanan</td><td style="padding:4px 6px;">Memutar sudut kamera (Orbit)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Panah ↑ ↓</b></td><td style="padding:4px 6px;">Mengatur sudut elevasi kamera</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Scroll Roda Mouse</b></td><td style="padding:4px 6px;">Zoom kamera mendekat (FPP/TPP) atau menjauh</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>ESC</b></td><td style="padding:4px 6px;">Menutup panel aktif / Lepas kursor mouse</td></tr>
+        </table>
+        <div style="font-weight:700;color:#38bdf8;margin:14px 0 8px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">📱 KONTROL LAYAR SENTUH (MOBILE)</div>
+        <table class="help-t" style="width:100%;font-size:12px;line-height:1.6;border-collapse:collapse;">
+          <tr><td style="padding:4px 6px;color:#ffe08a;width:35%;"><b>Analog Kiri Bawah</b></td><td style="padding:4px 6px;">Geser untuk bergerak (dorong penuh untuk sprint)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Tombol Pedang</b></td><td style="padding:4px 6px;">Serang kombo / Lempar Bom / Makan / Pancing</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Tombol Lompat</b></td><td style="padding:4px 6px;">Melompat / Berenang / Double jump pet</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Tombol Roll</b></td><td style="padding:4px 6px;">Mengelak cepat (Roll / Dodge)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Slot Skill Melingkar</b></td><td style="padding:4px 6px;">Pakai skill aktif 1–4 (tahan ikon hantam bumi untuk membidik)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Tombol 🤝</b></td><td style="padding:4px 6px;">Interaksi kontekstual (Bicara, Perabot, Altar, Party)</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Dua Jari (Geser)</b></td><td style="padding:4px 6px;">Memutar kamera 360° dengan mulus</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Dua Jari (Cubit)</b></td><td style="padding:4px 6px;">Zoom in / out kamera</td></tr>
+          <tr><td style="padding:4px 6px;color:#ffe08a;"><b>Menu Cepat Kanan</b></td><td style="padding:4px 6px;">Akses Tas, Craft, Skill, Party, dan Mode Bangun</td></tr>
+        </table>
+      </div>`;
+    el.appendChild(ctrlSec);
+
+    const btnToggleCtrl=ctrlSec.querySelector('#btn-toggle-ctrl');
+    const ctrlBox=ctrlSec.querySelector('#ctrl-guide-box');
+    let ctrlOpen=false;
+    btnToggleCtrl.addEventListener('click',()=>{
+      ctrlOpen=!ctrlOpen;
+      ctrlBox.style.display=ctrlOpen?'block':'none';
+      btnToggleCtrl.textContent=ctrlOpen?'🔼 Tutup Panduan Kontrol':'🎮 Lihat Semua Kontrol (All Controllers)';
+    });
+
     /* ===== CUSTOM UI ===== */
     const cui=document.createElement('div');
     cui.className='set-sec';

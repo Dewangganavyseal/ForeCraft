@@ -13,23 +13,23 @@
    ============================================================================= */
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
-  scorpion:'🦂',lizard:'🦎',dragon:'🐉',trex:'🦖',cow:'🐄',horse:'🐎',
+  scorpion:'🦂',lizard:'🦎',dragon:'🐉',trex:'🦖',mammoth:'🦣',cow:'🐄',horse:'🐎',
   kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
   rabbit:'carrot',scorpion:'meat',lizard:'meat',cow:'wheat',horse:'wheat',
-  dragon:'cmeat',trex:'cmeat',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard',
+  dragon:'cmeat',trex:'cmeat',mammoth:'cabbage',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard',
   tarantula:'meat'};
 
 /* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
    reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
-  scorpion:180,lizard:220,golem:320,dragon:520,trex:480,
+  scorpion:180,lizard:220,golem:320,dragon:520,trex:480,mammoth:480,
   kumbang:240,yeti:300,semut:150,reaper:360,tarantula:280};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
-  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,trex:2.1,
+  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,trex:2.1,mammoth:2.0,
   kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45,tarantula:1.5};
 
 /* panjang maksimum tali saat tarik-tarikan.
@@ -72,7 +72,8 @@ const Capture={
     reaper:   { baseHp:380,  baseDmg:63 },
     yeti:     { baseHp:450,  baseDmg:66 },
     dragon:   { baseHp:580,  baseDmg:78 },
-    trex:     { baseHp:550,  baseDmg:81 }
+    trex:     { baseHp:550,  baseDmg:81 },
+    mammoth:  { baseHp:550,  baseDmg:81 }
   },
 
   /* Offset posisi duduk / sadel presisi (tinggi Y & maju-mundur FWD) untuk semua pet tunggangan */
@@ -83,6 +84,7 @@ const Capture={
     wolf:      { y: 1.05, fwd: -0.08 },
     dragon:    { y: 3.85, fwd:  0.30 },
     trex:      { y: 2.42, fwd:  0.35 },
+    mammoth:   { y: 2.35, fwd: -0.10 },
     tarantula: { y: 0.82, fwd: -0.15 },
     golem:     { y: 1.95, fwd: -0.12 },
     yeti:      { y: 1.95, fwd: -0.10 },
@@ -600,7 +602,7 @@ const Capture={
   },
 
   clearActive(silent){
-    if(this.riding)this.stopRide(true);
+    if(this.riding)this.forceDismount();
     if(this.active)this.failCatch();
     if(this.pet){
       const i=Monsters.list.indexOf(this.pet);
@@ -688,7 +690,9 @@ const Capture={
 
   storeActive(silent){
     if(!this.pet)return;
-    if(this.riding)this.stopRide(true);
+    /* pet di-store saat ditunggangi: turunkan paksa instan DULU (bukan animasi
+       turun) karena mesh pet langsung dibuang — animasi tidak akan pernah selesai. */
+    if(this.riding)this.forceDismount();
     const m=this.pet;
     const i=this.deployedSlot;
     if(i>=0&&RPG.mobSlots[i]){
@@ -757,6 +761,39 @@ const Capture={
         if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
         return;
       }
+    }
+    /* ---------- PET SUSUL MASUK DUNGEON ----------
+       Pet besar sering tersangkut di mulut goa / tembok benteng saat mengikuti:
+       ia mondar-mandir di luar sementara pemain sudah jauh di dalam. Bila pet
+       tidak bertarung dan jaraknya 8-34 blok (belum sampai ambang teleport),
+       ia langsung menyusul ke belakang pemain supaya selalu ikut masuk. */
+    if(dp>8&&dp<=34&&!m.dead&&!this.riding){
+      const foe=m.target||m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget;
+      if(!foe||foe.dead){
+        m._followStuckT=(m._followStuckT||0)+dt;
+        if(m._followStuckT>2.5){
+          m._followStuckT=0;
+          const a=Cam.yaw+Math.PI;
+          const nx=Player.pos.x+Math.sin(a)*1.6,nz=Player.pos.z+Math.cos(a)*1.6;
+          let g=Player.pos.y;
+          if(typeof Dungeon!=='undefined'&&Dungeon.innerFloorY){
+            const near=(typeof WGEN!=='undefined'&&WGEN.nearestDungeon)
+              ?WGEN.nearestDungeon(Player.pos.x,Player.pos.z):null;
+            if(near&&near.dist<near.d.r+1)g=Dungeon.innerFloorY(nx,nz,Player.pos.y+2);
+            else if(typeof World!=='undefined'&&World.groundAt)g=World.groundAt(nx,nz,Player.pos.y+3);
+          }else if(typeof World!=='undefined'&&World.groundAt){
+            g=World.groundAt(nx,nz,Player.pos.y+3);
+          }
+          m.pos.set(nx,Math.max(g,Player.pos.y-1),nz);
+          m.vel.set(0,0,0);
+          m.mesh.position.copy(m.pos);
+          if(typeof FX!=='undefined')FX.ring(nx,Math.max(g,Player.pos.y-1)+0.1,nz,0x9fd7ff,0.6,2.4);
+        }
+      }else{
+        m._followStuckT=0;
+      }
+    }else{
+      m._followStuckT=0;
     }
 
     if(this.riding&&this.pet===m)return;
@@ -831,7 +868,7 @@ const Capture={
        aiSemut/aiReaper). Tanpa cabang ini, jurus yang dimulai petAttack() tidak
        pernah maju sehingga pet hanya mematung setelah serangan pertama. */
     {
-      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget;
+      const foe=m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget||m.mTarget;
       const live=(foe&&!foe.dead)?foe:(target&&!target.dead?target:null);
       const ang=live?Math.atan2(live.pos.x-m.pos.x,live.pos.z-m.pos.z):(m.mesh?m.mesh.rotation.y:0);
       const d=live?live.pos.distanceTo(m.pos):dp;
@@ -852,6 +889,9 @@ const Capture={
       }
       if(m.bAct&&typeof Monsters.boarAtk==='function'){
         Monsters.boarAtk(m,dt,d,ang,live);return;
+      }
+      if(m.mAct&&typeof Monsters.mammothAct==='function'){
+        Monsters.mammothAct(m,dt,d,ang,live);return;
       }
     }
 
@@ -877,6 +917,7 @@ const Capture={
                   (m.type==='reaper')?3.4:
                   (m.type==='tarantula')?5.2:
                   (m.type==='boar')?3.8:
+                  (m.type==='mammoth')?4.2:
                   (m.type==='dragon')?3.4:
                   (m.type==='golem')?3.0:
                   (m.type==='lizard')?2.6:1.8;
@@ -885,7 +926,7 @@ const Capture={
         let spd=m.speed*(m.slowMul||1);
         // Saat target serangan jauh, pet berlari kencang mendekat
         if(bd > holdR + 1.2 && !m.inWater){
-          if(m.type==='dragon'||m.type==='trex') spd *= 2.3;
+          if(m.type==='dragon'||m.type==='trex'||m.type==='mammoth') spd *= 2.3;
           else if(m.type==='wolf'||m.type==='boar') spd *= 1.45;
           else if(m.type==='kumbang'||m.type==='yeti') spd *= 1.4;
           else spd *= 1.35;
@@ -1019,7 +1060,14 @@ const Capture={
       if(dt<480){ // Double space tarantula instan cepat seperti naga!
         if(cd<=0){
           // Kecepatan awal vertikal untuk mencapai 6 blok: sqrt(2 * 26 * 6) = 17.66
-          m.vel.y=17.7;
+          // Dipangkas bila ada langit-langit (kubah goa dungeon) supaya tidak tembus ke atas.
+          let vy=17.7;
+          if(typeof Player!=='undefined'&&Player.leapCeilingY){
+            const ceil=Player.leapCeilingY();
+            const need=vy*vy/(2*26);
+            if(m.pos.y+need>ceil)vy=Math.max(8,Math.sqrt(Math.max(0.5,2*26*(ceil-m.pos.y-0.6))));
+          }
+          m.vel.y=vy;
           m.onGround=false;
           m.tSuperLeap=true;
           m.leapCd=3.0; // Cooldown tepat 3.0 detik
@@ -1133,6 +1181,28 @@ const Capture={
     UI.toast(`🐾 Menunggangi ${this.mobName(m.type)}!`);
   },
 
+  /* Turun paksa instan (tanpa animasi): dipakai saat pet hilang mendadak
+     (di-store, mati, despawn) supaya pemain tidak pernah stuck. Posisi pemain
+     dikembalikan ke tanah di dekat titik turun terakhir / titik pet. */
+  forceDismount(){
+    this.riding=false;
+    this.jumpQ=false;
+    this.mounting=false;
+    this.dismounting=false;
+    if(typeof Player!=='undefined'&&Player.pos){
+      let gx=Player.pos.x,gz=Player.pos.z,gy=Player.pos.y;
+      if(this.pet&&this.pet.pos){gx=this.pet.pos.x;gz=this.pet.pos.z;gy=this.pet.pos.y;}
+      else if(this.dismountTargetPos){gx=this.dismountTargetPos.x;gz=this.dismountTargetPos.z;}
+      if(typeof World!=='undefined'&&World.groundAt){
+        gy=Math.max(gy,World.groundAt(gx,gz,gy+3));
+      }
+      Player.pos.set(gx,gy,gz);
+      Player.vel.set(0,0,0);
+      Player.onGround=true;
+      if(Player.mesh)Player.mesh.position.copy(Player.pos);
+      if(Player.animator)Player.animator.setAnimation('idle');
+    }
+  },
   stopRide(silent){
     if(!this.riding)return;
     if(this.dismounting)return;
@@ -1173,7 +1243,7 @@ const Capture={
 
   ridePlayer(p,dt){
     const m=this.pet;
-    if(!m||m.dead){this.stopRide(true);return;}
+    if(!m||m.dead){this.forceDismount();return;}
 
     // Update super leap & spring bounce tarantula
     if(m.type==='tarantula'){

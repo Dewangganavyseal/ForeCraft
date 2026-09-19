@@ -55,6 +55,7 @@ const I18N_ITEMS={
   rope:{en:'Rope',zh:'绳子',ja:'ロープ'},
   saddle:{en:'Saddle',zh:'鞍',ja:'サドル'},
   pet_charm:{en:'Tamer Charm',zh:'驯兽护符',ja:'テイマーの護符'},
+  bomb:{en:'Black Bomb',zh:'黑炸弹',ja:'黒爆弾'},
   seed_wheat:{en:'Wheat Seed',zh:'小麦种子',ja:'小麦の種'},
   seed_carrot:{en:'Carrot Seed',zh:'胡萝卜种子',ja:'ニンジンの種'},
   seed_cabbage:{en:'Cabbage Seed',zh:'白菜种子',ja:'キャベツの種'},
@@ -84,6 +85,7 @@ const I18N_ITEMS={
   green_blood:{en:'Green Blood',zh:'绿色血液',ja:'緑の血'},
   toxic_venom:{en:'Toxic Venom',zh:'剧毒毒液',ja:'猛毒'},
   boss_core:{en:'Boss Core',zh:'首领核心',ja:'ボスコア'},
+  tusk:{en:'Mammoth Tusk',zh:'猛犸长牙',ja:'マンモスの牙'},
   soul_shard:{en:'Soul Shard',zh:'灵魂碎片',ja:'魂の破片'},
   dungeon_changer:{en:'Dungeon Changer',zh:'地牢变换器',ja:'ダンジョンチェンジャー'},
   /* 12 SET ZIRAH OTENTIK */
@@ -218,6 +220,7 @@ const I18N_MOBS={
   rabbit:{en:'Rabbit',zh:'兔子',ja:'ウサギ'},
   dragon:{en:'Dragon',zh:'龙',ja:'ドラゴン'},
   trex:{en:'T-Rex',zh:'霸王龙',ja:'ティラノサウルス'},
+  mammoth:{en:'Mammoth',zh:'猛犸象',ja:'マンモス'},
   lizard:{en:'Swamp Lizard',zh:'沼泽蜥蜴',ja:'沼のトカゲ'},
   cow:{en:'Cow',zh:'牛',ja:'牛'},
   horse:{en:'Horse',zh:'马',ja:'馬'},

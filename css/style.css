@@ -130,7 +130,7 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 .toast-item{display:inline-flex;align-items:center;gap:6px;background:rgba(8,12,8,.82);border:1px solid rgba(255,255,255,.18);padding:4px 12px;border-radius:12px;font-size:12px;backdrop-filter:blur(4px);animation:tin 2.4s forwards}
 .toast-item .iico{width:18px;height:18px;flex:0 0 auto}
 @keyframes tin{0%{opacity:0;transform:translateX(-10px)}15%,80%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
-#hint{position:absolute;bottom:14px;left:12px;font-size:10px;opacity:.5;max-width:300px;line-height:1.5}
+#hint{display:none!important}
 
 /* ==== Panels ==== */
 .panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,94vw);max-height:86vh;overflow-y:auto;background:rgba(20,16,12,.95);border:2px solid #7c2d12;border-radius:14px;padding:18px 22px;z-index:30;box-shadow:0 12px 50px rgba(0,0,0,.75);backdrop-filter:blur(6px)}

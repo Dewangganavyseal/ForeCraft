@@ -182,9 +182,18 @@ const FX={
        tanah yang benar-benar NAIK setinggi `lift` (puncak blok = gy+lift = persis
        tinggi physics waveHeightAt). Warna & tekstur mengikuti blok aslinya. */
     const mat=this.waveMat();
+    /* Di dalam goa dungeon: lantai gelombang HARUS lantai dalam (arena), bukan
+       puncak kubah. groundAt dari puncak dunia selalu menemukan atap goa duluan. */
+    const inCaveGoa=(typeof World!=='undefined'&&World.inDungeonCave==='function'
+      &&typeof Dungeon!=='undefined'&&Dungeon.innerFloorY)
+      ?World.inDungeonCave(Math.floor(x),Math.floor(y)+1,Math.floor(z)):null;
     for(const p of pts){
-      const gy=(typeof World!=='undefined'&&World.groundAt)
-        ?(World.groundAt(p.x,p.z,Math.max(y+6,CFG.WORLD_H-1))||World.groundAt(p.x,p.z)||y):y;
+      let gy=y;
+      if(inCaveGoa&&typeof Dungeon.innerFloorY==='function'){
+        gy=Dungeon.innerFloorY(p.x,p.z,y+2);
+      }else if(typeof World!=='undefined'&&World.groundAt){
+        gy=World.groundAt(p.x,p.z,y+2)||World.groundAt(p.x,p.z)||y;
+      }
       const blk=World.getBlock(Math.floor(p.x),Math.floor(gy)-1,Math.floor(p.z));
       const geo=this.waveBlockGeo(blk);
       const mesh=new THREE.Mesh(geo,mat);

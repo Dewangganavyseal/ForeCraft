@@ -959,6 +959,8 @@ const RPG={
     const s=this.hotbar[this.sel];
     if(!s)return false;
     if(s.id==='dungeon_changer'){this.useDungeonChanger(this.sel);return true;}
+    /* BOM HITAM: pegang di hotbar lalu klik / tekan tombol serang untuk melempar */
+    if(s.id==='bomb'&&typeof BombSys!=='undefined'){return BombSys.throwBomb();}
     return false;
   },
   /* ---------- DUNGEON CHANGER ----------

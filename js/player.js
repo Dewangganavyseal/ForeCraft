@@ -332,13 +332,40 @@ const Player={
      Terbang mengikuti busur dari posisi sekarang ke (tx,tz); saat mendarat
      langsung menghantam tanah (RPG.doSlamAt). Selama lompatan, fisika & gerak
      normal dilewati (di-handle update()). */
+  /* Plafon lompatan: bila ada langit-langit padat (kubah goa dungeon / atap
+     rumah) di atas kepala, puncak busur dipangkas supaya karakter tidak
+     menembus keluar dungeon. */
+  leapCeilingY(){
+    if(typeof World==='undefined'||!World.getBlock)return CFG.WORLD_H;
+    const px=Math.floor(this.pos.x),pz=Math.floor(this.pos.z);
+    for(let y=Math.floor(this.pos.y)+2;y<CFG.WORLD_H;y++){
+      const b=World.getBlock(px,y,pz);
+      if(b!==B.AIR&&b!==B.WATER)return y-1.6;
+    }
+    return CFG.WORLD_H;
+  },
   startSlamLeap(tx,tz){
     const dx=tx-this.pos.x,dz=tz-this.pos.z;
     const dist=Math.hypot(dx,dz);
-    const targetGy=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(tx,tz,CFG.WORLD_H-1)||World.groundAt(tx,tz)||this.pos.y):this.pos.y;
+    /* Di dalam goa: target = lantai dalam (bukan puncak kubah) supaya lompatan
+       mendarat di dalam goa, bukan terbang ke atas dungeon. */
+    let targetGy=this.pos.y;
+    if(typeof World!=='undefined'&&World.groundAt){
+      const inCave=(typeof World.inDungeonCave==='function')
+        ?World.inDungeonCave(Math.floor(this.pos.x),Math.floor(this.pos.y)+1,Math.floor(this.pos.z)):null;
+      if(inCave&&(typeof Dungeon!=='undefined')&&Dungeon.innerFloorY)
+        targetGy=Dungeon.innerFloorY(tx,tz,this.pos.y+2);
+      else
+        targetGy=World.groundAt(tx,tz,this.pos.y+2)||World.groundAt(tx,tz)||this.pos.y;
+    }
+    let arc=clamp(1.8+dist*0.22,2,3.4);
+    /* pangkas busur agar puncak tidak menembus langit-langit goa */
+    const ceil=this.leapCeilingY();
+    const peak=Math.max(this.pos.y,targetGy)+arc;
+    if(peak>ceil)arc=Math.max(0.6,arc-(peak-ceil));
     this.slamLeap={sx:this.pos.x,sy:this.pos.y,sz:this.pos.z,tx,tz,t:0,
       targetGy,
-      dur:clamp(dist/13,0.32,0.62),arc:clamp(1.8+dist*0.22,2,3.4)};
+      dur:clamp(dist/13,0.32,0.62),arc};
     if(dist>0.01)this.facing=Math.atan2(dx,dz);
     this.vel.set(0,0,0);
     this.onGround=false;
@@ -1756,7 +1783,17 @@ const SlamAim={
   hideIndicator(){ if(this.indicator)this.indicator.visible=false; },
   moveIndicator(){
     if(!this.indicator)return;
-    const gy=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(this.aim.x,this.aim.z,CFG.WORLD_H-1)||Player.pos.y):Player.pos.y;
+    /* Di dalam goa dungeon: ring HARUS di lantai dalam, bukan di puncak kubah.
+       groundAt dari puncak dunia selalu menemukan atap goa duluan. */
+    let gy=Player.pos.y;
+    if(typeof World!=='undefined'&&World.groundAt){
+      const inCave=(typeof World.inDungeonCave==='function')
+        ?World.inDungeonCave(Math.floor(Player.pos.x),Math.floor(Player.pos.y)+1,Math.floor(Player.pos.z)):null;
+      if(inCave&&(typeof Dungeon!=='undefined')&&Dungeon.innerFloorY)
+        gy=Dungeon.innerFloorY(this.aim.x,this.aim.z,Player.pos.y+2);
+      else
+        gy=World.groundAt(this.aim.x,this.aim.z,Player.pos.y+2)||Player.pos.y;
+    }
     this.indicator.position.set(this.aim.x,gy+0.08,this.aim.z);
   },
 };

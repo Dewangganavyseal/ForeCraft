@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.30',
+  VERSION:'0.2.31',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -387,8 +387,8 @@ const BIOME_INFO={
      (bobot 0.3 dari total ~9.3 ≈ 3% kemunculan) agar tidak sering muncul.
      Permukaan batu, sedikit pohon, bijih kristal. */
   [BIOME.MOUNTAIN]:{name:'Pegunungan',e:'⛰️',surface:B.STONE,sub:B.STONE,
-    fog:0xc4d2e0,tree:0.15,ore:B.ORE_CRYSTAL,mobs:['dragon','trex','wolf','golem'],
-    mobW:{dragon:0.3,trex:0.6,wolf:1.5,golem:7.0}},
+    fog:0xc4d2e0,tree:0.15,ore:B.ORE_CRYSTAL,mobs:['dragon','trex','mammoth','wolf','golem'],
+    mobW:{dragon:0.3,trex:0.6,mammoth:0.6,wolf:1.5,golem:6.4}},
   /* ---------- LAUT & PANTAI ----------
      OCEAN: dasar berpasir di bawah permukaan air; tidak ada pohon dan tidak
      pernah dipakai untuk desa. Monster darat tidak spawn di sini karena
@@ -672,6 +672,12 @@ const ITEMS={
   rope:{n:'Tali',e:'➰',rarity:'common'},
   saddle:{n:'Sadel',e:'🐴',rarity:'uncommon'},
   pet_charm:{n:'Jimat Pawang',e:'🧿',rarity:'rare'},
+  /* BOM HITAM (💣): bahan peledak lempar. Dipegang di hotbar lalu klik / tekan
+     tombol serang ke arah yang diinginkan: melambung menempel (maks 5 blok),
+     sumbu menyala ±2.2 detik, lalu meledak radius 4 blok — blok hancur ikut
+     menjatuhkan drop build mode seperti ditambang manual. */
+  bomb:{n:'Bom Hitam',e:'💣',rarity:'uncommon',
+    desc:'Bom lempar radius 4 blok. Pegang di hotbar lalu klik/serang untuk melempar (maks 5 blok).'},
   seed_wheat:{n:'Benih Gandum',e:'…',rarity:'common'},
   seed_carrot:{n:'Benih Wortel',e:'…',rarity:'common'},
   seed_cabbage:{n:'Benih Kubis',e:'…',rarity:'common'},
@@ -728,6 +734,8 @@ const ITEMS={
   dungeon_changer:{n:'Dungeon Changer',e:'🗝️',tool:'dchange',rarity:'epic'},
   /* drop boss */
   boss_core:{n:'Inti Boss',e:'🔮',rarity:'epic'},
+  /* gading mammoth purba: bahan pembuatan pedang dragon */
+  tusk:{n:'Gading Mammoth',e:'🦣',rarity:'epic',desc:'Gading purba raksasa dari Mammoth pegunungan. Bahan utama Dragonfang Greatsword.'},
   /* ================= 12 SET ZIRAH OTENTIK FORECRAFT ================= */
   /* 1. Berserker Fur Set (Tier Leather, Lv 1 - common) */
   helm_berserker  :{n:'Tudung Serigala Barbar',e:'🐺',rarity:'common',armor:{slot:'helm', def:0.07,tier:'leather',set:'berserker'}},
@@ -962,7 +970,7 @@ const DROP_COLOR={
   blk_leaf:0x3f7d2f, blk_sand:0xe3d29a, blk_snow:0xe8f2fa, blk_plank:0xb98a55,
   blk_roof:0x9c5a3c, blk_red_soil:0x9e3b2c, blk_farm:0x6f4a26,
   wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
-  rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,
+  rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,bomb:0x1a1a1e,
   meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,potion_stam:0xffd24d,
   sugar_cane:0xc9c157,sugar:0xf2ecdf,cake:0xf5d9a8,
   fish:0x93adc0,cfish:0xd98a4d,
@@ -981,7 +989,7 @@ const DROP_COLOR={
   insect_leg:0x7a4f24,hard_shell:0x9e3b2c,green_blood:0x6fe05c,toxic_venom:0x8dff3a,
   helm_carapace:0x9e3b2c,plate_carapace:0x9e3b2c,shield_carapace:0xb0432f,
   coal:0x2c2c30,
-  boss_core:0xff6bd6,
+  boss_core:0xff6bd6,tusk:0xf4ecd8,
   helm_gold:0xd9b23a,plate_gold:0xd9b23a,greaves_gold:0x9c7c1e,
   helm_crystal:0x7fd8ff,plate_crystal:0x7fd8ff,greaves_crystal:0x3f8fbf,
   /* pedang & equipment efek */
@@ -1017,6 +1025,7 @@ const RECIPES=[
   {out:'leather',need:{gel:2,fiber:2},name:'Kulit'},
   /* ---------- pawang ---------- */
   {out:'rope',need:{fiber:4,leather:1},name:'Tali'},
+  {out:'bomb',need:{coal:3,stone:2,fiber:1},name:'Bom Hitam'},
   {out:'saddle',need:{leather:4,wood:2},skill:'catcher',name:'Sadel'},
   {out:'pet_charm',need:{boss_core:1,gold_ingot:2,crystal:2},skill:'catch_master',name:'Jimat Pawang'},
   /* ---------- pertanian: cangkul & benih dari hasil panen ---------- */
@@ -1107,7 +1116,7 @@ const RECIPES=[
   {out:'sword_reaper',need:{soul_shard:6,crystal:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Soul Reaper Scythe'},
   {out:'sword_yeti',need:{crystal:6,pelt:4,boss_core:1},skill:'smith',prof:{mining:18},name:'Yeti Glacier Claymore'},
   {out:'sword_samurai',need:{tungstensteel_ore:8,gold_ingot:4,centipede_shell:2},skill:'smith',prof:{mining:22},name:'Muramasa Baja Tungsten'},
-  {out:'sword_dragon',need:{tungstensteel_ore:10,boss_core:2,pelt:4},skill:'smith',prof:{mining:25},name:'Dragonfang Greatsword'},
+  {out:'sword_dragon',need:{tungstensteel_ore:10,boss_core:2,tusk:1},skill:'smith',prof:{mining:25},name:'Dragonfang Greatsword'},
 
   /* ================= TEMPA EQUIPMENT EFEK ================= */
   {out:'cloak_swift',need:{pelt:3,fiber:4,resin:1},name:'Mantel Angin'},
@@ -1450,7 +1459,7 @@ const SHOP_VALUE={
   centipede_shell:14,
   fish_scale:8,golden_fish_scale:180,
   insect_leg:35,hard_shell:40,green_blood:45,toxic_venom:50,
-  boss_core:40,
+  boss_core:40,bomb:18,tusk:60,
 };
 function shopPrice(id){
   const g=SHOP_GOODS.find(g=>g.id===id);

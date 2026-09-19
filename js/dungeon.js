@@ -364,11 +364,13 @@ function buildDungeonPart(data,idx,x,z,wx,wz,h,d,C,H){
              d.gate===1?(lx===r&&az<=1):
              d.gate===2?(lz===-r&&ax<=1):
                         (lx===-r&&az<=1);
-  /* arah keluar mulut gua (setengah bidang menuju sisi gerbang) */
-  const mouth=d.gate===0?(lz>0&&ax<=1):
-              d.gate===1?(lx>0&&az<=1):
-              d.gate===2?(lz<0&&ax<=1):
-                         (lx<0&&az<=1);
+  /* arah keluar mulut gua (setengah bidang menuju sisi gerbang).
+     DILEBARKAN dari 1 → 3 blok (ax<=2) supaya PET BESAR (golem/naga/tarantula)
+     bisa masuk mengikuti pemain — sebelumnya hanya pemain yang muat. */
+  const mouth=d.gate===0?(lz>0&&ax<=2):
+              d.gate===1?(lx>0&&az<=2):
+              d.gate===2?(lz<0&&ax<=2):
+                         (lx<0&&az<=2);
 
   /* =========================================================================
      GUA BERKUBAH
@@ -389,9 +391,10 @@ function buildDungeonPart(data,idx,x,z,wx,wz,h,d,C,H){
     const ceil=caveCeilY(d,h,dist,cr);
     const shell=dist>cr-2;
     if(shell){
-      /* MULUT GUA: biarkan setinggi 3 blok sebagai lorong masuk */
+      /* MULUT GUA: lorong masuk DITINGGIKAN 3 → 5 blok (h..h+4 terbuka) supaya
+         pet tinggi (naga/golem/tarantula) tidak tersangkut langit-langit. */
       if(mouth){
-        set(h+3,WALL);set(h+4,WALL);
+        set(h+5,WALL);set(h+6,WALL);
         return true;
       }
       /* dinding batu masif — di sinilah bijih paling sering tertanam */
@@ -807,13 +810,38 @@ const Dungeon={
      petinya belum dibuka). Aman dipanggil berulang: peti yang sudah ada tidak
      diduplikasi. Posisinya mengikuti arenaCenter, jadi ikut berpindah bila
      arena dungeon itu berada di pojok — bukan lagi dipatok ke pusat. */
+  /* Lantai DALAM goa/benteng di titik (x,z): dipindai dari BAWAH (lantai arena
+     ke atas) supaya kubah/atap goa tidak ikut terbaca. World.topY/groundAt
+     memindai dari puncak dunia → di goa hasilnya = puncak kubah, sehingga
+     peti boss & ring leap muncul DI ATAS goa. */
+  innerFloorY(x,z,fromY){
+    if(typeof World==='undefined'||!World.getBlock)return fromY||CFG.SEA;
+    const bx=Math.floor(x),bz=Math.floor(z);
+    const yTop=(fromY!==undefined)?Math.min(CFG.WORLD_H-1,Math.floor(fromY)+1):CFG.WORLD_H-1;
+    for(let y=0;y<=yTop;y++){
+      const id=World.getBlock(bx,y,bz);
+      if(World.isFloor(id)){
+        /* pastikan ada ruang terbuka di atasnya (bukan tembok padat) */
+        let open=true;
+        for(let k=y+1;k<=Math.min(yTop,y+3);k++){
+          const b2=World.getBlock(bx,k,bz);
+          if(b2!==B.AIR&&b2!==B.WATER&&World.isFloor(b2)){open=false;break;}
+        }
+        if(open)return y+1;
+      }
+    }
+    return (fromY!==undefined)?fromY:CFG.SEA;
+  },
   spawnBossChest(d){
     if(!d||this.bossChest[d.key])return null;            // sudah dipanen
     /* jangan pasang dua kali untuk dungeon yang sama */
     for(const f of Furni.list)
       if(f.def==='bchest'&&f.dkey===d.key)return f;
     const c=this.arenaCenter(d);
-    const y=Math.max(CFG.SEA,World.topY(Math.floor(c.x),Math.floor(c.z)));
+    /* goa: peti HARUS di lantai dalam arena, bukan di puncak kubah (topY) */
+    const y=(d.kind==='cave')
+      ?this.innerFloorY(c.x,c.z,(typeof Player!=='undefined'?Player.pos.y:undefined))
+      :Math.max(CFG.SEA,World.topY(Math.floor(c.x),Math.floor(c.z)));
     const f=Furni.place('bchest',c.x,y,c.z,0,true);
     if(f){f.dkey=d.key;f.lvl=d.lvl;}
     return f;

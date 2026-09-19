@@ -223,6 +223,19 @@ const HeldModels={
       this.box(g,0.16,0.16,0.16,0xd070ff,0,0,0);
       this.box(g,0.08,0.08,0.08,0xffffff,0,0,0);
     },
+    /* BOM HITAM di tangan: model voxel bom otentik Forecraft */
+    bomb(g){
+      if (typeof BombSys !== 'undefined' && BombSys.buildVoxelBomb) {
+        const vm = BombSys.buildVoxelBomb();
+        vm.scale.setScalar(0.72);
+        g.add(vm);
+      } else {
+        this.box(g, 0.24, 0.24, 0.24, 0x181a1d, 0, 0, 0);
+        this.box(g, 0.10, 0.05, 0.10, 0xb38634, 0, 0.14, 0);
+        this.box(g, 0.035, 0.10, 0.035, 0x735738, 0.03, 0.20, 0, 0.2, 0, 0.3);
+        this.box(g, 0.045, 0.045, 0.045, 0xffaa33, 0.05, 0.24, 0);
+      }
+    },
     crystal(g){
       this.box(g,0.12,0.28,0.12,0x4dd0e1,0,0,0,0.2,0.3,0.4);
       this.box(g,0.08,0.24,0.08,0xe0f7fa,0,0,0,-0.2,-0.1,-0.3);

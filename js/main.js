@@ -512,6 +512,7 @@ const Game={
       try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
       if(UI.hudExtra){try{UI.hudExtra(dt);}catch(e){console.error('[hudExtra error]',e);}}
       try{World.update(dt,Player.pos);}catch(e){console.error('[World error]',e);}
+      if(typeof BombSys!=='undefined'){try{BombSys.update(dt);}catch(e){console.error('[BombSys error]',e);}}
       try{FX.update(dt);}catch(e){console.error('[FX error]',e);}
       try{Weather.update(dt);}catch(e){console.error('[Weather error]',e);}
       if(typeof HPBars!=='undefined'){try{HPBars.update(dt);}catch(e){console.error('[HPBars error]',e);}}

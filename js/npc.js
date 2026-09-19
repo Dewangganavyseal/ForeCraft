@@ -221,8 +221,8 @@ const NPCS={
     let need=npcXpNeed(n.level);
     while(n.xp>=need&&n.level<cap){
       n.xp-=need;n.level++;
-    n.maxhp=this.npcMaxHp(n);n.hp=n.maxhp;
-    n.maxStamina=this.npcMaxStamina(n);n.stamina=n.maxStamina;
+      n.maxhp=this.npcMaxHp(n);n.hp=n.maxhp;
+      /* stamina ikut bertambah saat naik level (+2 per level, penuh kembali) */
       n.maxStamina=this.npcMaxStamina(n);n.stamina=n.maxStamina;
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2.1,0)),'LV '+n.level,'#ffe066');
       if(this.isTeam(n))UI.toast(`${n.role.e} ${n.name} naik ke Lv ${n.level}!`);
@@ -1551,6 +1551,15 @@ const NPCS={
       terdorong masuk ke dinding; bila terjepit tembok, sisi lain yang mengalah.
       ========================================================================= */
   SEP_R:0.86,                    // jarak kontak dua badan (2 × BODY_R ≈ 0.84)
+  /* mesh collider NPC: hanya dorong bila badan benar-benar bertumpuk vertikal
+     (aturan sama seperti Monsters.bodiesOverlap) supaya pemain bisa melompati
+     NPC dan NPC yang melompat di atas tidak mendorong pemain. */
+  bodiesOverlap(aPos,aH,bPos,bH){
+    return (aPos.y+aH>bPos.y+0.35)&&(bPos.y+bH>aPos.y+0.35);
+  },
+  npcHeight(n){
+    return (n&&n.role&&n.role.tall)?2.2:1.8;
+  },
   separate(n,dt){
     const R=this.SEP_R;
     /* PENJAGA LAPAK (Dungeon Master): tidak digeser NPC lain — hanya lawan
@@ -1558,6 +1567,7 @@ const NPCS={
     const immovable=!!n.shopSpot;
     for(const o of this.list){
       if(o===n||o.dead)continue;
+      if(!this.bodiesOverlap(n.pos,this.npcHeight(n),o.pos,this.npcHeight(o)))continue;
       const dx=n.pos.x-o.pos.x,dz=n.pos.z-o.pos.z;
       const d2=dx*dx+dz*dz;
       if(d2>=R*R)continue;
@@ -1581,10 +1591,10 @@ const NPCS={
       if(!World.blockedAt(nx,n.pos.y,n.pos.z,this.BODY_R))n.pos.x=nx;
       if(!World.blockedAt(n.pos.x,n.pos.y,nz,this.BODY_R))n.pos.z=nz;
     }
-    /* badan pemain juga tidak boleh ditembus NPC */
+    /* badan pemain juga tidak boleh ditembus NPC (hanya bila sejajar vertikal) */
     const dx=n.pos.x-Player.pos.x,dz=n.pos.z-Player.pos.z;
     const dp2=dx*dx+dz*dz;
-    if(dp2<0.85*0.85&&dp2>1e-6){
+    if(dp2<0.85*0.85&&dp2>1e-6&&this.bodiesOverlap(n.pos,this.npcHeight(n),Player.pos,1.8)){
       const dp=Math.sqrt(dp2);
       if(dp<0.83){
         const push=(0.85-dp)*0.35;
@@ -1941,8 +1951,9 @@ const NPCS={
       }else{
         const damp=Math.exp(-6*dt);
         n.vel.x*=damp;n.vel.z*=damp;
-        /* menghadap arah pandang pemain saat berdiri menunggu dengan lirikan sesekali */
-        n.mesh.rotation.y=angLerp(n.mesh.rotation.y,Cam.yaw,dt*3);
+        /* DIAM NATURAL: badan tetap pada arah terakhir (tidak mengikuti kamera),
+           hanya kepala yang melirik sesekali. Menatap kamera terus-menerus
+           terlihat aneh saat pemain memutar kamera. */
         const glance=Math.sin(performance.now()*0.001*0.9+(n.id||0)*1.5)*0.22;
         n.headAngle=glance;
       }

@@ -2,7 +2,7 @@
 /* Monster: slime, babi hutan, golem perusak tanah, serigala, kalajengking */
 /* nama tampilan untuk notifikasi & teks UI */
 const MOB_NAME={slime:'Slime',boar:'Babi Hutan',golem:'Golem',
-  wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',
+  wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',mammoth:'Mammoth',
   lizard:'Lizard Rawa',cow:'Sapi',horse:'Kuda',
   kelabang:'Kelabang',kelabang_part:'Ruas Kelabang',kumbang:'Kumbang Tanduk',
   yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper',tarantula:'Tarantula Raksasa'};
@@ -29,6 +29,11 @@ const Monsters={
        Ukuran masif (sedikit di bawah naga), normalnya monster liar biasa (HP 360, Lv 50-75)
        dengan peluang menjadi mini boss raksasa (HP x6). */
     trex:{hp:360,dmg:22,xp:55,speed:2.4,r:0.85,aggro:24,noBossScale:true},
+    /* MAMMOTH (🦣): Behemoth purba pegunungan dari NEW MODEL/mammoth.html.
+       Ukuran & kekuatan setara T-Rex (HP 360, Lv 50-75) dengan peluang mini boss raksasa (HP x6).
+       Jurus: Seruduk Langit (uppercut), Hantaman Seismik (rearing slam AoE), Sapuan Belalai (swipe),
+       dan Auman Sang Raja (taunt/roar). */
+    mammoth:{hp:360,dmg:22,xp:55,speed:2.2,r:0.85,aggro:24,noBossScale:true},
     /* LIZARD RAWA: predator tepi sungai. Serangannya gigitan (jarak dekat),
        sapuan ekor (AoE), dan semburan asam (proyektil jarak jauh). Hanya
        muncul di tepi sungai/danau (lihat spawnLizard). Radius tabrakan kecil
@@ -1140,6 +1145,8 @@ const Monsters={
                           ['crystal',Math.random()<0.35?1:0]]:
        /* T-REX: daging melimpah + kulit keras purba (16% hard_shell, tidak 100%) */
        m.type==='trex'?[['meat',4],['hard_shell',Math.random()<0.16?1:0]]:
+       /* MAMMOTH: daging purba melimpah + kulit tebal + gading 5% (bahan pedang dragon) */
+       m.type==='mammoth'?[['meat',4],['leather',2+(Math.random()<0.5?1:0)],['tusk',Math.random()<0.05?1:0]]:
        m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
     /* ---------- INTI BOSS (boss_core): SATU-SATUNYA dari jalur kill() ----------
@@ -1198,7 +1205,7 @@ const Monsters={
       m.type==='lizard'?0x4e8f3a:m.type==='kumbang'?0x7a4f24:
       m.type==='yeti'?0xcfe0f2:m.type==='semut'?0x8a3b1f:
       m.type==='tarantula'?0x2e1910:
-      m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:0x8a8f98;
+      m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:m.type==='mammoth'?0x74451f:0x8a8f98;
     FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.8,0)),
       m.boss?0xff6bd6:dustColor,m.boss?32:16,m.boss?5:3.5);
     /* GORE: bagian tubuh (kepala/kaki/daging) terlepas terhambur. Hanya untuk
@@ -1217,6 +1224,7 @@ const Monsters={
       kelabang_part:[0x96332c,0x5f1d1a,0xa13a30],
       kumbang:[0x7a4f24,0x5a3a1a,0x96682f],
       trex:[0x5f7f4c,0x3f5a37,0xd9c9a2],
+      mammoth:[0x74451f,0x8a5628,0xe8dcc0],
       yeti:[0xeaf1f8,0xcfe0f2,0xa6c0db],
       semut:[0x8a3b1f,0x5e2412,0xa5502a],
       tarantula:[0x2e1910,0x9e4b1e,0xb3772a],
@@ -1611,6 +1619,12 @@ const Monsters={
       return;
     }
 
+    /* ---------- MAMMOTH PURBA: seruduk langit, hantaman seismik, sapuan belalai, auman sang raja ---------- */
+    if(m.type==='mammoth'){
+      this.aiMammoth(m,dt,dp,angP);
+      return;
+    }
+
     /* ---------- TERNAK PASIF: sapi & kuda ----------
        Tidak menyerang; hanya jalan-jalan, merumput, tidur (sapi), dan kabur
        dari predator atau pemain yang menyerang. */
@@ -1732,12 +1746,12 @@ const Monsters={
          seluruh mob yang memiliki animasi lari ikut berlari kencang mendekat */
       const pSpeed = (typeof Player !== 'undefined' && Player.vel) ? Math.hypot(Player.vel.x, Player.vel.z) : 0;
       const targetRunning = pSpeed > 3.4;
-      const mReach=(m.type==='dragon'?3.4:m.type==='trex'?3.2:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
+      const mReach=(m.type==='dragon'?3.4:(m.type==='trex'||m.type==='mammoth')?3.2:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
       const distFar = dp > (mReach * 1.25);
 
       if((targetRunning || distFar) && !m.inWater){
         if(m.type==='dragon') sp *= 2.3;
-        else if(m.type==='trex') sp *= 2.2;
+        else if(m.type==='trex'||m.type==='mammoth') sp *= 2.2;
         else if(m.type==='wolf') sp *= 1.45;
         else if(m.type==='boar') sp *= 1.45;
         else if(m.type==='lizard') sp *= 1.4;
@@ -3133,6 +3147,164 @@ const Monsters={
   },
 
   /* =========================================================================
+     AI MAMMOTH PURBA (RAJAGADING) — 4 aksi tempur (port dari mammoth.html)
+     -------------------------------------------------------------------------
+     'upper' (Seruduk Langit)   : sabetan gading ke atas meledak (knockup tinggi).
+     'slam'  (Hantaman Seismik) : angkat 2 kaki depan ke udara (rearing) lalu hantam tanah (AoE gempa).
+     'swipe' (Sapuan Belalai)   : sapuan horizontal belalai merusak musuh di depan.
+     'taunt' (Auman Sang Raja)  : angkat belalai tegak melepaskan 3 cincin auman (roar shockwave).
+     ========================================================================= */
+  pickMammothAtk(d){
+    if(d<=2.4) return Math.random()<0.65 ? 'upper' : 'swipe';
+    if(d<=5.5) {
+      const r=Math.random();
+      if(r<0.50) return 'slam';
+      if(r<0.80) return 'swipe';
+      return 'upper';
+    }
+    return Math.random()<0.50 ? 'taunt' : 'slam';
+  },
+
+  aiMammoth(m,dt,dp,angP){
+    this.pickFoe(m,dt);
+    const tgt=this.aimTarget(m);
+    const tpos=tgt?tgt.pos:Player.pos;
+    const dT=tgt?Math.hypot(tpos.x-m.pos.x,tpos.z-m.pos.z):999;
+    const angT=Math.atan2(tpos.x-m.pos.x,tpos.z-m.pos.z);
+
+    if(m.mAct){this.mammothAct(m,dt,dT,angT,tgt);return;}
+
+    const MB=CFG.MOB;
+    const sight=Math.min(this.TYPES.mammoth.aggro||24,MB.SIGHT);
+    m.seeT=Math.max(0,(m.seeT||0)-dt);
+    m.alert=Math.max(0,(m.alert||0)-dt);
+    if(tgt&&dT<sight)m.seeT=MB.MEM;
+    const active=!!tgt&&(m.seeT>0||m.alert>0);
+    m.state=active?'chase':'wander';
+
+    if(active){
+      if(dT>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*6);
+      let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+      if(dT>3.8 && !m.inWater) sp *= 2.2; // Derap lari kencang mendekat
+
+      if(dT>2.6){
+        m.vel.x=lerp(m.vel.x,Math.sin(angT)*sp,clamp(7*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(angT)*sp,clamp(7*dt,0,1));
+      }else{
+        const damp=Math.exp(-8*dt);
+        m.vel.x*=damp;m.vel.z*=damp;
+      }
+      if(m.atkCd<=0&&dT<=14) this.startMammothAtk(m,this.pickMammothAtk(dT),tgt);
+    }else{
+      m.t-=dt;
+      if(m.t<=0){m.t=rand(2.0,5.0);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
+      if(m.walking){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*2.5);
+        const sp=m.speed*0.35;
+        m.vel.x=lerp(m.vel.x,Math.sin(m.dir)*sp,clamp(4*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(m.dir)*sp,clamp(4*dt,0,1));
+      }else{m.vel.x*=0.85;m.vel.z*=0.85;}
+    }
+  },
+
+  startMammothAtk(m,name,target){
+    const M=(typeof Mob_Mammoth!=='undefined')?Mob_Mammoth:null;
+    m.mAct=name;m.mActT=0;
+    m.mActDur=(M&&M.DUR[name])||2.0;
+    m.mTarget=(target&&target!==Player)?target:null;
+    m._mHit=false;
+    m._mFired=[false,false,false];
+  },
+
+  mammothAct(m,dt,dp,angP,tgtIn){
+    const M=(typeof Mob_Mammoth!=='undefined')?Mob_Mammoth:null;
+    m.mActT+=dt;
+    const tA=m.mActT;
+    const tgt=(m.mTarget&&!m.mTarget.dead)?m.mTarget:
+              (tgtIn||(m.pet?null:this.aimTarget(m)));
+
+    if(m.mAct==='upper'){
+      // SERUDUK LANGIT (UPPERCUT TUSK SLASH)
+      if(tA<0.30){
+        if(dp>0.5)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else if(tA<0.55){
+        const yaw=m.mesh.rotation.y;
+        m.vel.x=lerp(m.vel.x,Math.sin(yaw)*7.0,clamp(10*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(yaw)*7.0,clamp(10*dt,0,1));
+      }else{
+        m.vel.x*=0.85;m.vel.z*=0.85;
+      }
+
+      if(!m._mHit&&tA>=0.50){
+        m._mHit=true;
+        if(M&&M.upperFX)M.upperFX(m);
+        const yaw=m.mesh.rotation.y;
+        const hx=m.pos.x+Math.sin(yaw)*1.8, hz=m.pos.z+Math.cos(yaw)*1.8;
+        const hit=this.hitTarget(m,tgt,Math.round(m.dmg*1.25),2.6,hx,hz,7);
+        if(hit&&tgt&&tgt.vel){
+          tgt.vel.y=Math.max(tgt.vel.y||0,7.0);
+          if(tgt===Player)Player.onGround=false;
+        }
+      }
+    }
+    else if(m.mAct==='slam'){
+      // HANTAMAN SEISMIK (REARING SEISMIC SLAM)
+      if(tA<1.24){
+        m.vel.x*=0.75;m.vel.z*=0.75;
+      }else if(tA<1.55){
+        m.vel.x*=0.6;m.vel.z*=0.6;
+      }else{
+        m.vel.x*=0.85;m.vel.z*=0.85;
+      }
+
+      if(!m._mHit&&tA>=1.40){
+        m._mHit=true;
+        if(M&&M.slamFX)M.slamFX(m);
+        const yaw=m.mesh.rotation.y;
+        const cx=m.pos.x+Math.sin(yaw)*1.4, cz=m.pos.z+Math.cos(yaw)*1.4;
+        this.areaHit(m,cx,cz,4.2,Math.round(m.dmg*1.6),11);
+      }
+    }
+    else if(m.mAct==='swipe'){
+      // SAPUAN BELALAI (TRUNK SWEEP)
+      if(tA<0.30){
+        if(dp>0.5)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else{
+        m.vel.x*=0.85;m.vel.z*=0.85;
+      }
+
+      if(!m._mHit&&tA>=0.46){
+        m._mHit=true;
+        if(M&&M.swipeFX)M.swipeFX(m);
+        const yaw=m.mesh.rotation.y;
+        const hx=m.pos.x+Math.sin(yaw)*2.0, hz=m.pos.z+Math.cos(yaw)*2.0;
+        this.hitTarget(m,tgt,Math.round(m.dmg*1.15),2.8,hx,hz,8);
+      }
+    }
+    else if(m.mAct==='taunt'){
+      // AUMAN SANG RAJA (KING ROAR)
+      m.vel.x*=0.8;m.vel.z*=0.8;
+      const times=[0.70, 1.05, 1.45];
+      for(let i=0;i<3;i++){
+        if(!m._mFired[i]&&tA>=times[i]){
+          m._mFired[i]=true;
+          if(M&&M.tauntFX)M.tauntFX(m);
+          if(i===0&&typeof FX!=='undefined'){
+            FX.text(m.pos.clone().add(new THREE.Vector3(0,3.2,0)),'🦣 AUMAN RAJA!','#ffd489');
+          }
+        }
+      }
+    }
+
+    if(m.mActT>=m.mActDur){
+      m.mAct=null;m.mTarget=null;
+      m.atkCd=rand(1.8,3.2);
+    }
+  },
+
+  /* =========================================================================
      SERANGAN MOB SEDERHANA — SATU JALUR UNTUK SEMUA SASARAN
      -------------------------------------------------------------------------
      Dipakai oleh ai() (lawan pemain), aiVsNpc() (lawan rekan NPC/pet), dan
@@ -3166,6 +3338,11 @@ const Monsters={
       case 'boar':
         if(m.atkCd>0||m.bAct)return false;
         this.startBoarAtk(m,this.pickBoarAtk(d),tgt);
+        return true;
+
+      case 'mammoth':
+        if(m.atkCd>0||m.mAct)return false;
+        this.startMammothAtk(m,this.pickMammothAtk(d),tgt);
         return true;
 
       case 'wolf':
@@ -3319,6 +3496,25 @@ const Monsters={
      Sapi/kuda tidak tembus pemain, NPC, maupun mob lain. Penyelesaian gaya
      dorong simetris: kedua badan dipisahkan setengah penetrasi, dengan cek
      terrain agar tidak terdorong masuk tembok. */
+  /* Tinggi collider badan (mesh collider): mengikuti tinggi model mob supaya
+     dorongan hanya terjadi bila kedua badan benar-benar bertumpuk VERTIKAL.
+     Tanpa ini collider = tiang tak berujung: pet yang melompat di atas kepala
+     pemain tetap mendorong, dan pemain tidak bisa melompati punggung pet. */
+  bodyTop(e){
+    if(!e||!e.pos)return -999;
+    const h=(typeof meshHeight==='function'?meshHeight(e.type||''):0)||1.2;
+    const mul=(e.sizeMul||1);
+    return e.pos.y+h*mul;
+  },
+  bodiesOverlap(a,b){
+    if(!a||!b||!a.pos||!b.pos)return false;
+    const aTop=this.bodyTop(a),aBot=a.pos.y;
+    const bTop=(b===Player)?(Player.pos.y+1.8):this.bodyTop(b);
+    const bBot=b.pos.y;
+    /* tumpang tindih vertikal dengan toleransi kaki 0.35 blok supaya yang
+       berdiri di tanah sejajar tetap saling mendorong */
+    return (aTop>bBot+0.35)&&(bTop>aBot+0.35);
+  },
   separateAnimal(m){
     if(m.dead)return;
     const R=m.r||0.6;
@@ -3326,6 +3522,10 @@ const Monsters={
       const dx=m.pos.x-ox,dz=m.pos.z-oz;
       const d=Math.hypot(dx,dz),min=R+or;
       if(d>=min||d<1e-4)return;
+      /* mesh collider: badan yang melayang jauh di atas / di bawah tidak
+         saling mendorong (bisa dilompati & bisa melompati) */
+      const other=(target==='player')?Player:target;
+      if(other&&!this.bodiesOverlap(m,other))return;
       const push=(min-d)*0.5,ux=dx/d,uz=dz/d;
       /* dorong lawan */
       if(target==='player'){
@@ -3366,7 +3566,7 @@ const Monsters={
     }
   },
 
-  PREDATORS:['wolf','boar','scorpion','lizard','dragon','trex'],
+  PREDATORS:['wolf','boar','scorpion','lizard','dragon','trex','mammoth'],
 
   /* kategori animal: sapi/kuda. NPC tidak boleh memburu/menyerang animal. */
   isAnimal(m){
@@ -3561,6 +3761,10 @@ const Monsters={
       /* ---------- BABI HUTAN PET: pukulan atas gading & seruduk lari kencang ---------- */
       else if(m.type==='boar'){
         if(!m.bAct)this.startBoarAtk(m,this.pickBoarAtk(d),target);
+      }
+      /* ---------- MAMMOTH PET: seruduk langit, hantaman seismik, sapuan belalai & auman ---------- */
+      else if(m.type==='mammoth'){
+        if(!m.mAct)this.startMammothAtk(m,this.pickMammothAtk(d),target);
       }
       /* ---------- REAPER PET: keempat aksinya dipakai ----------
          Timeline dijalankan reaperAct() (dipanggil dari Capture.petAI) dengan
@@ -3874,7 +4078,7 @@ const Monsters={
 };
 /* tinggi kira-kira model, dipakai untuk posisi teks damage & aura boss */
 function meshHeight(type){
-  return type==='golem'?3:type==='dragon'?4.2:type==='trex'?3.8:type==='cow'?1.8:type==='horse'?2.1:
+  return type==='golem'?3:type==='dragon'?4.2:type==='trex'?3.8:type==='mammoth'?3.8:type==='cow'?1.8:type==='horse'?2.1:
     type==='lizard'?1.2:type==='boar'?1.1:
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:

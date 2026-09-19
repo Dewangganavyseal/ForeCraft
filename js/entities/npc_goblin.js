@@ -112,8 +112,15 @@ const NPC_Goblin={
     };
     const shL=mkArm(1),shR=mkArm(-1);R.shL=shL;R.shR=shR;
 
-    /* belati emas di tangan kanan: pivot grip di telapak, bilah menjulur -Y */
+    /* belati emas di tangan kanan: pivot grip di telapak.
+       ORIENTASI: diputar 90° ke depan (X) + 90° ke samping (Z) supaya bilah
+       lurus ke depan (+Z) dengan mata tajam menghadap atas-bawah, bukan
+       menghadap ke bawah (-Y). */
     const grip=new THREE.Group();grip.position.set(0,-0.30,0.03);shR.add(grip);
+    /* urutan ZYX = putar depan (X) dulu, baru putar samping (Z): bilah -Y
+       → +Z lurus ke depan dengan mata tajam vertikal (atas-bawah) */
+    grip.rotation.order='ZYX';
+    grip.rotation.set(-Math.PI/2,0,Math.PI/2);
     grip.add(at(box(0.05,0.05,0.05,GOLD_D),0,0.05,0));          // pommel
     grip.add(at(box(0.045,0.12,0.045,LEATHER),0,-0.02,0));      // gagang
     grip.add(at(box(0.14,0.035,0.06,GOLD),0,-0.10,0));          // guard
@@ -301,7 +308,7 @@ const NPC_Goblin={
     R.kneeL.rotation.x=0;R.kneeR.rotation.x=0;
     R.earL.rotation.set(0,0,0);R.earR.rotation.set(0,0,0);
     R.tail.rotation.set(0,0,0);
-    R.grip.rotation.set(0.15,0,0);
+    R.grip.rotation.set(-Math.PI/2+0.15,0,Math.PI/2);
 
     const A=gb.action;
     if(A){
@@ -409,7 +416,7 @@ const NPC_Goblin={
       R.earL.rotation.x=Math.sin(tr*20)*0.15;
       R.earR.rotation.x=Math.sin(tr*20+1)*0.15;
       R.tail.rotation.y=Math.sin(tr*16)*0.5;         // ekor senang
-      R.grip.rotation.x=0.15-0.5*pulse*(side>0?1:0);
+      R.grip.rotation.x=-Math.PI/2+0.15-0.5*pulse*(side>0?1:0);
     }else if(T<tEnd){
       /* salto belakang turun dari punggung */
       const u=(T-tHop)/GB.hop;

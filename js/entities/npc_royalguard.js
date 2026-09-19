@@ -448,11 +448,25 @@ const NPC_RoyalGuard={
     }
   },
 
-  /* pose ayunan pedang biasa (dipakai saat swing dari aiFight) */
+  /* pose ayunan pedang biasa (dipakai saat swing dari aiFight).
+     Diperbesar: lengan kanan diangkat tinggi ke belakang lalu disabet penuh
+     ke depan + badan memutar, supaya ayunannya terlihat jelas bergerak
+     (sebelumnya gerakannya terlalu kecil sehingga tampak diam). */
   _poseSwing(n,P,u){
     u=clamp(u,0,1);
-    P.aRx=-0.14+u*0.8;P.aRz=-0.22-u*0.4;P.fRx=-0.62-u*0.5;
-    P.twist=0.25*u;P.lean=0.1;
+    const wind=u<0.4?u/0.4:1, hit=u<0.4?0:Math.min(1,(u-0.4)/0.35), rec=u<0.75?0:(u-0.75)/0.25;
+    /* ancang: angkat ke atas-belakang → sabet: tebas ke depan-bawah → pulih */
+    P.aRx=lerp(lerp(-0.14,-1.9,wind),lerp(-1.9,0.9,hit),1)+rec*0.1;
+    P.aRz=-0.22-wind*0.25+hit*0.15;
+    P.aRy=wind*0.35-hit*0.5;
+    P.fRx=lerp(lerp(-0.62,-0.25,wind),lerp(-0.25,-1.1,hit),1)+rec*0.48;
+    P.twist=wind*-0.3+hit*0.45;
+    P.lean=wind*-0.06+hit*0.22;
+    P.rootY=wind*0.06-hit*0.04;
+    P.headX=wind*-0.06+hit*0.1;
+    /* lengan kiri (perisai) ikut menyeimbang: buka saat ancang, tutup saat sabet */
+    P.aLx=-0.42-wind*0.15+hit*0.3;
+    P.fLx=-1.15+hit*0.25;
   },
 
   /* ---------- POSE SHIELD BASH (prototipe: wind 0.34 â†’ hit 0.16 â†’ recov) --- */

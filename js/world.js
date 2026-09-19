@@ -695,19 +695,23 @@ const World={
     const near=WGEN.nearestDungeon(px,pz);
     if(!near||near.d.kind!=='cave')return null;
     if(near.dist>near.d.r+1)return null;
-    /* ada langit-langit di atas kepala? */
-    let roofed=false;
-    for(let y=y0;y<CFG.WORLD_H;y++){
-      const b=this.getBlock(px,y,pz);
-      if(b!==B.AIR&&b!==B.WATER){roofed=true;break;}
-    }
-    if(!roofed)return null;
+    /* PENGAMAN LUBANG LANTAI: bila lantai goa hancur dan pemain jatuh ke lubang
+       yang digalinya sendiri, kolom di atas kepala bisa bolong (langit-langit
+       asli ikut hancur / pemain jatuh jauh ke bawah). Selama pemain masih di
+       dalam radius goa, ia TETAP dianggap di dalam goa walau tidak ada blok
+       tepat di atas kepalanya — yang dicek adalah KUBAH ASLI dungeon (radius
+       horizontal), bukan sisa blok yang sudah dihancurkan pemain. Tanpa ini
+       dinding goa tiba-tiba padat kembali saat pemain masuk lubang. */
     const d=near.d;
+    const caveBox={x:d.x-d.r,z:d.z-d.r,w:d.r*2,d:d.r*2,yTop:CFG.WORLD_H+2};
     /* yTop: kubah gua JAUH lebih tinggi dari atap rumah (domeH bisa 15-17 blok
        di atas lantai), jadi kotak oklusinya perlu setinggi dunia. Tanpa ini
        hanya DINDING SAMPING gua yang memudar — atapnya berada di luar kotak
-       sehingga tetap padat dan menutupi karakter dari atas. */
-    this._caveRes={x:d.x-d.r,z:d.z-d.r,w:d.r*2,d:d.r*2,yTop:CFG.WORLD_H+2};
+       sehingga tetap menutupi karakter dari atas.
+       PENGAMAN LUBANG: kotak ini dipakai SELALU selama pemain di radius goa,
+       walau kolom di atas kepala bolong (lantai/atap hancur, jatuh ke lubang
+       galian sampai dasar) — dinding tetap transparan. */
+    this._caveRes=caveBox;
     return this._caveRes;
   },
   updateRoof(dt,pp){
