@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecraft — Walkthrough & Ecosystem Editor</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Titan+One&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #0d1210;
+    --bg-card: #151d19;
+    --bg-card-hover: #1c2621;
+    --bg-panel: #111714;
+    --border: #28372e;
+    --border-light: #3d5246;
+    --text: #e8f0ea;
+    --text-muted: #889e90;
+    --accent: #22c55e;
+    --accent-glow: rgba(34, 197, 94, 0.25);
+    --gold: #f59e0b;
+    --gold-glow: rgba(245, 158, 11, 0.25);
+    --blue: #38bdf8;
+    --purple: #c084fc;
+    --red: #f43f5e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-dark);
+    color: var(--text);
+    font-family: 'Chakra Petch', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* TOP HEADER */
+  header {
+    height: 56px;
+    background: rgba(17, 23, 20, 0.95);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    gap: 16px;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .brand span { color: var(--accent); }
+  .nav-tabs {
+    display: flex;
+    gap: 6px;
+    background: rgba(0,0,0,0.35);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .tab-btn.active { color: #fff; background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-action {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-action:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .btn-action.btn-save {
+    background: linear-gradient(135deg, #15803d, #16a34a);
+    border: 1px solid #4ade80;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+  }
+  .btn-action.btn-save:hover {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+  }
+
+  /* MAIN LAYOUT */
+  .main-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 310px 1fr 370px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* SIDEBAR LEFT - ITEM BROWSER */
+  .sidebar-left {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .search-box {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .search-input {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border 0.15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .filter-pills {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .filter-pills::-webkit-scrollbar { height: 4px; }
+  .filter-pills::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .pill {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pill:hover { color: #fff; }
+  .pill.active { background: rgba(34, 197, 94, 0.2); border-color: var(--accent); color: #86efac; }
+
+  .item-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .item-list::-webkit-scrollbar { width: 6px; }
+  .item-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .item-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .item-entry:hover { background: var(--bg-card-hover); border-color: var(--border-light); }
+  .item-entry.selected {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 10px rgba(34, 197, 94, 0.1);
+  }
+  .item-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .item-icon img { width: 26px; height: 26px; object-fit: contain; }
+  .item-info { flex: 1; min-width: 0; }
+  .item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+  .badge-rarity {
+    font-size: 9px;
+    text-transform: uppercase;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+
+  /* RARITY COLORS */
+  .rar-common { color: #d1d5db; border-color: #6b7280; }
+  .rar-uncommon { color: #86efac; border-color: #22c55e; }
+  .rar-rare { color: #93c5fd; border-color: #3b82f6; }
+  .rar-epic { color: #d8b4fe; border-color: #a855f7; }
+  .rar-legendary { color: #fde047; border-color: #eab308; }
+  .rar-mythic { color: #f43f5e; border-color: #e11d48; }
+
+  /* CENTER CANVAS - ROOT TREE VIEW */
+  .center-canvas {
+    position: relative;
+    overflow: auto;
+    background: radial-gradient(circle at center, #131b16 0%, #090e0b 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 40px;
+  }
+  .center-canvas::-webkit-scrollbar { width: 8px; height: 8px; }
+  .center-canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .tree-section {
+    width: 100%;
+    max-width: 860px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.4);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .nodes-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  /* NODE CARD */
+  .node-card {
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    min-width: 200px;
+    max-width: 270px;
+    position: relative;
+  }
+  .node-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-light);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .node-card.target-hero {
+    background: linear-gradient(135deg, #18261e, #111a15);
+    border: 2.5px solid var(--accent);
+    box-shadow: 0 0 28px rgba(34, 197, 94, 0.28);
+    min-width: 290px;
+    padding: 16px 20px;
+    transform: scale(1.05);
+  }
+  .node-card.target-hero .item-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+    border-radius: 10px;
+  }
+  .node-card.target-hero .item-icon img { width: 38px; height: 38px; }
+  .node-card.target-hero .item-title { font-size: 16px; }
+
+  .node-card.source-node {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(14, 30, 38, 0.7);
+  }
+  .node-card.source-node:hover {
+    border-color: #38bdf8;
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+  }
+  .node-card.usage-node {
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(36, 26, 14, 0.7);
+  }
+  .node-card.usage-node:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.25);
+  }
+
+  .node-tag {
+    position: absolute;
+    top: -9px;
+    right: 12px;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #000;
+    border: 1px solid var(--border);
+    letter-spacing: 0.04em;
+  }
+  .tag-drop { color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); }
+  .tag-recipe { color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+  .tag-smelt { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+
+  .tree-arrow {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(to bottom, var(--border-light), var(--accent));
+    margin: -10px 0;
+    position: relative;
+  }
+  .tree-arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--accent);
+  }
+
+  /* SIDEBAR RIGHT - INSPECTOR & LIVE EDITOR */
+  .sidebar-right {
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-right::-webkit-scrollbar { width: 6px; }
+  .sidebar-right::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .inspector-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(0,0,0,0.25);
+  }
+  .inspector-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .inspector-icon img { width: 36px; height: 36px; object-fit: contain; }
+  .inspector-title-wrap h2 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .inspector-id { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+
+  .editor-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .editor-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .btn-mini-add {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--accent);
+    color: #86efac;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+  }
+  .btn-mini-add:hover { background: var(--accent); color: #fff; }
+
+  .card-editor {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .field-label { color: var(--text-muted); font-size: 11px; min-width: 70px; }
+  .field-input, .field-select {
+    flex: 1;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: #fff;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+  }
+  .field-input:focus, .field-select:focus { border-color: var(--accent); }
+
+  .ingredient-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.25);
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .btn-del {
+    background: rgba(244, 63, 94, 0.15);
+    border: 1px solid var(--red);
+    color: #fda4af;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .btn-del:hover { background: var(--red); color: #fff; }
+
+  /* DIFF BANNER */
+  .diff-badge {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid var(--gold);
+    color: #fde047;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-content {
+    background: var(--bg-panel);
+    border: 2px solid var(--border-light);
+    border-radius: 14px;
+    width: min(650px, 92vw);
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.8);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+    color: #d1fae5;
+    background: rgba(0,0,0,0.4);
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .modal-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* TOAST NOTIF */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #15803d;
+    border: 1px solid #4ade80;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 200;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>🌳</span> FORECRAFT <span>WALKTHROUGH & ECOSYSTEM EDITOR</span>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="setMode('tree')">🌳 Akar & Resep (Tree)</button>
+    <button class="tab-btn" onclick="setMode('mobs')">⚔️ Mob Drop Matrix</button>
+    <button class="tab-btn" onclick="setMode('recipes')">📜 Daftar Semua Resep</button>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-action" onclick="resetDefaults()" title="Kembalikan semua resep & drop ke bawaan game">🔄 Reset Default</button>
+    <button class="btn-action btn-save" onclick="openSaveModal()">💾 SIMPAN / EXPORT TXT</button>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- LEFT: SEARCH & LIST -->
+  <aside class="sidebar-left">
+    <div class="search-box">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Cari item, mob, atau resep..." oninput="onSearch()">
+      <div class="filter-pills" id="filterPills">
+        <div class="pill active" onclick="setFilter('all')">Semua</div>
+        <div class="pill" onclick="setFilter('ingot')">Bijih & Ingot</div>
+        <div class="pill" onclick="setFilter('weapon')">Pedang & Senjata</div>
+        <div class="pill" onclick="setFilter('armor')">Baju Zirah</div>
+        <div class="pill" onclick="setFilter('drop')">Drop Mob</div>
+        <div class="pill" onclick="setFilter('food')">Makanan</div>
+        <div class="pill" onclick="setFilter('furni')">Furnitur</div>
+      </div>
+    </div>
+    <div class="item-list" id="itemList"></div>
+  </aside>
+
+  <!-- CENTER: INTERACTIVE ROOT TREE CANVAS -->
+  <main class="center-canvas" id="centerCanvas">
+    <!-- SOURCES / ROOTS (UPPER) -->
+    <div class="tree-section" id="sourcesSection">
+      <div class="section-label">🌱 AKAR SUMBER (DIDAPATKAN DARI)</div>
+      <div class="nodes-grid" id="sourcesGrid"></div>
+    </div>
+
+    <!-- CONNECTOR ARROW DOWN -->
+    <div class="tree-arrow"></div>
+
+    <!-- TARGET HERO NODE (CENTER) -->
+    <div class="tree-section" id="targetSection">
+      <div class="node-card target-hero" id="heroNode"></div>
+    </div>
+
+    <!-- CONNECTOR ARROW DOWN -->
+    <div class="tree-arrow"></div>
+
+    <!-- USAGES / BRANCHES (LOWER) -->
+    <div class="tree-section" id="usagesSection">
+      <div class="section-label">🌿 CABANG KEGUNAAN (BAHAN UNTUK MEMBUAT)</div>
+      <div class="nodes-grid" id="usagesGrid"></div>
+    </div>
+
+    <!-- MATRIX VIEW (MODE: MOB DROP MATRIX & DAFTAR RESEP) -->
+    <div class="tree-section" id="matrixView" style="display:none;max-width:1020px;">
+      <div class="section-label" id="matrixLabel">⚔️ MATRIX DROP MOB</div>
+      <div class="nodes-grid" id="matrixGrid" style="justify-content:center;align-items:stretch;"></div>
+    </div>
+  </main>
+
+  <!-- RIGHT: INSPECTOR & LIVE EDITOR -->
+  <aside class="sidebar-right" id="inspectorSidebar">
+    <div class="inspector-header">
+      <div class="inspector-icon" id="inspIcon">📦</div>
+      <div class="inspector-title-wrap">
+        <h2 id="inspName">Pilih Item</h2>
+        <div class="inspector-id" id="inspId">Pilih salah satu item di daftar</div>
+      </div>
+    </div>
+
+    <!-- ITEM STATS EDITOR -->
+    <div class="editor-section">
+      <div class="editor-section-title">
+        <span>⚙️ Edit Properti Item</span>
+      </div>
+      <div class="card-editor">
+        <div class="field-row">
+          <span class="field-label">Nama Item:</span>
+          <input type="text" id="editItemName" class="field-input" onchange="updateItemName()">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Rarity:</span>
+          <select id="editItemRarity" class="field-select" onchange="updateItemRarity()">
+            <option value="common">Common (Abu-abu)</option>
+            <option value="uncommon">Uncommon (Hijau)</option>
+            <option value="rare">Rare (Biru)</option>
+            <option value="epic">Epic (Ungu)</option>
+            <option value="legendary">Legendary (Kuning)</option>
+            <option value="mythic">Mythic (Merah)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECIPES WHERE THIS ITEM IS OUTPUT -->
+    <div class="editor-section" id="recipesOutSection">
+      <div class="editor-section-title">
+        <span>📜 Resep Pembuatan Item Ini</span>
+        <button class="btn-mini-add" onclick="addNewRecipeForCurrent()">+ Resep Baru</button>
+      </div>
+      <div id="recipesOutList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- MOB DROPS SECTION IF APPLICABLE -->
+    <div class="editor-section" id="mobDropsSection">
+      <div class="editor-section-title">
+        <span>⚔️ Sumber Drop dari Mob</span>
+      </div>
+      <div id="mobDropsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- WORLD GATHER SOURCES -->
+    <div class="editor-section" id="gatherSection">
+      <div class="editor-section-title">
+        <span>🌍 Sumber Alam (Tambang / Tani / Pancing)</span>
+        <button class="btn-mini-add" onclick="addGatherPrompt()">+ Tambah</button>
+      </div>
+      <div id="gatherList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- USAGES IN RECIPES -->
+    <div class="editor-section" id="usagesEditSection">
+      <div class="editor-section-title">
+        <span>🔨 Dipakai di Resep Peralatan</span>
+      </div>
+      <div id="usagesEditList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- MODAL SAVE / EXPORT TXT -->
+<div class="modal-backdrop" id="saveModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="font-size:15px;color:var(--accent);">💾 Format File Perubahan Ekosistem (Untuk AI)</h3>
+      <button class="btn-del" onclick="closeSaveModal()">✕</button>
+    </div>
+    <div class="modal-body" id="saveOutput"></div>
+    <div class="modal-footer">
+      <button class="btn-action" onclick="copySaveText()">📋 Salin Teks</button>
+      <button class="btn-action btn-save" onclick="downloadTxtFile()">📥 Download TXT</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">Notifikasi</div>
+
+<!-- SCRIPT PENGHUBUNG GAME DATA -->
+<script src="js/config.js"></script>
+<script>
+/* =============================================================================
+   DATABASE MOB DROPS FORECRAFT (TERINTEGRASI LENGKAP DARI MONSTERS.JS)
+   ============================================================================= */
+const DEFAULT_MOB_DROPS = {
+  slime: [
+    { item: 'gel', chance: 100, min: 1, max: 2 },
+    { item: 'green_blood', chance: 16, min: 1, max: 1 }
+  ],
+  boar: [
+    { item: 'meat', chance: 100, min: 1, max: 2 },
+    { item: 'fiber', chance: 40, min: 1, max: 1 }
+  ],
+  wolf: [
+    { item: 'pelt', chance: 100, min: 1, max: 2 },
+    { item: 'meat', chance: 100, min: 1, max: 1 }
+  ],
+  scorpion: [
+    { item: 'venom', chance: 100, min: 1, max: 1 },
+    { item: 'fiber', chance: 50, min: 1, max: 1 },
+    { item: 'toxic_venom', chance: 16, min: 1, max: 1 },
+    { item: 'hard_shell', chance: 16, min: 1, max: 1 },
+    { item: 'insect_leg', chance: 16, min: 1, max: 1 }
+  ],
+  rabbit: [
+    { item: 'meat', chance: 100, min: 1, max: 1 },
+    { item: 'fiber', chance: 25, min: 1, max: 1 }
+  ],
+  cow: [
+    { item: 'meat', chance: 100, min: 2, max: 2 },
+    { item: 'leather', chance: 100, min: 2, max: 2 }
+  ],
+  horse: [
+    { item: 'meat', chance: 100, min: 2, max: 2 },
+    { item: 'leather', chance: 100, min: 2, max: 2 }
+  ],
+  kumbang: [
+    { item: 'centipede_shell', chance: 100, min: 1, max: 2 },
+    { item: 'fiber', chance: 50, min: 1, max: 1 },
+    { item: 'hard_shell', chance: 16, min: 1, max: 1 },
+    { item: 'insect_leg', chance: 16, min: 1, max: 1 },
+    { item: 'green_blood', chance: 16, min: 1, max: 1 }
+  ],
+  semut: [
+    { item: 'centipede_shell', chance: 100, min: 1, max: 1 },
+    { item: 'fiber', chance: 50, min: 1, max: 1 },
+    { item: 'insect_leg', chance: 16, min: 1, max: 1 },
+    { item: 'green_blood', chance: 16, min: 1, max: 1 },
+    { item: 'toxic_venom', chance: 16, min: 1, max: 1 }
+  ],
+  tarantula: [
+    { item: 'centipede_shell', chance: 100, min: 2, max: 2 },
+    { item: 'fiber', chance: 100, min: 1, max: 2 },
+    { item: 'insect_leg', chance: 32, min: 1, max: 1 },
+    { item: 'hard_shell', chance: 32, min: 1, max: 1 },
+    { item: 'green_blood', chance: 32, min: 1, max: 1 },
+    { item: 'toxic_venom', chance: 32, min: 1, max: 1 }
+  ],
+  yeti: [
+    { item: 'pelt', chance: 100, min: 2, max: 2 },
+    { item: 'meat', chance: 100, min: 2, max: 2 }
+  ],
+  reaper: [
+    { item: 'soul_shard', chance: 100, min: 1, max: 2 },
+    { item: 'crystal', chance: 35, min: 1, max: 1 }
+  ],
+  lizard: [
+    { item: 'meat', chance: 100, min: 1, max: 1 },
+    { item: 'stone', chance: 100, min: 2, max: 2 },
+    { item: 'hard_shell', chance: 16, min: 1, max: 1 },
+    { item: 'green_blood', chance: 16, min: 1, max: 1 }
+  ],
+  golem: [
+    { item: 'stone', chance: 100, min: 2, max: 3 },
+    { item: 'meat', chance: 100, min: 1, max: 1 }
+  ],
+  trex: [
+    { item: 'meat', chance: 100, min: 1, max: 1 },
+    { item: 'hard_shell', chance: 16, min: 1, max: 1 }
+  ],
+  mammoth: [
+    { item: 'meat', chance: 100, min: 4, max: 4 },
+    { item: 'leather', chance: 100, min: 2, max: 3 },
+    { item: 'tusk', chance: 5, min: 1, max: 1 }
+  ],
+  /* NAGA (non-boss): HANYA batu + daging. Inti Boss HANYA keluar bila naga
+     tersebut menjadi mini boss (aturan universal SEMUA mini boss, lihat BOSS_RULES). */
+  dragon: [
+    { item: 'stone', chance: 100, min: 2, max: 3 },
+    { item: 'meat', chance: 100, min: 1, max: 1 }
+  ],
+  /* BOSS ALTAR (kelabang raksasa): peluang 50% menjatuhkan 1-2 inti boss.
+     Satu-satunya sumber inti boss bernilai ganda. */
+  kelabang: [
+    { item: 'centipede_shell', chance: 100, min: 2, max: 2 },
+    { item: 'venom', chance: 100, min: 1, max: 1 },
+    { item: 'toxic_venom', chance: 32, min: 1, max: 1 },
+    { item: 'hard_shell', chance: 32, min: 1, max: 1 },
+    { item: 'insect_leg', chance: 32, min: 1, max: 1 },
+    { item: 'boss_core', chance: 50, min: 1, max: 2 }
+  ],
+  kelabang_part: [
+    { item: 'centipede_shell', chance: 100, min: 1, max: 2 },
+    { item: 'toxic_venom', chance: 16, min: 1, max: 1 }
+  ]
+};
+
+/* =============================================================================
+   ATURAN DROP INTI BOSS (boss_core) — HANYA dari 4 sumber ini, tidak ada yang lain:
+   1. Mob BIASA (tipe apa pun): peluang 7% drop 1 inti boss.
+   2. MINI BOSS (mob raksasa bertitik emas): peluang 10% drop 1 inti boss
+      (drop reguler lainnya tetap digandakan x2).
+   3. PETI BOSS DUNGEON (peti emas Penjaga Agung): peluang 12% isi 1 inti boss.
+   4. BOSS ALTAR (kelabang raksasa): peluang 50% drop 1-2 inti boss.
+   Sumber lama yang SUDAH DIHAPUS: drop pasti trex, leviathan, loot peti biasa,
+   hadiah penaklukan dungeon, dan SEMUA reward quest.
+   ============================================================================= */
+const BOSS_RULES = {
+  bossCoreNote: 'Inti Boss HANYA dari 4 sumber: mob biasa 7% (1x) · mini boss 10% (1x) · peti boss dungeon 12% (1x) · boss altar 50% (1-2x). Tidak ada sumber lain.',
+  normalMobNote: 'Mob BIASA (tipe apa pun, termasuk trex & naga biasa): peluang 7% menjatuhkan 1 inti boss.',
+  minibossNote: 'MINI BOSS (mob raksasa bertitik emas, tipe apa pun): peluang 10% menjatuhkan 1 inti boss. Drop reguler lainnya digandakan (x2).',
+  dungeonChestNote: 'PETI BOSS DUNGEON (peti emas Penjaga Agung): peluang 12% berisi 1 inti boss.',
+  altarBossNote: 'BOSS ALTAR (kelabang raksasa): peluang 50% menjatuhkan 1-2 inti boss.',
+  redlandsNote: 'Mob APAPUN yang mati di biome Tanah Merah punya peluang ekstra 16% per bahan ritual (insect_leg / hard_shell / green_blood / toxic_venom).',
+  minibossRitualNote: 'Mini boss (selain kelabang) punya peluang 32% menjatuhkan 1 bahan ritual altar acak.'
+};
+
+/* Alias item lama → item otentik (dari config.js). ID-ID ini BUKAN item beda:
+   mereka menunjuk objek yang SAMA, jadi di daftar diberi label "Alias". */
+const ALIAS_MAP = {
+  sword_wood: 'sword_elven', sword_copper: 'sword_steampunk',
+  sword_gold: 'sword_paladin', sword_storm: 'sword_paladin',
+  sword_venom: 'sword_shadow', sword_tungsten: 'sword_juggernaut',
+  sword_frost: 'sword_yeti', sword_titan: 'sword_dragon',
+  cap_leather: 'helm_elven', vest_leather: 'plate_elven', boots_leather: 'greaves_elven',
+  shield_wood: 'shield_berserker', shield_flame: 'shield_paladin',
+  shield_venom: 'shield_shadow', shield_storm: 'shield_juggernaut',
+  shield_frost: 'shield_crystal', shield_dark: 'shield_reaper',
+  shield_carapace: 'shield_dragon'
+};
+
+/* Sumber PENGUMPULAN DUNIA (bukan dari mob — dari tambang, tebang, tani, pancing). */
+const DEFAULT_GATHER = {
+  wood: [{ label: '🪓 Tebang Pohon', detail: 'Tebang batang kayu (B.WOOD). Peluang bonus resin 22% per batang.' }],
+  resin: [{ label: '🪓 Tebang Pohon', detail: 'Peluang 22% tiap batang kayu tumbang.' }],
+  stone: [{ label: '⛏️ Tambang Bongkahan Batu', detail: 'Hancurkan bongkahan batu ORE_STONE di dunia.' }],
+  coal: [{ label: '⛏️ Tambang Bijih Batu Bara', detail: 'Bongkahan ORE_COAL. Butuh Mining Lv 2.' }, { label: '📜 Hadiah Quest', detail: 'Quest tambang memberi 4x coal.' }],
+  copper_ore: [{ label: '⛏️ Tambang Bijih Tembaga', detail: 'Bongkahan ORE_COPPER. Butuh Mining Lv 7.' }],
+  iron_ore: [{ label: '⛏️ Tambang Bijih Besi', detail: 'Bongkahan ORE_IRON. Butuh Mining Lv 12.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 3x iron_ore.' }],
+  steel_ore: [{ label: '⛏️ Tambang Bijih Baja', detail: 'Bongkahan ORE_STEEL. Butuh Mining Lv 18.' }],
+  gold_ore: [{ label: '⛏️ Tambang Bijih Emas', detail: 'Bongkahan ORE_GOLD. Butuh Mining Lv 22.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2x gold_ore.' }],
+  tungsten_ore: [{ label: '⛏️ Tambang Bijih Tungsten', detail: 'Bongkahan ORE_TUNGSTEN. Butuh Mining Lv 26.' }],
+  crystal: [{ label: '⛏️ Tambang Kristal Beku', detail: 'Bongkahan ORE_CRYSTAL. Butuh Mining Lv 32.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2x crystal.' }],
+  tungstensteel_ore: [{ label: '⛏️ Tambang Bijih Baja Tungsten', detail: 'Bongkahan ORE_TUNGSTENSTEEL. Butuh Mining Lv 38.' }],
+  fiber: [{ label: '🌾 Petik Rumput Liar', detail: 'Rumput & tumbuhan liar. Sumber utama serat.' }, { label: '📜 Hadiah Quest', detail: 'Quest awal memberi 3-4x fiber.' }],
+  berry: [{ label: '🫐 Petik Semak Beri', detail: 'Semak beri voxel (2 buah + peluang 50% bonus 1).' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 3x berry.' }],
+  mush: [{ label: '🍄 Petik Jamur Liar', detail: 'Jamur liar di hutan.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2x mush.' }],
+  sugar_cane: [{ label: '🎋 Petik Tebu Liar', detail: 'Rumpun tebu (2 batang + peluang 50% bonus 1).' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 3x sugar_cane.' }],
+  fish: [{ label: '🎣 Memancing', detail: 'Menangkan minigame pancing (1x; ikan rare 2x; mythic 5x).' }],
+  fish_scale: [
+    { label: '⚔️ Bunuh Ikan Laut Liar', detail: 'Ikan yang berenang dibunuh → ikan biasa (teri/mas/lele/badut) drop 1-2 sisik; ikan rare (puffer/todak/lentera) drop 2-4 sisik; Leviathan drop 4-6 sisik.' },
+    { label: '🎣 Memancing (Otomatis Tiap Tangkapan)', detail: 'SETIAP ikan yang berhasil dipancing OTOMATIS memberi sisik dalam jumlah SAMA dengan ikannya: ikan biasa 1x sisik, ikan rare 2x sisik, ikan mythic 5x sisik.' }
+  ],
+  golden_fish_scale: [
+    { label: '⚔️ Bunuh Leviathan Liar (10%)', detail: 'Leviathan yang berenang dibunuh punya peluang 10% menjatuhkan sisik emas.' },
+    { label: '🎣 Pancing Leviathan (Mythic)', detail: 'Ikan Leviathan yang berhasil dipancing SELALU memberi 1x sisik emas (100%), di samping 5x ikan + 5x sisik biasa.' }
+  ],
+  boss_core: [
+    { label: '⚔️ Bunuh Leviathan Liar', detail: 'Leviathan yang berenang dibunuh SELALU menjatuhkan 1x Inti Boss (100%, bukan mini boss pun tetap drop). Catatan: memancing Leviathan TIDAK memberi inti boss.' }
+  ],
+  sand: [{ label: '⚠️ Item Warisan (Legacy)', detail: 'Blok pasir kini HANYA menjatuhkan Blok Pasir (blk_sand), bukan item Pasir. Resep tembaga masih membutuhkannya — dapatkan via terminal/chat, save lama, atau ubah resepnya di sini.' }],
+  wheat: [{ label: '🌾 Bertani', detail: 'Panen ladang gandum (hasil 1 + peluang bonus, +1 benih).' }],
+  carrot: [{ label: '🥕 Bertani', detail: 'Panen ladang wortel.' }],
+  cabbage: [{ label: '🥬 Bertani', detail: 'Panen ladang kubis.' }],
+  tomato: [{ label: '🍅 Bertani', detail: 'Panen ladang tomat.' }],
+  watermelon: [{ label: '🍉 Bertani', detail: 'Panen ladang semangka.' }],
+  seed_wheat: [{ label: '🌱 Panen / Tanaman Liar', detail: 'Peluang 10% dari tanaman liar + bonus tiap panen.' }, { label: '📜 Hadiah Quest', detail: 'Quest tani memberi 2-3x benih.' }],
+  seed_carrot: [{ label: '🌱 Panen / Tanaman Liar', detail: 'Peluang 10% dari tanaman liar + bonus tiap panen.' }, { label: '📜 Hadiah Quest', detail: 'Quest tani memberi 2x benih.' }],
+  seed_cabbage: [{ label: '🌱 Panen / Tanaman Liar', detail: 'Peluang 10% dari tanaman liar + bonus tiap panen.' }],
+  seed_tomato: [{ label: '🌱 Panen / Tanaman Liar', detail: 'Peluang 10% dari tanaman liar + bonus tiap panen.' }],
+  seed_watermelon: [{ label: '🌱 Panen / Tanaman Liar', detail: 'Peluang 10% dari tanaman liar + bonus tiap panen.' }],
+  bread: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 6 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2x bread.' }],
+  cmeat: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 10 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2x cmeat.' }],
+  bandage: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 14 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 1-2x bandage.' }],
+  potion_stam: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 16 koin.' }],
+  pie: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 22 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 1x pie.' }],
+  sugar: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 11 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 3x sugar.' }],
+  cake: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 28 koin.' }],
+  cfish: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 12 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memancing memberi 2x cfish.' }],
+  leather: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 9 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 2-3x leather.' }],
+  iron_ingot: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 18 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 1-3x iron_ingot.' }],
+  gold_ingot: [{ label: '🏪 Beli di Pedagang', detail: 'Harga 30 koin.' }, { label: '📜 Hadiah Quest', detail: 'Quest memberi 1-2x gold_ingot.' }],
+  rope: [{ label: '📜 Hadiah Quest', detail: 'Quest memberi 1x rope.' }],
+  venom: [{ label: '📜 Hadiah Quest', detail: 'Quest memberi 2x venom.' }],
+  pelt: [{ label: '📜 Hadiah Quest', detail: 'Quest memberi 3x pelt.' }],
+  soul_shard: [{ label: '📜 Hadiah Quest', detail: 'Quest dungeon memberi 2x soul_shard.' }],
+  salad: [{ label: '📜 Hadiah Quest', detail: 'Quest tani memberi 1x salad.' }]
+};
+
+const MOB_META = {
+  slime: { name: 'Slime', icon: '🟢', biome: 'Dataran Hijau / Hutan' },
+  boar: { name: 'Babi Hutan', icon: '🐗', biome: 'Hutan & Savana' },
+  wolf: { name: 'Serigala', icon: '🐺', biome: 'Tundra & Malam' },
+  scorpion: { name: 'Kalajengking', icon: '🦂', biome: 'Gurun Pasir' },
+  rabbit: { name: 'Kelinci', icon: '🐰', biome: 'Hutan / Gurun / Tundra' },
+  cow: { name: 'Sapi Ternak', icon: '🐄', biome: 'Padang Rumput' },
+  horse: { name: 'Kuda Ternak', icon: '🐴', biome: 'Padang Rumput' },
+  kumbang: { name: 'Kumbang Tanduk', icon: '🪲', biome: 'Tanah Merah (Redlands)' },
+  semut: { name: 'Semut Raksasa', icon: '🐜', biome: 'Tanah Merah (Redlands)' },
+  tarantula: { name: 'Tarantula Raksasa', icon: '🕷️', biome: 'Tanah Merah (Redlands)' },
+  yeti: { name: 'Yeti Salju', icon: '❄️', biome: 'Puncak Tundra' },
+  reaper: { name: 'Reaper Dungeon', icon: '👻', biome: 'Dungeon Bawah Tanah' },
+  lizard: { name: 'Kadal Rawa', icon: '🦎', biome: 'Tepi Sungai & Danau' },
+  golem: { name: 'Golem Batu', icon: '🗿', biome: 'Pegunungan' },
+  trex: { name: 'T-Rex Purba', icon: '🦖', biome: 'Puncak Pegunungan Purba' },
+  mammoth: { name: 'Mammoth Purba', icon: '🦣', biome: 'Pegunungan Tinggi' },
+  dragon: { name: 'Naga Merah', icon: '🐉', biome: 'Puncak Gunung Tertinggi' },
+  kelabang: { name: 'Kelabang Raksasa (Boss)', icon: '🐛', biome: 'Ritual Altar' },
+  kelabang_part: { name: 'Ruas Kelabang', icon: '🐛', biome: 'Potongan Boss' }
+};
+
+/* Barang yang dijual pedagang desa (dari config.js SHOP_GOODS). */
+const DEFAULT_SHOP = [
+  { id: 'bread', price: 6 }, { id: 'cmeat', price: 10 },
+  { id: 'bandage', price: 14 }, { id: 'potion_stam', price: 16 },
+  { id: 'pie', price: 22 }, { id: 'sugar', price: 11 },
+  { id: 'cake', price: 28 }, { id: 'fish', price: 8 },
+  { id: 'cfish', price: 12 }, { id: 'leather', price: 9 },
+  { id: 'iron_ingot', price: 18 }, { id: 'gold_ingot', price: 30 },
+  { id: 'sword_wood', price: 15 }, { id: 'shield_wood', price: 18 },
+  { id: 'cap_leather', price: 12 }, { id: 'vest_leather', price: 20 },
+  { id: 'boots_leather', price: 12 }
+];
+
+const DEFAULT_SMELTER = [
+  { inOre: 'copper_ore', outIngot: 'copper_ingot', req: 2, dur: 10 },
+  { inOre: 'iron_ore', outIngot: 'iron_ingot', req: 2, dur: 10 },
+  { inOre: 'steel_ore', outIngot: 'steel_ingot', req: 2, dur: 10 },
+  { inOre: 'gold_ore', outIngot: 'gold_ingot', req: 2, dur: 10 },
+  { inOre: 'tungsten_ore', outIngot: 'tungsten_ingot', req: 2, dur: 10 },
+  { inOre: 'tungstensteel_ore', outIngot: 'tungstensteel_ingot', req: 2, dur: 10 }
+];
+
+/* STATE APLIKASI */
+let appItems = {};
+let appRecipes = [];
+let appMobDrops = {};
+let appSmelter = [];
+let appGather = {};
+let appShop = [];
+
+let currentSelectedId = 'steel_ingot';
+let currentFilter = 'all';
+let currentMode = 'tree';
+
+/* INISIALISASI DATA */
+function safeStoreGet(k) {
+  try { return localStorage.getItem(k); } catch (e) { return null; }
+}
+function safeStoreSet(k, v) {
+  try { localStorage.setItem(k, v); } catch (e) {}
+}
+function safeStoreDel(k) {
+  try { localStorage.removeItem(k); } catch (e) {}
+}
+function initData() {
+  const cached = safeStoreGet('forecraft_ecosystem_custom_v2');
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      appItems = parsed.items;
+      appRecipes = parsed.recipes;
+      appMobDrops = parsed.mobDrops;
+      appSmelter = parsed.smelter || JSON.parse(JSON.stringify(DEFAULT_SMELTER));
+      appGather = parsed.gather || JSON.parse(JSON.stringify(DEFAULT_GATHER));
+      appShop = parsed.shop || JSON.parse(JSON.stringify(DEFAULT_SHOP));
+      return;
+    } catch(e) {}
+  }
+  loadDefaults();
+}
+
+function isAliasId(id) {
+  return Object.prototype.hasOwnProperty.call(ALIAS_MAP, id);
+}
+function aliasTarget(id) {
+  return ALIAS_MAP[id] || id;
+}
+
+function loadDefaults() {
+  appItems = JSON.parse(JSON.stringify(typeof ITEMS !== 'undefined' ? ITEMS : {}));
+  appRecipes = JSON.parse(JSON.stringify(typeof RECIPES !== 'undefined' ? RECIPES : []));
+  appMobDrops = JSON.parse(JSON.stringify(DEFAULT_MOB_DROPS));
+  appSmelter = JSON.parse(JSON.stringify(DEFAULT_SMELTER));
+  appGather = JSON.parse(JSON.stringify(DEFAULT_GATHER));
+  appShop = JSON.parse(JSON.stringify(DEFAULT_SHOP));
+}
+
+function saveState() {
+  safeStoreSet('forecraft_ecosystem_custom_v2', JSON.stringify({
+    items: appItems,
+    recipes: appRecipes,
+    mobDrops: appMobDrops,
+    smelter: appSmelter,
+    gather: appGather,
+    shop: appShop
+  }));
+}
+
+function resetDefaults() {
+  if (confirm('Kembalikan semua resep, drop rate mob, dan item ke standar game?')) {
+    safeStoreDel('forecraft_ecosystem_custom_v2');
+    loadDefaults();
+    renderAll();
+    showToast('Semua data berhasil di-reset ke default.');
+  }
+}
+
+/* HELPER ICONS */
+function getItemIconHtml(id) {
+  const it = appItems[id];
+  if (!it) return '📦';
+  const imgUrl = `buttons/${id}.png`;
+  return `<img src="${imgUrl}" onerror="this.onerror=null;this.replaceWith('${it.e || '📦'}');" alt="${it.n}">`;
+}
+
+function getItemRarity(id) {
+  const it = appItems[id];
+  return (it && it.rarity) ? it.rarity : 'common';
+}
+
+function getItemName(id) {
+  const it = appItems[id];
+  return it ? it.n : id;
+}
+
+/* SEARCH & FILTER */
+function onSearch() {
+  renderItemList();
+  if (currentMode === 'mobs') renderMobMatrix();
+  else if (currentMode === 'recipes') renderRecipeMatrix();
+}
+
+function resetListFilter() {
+  document.getElementById('searchInput').value = '';
+  setFilter('all');
+  if (currentMode !== 'tree') setMode('tree');
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-pills .pill').forEach(p => {
+    const t = p.textContent.toLowerCase();
+    const on = (f === 'all' && t.includes('semua'))
+      || (f === 'ingot' && t.includes('bijih'))
+      || (f === 'weapon' && t.includes('pedang'))
+      || (f === 'armor' && t.includes('zirah'))
+      || (f === 'drop' && t.includes('drop'))
+      || (f === 'food' && t.includes('makanan'))
+      || (f === 'furni' && t.includes('furnitur'));
+    p.classList.toggle('active', on);
+  });
+  renderItemList();
+}
+
+function renderItemList() {
+  const listEl = document.getElementById('itemList');
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  listEl.innerHTML = '';
+
+  const ids = Object.keys(appItems);
+  const   filtered = ids.filter(id => {
+    const it = appItems[id];
+    if (!it) return false;
+    if (q && !id.toLowerCase().includes(q) && !(it.n || '').toLowerCase().includes(q)) return false;
+    if (currentFilter === 'ingot') return id.includes('ore') || id.includes('ingot');
+    if (currentFilter === 'weapon') return it.weapon;
+    if (currentFilter === 'armor') return it.armor;
+    if (currentFilter === 'food') return it.food;
+    if (currentFilter === 'furni') return it.place;
+    if (currentFilter === 'drop') {
+      return Object.values(appMobDrops).some(list => list.some(d => d.item === id));
+    }
+    return true;
+  });
+
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:var(--text-muted);font-size:12px;padding:16px;text-align:center;line-height:2;';
+    empty.innerHTML = '🔍 Tidak ada item yang cocok dengan pencarian/filter.<br><button class="btn-mini-add" onclick="resetListFilter()">Tampilkan Semua Item</button>';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  filtered.forEach(id => {
+    const it = appItems[id];
+    if (!it || it === null) return;
+    const rar = getItemRarity(id);
+    const aliasTag = isAliasId(id)
+      ? `<span class="badge-rarity" style="color:#fde047;border:1px solid #eab308;" title="Nama lain dari ${aliasTarget(id)} — barang yang SAMA PERSIS, bukan item berbeda">ALIAS → ${aliasTarget(id)}</span>`
+      : '';
+    const entry = document.createElement('div');
+    entry.className = `item-entry ${id === currentSelectedId ? 'selected' : ''}`;
+    entry.onclick = () => selectItem(id);
+    entry.innerHTML = `
+      <div class="item-icon">${getItemIconHtml(id)}</div>
+      <div class="item-info">
+        <div class="item-title">${it.n}</div>
+        <div class="item-meta">
+          <span class="badge-rarity rar-${rar}">${rar}</span>
+          <span>${id}</span>
+        </div>
+        ${aliasTag ? `<div class="item-meta" style="margin-top:2px;">${aliasTag}</div>` : ''}
+      </div>
+    `;
+    listEl.appendChild(entry);
+  });
+}
+
+/* SELECT ITEM & UPDATE VIEWS */
+function selectItem(id) {
+  // Alias (mis. sword_gold) BUKAN item beda — langsung arahkan ke item otentiknya
+  // (mis. sword_paladin) supaya pohon & editor tidak menampilkan data ganda.
+  if (isAliasId(id)) {
+    const realId = aliasTarget(id);
+    showToast(`🏷️ "${id}" adalah nama lain dari "${realId}" — menampilkan item aslinya.`);
+    id = realId;
+  }
+  currentSelectedId = id;
+  renderItemList();
+  renderTree();
+  renderInspector();
+}
+
+/* RENDER TREE GRAPH (SOURCES - TARGET HERO - USAGES) */
+function renderTree() {
+  const id = currentSelectedId;
+  const it = appItems[id];
+  if (!it) return;
+
+  const rar = getItemRarity(id);
+
+  // 1. HERO TARGET
+  const heroEl = document.getElementById('heroNode');
+  const aliasNote = isAliasId(id)
+    ? `<div class="item-meta" style="color:#fde047;margin-top:4px;">🏷️ ALIAS — nama lain dari <b>${aliasTarget(id)}</b>. Barang yang SAMA PERSIS (satu objek di kode game), bukan item berbeda. Mengubah resep di sini = mengubah ${aliasTarget(id)} juga.</div>`
+    : '';
+  heroEl.innerHTML = `
+    <div class="item-icon">${getItemIconHtml(id)}</div>
+    <div>
+      <div class="item-title">${it.n}</div>
+      <div class="item-meta">
+        <span class="badge-rarity rar-${rar}">${rar}</span>
+        <span>ID: ${id}</span>
+      </div>
+      ${aliasNote}
+    </div>
+  `;
+  // Alias menunjuk objek yang sama — arahkan fokus ke item otentiknya supaya
+  // pohon akar & editor selalu menampilkan data yang benar dan tidak ganda.
+  if (isAliasId(id)) {
+    const realId = aliasTarget(id);
+    if (appItems[realId]) {
+      currentSelectedId = realId;
+      renderItemList();
+      renderTree();
+      renderInspector();
+      return;
+    }
+  }
+
+  // 2. SOURCES (AKAR)
+  const sourcesGrid = document.getElementById('sourcesGrid');
+  sourcesGrid.innerHTML = '';
+  const sources = [];
+
+  // Mob Drops
+  for (const mobKey in appMobDrops) {
+    const drops = appMobDrops[mobKey];
+    for (const d of drops) {
+      if (d.item === id) {
+        sources.push({
+          type: 'mob',
+          mob: mobKey,
+          chance: d.chance,
+          min: d.min,
+          max: d.max
+        });
+      }
+    }
+  }
+
+  // Smelter
+  appSmelter.forEach(s => {
+    if (s.outIngot === id) {
+      sources.push({
+        type: 'smelt',
+        inOre: s.inOre,
+        req: s.req,
+        dur: s.dur
+      });
+    }
+  });
+
+  // Pengumpulan dunia: tambang, tebang pohon, tani, pancing, petik liar
+  (appGather[id] || []).forEach(g => {
+    sources.push({ type: 'gather', label: g.label, detail: g.detail });
+  });
+
+  // Toko pedagang desa
+  (appShop || []).forEach(g => {
+    if (g.id === id) {
+      sources.push({ type: 'shop', price: g.price });
+    }
+  });
+
+  // ATURAN KHUSUS INTI BOSS: HANYA 4 sumber ini, tidak ada sumber lain
+  if (id === 'boss_core') {
+    sources.push({ type: 'bossrule', kind: 'normalmob' });
+    sources.push({ type: 'bossrule', kind: 'miniboss' });
+    sources.push({ type: 'bossrule', kind: 'dungeonchest' });
+    sources.push({ type: 'bossrule', kind: 'altarboss' });
+    sources.push({ type: 'mob', mob: 'kelabang', chance: 50, min: 1, max: 2, note: 'Boss altar (kelabang raksasa): 50% drop 1-2 inti boss.' });
+  }
+
+  // ATURAN BONUS BIOME TANAH MERAH untuk 4 bahan ritual altar
+  if (['insect_leg', 'hard_shell', 'green_blood', 'toxic_venom'].includes(id)) {
+    sources.push({ type: 'bossrule', kind: 'redlands' });
+    sources.push({ type: 'bossrule', kind: 'minibossritual' });
+  }
+
+  // Recipes where output == id
+  appRecipes.forEach((r, idx) => {
+    if (r.out === id) {
+      sources.push({
+        type: 'recipe',
+        recipeIndex: idx,
+        recipe: r
+      });
+    }
+  });
+
+  if (sources.length === 0) {
+    sourcesGrid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;">⚠️ Item ini TIDAK punya sumber perolehan di game saat ini (kemungkinan item lama yang belum/tidak dipakai).</div>';
+  } else {
+    sources.forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'node-card source-node';
+      if (s.type === 'mob') {
+        const mm = MOB_META[s.mob] || { name: s.mob, icon: '👾', biome: 'Alam' };
+        card.innerHTML = `
+          <div class="node-tag tag-drop">DROP MOB (${s.chance}%)</div>
+          <div class="item-icon">${mm.icon}</div>
+          <div>
+            <div class="item-title">${mm.name}</div>
+            <div class="item-meta">Jumlah: ${s.min === s.max ? s.min : s.min + '-' + s.max}x · ${mm.biome}</div>
+            ${s.note ? `<div class="item-meta" style="color:#fde047;">${s.note}</div>` : ''}
+          </div>
+        `;
+      } else if (s.type === 'gather') {
+        card.innerHTML = `
+          <div class="node-tag tag-drop" style="color:#86efac;border-color:rgba(34,197,94,.4);">SUMBER ALAM</div>
+          <div class="item-icon">🌍</div>
+          <div>
+            <div class="item-title">${s.label}</div>
+            <div class="item-meta">${s.detail}</div>
+          </div>
+        `;
+      } else if (s.type === 'shop') {
+        card.innerHTML = `
+          <div class="node-tag tag-recipe">TOKO PEDAGANG</div>
+          <div class="item-icon">🏪</div>
+          <div>
+            <div class="item-title">Beli di Pedagang Desa</div>
+            <div class="item-meta">Harga: ${s.price} koin</div>
+          </div>
+        `;
+      } else if (s.type === 'bossrule') {
+        const ruleMap = {
+          normalmob: ['1️⃣ MOB BIASA — 7%', BOSS_RULES.normalMobNote, '👾'],
+          miniboss: ['2️⃣ MINI BOSS — 10%', BOSS_RULES.minibossNote, '👑'],
+          dungeonchest: ['3️⃣ PETI BOSS DUNGEON — 12%', BOSS_RULES.dungeonChestNote, '🧰'],
+          altarboss: ['4️⃣ BOSS ALTAR — 50% (1-2x)', BOSS_RULES.altarBossNote, '🐛'],
+          redlands: ['BONUS TANAH MERAH', BOSS_RULES.redlandsNote, '🟥'],
+          minibossritual: ['BONUS MINI BOSS', BOSS_RULES.minibossRitualNote, '👑']
+        };
+        const r = ruleMap[s.kind] || ['ATURAN DROP', BOSS_RULES.bossCoreNote, '👑'];
+        card.innerHTML = `
+          <div class="node-tag tag-smelt">SUMBER INTI BOSS</div>
+          <div class="item-icon">${r[2]}</div>
+          <div>
+            <div class="item-title">${r[0]}</div>
+            <div class="item-meta">${r[1]}</div>
+          </div>
+        `;
+      } else if (s.type === 'smelt') {
+        card.innerHTML = `
+          <div class="node-tag tag-smelt">PELEBURAN SMELTER</div>
+          <div class="item-icon">${getItemIconHtml(s.inOre)}</div>
+          <div>
+            <div class="item-title">${getItemName(s.inOre)}</div>
+            <div class="item-meta">Butuh ${s.req}x Ore · Waktu ${s.dur}s</div>
+          </div>
+        `;
+        card.onclick = () => selectItem(s.inOre);
+      } else if (s.type === 'recipe') {
+        const ingCount = Object.keys(s.recipe.need || {}).length;
+        card.innerHTML = `
+          <div class="node-tag tag-recipe">CRAFTING RESEP</div>
+          <div class="item-icon">🔨</div>
+          <div>
+            <div class="item-title">${s.recipe.name || getItemName(id)}</div>
+            <div class="item-meta">${ingCount} jenis bahan · Stasiun: ${s.recipe.skill || 'craft'}</div>
+          </div>
+        `;
+      }
+      sourcesGrid.appendChild(card);
+    });
+  }
+
+  // 3. USAGES (CABANG KEGUNAAN)
+  const usagesGrid = document.getElementById('usagesGrid');
+  usagesGrid.innerHTML = '';
+  const usages = [];
+
+  // Used in smelter
+  appSmelter.forEach(s => {
+    if (s.inOre === id) {
+      usages.push({
+        type: 'smelt_out',
+        outIngot: s.outIngot,
+        req: s.req
+      });
+    }
+  });
+
+  // Used in recipes
+  appRecipes.forEach((r, idx) => {
+    if (r.need && r.need[id]) {
+      usages.push({
+        type: 'craft_usage',
+        recipeIndex: idx,
+        recipe: r,
+        count: r.need[id]
+      });
+    }
+  });
+
+  if (usages.length === 0) {
+    usagesGrid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;">Belum ada equipment / resep yang membutuhkan bahan ini. Tambahkan resep di panel kanan!</div>';
+  } else {
+    usages.forEach(u => {
+      const card = document.createElement('div');
+      card.className = 'node-card usage-node';
+      if (u.type === 'smelt_out') {
+        card.innerHTML = `
+          <div class="node-tag tag-smelt">HASIL SMELTER</div>
+          <div class="item-icon">${getItemIconHtml(u.outIngot)}</div>
+          <div>
+            <div class="item-title">${getItemName(u.outIngot)}</div>
+            <div class="item-meta">Membutuhkan ${u.req}x ${it.n}</div>
+          </div>
+        `;
+        card.onclick = () => selectItem(u.outIngot);
+      } else if (u.type === 'craft_usage') {
+        const outId = u.recipe.out;
+        const outRar = getItemRarity(outId);
+        card.innerHTML = `
+          <div class="node-tag tag-recipe">BAHAN: ${u.count}x</div>
+          <div class="item-icon">${getItemIconHtml(outId)}</div>
+          <div>
+            <div class="item-title">${u.recipe.name || getItemName(outId)}</div>
+            <div class="item-meta">
+              <span class="badge-rarity rar-${outRar}">${outRar}</span>
+              <span>${u.recipe.skill || 'craft'}</span>
+            </div>
+          </div>
+        `;
+        card.onclick = () => selectItem(outId);
+      }
+      usagesGrid.appendChild(card);
+    });
+  }
+}
+
+/* RENDER INSPECTOR & LIVE EDITORS */
+function renderInspector() {
+  const id = currentSelectedId;
+  const it = appItems[id];
+  if (!it) return;
+
+  document.getElementById('inspIcon').innerHTML = getItemIconHtml(id);
+  document.getElementById('inspName').textContent = it.n + (isAliasId(id) ? ` (alias → ${aliasTarget(id)})` : '');
+  document.getElementById('inspId').textContent = isAliasId(id)
+    ? `ID: ${id} — NAMA LAIN dari ${aliasTarget(id)} (barang sama persis)`
+    : `ID: ${id}`;
+
+  document.getElementById('editItemName').value = it.n;
+  document.getElementById('editItemRarity').value = it.rarity || 'common';
+
+  // 1. Recipes outputting this item
+  const rOutList = document.getElementById('recipesOutList');
+  rOutList.innerHTML = '';
+  const myRecipes = appRecipes.map((r, idx) => ({ r, idx })).filter(o => o.r.out === id);
+
+  if (myRecipes.length === 0) {
+    rOutList.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Tidak ada resep yang menghasilkan item ini.</div>';
+  } else {
+    myRecipes.forEach(({ r, idx }) => {
+      const card = document.createElement('div');
+      card.className = 'card-editor';
+      
+      let ingHtml = '';
+      for (const ingId in r.need) {
+        ingHtml += `
+          <div class="ingredient-row">
+            <span style="font-size:15px;">${appItems[ingId] ? appItems[ingId].e || '📦' : '📦'}</span>
+            <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;">${getItemName(ingId)}</span>
+            <input type="number" min="1" max="999" value="${r.need[ingId]}" style="width:50px;" class="field-input" onchange="updateIngredientCount(${idx}, '${ingId}', this.value)">
+            <button class="btn-del" onclick="removeIngredient(${idx}, '${ingId}')" title="Hapus bahan">✕</button>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:12px;color:var(--gold);">Resep #${idx+1} (${r.skill || 'craft'})</b>
+          <button class="btn-del" onclick="deleteRecipe(${idx})" title="Hapus seluruh resep">✕ Hapus</button>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Stasiun:</span>
+          <select class="field-select" onchange="updateRecipeSkill(${idx}, this.value)">
+            <option value="craft" ${r.skill==='craft'?'selected':''}>Crafting Tas</option>
+            <option value="workbench" ${r.skill==='workbench'?'selected':''}>Meja Kerja (Workbench)</option>
+            <option value="smith" ${r.skill==='smith'?'selected':''}>Penempaan (Anvil)</option>
+            <option value="stove" ${r.skill==='stove'?'selected':''}>Kompor (Stove)</option>
+            <option value="campfire" ${r.skill==='campfire'?'selected':''}>Api Unggun (Campfire)</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Bahan-bahan yang Dibutuhkan:</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">${ingHtml}</div>
+        <button class="btn-mini-add" style="margin-top:4px;align-self:flex-start;" onclick="addIngredientPrompt(${idx})">+ Tambah Bahan</button>
+      `;
+      rOutList.appendChild(card);
+    });
+  }
+
+  // 2. Mob Drops for this item
+  const mobDropList = document.getElementById('mobDropsList');
+  mobDropList.innerHTML = '';
+  const myDrops = [];
+  for (const mobKey in appMobDrops) {
+    appMobDrops[mobKey].forEach((d, dIdx) => {
+      if (d.item === id) {
+        myDrops.push({ mobKey, d, dIdx });
+      }
+    });
+  }
+
+  if (myDrops.length === 0) {
+    mobDropList.innerHTML = `
+      <div style="font-size:11px;color:var(--text-muted);">Item ini saat ini belum di-drop oleh mob mana pun.</div>
+      <button class="btn-mini-add" style="align-self:flex-start;margin-top:6px;" onclick="addMobDropPrompt('${id}')">+ Tambahkan Drop ke Mob</button>
+    `;
+  } else {
+    myDrops.forEach(({ mobKey, d, dIdx }) => {
+      const mm = MOB_META[mobKey] || { name: mobKey, icon: '👾' };
+      const card = document.createElement('div');
+      card.className = 'card-editor';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:12px;color:var(--blue);">${mm.icon} ${mm.name}</b>
+          <button class="btn-del" onclick="deleteMobDrop('${mobKey}', ${dIdx})">✕</button>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Peluang Drop:</span>
+          <div style="display:flex;align-items:center;gap:4px;flex:1;">
+            <input type="number" min="1" max="100" value="${d.chance}" class="field-input" onchange="updateMobDropChance('${mobKey}', ${dIdx}, this.value)">
+            <span style="font-size:11px;color:var(--text-muted);">%</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Jumlah (Min-Max):</span>
+          <div style="display:flex;align-items:center;gap:6px;flex:1;">
+            <input type="number" min="1" max="99" value="${d.min}" class="field-input" onchange="updateMobDropMin('${mobKey}', ${dIdx}, this.value)">
+            <span>-</span>
+            <input type="number" min="1" max="99" value="${d.max}" class="field-input" onchange="updateMobDropMax('${mobKey}', ${dIdx}, this.value)">
+          </div>
+        </div>
+      `;
+      mobDropList.appendChild(card);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-mini-add';
+    addBtn.style.alignSelf = 'flex-start';
+    addBtn.textContent = '+ Tambahkan Drop ke Mob Lain';
+    addBtn.onclick = () => addMobDropPrompt(id);
+    mobDropList.appendChild(addBtn);
+  }
+
+  // 2b. World gather sources (tambang / tani / pancing / toko / aturan)
+  const gatherList = document.getElementById('gatherList');
+  gatherList.innerHTML = '';
+  const myGather = (appGather[id] || []).map((g, gIdx) => ({ g, gIdx }));
+  if (myGather.length === 0) {
+    gatherList.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Tidak ada sumber alam tercatat untuk item ini.</div>';
+  } else {
+    myGather.forEach(({ g, gIdx }) => {
+      const card = document.createElement('div');
+      card.className = 'card-editor';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:12px;color:#86efac;">${g.label}</b>
+          <button class="btn-del" onclick="deleteGather('${id}', ${gIdx})">✕</button>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Detail:</span>
+          <input type="text" value="${g.detail.replace(/"/g, '&quot;')}" class="field-input" onchange="updateGatherDetail('${id}', ${gIdx}, this.value)">
+        </div>
+      `;
+      gatherList.appendChild(card);
+    });
+  }
+  // Info khusus yang TIDAK bisa diedit angkanya di sini (aturan kode game):
+  if (id === 'boss_core') {
+    const info = document.createElement('div');
+    info.className = 'card-editor';
+    info.innerHTML = `<div style="font-size:11px;line-height:1.7;color:#fde047;">👑 <b>Aturan Inti Boss (HANYA 4 sumber, tidak ada yang lain):</b><br>• ${BOSS_RULES.normalMobNote}<br>• ${BOSS_RULES.minibossNote}<br>• ${BOSS_RULES.dungeonChestNote}<br>• ${BOSS_RULES.altarBossNote}<br>• Untuk mengubah rate-nya, minta AI mengubah <i>Monsters.kill()</i>, <i>Dungeon.openBossChest()</i>.</div>`;
+    gatherList.appendChild(info);
+  }
+  if (['insect_leg', 'hard_shell', 'green_blood', 'toxic_venom'].includes(id)) {
+    const info = document.createElement('div');
+    info.className = 'card-editor';
+    info.innerHTML = `<div style="font-size:11px;line-height:1.7;color:#fde047;">👑 <b>Aturan Bahan Ritual (dari monsters.js):</b><br>• ${BOSS_RULES.redlandsNote}<br>• ${BOSS_RULES.minibossRitualNote}</div>`;
+    gatherList.appendChild(info);
+  }
+  const shopEntry = (appShop || []).find(g => g.id === id);
+  if (shopEntry) {
+    const shopCard = document.createElement('div');
+    shopCard.className = 'card-editor';
+    shopCard.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b style="font-size:12px;color:var(--gold);">🏪 Dijual Pedagang (${shopEntry.price} koin)</b>
+        <button class="btn-del" onclick="deleteShopEntry('${id}')">✕</button>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Harga Koin:</span>
+        <input type="number" min="1" max="9999" value="${shopEntry.price}" class="field-input" onchange="updateShopPrice('${id}', this.value)">
+      </div>
+    `;
+    gatherList.appendChild(shopCard);
+  }
+
+  // 3. Usages in Recipes
+  const usagesList = document.getElementById('usagesEditList');
+  usagesList.innerHTML = '';
+  const myUsages = appRecipes.map((r, idx) => ({ r, idx })).filter(o => o.r.need && o.r.need[id]);
+
+  if (myUsages.length === 0) {
+    usagesList.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">Item ini belum dipakai dalam resep apa pun.</div>';
+  } else {
+    myUsages.forEach(({ r, idx }) => {
+      const card = document.createElement('div');
+      card.className = 'card-editor';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:12px;color:#fff;">${getItemName(r.out)}</b>
+          <button class="btn-del" onclick="removeIngredient(${idx}, '${id}')" title="Hapus dari resep ini">✕</button>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Jumlah Butuh:</span>
+          <input type="number" min="1" max="999" value="${r.need[id]}" class="field-input" onchange="updateIngredientCount(${idx}, '${id}', this.value)">
+        </div>
+      `;
+      usagesList.appendChild(card);
+    });
+  }
+}
+
+/* LIVE EDIT ACTIONS — SUMBER ALAM & TOKO */
+function addGatherPrompt() {
+  const label = prompt('Label sumber (contoh: ⛏️ Tambang Bijih Baru):');
+  if (!label) return;
+  const detail = prompt('Detail sumber (contoh: Bongkahan ORE_X. Butuh Mining Lv 10.):') || '';
+  if (!appGather[currentSelectedId]) appGather[currentSelectedId] = [];
+  appGather[currentSelectedId].push({ label, detail });
+  saveState();
+  renderTree();
+  renderInspector();
+  showToast('Sumber alam ditambahkan!');
+}
+function updateGatherDetail(itemId, gIdx, val) {
+  if (appGather[itemId] && appGather[itemId][gIdx]) {
+    appGather[itemId][gIdx].detail = val;
+    saveState();
+    renderTree();
+    showToast('Detail sumber diperbarui.');
+  }
+}
+function deleteGather(itemId, gIdx) {
+  if (appGather[itemId]) {
+    appGather[itemId].splice(gIdx, 1);
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast('Sumber alam dihapus.');
+  }
+}
+function updateShopPrice(itemId, val) {
+  const entry = (appShop || []).find(g => g.id === itemId);
+  if (entry) {
+    entry.price = Math.max(1, parseInt(val, 10) || 1);
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast(`Harga jual ${getItemName(itemId)} diubah menjadi ${entry.price} koin.`);
+  }
+}
+function deleteShopEntry(itemId) {
+  appShop = (appShop || []).filter(g => g.id !== itemId);
+  saveState();
+  renderTree();
+  renderInspector();
+  showToast('Item dihapus dari daftar jualan pedagang.');
+}
+
+/* LIVE EDIT ACTIONS */
+function updateItemName() {
+  const v = document.getElementById('editItemName').value.trim();
+  if (v) {
+    appItems[currentSelectedId].n = v;
+    saveState();
+    renderAll();
+    showToast(`Nama item diperbarui: ${v}`);
+  }
+}
+
+function updateItemRarity() {
+  const v = document.getElementById('editItemRarity').value;
+  appItems[currentSelectedId].rarity = v;
+  saveState();
+  renderAll();
+  showToast(`Rarity diperbarui: ${v}`);
+}
+
+function updateIngredientCount(recipeIdx, ingId, val) {
+  const n = parseInt(val, 10);
+  if (n > 0) {
+    appRecipes[recipeIdx].need[ingId] = n;
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast(`Jumlah bahan ${getItemName(ingId)} diubah menjadi ${n}x`);
+  }
+}
+
+function removeIngredient(recipeIdx, ingId) {
+  delete appRecipes[recipeIdx].need[ingId];
+  saveState();
+  renderTree();
+  renderInspector();
+  showToast(`Bahan ${getItemName(ingId)} dihapus dari resep`);
+}
+
+function addIngredientPrompt(recipeIdx) {
+  const ingId = prompt('Masukkan ID Item bahan yang ingin ditambahkan (contoh: steel_ingot, wood, fiber):');
+  if (ingId && appItems[ingId]) {
+    const qty = parseInt(prompt(`Berapa banyak ${getItemName(ingId)} yang dibutuhkan?`, '1'), 10) || 1;
+    if (!appRecipes[recipeIdx].need) appRecipes[recipeIdx].need = {};
+    appRecipes[recipeIdx].need[ingId] = qty;
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast(`Bahan ${getItemName(ingId)} (${qty}x) ditambahkan ke resep!`);
+  } else if (ingId) {
+    alert(`Item dengan ID "${ingId}" tidak ditemukan!`);
+  }
+}
+
+function updateRecipeSkill(recipeIdx, skill) {
+  appRecipes[recipeIdx].skill = skill;
+  saveState();
+  renderTree();
+  showToast(`Stasiun resep diubah ke: ${skill}`);
+}
+
+function deleteRecipe(idx) {
+  if (confirm(`Hapus resep "${appRecipes[idx].name || appRecipes[idx].out}"?`)) {
+    appRecipes.splice(idx, 1);
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast('Resep berhasil dihapus.');
+  }
+}
+
+function addNewRecipeForCurrent() {
+  const skill = prompt('Pilih stasiun kerja (craft, workbench, smith, stove, campfire):', 'workbench') || 'workbench';
+  const newRec = {
+    out: currentSelectedId,
+    name: getItemName(currentSelectedId),
+    skill: skill,
+    need: {}
+  };
+  appRecipes.push(newRec);
+  saveState();
+  renderTree();
+  renderInspector();
+  showToast('Resep baru dibuat! Silakan tambahkan bahan-bahannya di panel kanan.');
+}
+
+function updateMobDropChance(mobKey, dIdx, val) {
+  const c = Math.max(1, Math.min(100, parseInt(val, 10) || 1));
+  appMobDrops[mobKey][dIdx].chance = c;
+  saveState();
+  renderTree();
+  showToast(`Peluang drop diubah menjadi ${c}%`);
+}
+
+function updateMobDropMin(mobKey, dIdx, val) {
+  const m = Math.max(1, parseInt(val, 10) || 1);
+  appMobDrops[mobKey][dIdx].min = m;
+  if (appMobDrops[mobKey][dIdx].max < m) appMobDrops[mobKey][dIdx].max = m;
+  saveState();
+  renderTree();
+}
+
+function updateMobDropMax(mobKey, dIdx, val) {
+  const m = Math.max(1, parseInt(val, 10) || 1);
+  appMobDrops[mobKey][dIdx].max = m;
+  if (appMobDrops[mobKey][dIdx].min > m) appMobDrops[mobKey][dIdx].min = m;
+  saveState();
+  renderTree();
+}
+
+function deleteMobDrop(mobKey, dIdx) {
+  if (confirm(`Hapus drop item ini dari mob ${MOB_META[mobKey]?.name || mobKey}?`)) {
+    appMobDrops[mobKey].splice(dIdx, 1);
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast('Drop mob berhasil dihapus.');
+  }
+}
+
+function addMobDropPrompt(itemId) {
+  const mobKey = prompt('Masukkan ID Mob yang menjatuhkan item ini (slime, boar, wolf, scorpion, rabbit, cow, horse, kumbang, semut, tarantula, yeti, reaper, lizard, golem, trex, dragon, kelabang):');
+  if (mobKey && appMobDrops[mobKey]) {
+    const chance = parseInt(prompt('Berapa % peluang drop item ini (1 - 100)?', '30'), 10) || 30;
+    const qty = parseInt(prompt('Berapa jumlah drop (1 - 10)?', '1'), 10) || 1;
+    appMobDrops[mobKey].push({
+      item: itemId,
+      chance: clampVal(chance, 1, 100),
+      min: qty,
+      max: qty
+    });
+    saveState();
+    renderTree();
+    renderInspector();
+    showToast(`Drop ${getItemName(itemId)} ditambahkan ke mob ${MOB_META[mobKey]?.name || mobKey}!`);
+  } else if (mobKey) {
+    alert(`Mob "${mobKey}" tidak valid.`);
+  }
+}
+
+/* NOTE: jangan pakai nama `clamp` di sini — js/config.js sudah mendefinisikan
+   `const clamp` di scope global, deklarasi ulang akan melempar SyntaxError dan
+   mematikan seluruh script halaman ini. */
+function clampVal(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+/* ============ DIFF EXPORT — hanya yang berubah saja ============ */
+function normVal(v) {
+  if (Array.isArray(v)) return v.map(normVal);
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).sort().forEach(k => { o[k] = normVal(v[k]); });
+    return o;
+  }
+  return v;
+}
+function deepEq(a, b) {
+  return JSON.stringify(normVal(a)) === JSON.stringify(normVal(b));
+}
+function baseItems() {
+  return (typeof ITEMS !== 'undefined') ? ITEMS : {};
+}
+function baseRecipes() {
+  return (typeof RECIPES !== 'undefined') ? RECIPES : [];
+}
+function diffItems() {
+  const out = { changed: [], added: [], removed: [] };
+  const base = baseItems();
+  for (const id in appItems) {
+    if (isAliasId(id)) continue; // alias bukan definisi asli — jangan diekspor
+    if (!base[id]) { out.added.push(id); continue; }
+    if (!deepEq(appItems[id], base[id])) out.changed.push(id);
+  }
+  for (const id in base) {
+    if (isAliasId(id)) continue;
+    if (id === null || base[id] === null) continue;
+    if (!appItems[id]) out.removed.push(id);
+  }
+  return out;
+}
+function recipeKey(r) {
+  return JSON.stringify(normVal(r));
+}
+function diffRecipes() {
+  const base = baseRecipes();
+  const baseSet = new Set(base.map(recipeKey));
+  const appSet = new Set(appRecipes.map(recipeKey));
+  const added = appRecipes.filter(r => !baseSet.has(recipeKey(r)));
+  const removed = base.filter(r => !appSet.has(recipeKey(r)));
+  return { added, removed };
+}
+function diffMobDrops() {
+  const out = {};
+  for (const mob in appMobDrops) {
+    const base = (DEFAULT_MOB_DROPS[mob] !== undefined) ? DEFAULT_MOB_DROPS[mob] : null;
+    if (!deepEq(appMobDrops[mob], base)) out[mob] = appMobDrops[mob];
+  }
+  for (const mob in DEFAULT_MOB_DROPS) {
+    if (!(mob in appMobDrops)) out[mob] = [];
+  }
+  return out;
+}
+function diffSmelter() {
+  return deepEq(appSmelter, DEFAULT_SMELTER) ? null : appSmelter;
+}
+function diffGather() {
+  const out = {};
+  const keys = new Set([...Object.keys(appGather || {}), ...Object.keys(DEFAULT_GATHER || {})]);
+  keys.forEach(k => {
+    if (!deepEq((appGather || {})[k] || null, (DEFAULT_GATHER || {})[k] || null)) out[k] = (appGather || {})[k] || [];
+  });
+  return out;
+}
+function diffShop() {
+  return deepEq(appShop || [], DEFAULT_SHOP) ? null : (appShop || []);
+}
+function countChanges() {
+  const di = diffItems();
+  const dr = diffRecipes();
+  const dm = diffMobDrops();
+  const ds = diffSmelter();
+  const dg = diffGather();
+  const dh = diffShop();
+  return di.changed.length + di.added.length + di.removed.length
+    + dr.added.length + dr.removed.length
+    + Object.keys(dm).length + (ds ? 1 : 0) + Object.keys(dg).length + (dh ? 1 : 0);
+}
+
+/* EXPORT / SAVE MODAL */
+function generateEcosystemReport() {
+  const di = diffItems();
+  const dr = diffRecipes();
+  const dm = diffMobDrops();
+  const ds = diffSmelter();
+  const dg = diffGather();
+  const dh = diffShop();
+  const total = countChanges();
+
+  let txt = `================================================================================\n`;
+  txt += `       FORECRAFT ECOSYSTEM EXPORT - HANYA PERUBAHAN (DIFF)\n`;
+  txt += `================================================================================\n`;
+  txt += `Tanggal Export: ${new Date().toLocaleString('id-ID')}\n`;
+  txt += `File ini HANYA berisi bagian ekosistem yang DIUBAH melalui\n`;
+  txt += `Walkthrough & Ecosystem Studio. Serahkan file ini kepada AI (Gorou/Antigravity)\n`;
+  txt += `untuk diterapkan ke kode game (config.js & monsters.js). Bagian yang tidak\n`;
+  txt += `tercantum di sini = TIDAK BERUBAH, jangan diutak-atik.\n`;
+  txt += `Total perubahan: ${total} bagian.\n\n`;
+
+  if (total === 0) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `TIDAK ADA PERUBAHAN. Semua data masih sama dengan bawaan game.\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    return txt;
+  }
+
+  if (di.changed.length || di.added.length || di.removed.length) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `1. PERUBAHAN PROPERTI ITEM (hanya item yang diubah)\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    const base = baseItems();
+    di.changed.forEach(id => {
+      txt += `[${id}] ${getItemName(id)}:\n`;
+      const b = base[id] || {};
+      const a = appItems[id] || {};
+      const keys = new Set([...Object.keys(b), ...Object.keys(a)]);
+      keys.forEach(k => {
+        if (!deepEq(b[k], a[k])) {
+          txt += `  - ${k}: ${JSON.stringify(b[k])}  ==>  ${JSON.stringify(a[k])}\n`;
+        }
+      });
+    });
+    di.added.forEach(id => { txt += `[${id}] BARU: ${JSON.stringify(appItems[id])}\n`; });
+    di.removed.forEach(id => { txt += `[${id}] DIHAPUS (ada di bawaan, tidak ada di hasil edit)\n`; });
+    txt += `\n`;
+  }
+
+  if (Object.keys(dm).length) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `2. PERUBAHAN DROP MOB (hanya mob yang drop-nya diubah)\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    for (const mobKey in dm) {
+      const mm = MOB_META[mobKey] || { name: mobKey, icon: '👾' };
+      const base = DEFAULT_MOB_DROPS[mobKey] || [];
+      txt += `[${mobKey.toUpperCase()}] ${mm.icon} ${mm.name}:\n`;
+      txt += `  Bawaan: ${base.map(d => `${d.item} ${d.chance}% x${d.min === d.max ? d.min : d.min + '-' + d.max}`).join(' | ') || '(kosong)'}\n`;
+      txt += `  Baru  : ${(dm[mobKey] || []).map(d => `${d.item} ${d.chance}% x${d.min === d.max ? d.min : d.min + '-' + d.max}`).join(' | ') || '(kosong)'}\n`;
+    }
+    txt += `\n`;
+  }
+
+  if (dr.added.length || dr.removed.length) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `3. PERUBAHAN RESEP (hanya resep yang ditambah / dihapus / diubah)\n`;
+    txt += `   Catatan: resep yang diubah tercatat sebagai 1 baris DIHAPUS + 1 baris BARU\n`;
+    txt += `   dengan output & bahan yang sama persis kecuali bagiannya yang diubah.\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    dr.removed.forEach(r => {
+      txt += `- DIHAPUS/BAWAAN: ${r.name || r.out} [${r.out}] (${r.skill || 'craft'}): `;
+      txt += `${Object.keys(r.need || {}).map(k => `${k}:${r.need[k]}x`).join(', ')}\n`;
+    });
+    dr.added.forEach(r => {
+      txt += `+ BARU/HASIL EDIT: ${r.name || r.out} [${r.out}] (${r.skill || 'craft'}): `;
+      txt += `${Object.keys(r.need || {}).map(k => `${k}:${r.need[k]}x`).join(', ')}\n`;
+    });
+    txt += `\n`;
+  }
+
+  if (ds) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `4. PERUBAHAN PELEBURAN SMELTER\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `Bawaan: ${DEFAULT_SMELTER.map(s => `${s.inOre}(${s.req}x)->${s.outIngot}`).join(' | ')}\n`;
+    txt += `Baru  : ${(ds || []).map(s => `${s.inOre}(${s.req}x)->${s.outIngot}`).join(' | ')}\n\n`;
+  }
+
+  if (Object.keys(dg).length) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `5. PERUBAHAN SUMBER ALAM (hanya item yang sumbernya diubah)\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    for (const gid in dg) {
+      txt += `[${gid}] ${getItemName(gid)}:\n`;
+      txt += `  Bawaan: ${((DEFAULT_GATHER || {})[gid] || []).map(g => `${g.label} — ${g.detail}`).join(' | ') || '(kosong)'}\n`;
+      txt += `  Baru  : ${((dg[gid]) || []).map(g => `${g.label} — ${g.detail}`).join(' | ') || '(kosong)'}\n`;
+    }
+    txt += `\n`;
+  }
+
+  if (dh) {
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `6. PERUBAHAN TOKO PEDAGANG (daftar / harga)\n`;
+    txt += `--------------------------------------------------------------------------------\n`;
+    txt += `Bawaan: ${DEFAULT_SHOP.map(g => `${g.id}@${g.price}`).join(', ')}\n`;
+    txt += `Baru  : ${(dh || []).map(g => `${g.id}@${g.price}`).join(', ')}\n\n`;
+  }
+
+  txt += `--------------------------------------------------------------------------------\n`;
+  txt += `7. DATA JSON RAW — HANYA BAGIAN YANG BERUBAH (COPY-PASTE KE AI PATCHER)\n`;
+  txt += `--------------------------------------------------------------------------------\n`;
+  txt += `const ECOSYSTEM_DIFF = {\n`;
+  const parts = [];
+  if (di.changed.length || di.added.length) {
+    const o = {};
+    di.changed.concat(di.added).forEach(id => { o[id] = appItems[id]; });
+    parts.push(`  itemsChanged: ${JSON.stringify(o, null, 2)}`);
+  }
+  if (di.removed.length) parts.push(`  itemsRemoved: ${JSON.stringify(di.removed)}`);
+  if (Object.keys(dm).length) parts.push(`  mobDropsChanged: ${JSON.stringify(dm, null, 2)}`);
+  if (dr.added.length) parts.push(`  recipesAdded: ${JSON.stringify(dr.added, null, 2)}`);
+  if (dr.removed.length) parts.push(`  recipesRemoved: ${JSON.stringify(dr.removed, null, 2)}`);
+  if (ds) parts.push(`  smelter: ${JSON.stringify(ds, null, 2)}`);
+  if (Object.keys(dg).length) parts.push(`  gatherChanged: ${JSON.stringify(dg, null, 2)}`);
+  if (dh) parts.push(`  shop: ${JSON.stringify(dh, null, 2)}`);
+  txt += parts.join(',\n') + `\n};\n`;
+
+  return txt;
+}
+
+function openSaveModal() {
+  const content = generateEcosystemReport();
+  document.getElementById('saveOutput').textContent = content;
+  document.getElementById('saveModal').classList.add('open');
+}
+
+function closeSaveModal() {
+  document.getElementById('saveModal').classList.remove('open');
+}
+
+function copySaveText() {
+  const txt = document.getElementById('saveOutput').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    showToast('📋 Teks berhasil disalin ke clipboard! Kirimkan ke AI.');
+  });
+}
+
+function downloadTxtFile() {
+  const txt = document.getElementById('saveOutput').textContent;
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ecosystem_forecraft_${Date.now()}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('📥 File TXT berhasil didownload!');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function renderAll() {
+  renderItemList();
+  renderTree();
+  renderInspector();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.nav-tabs .tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (mode==='tree'&&i===0) || (mode==='mobs'&&i===1) || (mode==='recipes'&&i===2));
+  });
+  const isMatrix = (mode === 'mobs' || mode === 'recipes');
+  document.getElementById('sourcesSection').style.display = isMatrix ? 'none' : '';
+  document.getElementById('targetSection').style.display = isMatrix ? 'none' : '';
+  document.getElementById('usagesSection').style.display = isMatrix ? 'none' : '';
+  document.querySelectorAll('#centerCanvas .tree-arrow').forEach(a => { a.style.display = isMatrix ? 'none' : ''; });
+  document.getElementById('matrixView').style.display = isMatrix ? '' : 'none';
+  if (mode === 'mobs') {
+    renderMobMatrix();
+  } else if (mode === 'recipes') {
+    renderRecipeMatrix();
+  } else {
+    setFilter('all');
+  }
+}
+
+/* MODE 2: MATRIX DROP MOB — daftar semua mob + dropnya, klik item untuk lompat ke tree */
+function renderMobMatrix() {
+  document.getElementById('matrixLabel').textContent = '⚔️ MATRIX DROP MOB — KLIK ITEM UNTUK LIHAT POHONNYA';
+  const grid = document.getElementById('matrixGrid');
+  grid.innerHTML = '';
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  for (const mobKey in appMobDrops) {
+    const mm = MOB_META[mobKey] || { name: mobKey, icon: '👾', biome: '' };
+    if (q && !mobKey.includes(q) && !mm.name.toLowerCase().includes(q)) continue;
+    const card = document.createElement('div');
+    card.className = 'node-card source-node';
+    card.style.cssText = 'flex-direction:column;align-items:flex-start;min-width:250px;max-width:320px;cursor:default;';
+    let dropsHtml = '';
+    (appMobDrops[mobKey] || []).forEach((d, dIdx) => {
+      dropsHtml += `
+        <div class="ingredient-row" style="width:100%;cursor:pointer;" onclick="selectItem('${d.item}');setMode('tree');" title="Klik untuk lihat pohon ${getItemName(d.item)}">
+          <span style="font-size:15px;">${getItemIconHtml(d.item)}</span>
+          <span style="flex:1;font-size:11px;">${getItemName(d.item)} <b style="color:#38bdf8;">${d.chance}%</b> ×${d.min === d.max ? d.min : d.min + '-' + d.max}</span>
+        </div>`;
+    });
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;width:100%;">
+        <div class="item-icon">${mm.icon}</div>
+        <div><div class="item-title">${mm.name}</div><div class="item-meta">${mm.biome}</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;width:100%;margin-top:6px;">${dropsHtml || '<i style="font-size:11px;">(tidak ada drop)</i>'}</div>
+    `;
+    grid.appendChild(card);
+  }
+  if (!grid.children.length) grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Tidak ada mob yang cocok dengan pencarian.</div>';
+}
+
+/* MODE 3: DAFTAR SEMUA RESEP — klik untuk lompat ke tree hasil / bahannya */
+function renderRecipeMatrix() {
+  document.getElementById('matrixLabel').textContent = '📜 DAFTAR SEMUA RESEP — KLIK UNTUK LIHAT POHONNYA';
+  const grid = document.getElementById('matrixGrid');
+  grid.innerHTML = '';
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  appRecipes.forEach((r, idx) => {
+    const outName = getItemName(r.out);
+    if (q && !r.out.toLowerCase().includes(q) && !outName.toLowerCase().includes(q)
+        && !Object.keys(r.need || {}).some(k => k.includes(q))) return;
+    const card = document.createElement('div');
+    card.className = 'node-card usage-node';
+    card.style.cssText = 'flex-direction:column;align-items:flex-start;min-width:250px;max-width:320px;cursor:pointer;';
+    let needHtml = '';
+    for (const ing in (r.need || {})) {
+      needHtml += `
+        <div class="ingredient-row" style="width:100%;cursor:pointer;" onclick="event.stopPropagation();selectItem('${ing}');setMode('tree');" title="Lihat pohon ${getItemName(ing)}">
+          <span style="font-size:14px;">${getItemIconHtml(ing)}</span>
+          <span style="flex:1;font-size:11px;">${getItemName(ing)} <b style="color:#f59e0b;">${r.need[ing]}x</b></span>
+        </div>`;
+    }
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;width:100%;" onclick="selectItem('${r.out}');setMode('tree');" title="Lihat pohon ${outName}">
+        <div class="item-icon">${getItemIconHtml(r.out)}</div>
+        <div><div class="item-title">${r.name || outName}</div><div class="item-meta">Stasiun: ${r.skill || 'craft'} · Resep #${idx + 1}</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;width:100%;margin-top:6px;">${needHtml || '<i style="font-size:11px;">(tanpa bahan)</i>'}</div>
+    `;
+    card.onclick = () => { selectItem(r.out); setMode('tree'); };
+    grid.appendChild(card);
+  });
+  if (!grid.children.length) grid.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Tidak ada resep yang cocok dengan pencarian.</div>';
+}
+
+// Inisialisasi awal saat halaman dibuka
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof ITEMS === 'undefined' || typeof RECIPES === 'undefined') {
+    document.getElementById('centerCanvas').innerHTML =
+      '<div style="color:#fda4af;background:rgba(244,63,94,.12);border:1px solid #f43f5e;'
+      + 'border-radius:10px;padding:18px;max-width:520px;margin-top:60px;font-size:13px;line-height:1.7;">'
+      + '⚠️ <b>js/config.js gagal dimuat.</b><br>Buka file ini dari folder project '
+      + '(atau via <b>Buka_Walkthrough_Studio.bat</b>) supaya path <i>js/config.js</i> terbaca.</div>';
+    return;
+  }
+  initData();
+  renderAll();
+});
+</script>
+</body>
+</html>

@@ -886,8 +886,10 @@ const Furni={
     this.scene.add(mesh);
     const f={id:this.uid++,def:defId,x,y,z,yaw:yaw||0,mesh,auto:!!auto};
     if(akey)f.akey=akey;
-    /* peti membawa inventory sendiri (array slot, null = kosong) */
-    if(defId==='chest'){
+    /* peti membawa inventory sendiri (array slot, null = kosong).
+       Berlaku juga untuk peti harta dungeon & karam supaya isi yang sudah
+       dijarah sebagian tetap tersimpan di vaults antar kunjungan. */
+    if(defId==='chest'||defId==='dchest'||defId==='wreck_chest'){
       f.inv=new Array(CHEST_SLOTS).fill(null);
       /* peti desa: kembalikan isi dari kunjungan sebelumnya (v = bentuk ringkas
          {i,n,l,m}; l = level tempa, m = tanda Log Pass) */
@@ -1263,15 +1265,17 @@ const Furni={
       const r=def.r;
       const dx = f.x - pos.x, dz = f.z - pos.z;
       const d=Math.hypot(dx, dz);
-      if(d>r||Math.abs(f.y-pos.y)>2.0)continue;
+      const isChest = (f.def === 'wreck_chest' || f.def === 'dchest' || f.def === 'bchest');
+      const maxDy = isChest ? 4.2 : 2.0;
+      if(d>r||Math.abs(f.y-pos.y)>maxDy)continue;
       let anglePen = 0;
       if(pFacing !== null){
         let diff = Math.abs(Math.atan2(dx, dz) - pFacing);
         if(diff > Math.PI) diff = Math.PI * 2 - diff;
-        if(diff > 1.4) continue; // abaikan perabot di belakang punggung pemain
+        if(diff > 1.4 && (!isChest || d > 2.5)) continue; // peti tetap bisa dibuka walau sudut hadap agak miring
         anglePen = diff * 0.35;
       }
-      const score = d + anglePen;
+      const score = d + anglePen - (isChest ? 0.8 : 0);
       if(score < bd){ best = f; bd = score; }
     }
     return best;
@@ -1910,6 +1914,10 @@ const Furni={
   openChest(f){
     if(!f.inv)f.inv=new Array(CHEST_SLOTS).fill(null);
     this.chest=f;
+    /* Judul panel mengikuti jenis peti (peti desa / harta dungeon / karam) */
+    const def=this.DEFS[f.def];
+    const titleEl=document.getElementById('chest-title');
+    if(titleEl)titleEl.textContent=(def&&def.panelTitle)||'Peti Penyimpanan';
     Sfx.open();
     if(UI.open!=='chest')UI.toggle('chest');
     else UI.renderChest();
@@ -2278,6 +2286,11 @@ const Furni={
       if(d<bd){bd=d;best=f;}
     }
     if(!best)return false;
+    /* PETI HARTA KARUN (dchest, wreck_chest, bchest): klik atau serang langsung membuka peti! */
+    if(best.def==='dchest'||best.def==='wreck_chest'||best.def==='bchest'){
+      this.interact(best);
+      return true;
+    }
     return this.damage(best,dmg||3);
   },
   damage(f,dmg){

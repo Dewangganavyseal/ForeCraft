@@ -549,6 +549,27 @@ const UI={
     clearTimeout(this._dgbT);
     this._dgbT=setTimeout(()=>el.classList.remove('show'),3200);
   },
+  /* =========================================================================
+     NOTIFIKASI PETI HARTA KARUN DI TENGAH LAYAR
+     ========================================================================= */
+  chestPopup(title, subtitle, items){
+    let el=document.getElementById('chest-popup');
+    if(!el){
+      el=document.createElement('div');
+      el.id='chest-popup';
+      document.body.appendChild(el);
+    }
+    const itemsHtml=(items||[]).map(it=>`<div class="cp-chip">${it}</div>`).join('');
+    el.className='';
+    el.innerHTML=
+      `<div class="cp-title">🧰 ${title||'PETI HARTA KARUN DIBUKA'}</div>`+
+      (subtitle?`<div class="cp-sub">${subtitle}</div>`:'')+
+      `<div class="cp-items">${itemsHtml}</div>`;
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(this._chestPopT);
+    this._chestPopT=setTimeout(()=>el.classList.remove('show'),4200);
+  },
   showCombo(n){
     const c=document.getElementById('combo');
     c.textContent='COMBO x'+n;

@@ -84,7 +84,7 @@ const Capture={
     wolf:      { y: 1.05, fwd: -0.08 },
     dragon:    { y: 3.85, fwd:  0.30 },
     trex:      { y: 2.42, fwd:  0.35 },
-    mammoth:   { y: 2.35, fwd: -0.10 },
+    mammoth:   { y: 3.85, fwd: -0.35 },
     tarantula: { y: 0.82, fwd: -0.15 },
     golem:     { y: 1.95, fwd: -0.12 },
     yeti:      { y: 1.95, fwd: -0.10 },
@@ -673,11 +673,13 @@ const Capture={
         m.parts.bossDot.visible=false;
       }
     }
-    /* naga tangkapan menyusut 50% (model naga sudah raksasa dari sananya) */
+    /* naga tangkapan menyusut (skala 60%). Pet mammoth memakai ukuran NORMAL mob (100%) */
     if(pet.type==='dragon'){
-      m.mesh.scale.multiplyScalar(0.5);
-      m.baseScale=(m.baseScale||1)*0.5;
-      m.sizeMul=(m.sizeMul||1)*0.5;
+      m.mesh.scale.multiplyScalar(0.6);
+      m.baseScale=(m.baseScale||1)*0.6;
+      m.sizeMul=(m.sizeMul||1)*0.6;
+      const T=Monsters.TYPES[m.type];
+      if(T) m.r = T.r * 0.6;
       m.flyCd=pet.flyCd||0;
     }
     Monsters.list.push(m);
@@ -917,7 +919,7 @@ const Capture={
                   (m.type==='reaper')?3.4:
                   (m.type==='tarantula')?5.2:
                   (m.type==='boar')?3.8:
-                  (m.type==='mammoth')?4.2:
+                  (m.type==='mammoth')?3.2:
                   (m.type==='dragon')?3.4:
                   (m.type==='golem')?3.0:
                   (m.type==='lizard')?2.6:1.8;
@@ -1169,6 +1171,10 @@ const Capture={
       UI.toast('🐾 Kemari!');
     }
     this.riding=true;
+    /* Batalkan seluruh aksi bertarung pet agar tidak macet di pose serang saat ditunggangi */
+    m.mAct=null;m.mActT=0;m.mTarget=null;
+    m.kumAtk=null;m.yAct=null;m.aAct=null;m.rAct=null;
+    m.tAct=null;m.bAct=null;
     /* animasi naik: badan dilerp dari posisi berdiri ke atas punggung selama
        durasi ride_mount, lalu masuk pose duduk. */
     this.mounting=true;
@@ -1244,6 +1250,9 @@ const Capture={
   ridePlayer(p,dt){
     const m=this.pet;
     if(!m||m.dead){this.forceDismount();return;}
+
+    /* Pastikan aksi bertarung pet bersih saat ditunggangi agar animasi gerak jalan/lari lancar */
+    if(m.mAct){m.mAct=null;m.mActT=0;m.mTarget=null;}
 
     // Update super leap & spring bounce tarantula
     if(m.type==='tarantula'){

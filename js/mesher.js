@@ -1203,6 +1203,16 @@ const Mesher=(()=>{
        tingkat terpakai kira-kira sama banyak; dengan ambang naif 0.25/0.5/0.75
        tingkat 0 & 3 hampir tidak pernah muncul dan gradasinya tak terlihat. */
     const qtier=v=>v<0.37?0:(v<0.50?1:(v<0.64?2:3));
+    /* Puncak tebing laut memakai B.GRASS walau biomanya OCEAN — deteksi tutup
+       kolomnya supaya tint & rumputnya ikut jalur berumput, bukan pasir. */
+    function oceanGrassTop(wx,wz){
+      for(let y=H-1;y>=0;y--){
+        const id=getB(wx,y,wz);
+        if(id===B.AIR||id===B.WATER)continue;
+        return id===B.GRASS;
+      }
+      return false;
+    }
     function colTint(x,z,wx,wz){
       const ci=x+z*C;
       if(cGot[ci])return ci;
@@ -1216,6 +1226,10 @@ const Mesher=(()=>{
       cTA[ci]=WGEN.tintA(wx,wz);
       cTB[ci]=WGEN.tintB(wx,wz);
       cTC[ci]=WGEN.tintC(wx,wz);
+      /* Puncak tebing laut berumput dicatat sebagai FOREST agar tint &
+         rumput dunia mengikuti jalur berumput (bukan pasir laut). */
+      const oceanTop=(bio===BIOME.OCEAN&&oceanGrassTop(wx,wz));
+      if(oceanTop)cBio[ci]=BIOME.FOREST;
       /* ---- TINGKAT GRADASI ----
          Biome BERUMPUT (Hutan, Tanah Merah) memakai GRADASI KONTINU dari
          WGEN.grassField: nilai bertanda yang terus turun dari pusat rumpun
@@ -1227,7 +1241,7 @@ const Mesher=(()=>{
          supaya pasir/salju/batu tetap bergradasi. cGpos = NaN → blockTint jatuh
          ke jalur palet 4-tingkat. */
       let tier, gpos=NaN;
-      if((WGEN.grassField||WGEN.grassHeat)&&(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN)){
+      if((WGEN.grassField||WGEN.grassHeat)&&(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN||oceanTop)){
         /* posisi ramp DI-DITHER & dikuantisasi per blok (lihat grassPosBlock):
            tetap bergradasi tapi tiap blok punya nada sendiri seperti prototipe
            yang memakai material diskret. */
@@ -1498,9 +1512,9 @@ const Mesher=(()=>{
          getB(wx,y+1,wz)===B.AIR&&
          typeof WGEN!=='undefined'&&WGEN.biomeAt&&WGEN.grassHeat){
         const bio=cBio[ci];
-        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN){
+        if(bio===BIOME.FOREST||bio===BIOME.REDLANDS||bio===BIOME.MOUNTAIN||(bio===BIOME.OCEAN&&id===B.GRASS)){
           /* World grass memakai sistem heat sama dengan biome jungle/forest */
-          const heat=WGEN.grassHeat(wx,wz);
+          const heat=(bio===BIOME.OCEAN&&id===B.GRASS)?Math.max(0.65,WGEN.grassHeat(wx,wz)):WGEN.grassHeat(wx,wz);
           /* ambang gundul: dari preset grafis (default High) */
           const hMin=HMIN;
           if(heat>hMin){

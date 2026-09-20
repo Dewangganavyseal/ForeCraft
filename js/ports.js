@@ -358,7 +358,7 @@ const PortChest={
     for(let y=9;y<=12;y++)for(let x=-2;x<=1;x++){
       const border=(y===9||y===12||x===-2||x===1);
       const hole=(y===10&&(x===-1||x===0));
-      lid.push({x,y,z:7-Z0,c:tint(border?GOLD_DARK:hole?GOLD_BLACK:GOLD)});
+      lp(x,y,7,tint(border?GOLD_DARK:hole?GOLD_BLACK:GOLD));
     }
     const lidMesh=build(lid);
     lidPivot.add(lidMesh);g.add(lidPivot);

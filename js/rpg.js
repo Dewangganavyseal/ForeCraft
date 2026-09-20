@@ -291,7 +291,13 @@ const RPG={
      oleh tekan-cepat (hantam di tempat) maupun slam terarah (hantam di titik
      pendaratan sesudah loncat). doSlamDipakai oleh SlamAim saat mendarat. */
   _slamAoE(x,y,z){
-    const actualY=(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(x,z,CFG.WORLD_H-1)||y):y;
+    /* Di dalam goa dungeon: hantaman HARUS di lantai dalam arena, bukan di
+       puncak kubah (groundAt dari puncak dunia selalu menemukan atap goa). */
+    const inCave=(typeof World!=='undefined'&&World.inDungeonCave==='function')
+      ?World.inDungeonCave(Math.floor(x),Math.floor(y)+1,Math.floor(z)):null;
+    const actualY=(inCave&&(typeof Dungeon!=='undefined')&&Dungeon.innerFloorY)
+      ?Dungeon.innerFloorY(x,z,y+2)
+      :(typeof World!=='undefined'&&World.groundAt)?(World.groundAt(x,z,CFG.WORLD_H-1)||y):y;
     y=actualY;
     const C=new THREE.Vector3(x,y,z);
     /* damage Hantam Bumi kini ditautkan ke weaponDmg() (skala level, pedang,

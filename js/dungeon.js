@@ -889,7 +889,11 @@ const Dungeon={
     Sfx.pickup();Sfx.levelup();
     /* XP peti boss: setara satu peti biasa ×3 karena hanya ada satu per dungeon */
     Player.addXP(Math.round((12+lvl*8)*(1+0.25*(lvl-1))*3));
-    UI.toast(`👑 PETI PENJAGA AGUNG (Lv ${lvl}): ${got.join(', ')||'kosong'}`);
+    if(typeof UI!=='undefined'&&UI.chestPopup){
+      UI.chestPopup('PETI PENJAGA AGUNG', `Dungeon Lv ${lvl}`, got.length?got:['<span style="color:#aaa">Peti ini sudah kosong...</span>']);
+    }else{
+      UI.toast(`👑 PETI PENJAGA AGUNG (Lv ${lvl}): ${got.join(', ')||'kosong'}`);
+    }
     if(gear){
       const R=RARITY[gear.rar]||RARITY.common;
       const gIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(gear.id):ITEMS[gear.id].e;
@@ -914,6 +918,7 @@ const Dungeon={
        (PortChest) tetapi isinya loot acak, bukan inventori titipan. */
     Furni.DEFS.dchest={
       n:'Peti Harta',e:'🧰',item:null,r:1.35,label:'🧰 Buka Peti',
+      panelTitle:'Peti Harta Dungeon',
       build(){return typeof PortChest!=='undefined'
         ?PortChest.build():Dungeon.buildChest();},
       use(f){Dungeon.openChest(f);},
@@ -962,8 +967,8 @@ const Dungeon={
     /* kunci emas di depan */
     const lock=new THREE.Mesh(new THREE.SphereGeometry(0.075,10,8),gold);
     lock.scale.set(1,1.2,0.6);lock.position.set(0,0.44,0.3);g.add(lock);
-    const kh=new THREE.Mesh(new THREE.TorusGeometry(0.055,0.018,6,12),gold);
-    kh.position.set(0,0.55,0.28);g.add(kh);
+    const kh=new THREE.Mesh(new THREE.TorusGeometry(0.045,0.014,6,12),gold);
+    kh.position.set(0,0.44,0.32);g.add(kh);
     /* kaki kecil */
     for(const sx of[-1,1])for(const sz of[-1,1])
       g.add(Furni.leg(sx*0.36,sz*0.22,0.09,0.045,0.055,iron,0));
@@ -1049,38 +1054,45 @@ const Dungeon={
     return out;
   },
 
-  /* ---------- membuka peti ---------- */
-  openChest(f){
-    const key=f.ckey;
-    if(this.opened[key]){UI.toast('🧰 Peti ini sudah kosong');return;}
-    this.opened[key]=true;this.save();
+  /* Isi peti ke inventory peti (f.inv) sekali, lalu buka panel ala desa. */
+  fillChestInv(f){
+    if(!f.inv)f.inv=new Array(CHEST_SLOTS).fill(null);
     const lvl=clamp(f.lvl||1,1,WGEN.DUNGEON_MAX_LVL);
     const table=this.lootTableFor(lvl);
     const rolls=2+Math.floor(Math.random()*2)+(lvl>=6?1:0)+(lvl>=9?1:0);
     const mul=this.lvlLootMul(lvl);
-    const got=[];
     for(let i=0;i<rolls;i++){
       const e=table[(Math.random()*table.length)|0];
       if(!ITEMS[e[0]])continue;
       const n=Math.max(1,Math.round(
         (e[1]+Math.floor(Math.random()*(e[2]-e[1]+1)))*mul));
-      RPG.addItem(e[0],n);
-      const ico=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(e[0]):ITEMS[e[0]].e;
-      got.push(`${ico} ${ITEMS[e[0]].n} ×${n}`);
+      if(typeof Furni!=='undefined'&&Furni.chestAdd)Furni.chestAdd(f,e[0],n);
+      else f.inv.push({id:e[0],n});
     }
-    /* animasi tutup terbuka + kilau (lid voxel ditangani Furni.update) */
-    f.lidOpen=true;
-    if(f.mesh)f.mesh.children.forEach(c=>{
-      if(c.geometry&&c.geometry.type==='CylinderGeometry'&&c.position.y>0.4)
-        c.rotation.x=-0.9;
-    });
-    FX.debris(new THREE.Vector3(f.x,f.y+0.7,f.z),0xffd76b,16,3);
-    FX.ring(f.x,f.y+0.1,f.z,0xffd76b,1.1,3);
-    Sfx.pickup();Sfx.levelup();
-    /* XP peti ikut level dungeon (dulu 12+lvl*8 datar) */
-    Player.addXP(Math.round((12+lvl*8)*(1+0.25*(lvl-1))));
-    UI.toast(`🧰 Harta Dungeon Lv ${lvl}: ${got.join(', ')||'kosong'}`);
-    UI.renderAll();
+  },
+  /* ---------- membuka peti: isi sekali, lalu buka panel inventory ala desa ---------- */
+  openChest(f){
+    const key=f.ckey;
+    /* Buka pertama kali: isi inventory + efek + XP */
+    if(!this.opened[key]){
+      this.opened[key]=true;this.save();
+      this.fillChestInv(f);
+      /* animasi tutup terbuka + kilau (lid voxel ditangani Furni.update) */
+      f.lidOpen=true;
+      if(f.mesh)f.mesh.children.forEach(c=>{
+        if(c.geometry&&c.geometry.type==='CylinderGeometry'&&c.position.y>0.4)
+          c.rotation.x=-0.9;
+      });
+      FX.debris(new THREE.Vector3(f.x,f.y+0.7,f.z),0xffd76b,16,3);
+      FX.ring(f.x,f.y+0.1,f.z,0xffd76b,1.1,3);
+      Sfx.pickup();Sfx.levelup();
+      /* XP peti ikut level dungeon (dulu 12+lvl*8 datar) */
+      const lvl=clamp(f.lvl||1,1,WGEN.DUNGEON_MAX_LVL);
+      Player.addXP(Math.round((12+lvl*8)*(1+0.25*(lvl-1))));
+    }
+    /* Selalu buka panel inventory peti — ambil isinya sesuka hati */
+    if(typeof Furni!=='undefined'&&Furni.openChest)Furni.openChest(f);
+    else UI.toast('🧰 Peti ini sudah kosong');
   },
 
   /* =========================================================================
@@ -1334,6 +1346,10 @@ const Dungeon={
     delete this.killedAt[k];
     /* hapus semua peti biasa milik dungeon ini (kunci peti = 'key:index') */
     for(const ck in this.opened)if(ck.indexOf(k+':')===0)delete this.opened[ck];
+    /* bersihkan sisa isi peti dari vaults agar peti reset benar-benar penuh lagi */
+    if(typeof Furni!=='undefined'&&Furni.vaults)
+      for(const vk in Furni.vaults)
+        if(vk.indexOf('dchest@')===0)delete Furni.vaults[vk];
     /* level acak baru 1..100 */
     const nl=1+Math.floor(Math.random()*WGEN.DUNGEON_MAX_LVL);
     this.changedLvl[k]=nl;
