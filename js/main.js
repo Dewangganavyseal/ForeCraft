@@ -88,6 +88,7 @@ const Game={
     FX.init(this.scene);
     Furni.init(this.scene);
     if(typeof Altar!=='undefined')Altar.init(this.scene);
+    if(typeof OceanCliffs!=='undefined')OceanCliffs.init(this.scene);
     Dungeon.init();
     SaveGame.init();
     Music.initUI();
@@ -510,6 +511,7 @@ const Game={
       if(typeof BuildSys!=='undefined'){try{BuildSys.update(dt);}catch(e){console.error('[BuildSys error]',e);}}
       if(typeof Altar!=='undefined'){try{Altar.update(dt);}catch(e){console.error('[Altar error]',e);}}
       try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
+      if(typeof OceanCliffs!=='undefined'){try{OceanCliffs.update(dt);}catch(e){console.error('[OceanCliffs error]',e);}}
       if(UI.hudExtra){try{UI.hudExtra(dt);}catch(e){console.error('[hudExtra error]',e);}}
       try{World.update(dt,Player.pos);}catch(e){console.error('[World error]',e);}
       if(typeof BombSys!=='undefined'){try{BombSys.update(dt);}catch(e){console.error('[BombSys error]',e);}}

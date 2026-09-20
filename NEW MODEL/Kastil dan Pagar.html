@@ -1,0 +1,2725 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏰 Kastil Forecraft (14x14, 17x17, 20x20) — Interior Walkable, Atap Rapat &amp; Gerbang Animasi</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #f5c862;
+    --gold-dim: #99782d;
+    --gold-glow: rgba(245, 200, 98, 0.4);
+    --bg-dark: #0c0f17;
+    --card-bg: rgba(16, 21, 34, 0.94);
+    --card-border: rgba(245, 200, 98, 0.35);
+    --btn-bg: #1a2236;
+    --btn-hover: #263352;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-red: #f87171;
+    --accent-pink: #f472b6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+  body {
+    background: var(--bg-dark);
+    color: #e2e8f0;
+    font-family: 'Nunito', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(5, 7, 13, 0.75) 100%);
+  }
+
+  /* Header Top Left */
+  #header {
+    position: fixed; top: 16px; left: 18px; z-index: 10;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
+    padding: 14px 20px;
+    box-shadow: 0 10px 35px rgba(0,0,0,0.5);
+    max-width: 450px;
+    transition: all 0.3s ease;
+  }
+  #header h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    font-size: 17.5px;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-shadow: 0 2px 10px var(--gold-glow);
+  }
+  #header .subtitle {
+    font-size: 11.5px;
+    color: #94a3b8;
+    margin-top: 4px;
+    line-height: 1.45;
+  }
+  #header .badge-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-castle { background: rgba(245, 200, 98, 0.15); color: #f5c862; border: 1px solid rgba(245, 200, 98, 0.35); }
+  .badge-roof { background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.35); }
+  .badge-door { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
+  .badge-fence { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+  .badge-char { background: rgba(244, 114, 182, 0.18); color: #f472b6; border: 1px solid rgba(244, 114, 182, 0.4); }
+
+  /* Mode Switcher Tabs */
+  #mode-tabs {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+    display: flex;
+    background: rgba(16, 21, 34, 0.94);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(14px);
+    border-radius: 40px;
+    padding: 4px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    gap: 4px;
+  }
+  .mode-tab {
+    padding: 8px 18px;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 12px;
+    border: none;
+    border-radius: 30px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mode-tab:hover { color: #f8fafc; background: rgba(255,255,255,0.06); }
+  .mode-tab.active {
+    background: linear-gradient(135deg, #d99f32, #b57a17);
+    color: #0c0f17;
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(217, 159, 50, 0.4);
+  }
+
+  /* Right Tools / Environment Controls */
+  #top-right {
+    position: fixed; top: 16px; right: 18px; z-index: 10;
+    display: flex; gap: 8px;
+  }
+  .btn-icon {
+    width: 40px; height: 40px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  .btn-icon:hover { transform: translateY(-2px); border-color: var(--gold); background: var(--btn-hover); }
+  .btn-icon.active { background: var(--gold); color: #0c0f17; }
+
+  /* Bottom Controls: Inspector Controls */
+  #inspector-panel {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(14px);
+    border-radius: 20px;
+    padding: 12px 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    max-width: 95vw;
+  }
+  .cat-selector {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  }
+  .btn-cat {
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid rgba(245, 200, 98, 0.2);
+    background: rgba(26, 34, 54, 0.7);
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-cat:hover { border-color: var(--gold); }
+  .btn-cat.active {
+    background: var(--gold);
+    color: #0c0f17;
+    border-color: var(--gold);
+    box-shadow: 0 2px 10px var(--gold-glow);
+  }
+  .tier-selector {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center;
+  }
+  .btn-tier {
+    padding: 6px 14px;
+    border-radius: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    background: #151b2c;
+    border: 1px solid #2d3748;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .btn-tier:hover { border-color: var(--gold); transform: translateY(-1px); }
+  .btn-tier.active {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(245, 200, 98, 0.25), rgba(181, 122, 23, 0.15));
+    color: var(--gold);
+    box-shadow: 0 0 12px rgba(245, 200, 98, 0.2);
+  }
+
+  /* Sandbox Controls Bar */
+  #sandbox-panel {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(14px);
+    border-radius: 20px;
+    padding: 10px 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    display: none; align-items: center; gap: 8px;
+    max-width: 95vw;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tool-group {
+    display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: center;
+  }
+  .tool-btn {
+    padding: 6px 11px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #172033;
+    border: 1px solid #2b3954;
+    color: #cbd5e1;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: all 0.2s;
+  }
+  .tool-btn:hover { border-color: var(--gold); transform: translateY(-1px); }
+  .tool-btn.active {
+    background: var(--gold);
+    color: #0c0f17;
+    border-color: var(--gold);
+    box-shadow: 0 2px 10px var(--gold-glow);
+  }
+  .tool-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+  .divider-v {
+    width: 1px; height: 24px; background: rgba(255,255,255,0.15);
+  }
+
+  /* Info Notification Toast */
+  #info-toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 15;
+    background: rgba(12, 16, 27, 0.95);
+    border: 1px solid var(--gold);
+    color: #f1f5f9;
+    padding: 10px 22px;
+    border-radius: 30px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.7), 0 0 15px rgba(245,200,98,0.25);
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    text-align: center;
+    white-space: nowrap;
+    max-width: 90vw;
+  }
+
+  /* Stats Overlay */
+  #stats-hud {
+    position: fixed; bottom: 20px; left: 18px; z-index: 10;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    backdrop-filter: blur(10px); border-radius: 12px; padding: 12px 16px;
+    font-size: 11.5px; color: #94a3b8; pointer-events: none;
+    line-height: 1.6; max-width: 430px;
+  }
+  #stats-hud b { color: #f8fafc; }
+  .scale-box {
+    margin-top: 6px; padding: 7px 11px; background: rgba(244, 114, 182, 0.1);
+    border: 1px solid rgba(244, 114, 182, 0.3); border-radius: 8px; font-size: 11px; color: #fbcfe8;
+  }
+  .interior-box {
+    margin-top: 5px; padding: 6px 10px; background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 8px; font-size: 11px; color: #bbf7d0;
+  }
+
+  #hint-bar {
+    position: fixed; bottom: 6px; right: 18px; z-index: 5;
+    font-size: 11px; color: #64748b; pointer-events: none;
+  }
+
+  /* Code / Spec Modal */
+  #spec-modal {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(5, 8, 15, 0.85);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-content {
+    background: #0f1523;
+    border: 1px solid var(--gold);
+    border-radius: 18px;
+    width: min(940px, 94vw);
+    max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid rgba(245, 200, 98, 0.2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-header h2 {
+    font-family: 'Cinzel', serif; font-size: 18px; color: var(--gold);
+  }
+  .modal-close {
+    background: none; border: none; font-size: 22px; color: #94a3b8; cursor: pointer;
+  }
+  .modal-close:hover { color: #f8fafc; }
+  .modal-body {
+    padding: 20px; overflow-y: auto; color: #cbd5e1; font-size: 13.5px; line-height: 1.6;
+  }
+  .modal-body pre {
+    background: #090c14; border: 1px solid #1e293b; border-radius: 10px;
+    padding: 14px; color: #a5f3fc; font-family: monospace; font-size: 12px;
+    overflow-x: auto; margin-top: 10px;
+  }
+  .spec-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+  }
+  @media (max-width: 700px) {
+    .spec-grid { grid-template-columns: 1fr; }
+    #header { max-width: calc(100vw - 36px); }
+  }
+  .spec-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 14px;
+  }
+  .spec-card h3 {
+    font-size: 14px; color: var(--gold); margin-bottom: 6px; font-family: 'Cinzel', serif;
+  }
+</style>
+</head>
+<body>
+
+<div id="vignette"></div>
+
+<!-- Header -->
+<div id="header">
+  <h1>🏰 KASTIL FORECRAFT V2.4</h1>
+  <div class="subtitle">Kastil 14x14, 17x17, 20x20 &bull; Atap Rapat Tertutup Penuh &bull; Animasi Gerbang &amp; Pintu Halus</div>
+  <div class="badge-row">
+    <span class="badge badge-castle">14x14 &bull; 17x17 &bull; 20x20</span>
+    <span class="badge badge-roof">Atap Rapat Tertutup</span>
+    <span class="badge badge-door">Animasi Buka-Tutup Smooth</span>
+    <span class="badge badge-fence">Gerbang T3 (Lebar 6 Blok)</span>
+    <span class="badge badge-char">Karakter 1.92 Blok</span>
+  </div>
+</div>
+
+<!-- Mode Switcher -->
+<div id="mode-tabs">
+  <button class="mode-tab active" id="tab-inspector">🔍 Inspeksi Model 3D</button>
+  <button class="mode-tab" id="tab-sandbox">🏗️ Simulator Sambungan Organik</button>
+  <button class="mode-tab" id="tab-spec">📜 Spesifikasi &amp; Detail Game</button>
+</div>
+
+<!-- Top Right Tool Buttons -->
+<div id="top-right">
+  <button class="btn-icon" id="btn-door" title="Buka / Tutup Semua Gerbang &amp; Pintu (Smooth Animation)">🚪</button>
+  <button class="btn-icon" id="btn-roof" title="Buka / Tutup Atap Kastil (Cutaway Interior Mode)">🏛️</button>
+  <button class="btn-icon active" id="btn-char" title="Tampilkan / Sembunyikan Simulasi Karakter">🧍</button>
+  <button class="btn-icon" id="btn-ruler" title="Tampilkan Penggaris Ketinggian Blok">📏</button>
+  <button class="btn-icon" id="btn-walk" title="Animasi Berjalan / Diam">🚶</button>
+  <button class="btn-icon" id="btn-sun" title="Ganti Siang / Malam">☀️</button>
+  <button class="btn-icon" id="btn-spin" title="Rotasi Kamera Otomatis">🔄</button>
+  <button class="btn-icon" id="btn-reset-cam" title="Reset Pandangan Kamera">⌂</button>
+</div>
+
+<!-- Inspector Controls -->
+<div id="inspector-panel">
+  <div class="cat-selector">
+    <button class="btn-cat active" data-cat="castle">🏰 Kastil</button>
+    <button class="btn-cat" data-cat="fence">🛡️ Pagar &amp; Gerbang Organik</button>
+    <button class="btn-cat" data-cat="house">🏠 Rumah Kayu Game (7x7)</button>
+    <button class="btn-cat" data-cat="scale">🧍 Perbandingan Skala</button>
+  </div>
+  <div class="tier-selector" id="tier-container"></div>
+</div>
+
+<!-- Sandbox Controls (Grid Simulator) -->
+<div id="sandbox-panel">
+  <div class="tool-group">
+    <button class="tool-btn active" data-tool="castle1">🏰 Kastil T1 (14x14)</button>
+    <button class="tool-btn" data-tool="castle2">🏰 Kastil T2 (17x17)</button>
+    <button class="tool-btn" data-tool="castle3">🏰 Kastil T3 (20x20)</button>
+  </div>
+  <div class="divider-v"></div>
+  <div class="tool-group">
+    <button class="tool-btn" data-tool="fence1">🛡️ Pagar T1</button>
+    <button class="tool-btn" data-tool="fence2">🛡️ Pagar T2</button>
+    <button class="tool-btn" data-tool="fence3">🛡️ Pagar T3 (2× Besar)</button>
+  </div>
+  <div class="divider-v"></div>
+  <div class="tool-group">
+    <button class="tool-btn" data-tool="gate1">🚪 Gerbang Pagar T1</button>
+    <button class="tool-btn" data-tool="gate2">🚪 Gerbang Pagar T2</button>
+    <button class="tool-btn" data-tool="gate3">🚪 Gerbang T3 (Lebar 6 Blok)</button>
+  </div>
+  <div class="divider-v"></div>
+  <div class="tool-group">
+    <button class="tool-btn" data-tool="character">🧍 Taruh Karakter</button>
+    <button class="tool-btn" data-tool="house">🏠 Rumah (7x7)</button>
+    <button class="tool-btn danger" data-tool="delete">⛏️ Hapus</button>
+  </div>
+  <div class="divider-v"></div>
+  <div class="tool-group">
+    <button class="tool-btn" id="btn-demo-straight">📏 Demo 2 vs 3 Pagar</button>
+    <button class="tool-btn" id="btn-demo-corner">📐 Demo Belokan</button>
+    <button class="tool-btn" id="btn-preset-fort">🌟 Preset Benteng</button>
+    <button class="tool-btn danger" id="btn-clear-grid">🧹 Kosongkan</button>
+  </div>
+</div>
+
+<!-- Info Toast -->
+<div id="info-toast">✨ Model Siap — Drag untuk memutar, Scroll untuk Zoom</div>
+
+<!-- Stats HUD -->
+<div id="stats-hud">
+  <div id="hud-name"><b>Kastil Tingkat 1 (Stone Fortress Keep)</b></div>
+  <div id="hud-dim">Ukuran: <b>14 × 14 Blok</b> | Gerbang: <b>Depan (Besar 3.6×4.5)</b></div>
+  <div id="hud-prop">Status Sambungan: <b id="hud-merge-status">Kastil Mandiri (Tidak Bergabung)</b></div>
+  <div class="interior-box" id="hud-interior-info">
+    🏛️ <b>Atap Tertutup Rapat &amp; Interior Walkable:</b> Atap genteng piramida bertingkat menutupi 100% bentangan kastil tanpa celah/bolong. Tekan 🏛️ untuk membuka atap dan melihat interior aula tahta.
+  </div>
+  <div class="scale-box" id="hud-char-scale">
+    🚪 <b>Pintu &amp; Gerbang Animasi Smooth:</b> Tekan 🚪 untuk membuka/menutup pintu kastil (terbuka ke kanan &amp; kiri), pintu rumah biasa (kanan &amp; kiri), dan gerbang pagar (terangkat ke atas secara halus).
+  </div>
+</div>
+
+<div id="hint-bar">Klik Kiri: Pilih / Taruh | Klik Kanan: Geser | R: Putar Hadap</div>
+
+<!-- Spec & Rules Modal -->
+<div id="spec-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>📜 SPESIFIKASI KASTIL AKBAR &amp; SISTEM GERBANG ANIMASI</h2>
+      <button class="modal-close" id="btn-close-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="spec-grid">
+        <div class="spec-card">
+          <h3>🏰 1. Perbaikan Atap Kastil (100% Rapat &amp; Tertutup)</h3>
+          <p>• <b>Masalah Sebelumnya:</b> Atap sebelumnya hanya berupa menara kecil di tengah sehingga menyisakan celah/lubang besar terbuka ke langit.</p>
+          <p>• <b>Solusi Patch:</b></p>
+          <p>&nbsp;&nbsp;- <b>Plafon Interior (Ceiling Slab):</b> Papan kayu solid dengan balok penyangga melintang menutupi seluruh ruangan pada ketinggian dinding.</p>
+          <p>&nbsp;&nbsp;- <b>Atap Bertingkat Penuh (Full Stepped Hip Roof):</b> Genteng terakota <code>B.ROOF</code> membentang dari tepi dalam dinding pembatas hingga menara pusat secara rapat bertingkat tanpa celah sedikit pun.</p>
+          <p>&nbsp;&nbsp;- <b>Atap Menara Sudut:</b> Masing-masing dari 4 menara sudut kini memiliki atap piramida/kerucut pelindung utuh.</p>
+          <p>&nbsp;&nbsp;- <b>Cutaway Mode:</b> Tombol 🏛️ memungkinkan atap dibuka untuk inspeksi interior.</p>
+        </div>
+        <div class="spec-card">
+          <h3>🚪 2. Animasi Buka Tutup Smooth (Pintu Kastil &amp; Gerbang Pagar)</h3>
+          <p>• <b>Pintu Kastil:</b> Sepasang daun pintu gerbang agung yang berayun membuka ke <b>kanan dan kiri</b> secara halus (tanpa pintu dobel atau kisi naik ke atas), memberi akses megah langsung ke aula tahta.</p>
+          <p>• <b>Pintu Rumah Biasa:</b> Pintu ganda kayu Forecraft (2 blok) berayun membuka ke kanan dan kiri secara presisi dan halus.</p>
+          <p>• <b>Gerbang Pagar Organik (Lifting Gate):</b></p>
+          <p>&nbsp;&nbsp;- Gerbang pagar terbuka dengan cara <b>terangkat meluncur ke atas</b> di antara tiang pemandu!</p>
+          <p>&nbsp;&nbsp;- T1: Gerbang palisade kayu berpalang besi terangkat ke atas.</p>
+          <p>&nbsp;&nbsp;- T2: Kisi gerbang besi tempa terangkat ke atas.</p>
+          <p>&nbsp;&nbsp;- T3: Gerbang kekaisaran raksasa setinggi 3.8m dengan taring besi hitam dan trim emas yang meluncur naik ke atas di antara menara gerbang 7.6m (2× lipat ukuran normal!).</p>
+        </div>
+      </div>
+      <div class="spec-grid">
+        <div class="spec-card">
+          <h3>🏰 3. Ukuran Kastil (14x14, 17x17, 20x20)</h3>
+          <p>• <b>Tier 1:</b> <b>14×14 Blok</b>. Menara sudut 3×3 setinggi 9 blok, gerbang 3.6×4.5 blok.</p>
+          <p>• <b>Tier 2:</b> <b>17×17 Blok</b> (+3). Menara sudut 4×4 setinggi 12 blok, gerbang 4.6×5.5 blok.</p>
+          <p>• <b>Tier 3:</b> <b>20×20 Blok</b> (+3). Menara sudut 5×5 setinggi 15 blok dengan spire 21 blok, gerbang 5.8×6.8 blok.</p>
+        </div>
+        <div class="spec-card">
+          <h3>🧍 4. Skala Karakter Forecraft</h3>
+          <p>• Tinggi karakter tepat <b>1.92 Blok Voxel</b> (192 cm).</p>
+          <p>• Karakter dapat berjalan menembus gerbang kastil dan gerbang pagar yang terbuka dengan leluasa.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Three.js Setup with ImportMap -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================================
+   AUDIO FEEDBACK
+   ========================================================================= */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function playSound(type) {
+  try {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'click') {
+      osc.type = 'sine'; osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.06);
+      gain.gain.setValueAtTime(0.12, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+      osc.start(now); osc.stop(now + 0.06);
+    } else if (type === 'place') {
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.15);
+      gain.gain.setValueAtTime(0.25, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+      osc.start(now); osc.stop(now + 0.15);
+    } else if (type === 'gate') {
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(140, now);
+      osc.frequency.linearRampToValueAtTime(260, now + 0.4);
+      gain.gain.setValueAtTime(0.16, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+      osc.start(now); osc.stop(now + 0.4);
+    } else if (type === 'delete') {
+      osc.type = 'square'; osc.frequency.setValueAtTime(180, now);
+      osc.frequency.linearRampToValueAtTime(60, now + 0.12);
+      gain.gain.setValueAtTime(0.18, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+      osc.start(now); osc.stop(now + 0.12);
+    }
+  } catch(e) {}
+}
+
+/* =========================================================================
+   SCENE & CAMERA SETUP
+   ========================================================================= */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e1a);
+scene.fog = new THREE.FogExp2(0x0a0e1a, 0.008);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(26, 24, 36);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(0, 4, 0);
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+controls.minDistance = 3;
+controls.maxDistance = 220;
+
+/* =========================================================================
+   LIGHTING SETUP
+   ========================================================================= */
+let isDay = true;
+const hemiLight = new THREE.HemisphereLight(0xdce7ff, 0x1a2130, 0.95);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff3db, 2.2);
+sunLight.position.set(38, 55, 32);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -50; sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50; sunLight.shadow.camera.bottom = -50;
+sunLight.shadow.camera.near = 5; sunLight.shadow.camera.far = 160;
+sunLight.shadow.bias = -0.0004;
+scene.add(sunLight);
+
+const fillLight = new THREE.DirectionalLight(0x768eb8, 0.55);
+fillLight.position.set(-30, 25, -30);
+scene.add(fillLight);
+
+function setLighting(day) {
+  isDay = day;
+  if (day) {
+    scene.background.setHex(0x0e1726);
+    scene.fog.color.setHex(0x0e1726);
+    hemiLight.color.setHex(0xdce7ff);
+    hemiLight.groundColor.setHex(0x1a2130);
+    hemiLight.intensity = 0.95;
+    sunLight.color.setHex(0xfff3db);
+    sunLight.intensity = 2.2;
+    sunLight.position.set(38, 55, 32);
+  } else {
+    scene.background.setHex(0x060810);
+    scene.fog.color.setHex(0x060810);
+    hemiLight.color.setHex(0x28385e);
+    hemiLight.groundColor.setHex(0x080a14);
+    hemiLight.intensity = 0.5;
+    sunLight.color.setHex(0x6080cc);
+    sunLight.intensity = 0.9;
+    sunLight.position.set(-25, 40, -25);
+  }
+}
+
+/* =========================================================================
+   TEKSTUR BLOK PERSIS GAME FORECRAFT
+   ========================================================================= */
+function generateBlockTexture(type) {
+  const cv = document.createElement('canvas');
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  let sd = 42;
+  const rr = () => { sd ^= sd << 13; sd ^= sd >>> 17; sd ^= sd << 5; return (sd >>> 0) / 4294967296; };
+  const px = (x, y, col) => { c.fillStyle = col; c.fillRect(x, y, 1, 1); };
+
+  if (type === 'stone') {
+    c.fillStyle = '#8a8f98'; c.fillRect(0, 0, 16, 16);
+    const vars = ['#7b8089', '#9aa0a8', '#6f747d'];
+    for (let k = 0; k < 80; k++) px((rr()*16)|0, (rr()*16)|0, vars[(rr()*vars.length)|0]);
+    for (let k = 0; k < 6; k++) {
+      const x = (rr()*14)|0, y = (rr()*14)|0;
+      px(x, y, '#5c616a'); px(x + 1, y + 1, '#5c616a');
+    }
+  } else if (type === 'stone_dark') {
+    c.fillStyle = '#4c525a'; c.fillRect(0, 0, 16, 16);
+    const vars = ['#3e434a', '#585e68', '#34383e'];
+    for (let k = 0; k < 80; k++) px((rr()*16)|0, (rr()*16)|0, vars[(rr()*vars.length)|0]);
+    for (let k = 0; k < 6; k++) {
+      const x = (rr()*14)|0, y = (rr()*14)|0;
+      px(x, y, '#282b30'); px(x + 1, y + 1, '#282b30');
+    }
+  } else if (type === 'wood_log') {
+    for (let x = 0; x < 16; x++) {
+      const col = x % 4 < 2 ? '#6e4f2f' : '#5d4126';
+      for (let y = 0; y < 16; y++) px(x, y, col);
+    }
+    for (let k = 0; k < 26; k++) px((rr()*16)|0, (rr()*16)|0, '#523719');
+  } else if (type === 'plank') {
+    for (let y = 0; y < 16; y++) {
+      const col = (y % 5 === 0) ? '#8a6236' : (y % 2 ? '#b98a55' : '#c49560');
+      for (let x = 0; x < 16; x++) px(x, y, col);
+    }
+    for (let k = 0; k < 18; k++) px((rr()*16)|0, (rr()*16)|0, '#a37a48');
+  } else if (type === 'roof') {
+    c.fillStyle = '#9c5a3c'; c.fillRect(0, 0, 16, 16);
+    for (let y = 0; y < 16; y += 4) {
+      c.fillStyle = '#7a3b22'; c.fillRect(0, y, 16, 1);
+      for (let x = 0; x < 16; x += 4) {
+        const ox = (y % 8 === 0) ? 0 : 2;
+        c.fillStyle = '#652a16'; c.fillRect((x + ox) % 16, y, 1, 4);
+      }
+    }
+    for (let k = 0; k < 20; k++) px((rr()*16)|0, (rr()*16)|0, '#b86b4a');
+  } else if (type === 'iron') {
+    c.fillStyle = '#34383f'; c.fillRect(0, 0, 16, 16);
+    const vars = ['#282c32', '#41474f', '#4f5660'];
+    for (let k = 0; k < 60; k++) px((rr()*16)|0, (rr()*16)|0, vars[(rr()*vars.length)|0]);
+    px(2, 2, '#707a86'); px(13, 2, '#707a86'); px(2, 13, '#707a86'); px(13, 13, '#707a86');
+  } else if (type === 'gold') {
+    c.fillStyle = '#d9b23a'; c.fillRect(0, 0, 16, 16);
+    const vars = ['#c49b25', '#ecc044', '#ffe07a'];
+    for (let k = 0; k < 60; k++) px((rr()*16)|0, (rr()*16)|0, vars[(rr()*vars.length)|0]);
+  }
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const TEX = {
+  stone:     generateBlockTexture('stone'),
+  stoneDark: generateBlockTexture('stone_dark'),
+  woodLog:   generateBlockTexture('wood_log'),
+  plank:     generateBlockTexture('plank'),
+  roof:      generateBlockTexture('roof'),
+  iron:      generateBlockTexture('iron'),
+  gold:      generateBlockTexture('gold')
+};
+
+const MATS = {
+  stone:      new THREE.MeshLambertMaterial({ map: TEX.stone }),
+  stoneDark:  new THREE.MeshLambertMaterial({ map: TEX.stoneDark }),
+  woodLog:    new THREE.MeshLambertMaterial({ map: TEX.woodLog }),
+  plank:      new THREE.MeshLambertMaterial({ map: TEX.plank }),
+  roof:       new THREE.MeshLambertMaterial({ map: TEX.roof }),
+  iron:       new THREE.MeshLambertMaterial({ map: TEX.iron }),
+  gold:       new THREE.MeshLambertMaterial({ map: TEX.gold }),
+
+  bannerRed:  new THREE.MeshLambertMaterial({ color: 0x9e2424 }),
+  bannerBlue: new THREE.MeshLambertMaterial({ color: 0x244f9e }),
+  carpetRed:  new THREE.MeshLambertMaterial({ color: 0x8b1a1a }),
+  throneCloth:new THREE.MeshLambertMaterial({ color: 0x6b1414 }),
+  fire:       new THREE.MeshBasicMaterial({ color: 0xff7722 }),
+  fireCore:   new THREE.MeshBasicMaterial({ color: 0xffdd77 }),
+  crystal:    new THREE.MeshBasicMaterial({ color: 0x5ce1e6 }),
+  groundGrid: new THREE.MeshLambertMaterial({ color: 0x141b2c }),
+
+  charSkin:   new THREE.MeshLambertMaterial({ color: 0xe8bd92 }),
+  charSkinD:  new THREE.MeshLambertMaterial({ color: 0xd2a279 }),
+  charJacket: new THREE.MeshLambertMaterial({ color: 0x6a4a2e }),
+  charJacketD:new THREE.MeshLambertMaterial({ color: 0x53381f }),
+  charPants:  new THREE.MeshLambertMaterial({ color: 0x3a4149 }),
+  charPantsD: new THREE.MeshLambertMaterial({ color: 0x2c323a }),
+  charBoot:   new THREE.MeshLambertMaterial({ color: 0x2c2018 }),
+  charHair:   new THREE.MeshLambertMaterial({ color: 0x2c1f14 }),
+  charEye:    new THREE.MeshLambertMaterial({ color: 0x241d14 }),
+  charSclera: new THREE.MeshLambertMaterial({ color: 0xf6f1e6 }),
+  charRuler:  new THREE.MeshBasicMaterial({ color: 0xf472b6 })
+};
+
+function createBox(w, h, d, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.position.set(x, y, z);
+  if (rx) mesh.rotation.x = rx;
+  if (ry) mesh.rotation.y = ry;
+  if (rz) mesh.rotation.z = rz;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+/* =========================================================================
+   GLOBAL DOOR & GATE ANIMATION REGISTRY
+   ========================================================================= */
+const animatedDoors = new Set();
+let isDoorOpen = false;
+let currentDoorProgress = 0.0;
+
+/* =========================================================================
+   MODEL KARAKTER FORECRAFT (TINGGI TEPAT 1.92 BLOK)
+   ========================================================================= */
+const CharacterBuilder = {
+  HEIGHT: 1.92,
+
+  build(options = { withRuler: false }) {
+    const root = new THREE.Group();
+    root.name = 'ForecraftPlayerCharacter';
+    root.userData = { type: 'character', height: 1.92 };
+
+    const rollG = new THREE.Group();
+    rollG.name = 'RollGroup';
+    rollG.position.y = 0.055;
+    root.add(rollG);
+
+    const body = new THREE.Group();
+    body.name = 'Body';
+    rollG.add(body);
+
+    const parts = { root, rollG, body };
+
+    // Kaki
+    const makeLeg = (side) => {
+      const leg = new THREE.Group();
+      leg.position.set(0.13 * side, 0.66, 0);
+      leg.add(createBox(0.21, 0.34, 0.23, MATS.charPants, 0, -0.17, 0));
+      leg.add(createBox(0.06, 0.13, 0.15, MATS.charPantsD, 0.12 * side, -0.16, 0));
+
+      const shin = new THREE.Group();
+      shin.position.y = -0.34;
+      shin.add(createBox(0.19, 0.22, 0.21, MATS.charPantsD, 0, -0.11, 0));
+      shin.add(createBox(0.21, 0.12, 0.27, MATS.charBoot, 0, -0.26, 0.03));
+      shin.add(createBox(0.22, 0.04, 0.30, MATS.charPantsD, 0, -0.34, 0.04));
+
+      leg.add(shin);
+      leg.userData.shin = shin;
+      body.add(leg);
+      return leg;
+    };
+
+    parts.legL = makeLeg(1);
+    parts.legR = makeLeg(-1);
+
+    // Torso
+    const torso = new THREE.Group();
+    torso.position.y = 0.66;
+    body.add(torso);
+    parts.torso = torso;
+
+    torso.add(createBox(0.48, 0.16, 0.28, MATS.charPantsD, 0, 0.08, 0));
+    torso.add(createBox(0.50, 0.08, 0.32, MATS.charBoot, 0, 0.14, 0));
+    torso.add(createBox(0.12, 0.09, 0.34, MATS.gold, 0, 0.14, 0));
+
+    torso.add(createBox(0.48, 0.24, 0.30, MATS.charJacket, 0, 0.26, 0));
+    torso.add(createBox(0.56, 0.26, 0.33, MATS.charJacket, 0, 0.50, 0));
+    torso.add(createBox(0.60, 0.10, 0.35, MATS.charJacketD, 0, 0.68, 0));
+    torso.add(createBox(0.34, 0.14, 0.30, MATS.charPantsD, 0, 0.72, 0));
+    torso.add(createBox(0.18, 0.22, 0.18, MATS.charSkinD, 0, 0.80, 0));
+
+    // Lengan
+    const makeArm = (side) => {
+      const arm = new THREE.Group();
+      arm.position.set(0.35 * side, 0.63, 0);
+      arm.add(createBox(0.20, 0.28, 0.20, MATS.charJacket, 0, -0.14, 0));
+
+      const fore = new THREE.Group();
+      fore.position.y = -0.26;
+      fore.add(createBox(0.17, 0.22, 0.18, MATS.charJacketD, 0, -0.11, 0));
+      fore.add(createBox(0.16, 0.14, 0.17, MATS.charBoot, 0, -0.26, 0));
+
+      arm.add(fore);
+      arm.userData.fore = fore;
+      torso.add(arm);
+      return arm;
+    };
+
+    parts.armL = makeArm(1);
+    parts.armR = makeArm(-1);
+
+    // Kepala
+    const head = new THREE.Group();
+    head.position.set(0, 0.80, 0);
+    torso.add(head);
+    parts.head = head;
+
+    head.add(createBox(0.40, 0.40, 0.38, MATS.charSkin, 0, 0.20, 0));
+
+    for (const sx of [-0.095, 0.095]) {
+      head.add(createBox(0.08, 0.07, 0.02, MATS.charSclera, sx, 0.22, 0.192));
+      head.add(createBox(0.05, 0.07, 0.02, MATS.charEye, sx, 0.22, 0.198));
+      head.add(createBox(0.09, 0.03, 0.02, MATS.charHair, sx, 0.29, 0.196));
+    }
+    head.add(createBox(0.05, 0.07, 0.04, MATS.charSkinD, 0, 0.19, 0.20));
+
+    head.add(createBox(0.44, 0.14, 0.42, MATS.charHair, 0, 0.44, 0));
+    head.add(createBox(0.38, 0.10, 0.08, MATS.charHair, 0, 0.39, 0.20));
+    head.add(createBox(0.06, 0.22, 0.36, MATS.charHair, 0.21, 0.28, 0));
+    head.add(createBox(0.06, 0.22, 0.36, MATS.charHair, -0.21, 0.28, 0));
+    head.add(createBox(0.44, 0.22, 0.08, MATS.charHair, 0, 0.28, -0.20));
+
+    // Penggaris Pengukur 3D
+    const rulerGroup = new THREE.Group();
+    rulerGroup.name = 'HeightRuler';
+    rulerGroup.position.set(0.65, 0, 0);
+
+    rulerGroup.add(createBox(0.04, 1.92, 0.04, MATS.charRuler, 0, 1.92 / 2, 0));
+    [0.0, 0.5, 1.0, 1.5, 1.92].forEach(y => {
+      rulerGroup.add(createBox(0.24, 0.03, 0.08, MATS.gold, 0.08, y, 0));
+    });
+    rulerGroup.add(createBox(0.6, 0.18, 0.05, MATS.charRuler, 0.35, 1.92, 0));
+
+    root.add(rulerGroup);
+    parts.ruler = rulerGroup;
+    rulerGroup.visible = !!options.withRuler;
+
+    root.userData.parts = parts;
+    return root;
+  },
+
+  animate(charGroup, elapsed, mode = 'idle') {
+    if (!charGroup || !charGroup.userData.parts) return;
+    const { legL, legR, armL, armR, torso, head, body } = charGroup.userData.parts;
+
+    if (mode === 'walk') {
+      const freq = 6.5;
+      const sw = Math.sin(elapsed * freq);
+      const cw = Math.cos(elapsed * freq);
+
+      legL.rotation.x = sw * 0.55;
+      legR.rotation.x = -sw * 0.55;
+      legL.userData.shin.rotation.x = Math.max(0, -cw) * 0.6;
+      legR.userData.shin.rotation.x = Math.max(0, cw) * 0.6;
+
+      armL.rotation.x = -sw * 0.45;
+      armR.rotation.x = sw * 0.45;
+      armL.userData.fore.rotation.x = -0.3;
+      armR.userData.fore.rotation.x = -0.3;
+
+      torso.rotation.y = sw * 0.08;
+      body.position.y = Math.abs(Math.sin(elapsed * freq)) * 0.05;
+      head.rotation.y = -sw * 0.05;
+    } else {
+      const br = Math.sin(elapsed * 2.2) * 0.012;
+      body.position.y = br;
+      torso.rotation.x = br * 0.4;
+      torso.rotation.y = Math.sin(elapsed * 1.1) * 0.03;
+
+      legL.rotation.set(0, 0, 0);
+      legR.rotation.set(0, 0, 0);
+      legL.userData.shin.rotation.set(0, 0, 0);
+      legR.userData.shin.rotation.set(0, 0, 0);
+
+      armL.rotation.x = Math.sin(elapsed * 2.0) * 0.05;
+      armL.rotation.z = 0.08;
+      armR.rotation.x = -Math.sin(elapsed * 2.0) * 0.05;
+      armR.rotation.z = -0.08;
+      armL.userData.fore.rotation.x = -0.15;
+      armR.userData.fore.rotation.x = -0.15;
+
+      head.rotation.y = Math.sin(elapsed * 0.8) * 0.12;
+      head.rotation.x = Math.sin(elapsed * 1.3) * 0.03;
+    }
+  }
+};
+
+/* =========================================================================
+   BUILDER KASTIL (14x14, 17x17, 20x20 — ATAP RAPAT TERTUTUP & INTERIOR WALKABLE)
+   =========================================================================
+   - Tier 1: 14×14 Blok
+   - Tier 2: 17×17 Blok (+3 Blok)
+   - Tier 3: 20×20 Blok (+3 Blok)
+   - Atap 100% rapat dan tertutup penuh tanpa celah/bolong.
+   - Pintu gerbang portcullis dan daun pintu ganda dapat beranimasi halus.
+   - Interior berongga (hollow) dengan aula tahta luas yang dapat dijelajahi.
+   - Tombol 🏛️ untuk membuka atap (cutaway mode).
+*/
+const CastleBuilder = {
+  getCastleSize(tier) {
+    if (tier === 1) return 14;
+    if (tier === 2) return 17;
+    return 20;
+  },
+
+  buildCastle(tier = 1, doorOpen = 0, openRoof = false) {
+    const size = this.getCastleSize(tier);
+    const group = new THREE.Group();
+    group.name = `Castle_Tier_${tier}_${size}x${size}`;
+    group.userData = { type: 'castle', tier, size, openRoof };
+
+    const half = size / 2;
+    const stoneMat = tier === 3 ? MATS.stoneDark : MATS.stone;
+
+    // Group khusus atap yang dapat disembunyikan saat mode interior aktif
+    const roofGroup = new THREE.Group();
+    roofGroup.name = "CastleRoofGroup";
+    group.add(roofGroup);
+    group.userData.roofGroup = roofGroup;
+
+    // 1. PONDASI & LANTAI INTERIOR (B.STONE & B.PLANK)
+    group.add(createBox(size + 0.4, 0.4, size + 0.4, MATS.stone, 0, 0.2, 0));
+    group.add(createBox(size - 0.4, 0.1, size - 0.4, MATS.plank, 0, 0.45, 0));
+
+    // 2. EMPAT MENARA SUDUT BENTENG
+    const towerW = tier === 1 ? 3.0 : (tier === 2 ? 4.0 : 5.0);
+    const towerH = tier === 1 ? 9.0 : (tier === 2 ? 12.0 : 15.0);
+    const wallH  = tier === 1 ? 6.2 : (tier === 2 ? 8.0 : 10.0);
+
+    const cornerDist = half - towerW / 2;
+    const corners = [
+      { x: -cornerDist, z: -cornerDist },
+      { x:  cornerDist, z: -cornerDist },
+      { x: -cornerDist, z:  cornerDist },
+      { x:  cornerDist, z:  cornerDist }
+    ];
+
+    corners.forEach(pos => {
+      const tower = new THREE.Group();
+      tower.position.set(pos.x, 0, pos.z);
+
+      tower.add(createBox(towerW, towerH, towerW, stoneMat, 0, towerH / 2, 0));
+
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const colX = sx * (towerW / 2 - 0.2);
+          const colZ = sz * (towerW / 2 - 0.2);
+          tower.add(createBox(0.45, towerH + 0.3, 0.45, MATS.woodLog, colX, (towerH + 0.3) / 2, colZ));
+        }
+      }
+
+      const bibirW = towerW + 0.8;
+      tower.add(createBox(bibirW, 0.7, bibirW, MATS.stone, 0, towerH + 0.35, 0));
+
+      const step = 0.8;
+      for (let ox = -bibirW/2 + 0.4; ox <= bibirW/2 - 0.4; ox += step) {
+        tower.add(createBox(0.45, 0.9, 0.35, MATS.stone, ox, towerH + 1.1, bibirW/2 - 0.17));
+        tower.add(createBox(0.45, 0.9, 0.35, MATS.stone, ox, towerH + 1.1, -bibirW/2 + 0.17));
+      }
+      for (let oz = -bibirW/2 + 0.4; oz <= bibirW/2 - 0.4; oz += step) {
+        tower.add(createBox(0.35, 0.9, 0.45, MATS.stone, bibirW/2 - 0.17, towerH + 1.1, oz));
+        tower.add(createBox(0.35, 0.9, 0.45, MATS.stone, -bibirW/2 + 0.17, towerH + 1.1, oz));
+      }
+
+      // Atap menara sudut (disatukan ke roofGroup agar tidak bolong!)
+      if (tier === 1) {
+        // T1: Atap Piramida Terakota Menara Sudut
+        const tRoof1 = createBox(towerW + 0.2, 0.5, towerW + 0.2, MATS.roof, pos.x, towerH + 1.3, pos.z);
+        const tRoof2 = createBox(towerW - 0.8, 0.5, towerW - 0.8, MATS.roof, pos.x, towerH + 1.8, pos.z);
+        const tRoof3 = createBox(towerW - 1.8, 0.5, towerW - 1.8, MATS.roof, pos.x, towerH + 2.3, pos.z);
+        const tFinial = createBox(0.2, 0.8, 0.2, MATS.gold, pos.x, towerH + 2.8, pos.z);
+        roofGroup.add(tRoof1); roofGroup.add(tRoof2); roofGroup.add(tRoof3); roofGroup.add(tFinial);
+      } else if (tier === 2) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(towerW * 0.7, 4.2, 4), MATS.roof);
+        cone.position.set(pos.x, towerH + 2.8, pos.z);
+        cone.rotation.y = Math.PI / 4;
+        cone.castShadow = true;
+        const cFinial = createBox(0.2, 1.0, 0.2, MATS.gold, pos.x, towerH + 5.2, pos.z);
+        roofGroup.add(cone); roofGroup.add(cFinial);
+      } else if (tier === 3) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(towerW * 0.75, 5.8, 8), MATS.roof);
+        cone.position.set(pos.x, towerH + 3.8, pos.z);
+        cone.castShadow = true;
+        const cFinial = createBox(0.25, 1.4, 0.25, MATS.gold, pos.x, towerH + 7.0, pos.z);
+        roofGroup.add(cone); roofGroup.add(cFinial);
+      }
+
+      group.add(tower);
+    });
+
+    // 3. DINDING PERIMETER LUAR
+    const wallLen = size - towerW * 2;
+    const wallThick = tier === 1 ? 1.0 : (tier === 2 ? 1.2 : 1.5);
+    const wallOffset = half - wallThick / 2;
+
+    // Dinding Barat
+    group.add(createBox(wallThick, wallH, wallLen, stoneMat, -wallOffset, wallH / 2, 0));
+    group.add(createBox(0.8, 0.35, wallLen, MATS.plank, -wallOffset + wallThick/2 + 0.4, wallH - 0.2, 0));
+    for (let z = -wallLen/2 + 0.5; z <= wallLen/2 - 0.5; z += 0.9) {
+      group.add(createBox(0.3, 0.8, 0.45, MATS.stone, -half + 0.2, wallH + 0.4, z));
+    }
+
+    // Dinding Timur
+    group.add(createBox(wallThick, wallH, wallLen, stoneMat, wallOffset, wallH / 2, 0));
+    group.add(createBox(0.8, 0.35, wallLen, MATS.plank, wallOffset - wallThick/2 - 0.4, wallH - 0.2, 0));
+    for (let z = -wallLen/2 + 0.5; z <= wallLen/2 - 0.5; z += 0.9) {
+      group.add(createBox(0.3, 0.8, 0.45, MATS.stone, half - 0.2, wallH + 0.4, z));
+    }
+
+    // Dinding Belakang (Utara)
+    group.add(createBox(wallLen, wallH, wallThick, stoneMat, 0, wallH / 2, -wallOffset));
+    group.add(createBox(wallLen, 0.35, 0.8, MATS.plank, 0, wallH - 0.2, -wallOffset + wallThick/2 + 0.4));
+    for (let x = -wallLen/2 + 0.5; x <= wallLen/2 - 0.5; x += 0.9) {
+      group.add(createBox(0.45, 0.8, 0.3, MATS.stone, x, wallH + 0.4, -half + 0.2));
+    }
+
+    // 4. PINTU GERBANG UTAMA KASTIL (PINTU GANDA BUKA KANAN & KIRI)
+    const gateW = tier === 1 ? 3.6 : (tier === 2 ? 4.6 : 5.8);
+    const gateH = tier === 1 ? 4.5 : (tier === 2 ? 5.5 : 6.8);
+    const gatehouseH = wallH + (tier === 1 ? 1.5 : (tier === 2 ? 2.5 : 3.5));
+
+    const gateGroup = new THREE.Group();
+    gateGroup.position.set(0, 0, wallOffset);
+
+    const sideWallW = (wallLen - gateW) / 2;
+    if (sideWallW > 0) {
+      gateGroup.add(createBox(sideWallW, gatehouseH, wallThick, stoneMat, -(gateW/2 + sideWallW/2), gatehouseH / 2, 0));
+      gateGroup.add(createBox(sideWallW, gatehouseH, wallThick, stoneMat,  (gateW/2 + sideWallW/2), gatehouseH / 2, 0));
+    }
+
+    // Lintel lengkung di atas gerbang
+    const archH = gatehouseH - gateH;
+    gateGroup.add(createBox(gateW + 0.6, archH, wallThick + 0.3, MATS.stone, 0, gateH + archH / 2, 0));
+    gateGroup.add(createBox(1.2, 1.2, wallThick + 0.5, tier === 3 ? MATS.gold : MATS.stone, 0, gateH + archH / 2, 0.15));
+
+    // DAUN PINTU GANDA KASTIL (Hanya 1 set pintu agung, berengsel kiri & kanan, BUKA KANAN & KIRI)
+    const doorLeafL = new THREE.Group();
+    doorLeafL.name = "CastleDoorLeafL";
+    doorLeafL.position.set(-gateW / 2, 0, 0);
+
+    const doorLeafR = new THREE.Group();
+    doorLeafR.name = "CastleDoorLeafR";
+    doorLeafR.position.set(gateW / 2, 0, 0);
+
+    const halfGateW = gateW / 2;
+    const leafActualW = halfGateW - 0.04;
+    const leafThick = 0.24;
+
+    if (tier === 1) {
+      // Tier 1: Pintu Papan Kayu Solid (B.PLANK) + 3 Palang Besi Tempa
+      doorLeafL.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.plank, leafActualW / 2, (gateH - 0.06) / 2, 0));
+      for (const py of [0.22, 0.50, 0.78]) {
+        doorLeafL.add(createBox(leafActualW + 0.02, 0.24, leafThick + 0.06, MATS.iron, leafActualW / 2, gateH * py, 0));
+      }
+      // Gagang Pintu Cincin Besi
+      doorLeafL.add(createBox(0.20, 0.36, 0.32, MATS.iron, leafActualW - 0.35, gateH * 0.48, 0));
+
+      doorLeafR.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.plank, -leafActualW / 2, (gateH - 0.06) / 2, 0));
+      for (const py of [0.22, 0.50, 0.78]) {
+        doorLeafR.add(createBox(leafActualW + 0.02, 0.24, leafThick + 0.06, MATS.iron, -leafActualW / 2, gateH * py, 0));
+      }
+      doorLeafR.add(createBox(0.20, 0.36, 0.32, MATS.iron, -(leafActualW - 0.35), gateH * 0.48, 0));
+    } else if (tier === 2) {
+      // Tier 2: Pintu Kayu Gelap Diperkuat Plat Besi Silang & Stud Paku
+      doorLeafL.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.woodLog, leafActualW / 2, (gateH - 0.06) / 2, 0));
+      doorLeafL.add(createBox(leafActualW + 0.02, 0.28, leafThick + 0.06, MATS.iron, leafActualW / 2, gateH * 0.20, 0));
+      doorLeafL.add(createBox(leafActualW + 0.02, 0.28, leafThick + 0.06, MATS.iron, leafActualW / 2, gateH * 0.80, 0));
+      doorLeafL.add(createBox(0.22, gateH - 0.4, leafThick + 0.06, MATS.iron, leafActualW / 2, gateH / 2, 0));
+      doorLeafL.add(createBox(0.24, 0.42, 0.34, MATS.gold, leafActualW - 0.38, gateH * 0.48, 0)); // Lion knocker emas
+
+      doorLeafR.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.woodLog, -leafActualW / 2, (gateH - 0.06) / 2, 0));
+      doorLeafR.add(createBox(leafActualW + 0.02, 0.28, leafThick + 0.06, MATS.iron, -leafActualW / 2, gateH * 0.20, 0));
+      doorLeafR.add(createBox(leafActualW + 0.02, 0.28, leafThick + 0.06, MATS.iron, -leafActualW / 2, gateH * 0.80, 0));
+      doorLeafR.add(createBox(0.22, gateH - 0.4, leafThick + 0.06, MATS.iron, -leafActualW / 2, gateH / 2, 0));
+      doorLeafR.add(createBox(0.24, 0.42, 0.34, MATS.gold, -(leafActualW - 0.38), gateH * 0.48, 0));
+    } else {
+      // Tier 3: Pintu Agung Kekaisaran Besi Gelap Berbingkai Emas Murni
+      doorLeafL.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.stoneDark, leafActualW / 2, (gateH - 0.06) / 2, 0));
+      // Bingkai Emas Pinggir Pintu
+      doorLeafL.add(createBox(leafActualW + 0.02, 0.32, leafThick + 0.08, MATS.gold, leafActualW / 2, gateH * 0.15, 0));
+      doorLeafL.add(createBox(leafActualW + 0.02, 0.32, leafThick + 0.08, MATS.gold, leafActualW / 2, gateH * 0.85, 0));
+      doorLeafL.add(createBox(0.28, gateH - 0.2, leafThick + 0.08, MATS.gold, 0.14, gateH / 2, 0));
+      doorLeafL.add(createBox(0.28, gateH - 0.2, leafThick + 0.08, MATS.gold, leafActualW - 0.14, gateH / 2, 0));
+      // Medali & Singa Emas
+      doorLeafL.add(createBox(0.65, 0.65, 0.34, MATS.gold, leafActualW / 2, gateH * 0.50, 0));
+      doorLeafL.add(createBox(0.26, 0.46, 0.40, MATS.gold, leafActualW - 0.45, gateH * 0.48, 0));
+
+      doorLeafR.add(createBox(leafActualW, gateH - 0.06, leafThick, MATS.stoneDark, -leafActualW / 2, (gateH - 0.06) / 2, 0));
+      doorLeafR.add(createBox(leafActualW + 0.02, 0.32, leafThick + 0.08, MATS.gold, -leafActualW / 2, gateH * 0.15, 0));
+      doorLeafR.add(createBox(leafActualW + 0.02, 0.32, leafThick + 0.08, MATS.gold, -leafActualW / 2, gateH * 0.85, 0));
+      doorLeafR.add(createBox(0.28, gateH - 0.2, leafThick + 0.08, MATS.gold, -0.14, gateH / 2, 0));
+      doorLeafR.add(createBox(0.28, gateH - 0.2, leafThick + 0.08, MATS.gold, -(leafActualW - 0.14), gateH / 2, 0));
+      doorLeafR.add(createBox(0.65, 0.65, 0.34, MATS.gold, -leafActualW / 2, gateH * 0.50, 0));
+      doorLeafR.add(createBox(0.26, 0.46, 0.40, MATS.gold, -(leafActualW - 0.45), gateH * 0.48, 0));
+    }
+
+    gateGroup.add(doorLeafL);
+    gateGroup.add(doorLeafR);
+
+    // Patung Penjaga Tier 3
+    if (tier === 3) {
+      gateGroup.add(createBox(0.9, 2.8, 0.9, MATS.stone, -(gateW/2 + 1.1), 1.4, 1.0));
+      gateGroup.add(createBox(0.9, 2.8, 0.9, MATS.stone,  (gateW/2 + 1.1), 1.4, 1.0));
+      gateGroup.add(createBox(1.0, 0.5, 1.0, MATS.gold, -(gateW/2 + 1.1), 2.9, 1.0));
+      gateGroup.add(createBox(1.0, 0.5, 1.0, MATS.gold,  (gateW/2 + 1.1), 2.9, 1.0));
+    }
+
+    // Obor luar gerbang
+    const torchOffset = gateW / 2 + 0.7;
+    [-torchOffset, torchOffset].forEach(ox => {
+      gateGroup.add(createBox(0.35, 0.6, 0.35, MATS.iron, ox, gateH * 0.7, wallThick/2 + 0.25));
+      gateGroup.add(createBox(0.3, 0.45, 0.3, MATS.fire, ox, gateH * 0.7 + 0.45, wallThick/2 + 0.25));
+      gateGroup.add(createBox(0.16, 0.25, 0.16, MATS.fireCore, ox, gateH * 0.7 + 0.45, wallThick/2 + 0.25));
+    });
+
+    group.add(gateGroup);
+
+    // Daftarkan bagian pintu kastil ke registry animasi (hanya pintu ganda buka kanan-kiri)
+    group.userData.gateParts = {
+      type: 'castle',
+      leafL: doorLeafL,
+      leafR: doorLeafR
+    };
+    animatedDoors.add(group.userData.gateParts);
+
+    // 5. INTERIOR AULA UTAMA & RUANG TAHTA AKBAR (BERONGGA & WALKABLE!)
+    const interiorGroup = new THREE.Group();
+    interiorGroup.name = "CastleInterior";
+
+    // A. Karpet Merah Seremonial Panjang
+    const carpetLen = size - 3.8;
+    const carpetW = tier === 1 ? 2.0 : (tier === 2 ? 2.6 : 3.2);
+    interiorGroup.add(createBox(carpetW, 0.05, carpetLen, MATS.carpetRed, 0, 0.52, (wallOffset - carpetLen/2) - 0.3));
+    interiorGroup.add(createBox(0.10, 0.06, carpetLen, MATS.gold, -(carpetW/2 + 0.05), 0.52, (wallOffset - carpetLen/2) - 0.3));
+    interiorGroup.add(createBox(0.10, 0.06, carpetLen, MATS.gold,  (carpetW/2 + 0.05), 0.52, (wallOffset - carpetLen/2) - 0.3));
+
+    // B. Panggung Undakan Batu & Singgasana Tahta Raja
+    const daisZ = -wallOffset + 2.0;
+    const daisW = tier === 1 ? 3.6 : (tier === 2 ? 4.8 : 6.0);
+    interiorGroup.add(createBox(daisW, 0.25, 2.6, MATS.stone, 0, 0.62, daisZ));
+    interiorGroup.add(createBox(daisW - 0.8, 0.25, 2.0, MATS.stone, 0, 0.87, daisZ - 0.2));
+
+    // Kursi Singgasana Tahta
+    const throneGroup = new THREE.Group();
+    throneGroup.position.set(0, 1.0, daisZ - 0.3);
+    throneGroup.add(createBox(1.2, 0.5, 0.9, MATS.throneCloth, 0, 0.25, 0));
+    throneGroup.add(createBox(1.2, 1.4, 0.25, MATS.throneCloth, 0, 1.0, -0.35));
+    throneGroup.add(createBox(1.3, 0.3, 0.3, MATS.gold, 0, 1.75, -0.35));
+    throneGroup.add(createBox(0.25, 0.45, 0.25, MATS.gold, 0, 2.05, -0.35));
+    throneGroup.add(createBox(0.22, 0.45, 0.9, MATS.gold, -0.6, 0.6, 0));
+    throneGroup.add(createBox(0.22, 0.45, 0.9, MATS.gold,  0.6, 0.6, 0));
+    interiorGroup.add(throneGroup);
+
+    // C. Pilar Kolonade Penopang Aula Interior & Obor Dinding
+    const colZDist = half * 0.55;
+    const colXDist = (half - wallThick) * 0.55;
+
+    for (let z = -colZDist; z <= colZDist; z += 2.8) {
+      for (const sx of [-1, 1]) {
+        const colH = wallH - 0.4;
+        interiorGroup.add(createBox(0.6, colH, 0.6, MATS.stone, sx * colXDist, colH / 2 + 0.45, z));
+        interiorGroup.add(createBox(0.85, 0.35, 0.85, MATS.stoneDark, sx * colXDist, colH + 0.45, z));
+
+        interiorGroup.add(createBox(0.22, 0.35, 0.22, MATS.iron, sx * (colXDist - 0.35), 2.8, z));
+        interiorGroup.add(createBox(0.2, 0.3, 0.2, MATS.fire, sx * (colXDist - 0.35), 3.2, z));
+        interiorGroup.add(createBox(0.12, 0.16, 0.12, MATS.fireCore, sx * (colXDist - 0.35), 3.2, z));
+      }
+    }
+
+    // D. Meja Jamuan Panjang Kayu & Bangku
+    [-1, 1].forEach(side => {
+      const tableGroup = new THREE.Group();
+      tableGroup.position.set(side * (colXDist + 1.4), 0.45, 0.2);
+      tableGroup.add(createBox(1.1, 0.14, 3.6, MATS.plank, 0, 0.75, 0));
+      for (let tz = -1.4; tz <= 1.4; tz += 2.8) {
+        tableGroup.add(createBox(0.18, 0.7, 0.18, MATS.woodLog, -0.4, 0.35, tz));
+        tableGroup.add(createBox(0.18, 0.7, 0.18, MATS.woodLog,  0.4, 0.35, tz));
+      }
+      tableGroup.add(createBox(0.4, 0.1, 3.6, MATS.plank, side * 0.8, 0.45, 0));
+      interiorGroup.add(tableGroup);
+    });
+
+    // E. Spanduk Kerajaan Agung di Belakang Tahta
+    interiorGroup.add(createBox(1.1, 4.2, 0.08, tier === 3 ? MATS.bannerRed : MATS.bannerBlue, -1.6, 4.2, -wallOffset + 0.6));
+    interiorGroup.add(createBox(1.1, 4.2, 0.08, tier === 3 ? MATS.bannerRed : MATS.bannerBlue,  1.6, 4.2, -wallOffset + 0.6));
+
+    group.add(interiorGroup);
+
+    // 6. STRUKTUR ATAP KASTIL — 100% TERTUTUP RAPAT (ZERO HOLES / GAPS!)
+    // A. Plafon Interior Solid (Ceiling Slab + Beams) menutupi seluruh ruangan dalam
+    const innerSpan = size - wallThick * 2;
+    roofGroup.add(createBox(innerSpan + 0.2, 0.4, innerSpan + 0.2, MATS.plank, 0, wallH - 0.15, 0));
+    // Balok kayu penyangga melintang
+    for (let bx = -half + wallThick + 1.2; bx <= half - wallThick - 1.2; bx += 2.4) {
+      roofGroup.add(createBox(0.4, 0.45, innerSpan, MATS.woodLog, bx, wallH - 0.18, 0));
+    }
+    for (let bz = -half + wallThick + 1.2; bz <= half - wallThick - 1.2; bz += 2.4) {
+      roofGroup.add(createBox(innerSpan, 0.45, 0.4, MATS.woodLog, 0, wallH - 0.18, bz));
+    }
+
+    // B. Stepped Pyramid / Hip Roof Penutup Penuh (Dari Dinding Luar Menuju Puncak)
+    const roofBaseY = wallH + 0.3;
+    const outerSpan = size - wallThick * 2 + 0.6; // Spans 100% of inner perimeter!
+
+    if (tier === 1) {
+      // T1 (14x14): Atap bertangga 4 lapis yang menutup penuh
+      roofGroup.add(createBox(outerSpan, 0.55, outerSpan, MATS.roof, 0, roofBaseY, 0));
+      roofGroup.add(createBox(outerSpan - 1.6, 0.55, outerSpan - 1.6, MATS.roof, 0, roofBaseY + 0.55, 0));
+      roofGroup.add(createBox(outerSpan - 3.2, 0.55, outerSpan - 3.2, MATS.roof, 0, roofBaseY + 1.10, 0));
+      roofGroup.add(createBox(outerSpan - 4.8, 0.55, outerSpan - 4.8, MATS.roof, 0, roofBaseY + 1.65, 0));
+
+      // Menara Observasi Pusat
+      const keepW = 5.8;
+      roofGroup.add(createBox(keepW, 3.2, keepW, MATS.stone, 0, roofBaseY + 3.2, 0));
+      roofGroup.add(createBox(keepW + 0.8, 0.6, keepW + 0.8, MATS.stoneDark, 0, roofBaseY + 5.0, 0));
+      // Puncak atap piramida menara pusat
+      roofGroup.add(createBox(keepW + 0.4, 0.5, keepW + 0.4, MATS.roof, 0, roofBaseY + 5.5, 0));
+      roofGroup.add(createBox(keepW - 1.4, 0.5, keepW - 1.4, MATS.roof, 0, roofBaseY + 6.0, 0));
+      roofGroup.add(createBox(keepW - 3.0, 0.5, keepW - 3.0, MATS.roof, 0, roofBaseY + 6.5, 0));
+      roofGroup.add(createBox(1.6, 0.6, 1.6, MATS.roof, 0, roofBaseY + 7.0, 0));
+      roofGroup.add(createBox(0.25, 1.4, 0.25, MATS.gold, 0, roofBaseY + 8.0, 0));
+    } else if (tier === 2) {
+      // T2 (17x17): Atap bertangga 5 lapis yang menutup penuh
+      roofGroup.add(createBox(outerSpan, 0.55, outerSpan, MATS.roof, 0, roofBaseY, 0));
+      roofGroup.add(createBox(outerSpan - 1.8, 0.55, outerSpan - 1.8, MATS.roof, 0, roofBaseY + 0.55, 0));
+      roofGroup.add(createBox(outerSpan - 3.6, 0.55, outerSpan - 3.6, MATS.roof, 0, roofBaseY + 1.10, 0));
+      roofGroup.add(createBox(outerSpan - 5.4, 0.55, outerSpan - 5.4, MATS.roof, 0, roofBaseY + 1.65, 0));
+      roofGroup.add(createBox(outerSpan - 7.2, 0.55, outerSpan - 7.2, MATS.roof, 0, roofBaseY + 2.20, 0));
+
+      // Menara Kerajaan Pusat
+      const keepW = 7.0;
+      roofGroup.add(createBox(keepW, 4.5, keepW, MATS.stone, 0, roofBaseY + 4.4, 0));
+      roofGroup.add(createBox(keepW + 0.8, 0.65, keepW + 0.8, MATS.stoneDark, 0, roofBaseY + 6.9, 0));
+      const centerRoof = new THREE.Mesh(new THREE.ConeGeometry(keepW * 0.65, 5.5, 4), MATS.roof);
+      centerRoof.position.set(0, roofBaseY + 9.8, 0);
+      centerRoof.rotation.y = Math.PI / 4;
+      centerRoof.castShadow = true;
+      roofGroup.add(centerRoof);
+      roofGroup.add(createBox(0.25, 1.6, 0.25, MATS.gold, 0, roofBaseY + 13.0, 0));
+    } else {
+      // T3 (20x20): Atap bertangga 6 lapis yang menutup penuh
+      roofGroup.add(createBox(outerSpan, 0.6, outerSpan, MATS.roof, 0, roofBaseY, 0));
+      roofGroup.add(createBox(outerSpan - 1.8, 0.6, outerSpan - 1.8, MATS.roof, 0, roofBaseY + 0.60, 0));
+      roofGroup.add(createBox(outerSpan - 3.6, 0.6, outerSpan - 3.6, MATS.roof, 0, roofBaseY + 1.20, 0));
+      roofGroup.add(createBox(outerSpan - 5.4, 0.6, outerSpan - 5.4, MATS.roof, 0, roofBaseY + 1.80, 0));
+      roofGroup.add(createBox(outerSpan - 7.2, 0.6, outerSpan - 7.2, MATS.roof, 0, roofBaseY + 2.40, 0));
+      roofGroup.add(createBox(outerSpan - 9.0, 0.6, outerSpan - 9.0, MATS.roof, 0, roofBaseY + 3.00, 0));
+
+      // Katedral Imperial Pusat
+      const keepW = 8.6;
+      roofGroup.add(createBox(keepW, 6.5, keepW, MATS.stoneDark, 0, roofBaseY + 6.2, 0));
+      roofGroup.add(createBox(keepW + 1.0, 0.7, keepW + 1.0, MATS.gold, 0, roofBaseY + 9.8, 0));
+
+      // Spire Raksasa Katedral
+      const grandCone = new THREE.Mesh(new THREE.ConeGeometry(keepW * 0.6, 7.8, 8), MATS.roof);
+      grandCone.position.set(0, roofBaseY + 14.0, 0);
+      grandCone.castShadow = true;
+      roofGroup.add(grandCone);
+
+      roofGroup.add(createBox(0.3, 2.2, 0.3, MATS.gold, 0, roofBaseY + 18.5, 0));
+      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.85), MATS.crystal);
+      crystal.position.set(0, roofBaseY + 20.0, 0);
+      crystal.name = "ArcaneCrystal";
+      roofGroup.add(crystal);
+    }
+
+    roofGroup.visible = !openRoof;
+
+    return group;
+  }
+};
+
+/* =========================================================================
+   BUILDER PAGAR & GERBANG ORGANIK (FENCE GATE DENGAN ANIMASI SMOOTH)
+   =========================================================================
+   - Tier 1: Tinggi 1.2, Pilar 1.5, Tebal 0.35 (Kayu & Batu)
+   - Tier 2: Tinggi 1.5, Pilar 1.9, Tebal 0.45 (Batu Berkrenelasi)
+   - Tier 3: Tinggi 3.8 (2x lipat!), Pilar 4.8 (2x lipat!), Tebal 1.10 (2x lipat!)
+   - buildFenceGate(tier): Gerbang pagar berengsel ganda yang berayun membuka/menutup halus!
+*/
+const CastleFenceBuilder = {
+  shouldHavePillar(connections) {
+    const { n, s, w, e } = connections;
+    const count = (n?1:0) + (s?1:0) + (w?1:0) + (e?1:0);
+    const isStraight = (count === 2) && ((n && s) || (w && e));
+    if (isStraight) return false;
+    return true;
+  },
+
+  buildFence(tier = 1, connections = { n: false, s: false, w: false, e: false }, touchesCastle = false) {
+    const group = new THREE.Group();
+    group.name = `Fence_Tier_${tier}`;
+    group.userData = { type: 'fence', tier, connections, touchesCastle };
+
+    const { n, s, w, e } = connections;
+    const hasPillar = this.shouldHavePillar(connections);
+
+    let pillarH, wallH, wallThick, postW;
+    if (tier === 1) {
+      pillarH = 1.5; wallH = 1.2; wallThick = 0.35; postW = 0.45;
+    } else if (tier === 2) {
+      pillarH = 1.9; wallH = 1.5; wallThick = 0.45; postW = 0.55;
+    } else {
+      // TIER 3: TEPAT 2X LIPAT LEBIH BESAR!
+      pillarH = 4.80;
+      wallH   = 3.80;
+      wallThick = 1.10;
+      postW   = 1.30;
+    }
+
+    if (hasPillar) {
+      const pMat = tier === 3 ? MATS.stoneDark : MATS.stone;
+      group.add(createBox(postW, pillarH, postW, pMat, 0, pillarH / 2, 0));
+
+      if (tier === 1) {
+        group.add(createBox(postW + 0.08, 0.15, postW + 0.08, MATS.woodLog, 0, pillarH + 0.07, 0));
+      } else if (tier === 2) {
+        group.add(createBox(postW + 0.1, 0.2, postW + 0.1, MATS.stone, 0, pillarH + 0.1, 0));
+        group.add(createBox(0.2, 0.25, 0.2, MATS.fireCore, 0, pillarH + 0.32, 0));
+        group.add(createBox(0.26, 0.08, 0.26, MATS.iron, 0, pillarH + 0.48, 0));
+      } else {
+        group.add(createBox(postW + 0.24, 0.40, postW + 0.24, MATS.gold, 0, pillarH + 0.20, 0));
+        group.add(createBox(0.65, 0.45, 0.65, MATS.fire, 0, pillarH + 0.55, 0));
+        group.add(createBox(0.35, 0.30, 0.35, MATS.fireCore, 0, pillarH + 0.65, 0));
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            group.add(createBox(0.12, 0.3, 0.12, MATS.iron, sx * 0.4, pillarH + 0.15, sz * 0.4));
+          }
+        }
+      }
+    }
+
+    const count = (n?1:0) + (s?1:0) + (w?1:0) + (e?1:0);
+    const isStraight = (count === 2) && ((n && s) || (w && e));
+
+    if (isStraight) {
+      if (n && s) {
+        const mat = tier === 1 ? MATS.plank : (tier === 3 ? MATS.stoneDark : MATS.stone);
+        group.add(createBox(wallThick, wallH, 1.0, mat, 0, wallH / 2, 0));
+        if (tier === 1) {
+          group.add(createBox(0.12, 0.12, 1.0, MATS.woodLog, 0, wallH * 0.35, 0));
+          group.add(createBox(0.12, 0.12, 1.0, MATS.woodLog, 0, wallH * 0.8, 0));
+        } else if (tier === 2) {
+          group.add(createBox(wallThick + 0.08, 0.12, 1.0, MATS.stone, 0, wallH + 0.06, 0));
+        } else {
+          group.add(createBox(wallThick + 0.18, 0.30, 1.0, MATS.gold, 0, wallH + 0.15, 0));
+          group.add(createBox(wallThick - 0.2, 0.15, 1.0, MATS.plank, 0, wallH + 0.08, 0));
+          for (let z = -0.35; z <= 0.35; z += 0.35) {
+            group.add(createBox(0.22, 0.90, 0.22, MATS.iron, 0, wallH + 0.70, z));
+            group.add(createBox(0.12, 0.35, 0.12, MATS.gold, 0, wallH + 1.20, z));
+          }
+        }
+      } else if (w && e) {
+        const mat = tier === 1 ? MATS.plank : (tier === 3 ? MATS.stoneDark : MATS.stone);
+        group.add(createBox(1.0, wallH, wallThick, mat, 0, wallH / 2, 0));
+        if (tier === 1) {
+          group.add(createBox(1.0, 0.12, 0.12, MATS.woodLog, 0, wallH * 0.35, 0));
+          group.add(createBox(1.0, 0.12, 0.12, MATS.woodLog, 0, wallH * 0.8, 0));
+        } else if (tier === 2) {
+          group.add(createBox(1.0, 0.12, wallThick + 0.08, MATS.stone, 0, wallH + 0.06, 0));
+        } else {
+          group.add(createBox(1.0, 0.30, wallThick + 0.18, MATS.gold, 0, wallH + 0.15, 0));
+          group.add(createBox(1.0, 0.15, wallThick - 0.2, MATS.plank, 0, wallH + 0.08, 0));
+          for (let x = -0.35; x <= 0.35; x += 0.35) {
+            group.add(createBox(0.22, 0.90, 0.22, MATS.iron, x, wallH + 0.70, 0));
+            group.add(createBox(0.12, 0.35, 0.12, MATS.gold, x, wallH + 1.20, 0));
+          }
+        }
+      }
+    } else {
+      const addArm = (dir) => {
+        let ax = 0, az = 0, aw = wallThick, ad = wallThick;
+        if (dir === 'n') { az = -0.25; ad = 0.5; }
+        else if (dir === 's') { az = 0.25; ad = 0.5; }
+        else if (dir === 'w') { ax = -0.25; aw = 0.5; }
+        else if (dir === 'e') { ax = 0.25; aw = 0.5; }
+
+        const mat = tier === 1 ? MATS.plank : (tier === 3 ? MATS.stoneDark : MATS.stone);
+        group.add(createBox(aw, wallH, ad, mat, ax, wallH / 2, az));
+
+        if (tier === 1) {
+          if (dir === 'n' || dir === 's') {
+            group.add(createBox(0.12, 0.12, 0.5, MATS.woodLog, 0, wallH * 0.35, az));
+            group.add(createBox(0.12, 0.12, 0.5, MATS.woodLog, 0, wallH * 0.8, az));
+          } else {
+            group.add(createBox(0.5, 0.12, 0.12, MATS.woodLog, ax, wallH * 0.35, 0));
+            group.add(createBox(0.5, 0.12, 0.12, MATS.woodLog, ax, wallH * 0.8, 0));
+          }
+        } else if (tier === 2) {
+          const capW = (dir === 'n' || dir === 's') ? (wallThick + 0.08) : 0.5;
+          const capD = (dir === 'n' || dir === 's') ? 0.5 : (wallThick + 0.08);
+          group.add(createBox(capW, 0.12, capD, MATS.stone, ax, wallH + 0.06, az));
+        } else {
+          const trimW = (dir === 'n' || dir === 's') ? (wallThick + 0.18) : 0.5;
+          const trimD = (dir === 'n' || dir === 's') ? 0.5 : (wallThick + 0.18);
+          group.add(createBox(trimW, 0.28, trimD, MATS.gold, ax, wallH + 0.14, az));
+          group.add(createBox(0.22, 0.90, 0.22, MATS.iron, ax, wallH + 0.70, az));
+        }
+      };
+
+      if (n) addArm('n');
+      if (s) addArm('s');
+      if (w) addArm('w');
+      if (e) addArm('e');
+    }
+
+    if (touchesCastle) {
+      const anchorSize = tier === 3 ? 1.4 : 0.65;
+      group.add(createBox(anchorSize, anchorSize * 0.8, anchorSize, MATS.iron, 0, wallH * 0.5, 0));
+    }
+
+    return group;
+  },
+
+  // BUILD GERBANG PAGAR LEBAR (FENCE GATE — BUKA TERANGKAT KE ATAS SMOOTH)
+  // Tier 1 & 2: Membentang 2 blok penuh (bukaan 1.4m)
+  // Tier 3: Membentang 6 BLOK PENUH (bukaan 4.2m, menara 8.6m, tebal 1.1m)
+  buildFenceGate(tier = 1, axis = 'x') {
+    const group = new THREE.Group();
+    group.name = `FenceGate_Tier_${tier}`;
+    group.userData = { type: 'fenceGate', tier, axis };
+
+    const pMat = tier === 3 ? MATS.stoneDark : MATS.stone;
+    let frameH, wallH, wallThick, postW, postOffset, gateW, liftH, spanHalf;
+
+    if (tier === 1) {
+      spanHalf = 1.0; frameH = 3.6; wallH = 1.20; wallThick = 0.35; postW = 0.36;
+      postOffset = 0.82; gateW = 1.40; liftH = 2.20;
+    } else if (tier === 2) {
+      spanHalf = 1.0; frameH = 4.2; wallH = 1.50; wallThick = 0.45; postW = 0.42;
+      postOffset = 0.80; gateW = 1.40; liftH = 2.50;
+    } else {
+      // TIER 3 (LEBAR 6 BLOK PENUH!)
+      spanHalf = 3.0; frameH = 8.6; wallH = 3.80; wallThick = 1.10; postW = 0.85;
+      postOffset = 2.45; gateW = 4.15; liftH = 4.80;
+    }
+
+    // 1. DUA TIANG PENUNTUN GERBANG KIRI & KANAN (GUIDE TOWERS)
+    group.add(createBox(postW, frameH, tier === 3 ? 1.25 : postW, pMat, -postOffset, frameH / 2, 0));
+    group.add(createBox(postW, frameH, tier === 3 ? 1.25 : postW, pMat,  postOffset, frameH / 2, 0));
+
+    // 2. SAMBUNGAN DINDING BIASA KE PAGAR (SEAMLESS WALL EXTENSION - BUKAN PILAR TEPIAN!)
+    // Dinding membentang dari luar tiang (±postOffset) hingga ke batas blok (±spanHalf)
+    const connLen = spanHalf - (postOffset - postW / 2);
+    if (connLen > 0.01) {
+      const connMat = tier === 1 ? MATS.plank : (tier === 3 ? MATS.stoneDark : MATS.stone);
+      const connCenterX = (spanHalf + (postOffset - postW / 2)) / 2;
+
+      // Sayap penyambung kiri & kanan
+      group.add(createBox(connLen, wallH, wallThick, connMat, -connCenterX, wallH / 2, 0));
+      group.add(createBox(connLen, wallH, wallThick, connMat,  connCenterX, wallH / 2, 0));
+
+      if (tier === 1) {
+        group.add(createBox(connLen, 0.12, 0.12, MATS.woodLog, -connCenterX, wallH * 0.35, 0));
+        group.add(createBox(connLen, 0.12, 0.12, MATS.woodLog, -connCenterX, wallH * 0.80, 0));
+        group.add(createBox(connLen, 0.12, 0.12, MATS.woodLog,  connCenterX, wallH * 0.35, 0));
+        group.add(createBox(connLen, 0.12, 0.12, MATS.woodLog,  connCenterX, wallH * 0.80, 0));
+      } else if (tier === 2) {
+        group.add(createBox(connLen, 0.12, wallThick + 0.08, MATS.stone, -connCenterX, wallH + 0.06, 0));
+        group.add(createBox(connLen, 0.12, wallThick + 0.08, MATS.stone,  connCenterX, wallH + 0.06, 0));
+      } else {
+        group.add(createBox(connLen, 0.25, wallThick + 0.18, MATS.gold, -connCenterX, wallH + 0.12, 0));
+        group.add(createBox(connLen, 0.25, wallThick + 0.18, MATS.gold,  connCenterX, wallH + 0.12, 0));
+      }
+    }
+
+    // 3. BALOK LINTEL / ARCHWAY ATAS PENYANGGA KATROL
+    const archThick = tier === 3 ? 1.30 : (wallThick + 0.10);
+    const archH = tier === 3 ? 0.90 : 0.35;
+    const archW = postOffset * 2 + postW + 0.1;
+    group.add(createBox(archW, archH, archThick, tier === 3 ? MATS.stoneDark : MATS.woodLog, 0, frameH - archH / 2, 0));
+
+    if (tier === 1) {
+      group.add(createBox(postW + 0.08, 0.18, postW + 0.08, MATS.woodLog, -postOffset, frameH + 0.09, 0));
+      group.add(createBox(postW + 0.08, 0.18, postW + 0.08, MATS.woodLog,  postOffset, frameH + 0.09, 0));
+      group.add(createBox(0.24, 0.24, 0.24, MATS.iron, 0, frameH - archH - 0.12, 0));
+    } else if (tier === 2) {
+      [-postOffset, postOffset].forEach(ox => {
+        group.add(createBox(postW + 0.10, 0.22, postW + 0.10, MATS.stone, ox, frameH + 0.11, 0));
+        group.add(createBox(0.22, 0.28, 0.22, MATS.fireCore, ox, frameH + 0.36, 0));
+        group.add(createBox(0.28, 0.08, 0.28, MATS.iron, ox, frameH + 0.54, 0));
+      });
+      group.add(createBox(0.32, 0.28, 0.30, MATS.iron, 0, frameH - archH - 0.14, 0));
+    } else {
+      // Tier 3: Mahkota Emas & Mangkuk Api Raksasa di Puncak Menara Gerbang 8.6m
+      group.add(createBox(archW + 0.20, 0.32, archThick + 0.15, MATS.gold, 0, frameH + 0.16, 0));
+      [-postOffset, postOffset].forEach(ox => {
+        group.add(createBox(postW + 0.30, 0.45, postW + 0.30, MATS.gold, ox, frameH + 0.22, 0));
+        group.add(createBox(0.85, 0.55, 0.85, MATS.fire, ox, frameH + 0.70, 0));
+        group.add(createBox(0.48, 0.38, 0.48, MATS.fireCore, ox, frameH + 0.82, 0));
+      });
+      // Roda katrol rantai ganda
+      group.add(createBox(0.90, 0.60, 0.60, MATS.iron, 0, frameH - archH - 0.30, 0));
+    }
+
+    // 4. KISI GERBANG LEBAR YANG TERANGKAT KE ATAS (WIDE LIFTING GATE PANEL)
+    const gatePanel = new THREE.Group();
+    gatePanel.name = "LiftingGatePanel";
+
+    if (tier === 1) {
+      gatePanel.add(createBox(gateW, wallH, 0.14, MATS.plank, 0, wallH / 2, 0));
+      gatePanel.add(createBox(gateW + 0.04, 0.15, 0.18, MATS.woodLog, 0, wallH * 0.25, 0));
+      gatePanel.add(createBox(gateW + 0.04, 0.15, 0.18, MATS.woodLog, 0, wallH * 0.80, 0));
+      for (let px = -gateW / 2 + 0.14; px <= gateW / 2 - 0.10; px += 0.24) {
+        gatePanel.add(createBox(0.12, 0.28, 0.16, MATS.woodLog, px, wallH + 0.12, 0));
+      }
+      gatePanel.add(createBox(0.05, 0.7, 0.05, MATS.iron, -0.35, wallH + 0.35, 0));
+      gatePanel.add(createBox(0.05, 0.7, 0.05, MATS.iron,  0.35, wallH + 0.35, 0));
+    } else if (tier === 2) {
+      gatePanel.add(createBox(gateW, wallH, 0.14, MATS.iron, 0, wallH / 2, 0));
+      for (let bx = -gateW / 2 + 0.14; bx <= gateW / 2 - 0.10; bx += 0.24) {
+        gatePanel.add(createBox(0.08, wallH + 0.40, 0.16, MATS.iron, bx, wallH / 2 + 0.10, 0));
+      }
+      for (let by = 0.35; by <= wallH - 0.2; by += 0.45) {
+        gatePanel.add(createBox(gateW + 0.04, 0.10, 0.16, MATS.iron, 0, by, 0));
+      }
+      for (let bx = -gateW / 2 + 0.14; bx <= gateW / 2 - 0.10; bx += 0.24) {
+        gatePanel.add(createBox(0.08, 0.25, 0.08, MATS.iron, bx, -0.12, 0));
+      }
+      gatePanel.add(createBox(0.06, 0.8, 0.06, MATS.iron, -0.35, wallH + 0.40, 0));
+      gatePanel.add(createBox(0.06, 0.8, 0.06, MATS.iron,  0.35, wallH + 0.40, 0));
+    } else {
+      // TIER 3 (LEBAR 6 BLOK — BUKAAN 4.15m RAKSASA!)
+      gatePanel.add(createBox(gateW, wallH, 0.26, MATS.iron, 0, wallH / 2, 0));
+      gatePanel.add(createBox(gateW + 0.08, 0.36, 0.32, MATS.gold, 0, wallH * 0.25, 0));
+      gatePanel.add(createBox(gateW + 0.08, 0.36, 0.32, MATS.gold, 0, wallH * 0.55, 0));
+      gatePanel.add(createBox(gateW + 0.08, 0.36, 0.32, MATS.gold, 0, wallH * 0.85, 0));
+      for (let bx = -gateW / 2 + 0.25; bx <= gateW / 2 - 0.20; bx += 0.38) {
+        gatePanel.add(createBox(0.20, wallH + 0.90, 0.28, MATS.iron, bx, wallH / 2 + 0.25, 0));
+        gatePanel.add(createBox(0.16, 0.50, 0.16, MATS.gold, bx, wallH + 0.90, 0));
+        gatePanel.add(createBox(0.18, 0.55, 0.18, MATS.iron, bx, -0.28, 0));
+      }
+      // Rantai pengangkat ganda
+      gatePanel.add(createBox(0.12, 1.6, 0.12, MATS.iron, -1.2, wallH + 0.80, 0));
+      gatePanel.add(createBox(0.12, 1.6, 0.12, MATS.iron,  1.2, wallH + 0.80, 0));
+    }
+
+    group.add(gatePanel);
+
+    if (axis === 'z') {
+      group.rotation.y = Math.PI / 2;
+    }
+
+    group.userData.gateParts = {
+      type: 'fenceGate',
+      gatePanel: gatePanel,
+      liftH: liftH,
+      baseY: 0
+    };
+    animatedDoors.add(group.userData.gateParts);
+
+    return group;
+  }
+};
+
+/* =========================================================================
+   RUMAH KAYU GAME (7x7 — DENGAN PINTU GANDA ANIMASI SMOOTH)
+   ========================================================================= */
+const GameHouseBuilder = {
+  buildHouse(cells = [{ bx: 0, bz: 0 }], door = { x: 3, z: 6, side: 's' }) {
+    const group = new THREE.Group();
+    group.name = "Original_Game_House";
+    group.userData = { type: 'house', size: 7 };
+
+    const S = 7, H = 6;
+    const K = (x, z) => `${x},${z}`;
+    const fp = new Set();
+    cells.forEach(c => {
+      for (let dx = 0; dx < S; dx++) {
+        for (let dz = 0; dz < S; dz++) {
+          fp.add(K(c.bx + dx, c.bz + dz));
+        }
+      }
+    });
+
+    const inF = (x, z) => fp.has(K(x, z));
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    fp.forEach(k => {
+      const [x, z] = k.split(',').map(Number);
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    });
+
+    const ox = (minX + maxX + 1) / 2;
+    const oz = (minZ + maxZ + 1) / 2;
+
+    const boxAt = (x, y, z, w, h, d, mat) => {
+      const m = createBox(w, h, d, mat, x + 0.5 - ox, y + h / 2, z + 0.5 - oz);
+      group.add(m);
+      return m;
+    };
+
+    const doorBlocks = new Set();
+    if (door) {
+      const p = (door.side === 'n' || door.side === 's') ?
+        [[door.x, door.z], [door.x + 1, door.z]] :
+        [[door.x, door.z], [door.x, door.z + 1]];
+      p.forEach(([x, z]) => doorBlocks.add(K(x, z)));
+    }
+
+    fp.forEach(k => {
+      const [x, z] = k.split(',').map(Number);
+      const openN = !inF(x, z - 1), openS = !inF(x, z + 1),
+            openW = !inF(x - 1, z), openE = !inF(x + 1, z);
+      if (!(openN || openS || openW || openE)) return;
+
+      const corner = ((x === minX || x === maxX) && (z === minZ || z === maxZ));
+      const isDoor = doorBlocks.has(k);
+
+      for (let wy = 0; wy < H; wy++) {
+        let id = 'wall';
+        if (corner) id = 'beam';
+        else if (isDoor && wy < 2) id = 'air';
+        else if (wy === H - 1) id = 'beam';
+        else if (wy === 2 && ((x + z) % 2 === 0) && !isDoor) id = 'air';
+
+        if (id === 'wall') boxAt(x, wy, z, 1, 1, 1, MATS.plank);
+        else if (id === 'beam') boxAt(x, wy, z, 1, 1, 1, MATS.woodLog);
+      }
+    });
+
+    // PINTU GANDA KAYU RUMAH DENGAN ENGSEL ANIMASI
+    if (door) {
+      const doorLeafL = new THREE.Group();
+      const doorLeafR = new THREE.Group();
+
+      const p0 = door.x + 0.5 - ox;
+      const p1 = door.x + 1.5 - ox;
+      const pz = door.z + 0.5 - oz;
+
+      // Engsel kiri & kanan
+      doorLeafL.position.set(p0 - 0.48, 0, pz);
+      doorLeafR.position.set(p1 + 0.48, 0, pz);
+
+      doorLeafL.add(createBox(0.96, 1.95, 0.12, MATS.plank, 0.48, 0.98, 0));
+      doorLeafL.add(createBox(0.12, 0.35, 0.18, MATS.iron, 0.85, 0.98, 0));
+
+      doorLeafR.add(createBox(0.96, 1.95, 0.12, MATS.plank, -0.48, 0.98, 0));
+      doorLeafR.add(createBox(0.12, 0.35, 0.18, MATS.iron, -0.85, 0.98, 0));
+
+      group.add(doorLeafL);
+      group.add(doorLeafR);
+
+      group.userData.gateParts = {
+        type: 'house',
+        leafL: doorLeafL,
+        leafR: doorLeafR
+      };
+      animatedDoors.add(group.userData.gateParts);
+    }
+
+    cells.forEach(c => {
+      boxAt(c.bx + S / 2 - 0.5, 0, c.bz + S / 2 - 0.5, S, 0.15, S, MATS.plank);
+    });
+
+    const runLen = (x, z, dx, dz) => {
+      let n = 0; while (inF(x + dx * n, z + dz * n)) n++; return n;
+    };
+
+    fp.forEach(k => {
+      const [x, z] = k.split(',').map(Number);
+      const lvl = Math.min(runLen(x, z, 1, 0), runLen(x, z, -1, 0), runLen(x, z, 0, 1), runLen(x, z, 0, -1)) - 1;
+      if (lvl >= 0) boxAt(x, H, z, 1, lvl + 1, 1, MATS.roof);
+    });
+
+    for (let x = minX - 1; x <= maxX + 1; x++) {
+      for (let z = minZ - 1; z <= maxZ + 1; z++) {
+        if (inF(x, z)) continue;
+        let near = false;
+        for (let dx = -1; dx <= 1 && !near; dx++) {
+          for (let dz = -1; dz <= 1 && !near; dz++) {
+            if ((dx || dz) && inF(x + dx, z + dz)) near = true;
+          }
+        }
+        if (near) boxAt(x, H, z, 1, 1, 1, MATS.roof);
+      }
+    }
+
+    return group;
+  }
+};
+
+/* =========================================================================
+   INSPECTOR VIEW
+   ========================================================================= */
+const inspectorRoot = new THREE.Group();
+scene.add(inspectorRoot);
+
+const inspectPedestal = new THREE.Group();
+inspectPedestal.add(createBox(26, 0.5, 26, MATS.stoneDark, 0, -0.25, 0));
+inspectPedestal.add(createBox(26.6, 0.2, 26.6, MATS.gold, 0, -0.4, 0));
+inspectorRoot.add(inspectPedestal);
+
+let currentCat = 'castle';
+let currentTier = 1;
+let showCharacter = true;
+let showRuler = false;
+let isWalking = false;
+let openRoof = false;
+let charPositionMode = 'gate';
+
+let activeInspectorModel = null;
+let inspectorCharacter = null;
+
+function updateInspector() {
+  if (activeInspectorModel) {
+    activeInspectorModel.traverse(child => {
+      if (child.userData && child.userData.gateParts) {
+        animatedDoors.delete(child.userData.gateParts);
+      }
+      if (child.geometry) child.geometry.dispose();
+    });
+    if (activeInspectorModel.userData && activeInspectorModel.userData.gateParts) {
+      animatedDoors.delete(activeInspectorModel.userData.gateParts);
+    }
+    inspectorRoot.remove(activeInspectorModel);
+  }
+  if (inspectorCharacter) {
+    inspectorRoot.remove(inspectorCharacter);
+  }
+
+  if (currentCat === 'castle') {
+    activeInspectorModel = CastleBuilder.buildCastle(currentTier, currentDoorProgress, openRoof);
+    const size = CastleBuilder.getCastleSize(currentTier);
+    inspectPedestal.scale.set(size / 8.5, 1, size / 8.5);
+    inspectPedestal.visible = true;
+
+    const names = [
+      "Kastil Tingkat 1 (Stone Fortress Keep & Aula Akbar 14x14)",
+      "Kastil Tingkat 2 (Royal Citadel & Great Throne Hall 17x17)",
+      "Kastil Tingkat 3 (Imperial High Palace & Grand Cathedral 20x20)"
+    ];
+    document.getElementById('hud-name').innerHTML = `<b>${names[currentTier - 1]}</b>`;
+    document.getElementById('hud-dim').innerHTML = `Ukuran: <b>${size} × ${size} Blok</b> | Atap: <b>Rapat Tertutup 100%</b>`;
+    document.getElementById('hud-merge-status').innerHTML = `<span style="color:#f5c862">Kastil Mandiri (Tidak Gabung Kastil Lain)</span>`;
+    document.getElementById('hud-interior-info').style.display = 'block';
+  } else if (currentCat === 'fence') {
+    const fenceShowcase = new THREE.Group();
+
+    // Group 1: 2 Pagar Berdampingan (Pilar di kedua ujung)
+    const g1 = new THREE.Group();
+    g1.position.set(-7, 0, -2);
+    const p1a = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: false, e: true });
+    p1a.position.set(0, 0, 0); g1.add(p1a);
+    const p1b = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: true, e: false });
+    p1b.position.set(1.5, 0, 0); g1.add(p1b);
+    fenceShowcase.add(g1);
+
+    // Group 2: 3 Pagar Lurus (Pilar tengah hilang!)
+    const g2 = new THREE.Group();
+    g2.position.set(2, 0, -2);
+    const p2a = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: false, e: true });
+    p2a.position.set(0, 0, 0); g2.add(p2a);
+    const p2b = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: true, e: true });
+    p2b.position.set(1.5, 0, 0); g2.add(p2b);
+    const p2c = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: true, e: false });
+    p2c.position.set(3.0, 0, 0); g2.add(p2c);
+    fenceShowcase.add(g2);
+
+    // Group 3: Pagar Belok Sudut 90°
+    const g3 = new THREE.Group();
+    g3.position.set(-5, 0, 3);
+    const p3a = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: false, e: true });
+    p3a.position.set(0, 0, 0); g3.add(p3a);
+    const p3b = CastleFenceBuilder.buildFence(currentTier, { n: false, s: true, w: true, e: false });
+    p3b.position.set(1.5, 0, 0); g3.add(p3b);
+    const p3c = CastleFenceBuilder.buildFence(currentTier, { n: true, s: false, w: false, e: false });
+    p3c.position.set(1.5, 0, 1.5); g3.add(p3c);
+    fenceShowcase.add(g3);
+
+    // Group 4: GERBANG PAGAR LEBAR TERPASANG DI PAGAR (SAMBUNGAN BIASA TANPA PILAR TEPIAN)
+    const g4 = new THREE.Group();
+    const isT3 = (currentTier === 3);
+    const gateHalf = isT3 ? 3.0 : 1.0;
+    const fenceOffset = gateHalf + 0.5;
+
+    g4.position.set(0, 0, 3.5);
+
+    // Pagar kiri menyambung biasa
+    const pLeft = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: false, e: true });
+    pLeft.position.set(-fenceOffset, 0, 0);
+    g4.add(pLeft);
+
+    // Gerbang pagar lebar di tengah (T1/T2 = 2 blok, T3 = 6 blok!)
+    const fGate = CastleFenceBuilder.buildFenceGate(currentTier, 'x');
+    fGate.position.set(0, 0, 0);
+    g4.add(fGate);
+
+    // Pagar kanan menyambung biasa
+    const pRight = CastleFenceBuilder.buildFence(currentTier, { n: false, s: false, w: true, e: false });
+    pRight.position.set(fenceOffset, 0, 0);
+    g4.add(pRight);
+
+    fenceShowcase.add(g4);
+
+    activeInspectorModel = fenceShowcase;
+    inspectPedestal.scale.set(isT3 ? 1.6 : 1.2, 1, isT3 ? 1.2 : 1.0);
+    inspectPedestal.visible = true;
+
+    const fNames = [
+      "Pagar T1 (Palisade Kayu & Gerbang Lebar 2 Blok)",
+      "Pagar T2 (Tembok Batu & Gerbang Besi Lebar 2 Blok)",
+      "Pagar T3 (Tembok Imperial & Gerbang Akbar Lebar 6 Blok!)"
+    ];
+    document.getElementById('hud-name').innerHTML = `<b>${fNames[currentTier - 1]}</b>`;
+    document.getElementById('hud-dim').innerHTML = currentTier === 3 ?
+      `Tinggi: <b>3.8 Blok</b> | Gerbang: <b>Lebar 6 Blok (Bukaan 4.15m)</b> | Angkat: <b>Smooth 4.8m</b>` :
+      `Tinggi: <b>${currentTier === 1 ? '1.2' : '1.5'} Blok</b> | Gerbang: <b>Lebar 2 Blok (Bukaan 1.4m)</b>`;
+    document.getElementById('hud-merge-status').innerHTML = `<span style="color:#38bdf8">Tersambung Organik ke Pagar &amp; Dinding Kastil</span>`;
+    document.getElementById('hud-interior-info').style.display = 'none';
+  } else if (currentCat === 'house') {
+    activeInspectorModel = GameHouseBuilder.buildHouse();
+    inspectPedestal.scale.set(0.7, 1, 0.7);
+    inspectPedestal.visible = true;
+
+    document.getElementById('hud-name').innerHTML = `<b>Rumah Kayu Asli Game (Forecraft Vanilla 7x7)</b>`;
+    document.getElementById('hud-dim').innerHTML = `Ukuran: <b>7 × 7 Blok</b> | Pintu: <b>Daun Ganda Animasi Smooth</b>`;
+    document.getElementById('hud-merge-status').innerHTML = `<span style="color:#4ade80">HANYA Menyambung dengan Sesama Rumah Kayu</span>`;
+    document.getElementById('hud-interior-info').style.display = 'none';
+  } else if (currentCat === 'scale') {
+    const compGroup = new THREE.Group();
+    compGroup.add(createBox(1, 1, 1, MATS.stone, -4.5, 0.5, 0));
+    const f1 = CastleFenceBuilder.buildFence(1, { n: false, s: false, w: false, e: false });
+    f1.position.set(-2.8, 0, 0); compGroup.add(f1);
+    const f2 = CastleFenceBuilder.buildFence(2, { n: false, s: false, w: false, e: false });
+    f2.position.set(-1.2, 0, 0); compGroup.add(f2);
+    const f3 = CastleFenceBuilder.buildFence(3, { n: false, s: false, w: false, e: false });
+    f3.position.set(1.5, 0, 0); compGroup.add(f3);
+
+    activeInspectorModel = compGroup;
+    inspectPedestal.scale.set(1.0, 1, 0.7);
+    inspectPedestal.visible = true;
+
+    document.getElementById('hud-name').innerHTML = `<b>🧍 Perbandingan Skala Nyata (Karakter vs Pagar T1, T2, T3)</b>`;
+    document.getElementById('hud-dim').innerHTML = `Karakter: <b>1.92 Blok</b> | Pagar T3: <b>3.8 Blok (2× Lebih Tinggi dari Karakter!)</b>`;
+    document.getElementById('hud-merge-status').innerHTML = `<span style="color:#f472b6">Pagar T3 Kini Menjulang Tinggi 2× Lipat</span>`;
+    document.getElementById('hud-interior-info').style.display = 'none';
+  }
+
+  inspectorRoot.add(activeInspectorModel);
+
+  // Pasang Karakter Simulasi
+  if (showCharacter) {
+    inspectorCharacter = CharacterBuilder.build({ withRuler: showRuler });
+
+    if (currentCat === 'castle') {
+      const size = CastleBuilder.getCastleSize(currentTier);
+      const half = size / 2;
+      if (charPositionMode === 'gate') {
+        inspectorCharacter.position.set(0, 0.45, half + 1.2);
+        inspectorCharacter.rotation.y = Math.PI;
+      } else if (charPositionMode === 'throne') {
+        const daisZ = -(half - 1.0 / 2) + 2.8;
+        inspectorCharacter.position.set(0, 0.45, daisZ);
+        inspectorCharacter.rotation.y = Math.PI;
+      } else if (charPositionMode === 'wall') {
+        inspectorCharacter.position.set(half + 1.5, 0, 0);
+        inspectorCharacter.rotation.y = -Math.PI / 2;
+      } else {
+        inspectorCharacter.position.set(0, 0.45, half + 2.5);
+        inspectorCharacter.rotation.y = 0;
+      }
+    } else if (currentCat === 'fence') {
+      inspectorCharacter.position.set(-5.5, 0, 1.2);
+      inspectorCharacter.rotation.y = Math.PI;
+    } else if (currentCat === 'house') {
+      inspectorCharacter.position.set(0, 0, 4.2);
+      inspectorCharacter.rotation.y = Math.PI;
+    } else {
+      inspectorCharacter.position.set(3.4, 0, 0);
+      inspectorCharacter.rotation.y = Math.PI;
+    }
+
+    inspectorRoot.add(inspectorCharacter);
+  }
+}
+
+function renderTierButtons() {
+  const container = document.getElementById('tier-container');
+  container.innerHTML = '';
+
+  if (currentCat === 'castle') {
+    const labels = ["T1: 14×14", "T2: 17×17 (+3)", "T3: 20×20 (+3)"];
+    for (let t = 1; t <= 3; t++) {
+      const btn = document.createElement('button');
+      btn.className = `btn-tier ${t === currentTier ? 'active' : ''}`;
+      btn.innerHTML = `🏰 ${labels[t - 1]}`;
+      btn.onclick = () => {
+        currentTier = t;
+        playSound('click');
+        renderTierButtons();
+        updateInspector();
+      };
+      container.appendChild(btn);
+    }
+
+    const btnCutaway = document.createElement('button');
+    btnCutaway.className = `btn-tier ${openRoof ? 'active' : ''}`;
+    btnCutaway.innerHTML = `🏛️ ${openRoof ? 'Tutup Atap' : 'Buka Atap (Cutaway Interior)'}`;
+    btnCutaway.onclick = () => {
+      openRoof = !openRoof;
+      playSound('click');
+      renderTierButtons();
+      updateInspector();
+      showToast(openRoof ? "🏛️ Atap Dibuka: Menampilkan Interior Aula Tahta Akbar yang Luas!" : "🏰 Atap Ditutup: Menampilkan Atap Rapat Tertutup 100%.");
+    };
+    container.appendChild(btnCutaway);
+
+    const btnPos = document.createElement('button');
+    btnPos.className = 'btn-tier';
+    const posNames = {
+      'gate': '🚪 Di Luar Gerbang',
+      'throne': '👑 Di Aula Tahta (Dalam)',
+      'wall': '🧱 Samping Dinding',
+      'patrol': '🚶 Patroli Masuk-Keluar'
+    };
+    btnPos.innerHTML = `📍 ${posNames[charPositionMode]}`;
+    btnPos.onclick = () => {
+      if (charPositionMode === 'gate') charPositionMode = 'throne';
+      else if (charPositionMode === 'throne') charPositionMode = 'patrol';
+      else if (charPositionMode === 'patrol') charPositionMode = 'wall';
+      else charPositionMode = 'gate';
+
+      playSound('click');
+      renderTierButtons();
+      updateInspector();
+      showToast(`🧍 Karakter diposisikan: ${posNames[charPositionMode]}`);
+    };
+    container.appendChild(btnPos);
+  } else if (currentCat === 'fence') {
+    for (let t = 1; t <= 3; t++) {
+      const btn = document.createElement('button');
+      btn.className = `btn-tier ${t === currentTier ? 'active' : ''}`;
+      btn.innerHTML = t === 3 ? `🛡️ Pagar &amp; Gerbang T3 (2× Besar!)` : `🛡️ Pagar &amp; Gerbang T${t}`;
+      btn.onclick = () => {
+        currentTier = t;
+        playSound('click');
+        renderTierButtons();
+        updateInspector();
+      };
+      container.appendChild(btn);
+    }
+  } else if (currentCat === 'scale') {
+    const btnR = document.createElement('button');
+    btnR.className = `btn-tier ${showRuler ? 'active' : ''}`;
+    btnR.innerHTML = `📏 ${showRuler ? 'Sembunyikan Penggaris' : 'Tampilkan Penggaris (1.92 Blok)'}`;
+    btnR.onclick = () => {
+      showRuler = !showRuler;
+      playSound('click');
+      updateInspector();
+      renderTierButtons();
+    };
+    container.appendChild(btnR);
+  } else {
+    const info = document.createElement('div');
+    info.style.fontSize = '12px';
+    info.style.color = '#94a3b8';
+    info.style.padding = '6px';
+    info.innerHTML = "Model rumah modular 7×7 bawaan game dengan pintu ganda animasi";
+    container.appendChild(info);
+  }
+}
+
+document.querySelectorAll('.btn-cat').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.btn-cat').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat = btn.dataset.cat;
+    playSound('click');
+    renderTierButtons();
+    updateInspector();
+  };
+});
+
+/* =========================================================================
+   SANDBOX / SIMULATOR
+   ========================================================================= */
+const sandboxRoot = new THREE.Group();
+sandboxRoot.visible = false;
+scene.add(sandboxRoot);
+
+const GRID_SIZE = 64;
+const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0xf5c862, 0x222e47);
+gridHelper.position.y = 0.02;
+sandboxRoot.add(gridHelper);
+
+const groundPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE),
+  MATS.groundGrid
+);
+groundPlane.rotation.x = -Math.PI / 2;
+groundPlane.receiveShadow = true;
+sandboxRoot.add(groundPlane);
+
+const worldGrid = new Map();
+const K = (x, z) => `${x},${z}`;
+
+let nextObjectId = 1;
+const placedObjects = new Map();
+let currentTool = 'castle1';
+
+function isCastleWall(gx, gz) {
+  for (const [key, val] of worldGrid.entries()) {
+    if (val.type === 'castle') {
+      const [cx, cz] = key.split(',').map(Number);
+      if (cx === gx && cz === gz) return true;
+    }
+  }
+  return false;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('info-toast');
+  t.innerHTML = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t.timer);
+  t.timer = setTimeout(() => {
+    t.style.opacity = '0.9';
+  }, 4000);
+}
+
+function rebuildFences() {
+  const fenceCells = [];
+  worldGrid.forEach((val, key) => {
+    if (val.type === 'fence') {
+      const [x, z] = key.split(',').map(Number);
+      fenceCells.push({ x, z, tier: val.tier, id: val.id });
+    }
+  });
+
+  fenceCells.forEach(cell => {
+    const { x, z, tier, id } = cell;
+    const hasN = isFenceOrCastle(x, z - 1);
+    const hasS = isFenceOrCastle(x, z + 1);
+    const hasW = isFenceOrCastle(x - 1, z);
+    const hasE = isFenceOrCastle(x + 1, z);
+
+    const touchesCastle = isCastleWall(x, z - 1) || isCastleWall(x, z + 1) || isCastleWall(x - 1, z) || isCastleWall(x + 1, z);
+
+    const oldMesh = placedObjects.get(id);
+    if (oldMesh) {
+      if (oldMesh.userData && oldMesh.userData.gateParts) animatedDoors.delete(oldMesh.userData.gateParts);
+      sandboxRoot.remove(oldMesh);
+    }
+
+    const newMesh = CastleFenceBuilder.buildFence(tier, { n: hasN, s: hasS, w: hasW, e: hasE }, touchesCastle);
+    newMesh.position.set(x, 0, z);
+    sandboxRoot.add(newMesh);
+    placedObjects.set(id, newMesh);
+  });
+}
+
+function isFenceOrCastle(x, z) {
+  const k = K(x, z);
+  if (!worldGrid.has(k)) return false;
+  const type = worldGrid.get(k).type;
+  return type === 'fence' || type === 'castle' || type === 'fenceGate';
+}
+
+function rebuildHouses() {
+  const houseCells = [];
+  worldGrid.forEach((val, key) => {
+    if (val.type === 'house' && val.isRoot) {
+      houseCells.push(val);
+    }
+  });
+
+  houseCells.forEach(h => {
+    const oldMesh = placedObjects.get(h.id);
+    if (oldMesh) {
+      if (oldMesh.userData && oldMesh.userData.gateParts) animatedDoors.delete(oldMesh.userData.gateParts);
+      sandboxRoot.remove(oldMesh);
+    }
+
+    const newMesh = GameHouseBuilder.buildHouse(h.cells);
+    newMesh.position.set(0, 0, 0);
+    sandboxRoot.add(newMesh);
+    placedObjects.set(h.id, newMesh);
+  });
+}
+
+function deleteGridObject(cellKey) {
+  if (!worldGrid.has(cellKey)) return;
+  const item = worldGrid.get(cellKey);
+  const objId = item.id;
+
+  const toDelete = [];
+  worldGrid.forEach((val, ck) => {
+    if (val.id === objId) toDelete.push(ck);
+  });
+  toDelete.forEach(ck => worldGrid.delete(ck));
+
+  const mesh = placedObjects.get(objId);
+  if (mesh) {
+    if (mesh.userData && mesh.userData.gateParts) animatedDoors.delete(mesh.userData.gateParts);
+    mesh.traverse(child => {
+      if (child.userData && child.userData.gateParts) animatedDoors.delete(child.userData.gateParts);
+      if (child.geometry) child.geometry.dispose();
+    });
+    sandboxRoot.remove(mesh);
+    placedObjects.delete(objId);
+  }
+}
+
+function placeObjectAt(gx, gz, tool) {
+  if (tool.startsWith('castle')) {
+    const tier = parseInt(tool.replace('castle', ''));
+    const size = CastleBuilder.getCastleSize(tier);
+
+    const minX = gx - Math.floor(size / 2);
+    const maxX = minX + size - 1;
+    const minZ = gz - Math.floor(size / 2);
+    const maxZ = minZ + size - 1;
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        if (worldGrid.has(K(x, z))) {
+          showToast(`❌ Area terhalang! Kastil ${size}×${size} butuh tanah kosong.`);
+          playSound('delete');
+          return;
+        }
+      }
+    }
+
+    const objId = nextObjectId++;
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        worldGrid.set(K(x, z), { type: 'castle', id: objId, tier, size, rootX: gx, rootZ: gz });
+      }
+    }
+
+    const castleMesh = CastleBuilder.buildCastle(tier, currentDoorProgress, openRoof);
+    const posX = (minX + maxX) / 2;
+    const posZ = (minZ + maxZ) / 2;
+    castleMesh.position.set(posX, 0, posZ);
+    sandboxRoot.add(castleMesh);
+    placedObjects.set(objId, castleMesh);
+
+    playSound('place');
+    showToast(`🏰 Kastil Tingkat ${tier} (${size}×${size} Blok) dibangun dengan atap tertutup rapat &amp; gerbang animasi!`);
+    rebuildFences();
+  } else if (tool.startsWith('fence')) {
+    const tier = parseInt(tool.replace('fence', ''));
+    const k = K(gx, gz);
+    const existing = worldGrid.get(k);
+
+    if (existing && existing.type === 'fenceGate') {
+      deleteGridObject(k);
+    } else if (existing) {
+      showToast("⚠️ Petak ini sudah terisi!");
+      return;
+    }
+
+    const objId = nextObjectId++;
+    worldGrid.set(k, { type: 'fence', id: objId, tier });
+
+    playSound('place');
+    rebuildFences();
+
+    const hasN = isFenceOrCastle(gx, gz - 1);
+    const hasS = isFenceOrCastle(gx, gz + 1);
+    const hasW = isFenceOrCastle(gx - 1, gz);
+    const hasE = isFenceOrCastle(gx + 1, gz);
+    const count = (hasN?1:0) + (hasS?1:0) + (hasW?1:0) + (hasE?1:0);
+    const isStraight = (count === 2) && ((hasN && hasS) || (hasW && hasE));
+
+    if (tier === 3) {
+      showToast("🛡️ Pagar T3 (Ukuran 2× Lipat, Tinggi 3.8 Blok) berhasil dibangun!");
+    } else if (isStraight) {
+      showToast("🛡️ Pagar lurus menyambung! Pilar tengah otomatis hilang (pilar hanya di ujung ke ujung).");
+    } else if (count === 2) {
+      showToast("📐 Pagar belok sudut! Pilar tetap berada di sudut dan pilar baru ada di ujung.");
+    } else {
+      showToast(`🛡️ Pagar T${tier} ditempatkan!`);
+    }
+  } else if (tool.startsWith('gate')) {
+    // GERBANG PAGAR LEBAR (BISA LANGSUNG DIPASANG DI ATAS PAGAR!)
+    // T1/T2: Lebar 2 Blok | T3: LEBAR 6 BLOK!
+    const tier = parseInt(tool.replace('gate', ''));
+    const isT3 = (tier === 3);
+    const k = K(gx, gz);
+    const existing = worldGrid.get(k);
+
+    let axis = 'x';
+    const hasN = isFenceOrCastle(gx, gz - 1);
+    const hasS = isFenceOrCastle(gx, gz + 1);
+    const hasW = isFenceOrCastle(gx - 1, gz);
+    const hasE = isFenceOrCastle(gx + 1, gz);
+
+    if (hasN || hasS) axis = 'z';
+    else axis = 'x';
+
+    if (existing && existing.type !== 'fence' && existing.type !== 'fenceGate') {
+      showToast("⚠️ Petak ini sudah terisi bangunan lain!");
+      return;
+    }
+
+    const cellKeys = [];
+    let centerX = gx, centerZ = gz;
+
+    if (isT3) {
+      // 6 Blok: terpusat pada klik pemain
+      if (axis === 'z') {
+        const startZ = gz - 2;
+        for (let i = 0; i < 6; i++) cellKeys.push(K(gx, startZ + i));
+        centerX = gx;
+        centerZ = (startZ + (startZ + 5)) / 2;
+      } else {
+        const startX = gx - 2;
+        for (let i = 0; i < 6; i++) cellKeys.push(K(startX + i, gz));
+        centerX = (startX + (startX + 5)) / 2;
+        centerZ = gz;
+      }
+    } else {
+      // 2 Blok:
+      if (axis === 'z') {
+        const partnerZ = (hasS && worldGrid.get(K(gx, gz + 1))?.type === 'fence') ? (gz + 1) :
+                         (hasN && worldGrid.get(K(gx, gz - 1))?.type === 'fence') ? (gz - 1) : (gz + 1);
+        cellKeys.push(K(gx, gz), K(gx, partnerZ));
+        centerX = gx;
+        centerZ = (gz + partnerZ) / 2;
+      } else {
+        const partnerX = (hasE && worldGrid.get(K(gx + 1, gz))?.type === 'fence') ? (gx + 1) :
+                         (hasW && worldGrid.get(K(gx - 1, gz))?.type === 'fence') ? (gx - 1) : (gx + 1);
+        cellKeys.push(K(gx, gz), K(partnerX, gz));
+        centerX = (gx + partnerX) / 2;
+        centerZ = gz;
+      }
+    }
+
+    // Hapus pagar/gerbang lama yang berada di petak-petak target gerbang ini
+    cellKeys.forEach(ck => {
+      if (worldGrid.has(ck) && (worldGrid.get(ck).type === 'fence' || worldGrid.get(ck).type === 'fenceGate')) {
+        deleteGridObject(ck);
+      }
+    });
+
+    const objId = nextObjectId++;
+    cellKeys.forEach(ck => {
+      worldGrid.set(ck, { type: 'fenceGate', id: objId, tier, axis, cells: cellKeys });
+    });
+
+    const gateMesh = CastleFenceBuilder.buildFenceGate(tier, axis);
+    gateMesh.position.set(centerX, 0, centerZ);
+    sandboxRoot.add(gateMesh);
+    placedObjects.set(objId, gateMesh);
+
+    playSound('place');
+    showToast(isT3 ?
+      `🚪 Pagar seketika berubah jadi Gerbang T3 (Lebar 6 Blok!) dengan sambungan biasa!` :
+      `🚪 Pagar seketika berubah jadi Gerbang T${tier} (Lebar 2 Blok) dengan sambungan biasa!`);
+    rebuildFences();
+  } else if (tool === 'character') {
+    const k = K(gx, gz);
+    if (worldGrid.has(k)) {
+      showToast("⚠️ Petak ini sudah terisi!");
+      return;
+    }
+
+    const objId = nextObjectId++;
+    worldGrid.set(k, { type: 'char', id: objId });
+
+    const charMesh = CharacterBuilder.build({ withRuler: true });
+    charMesh.position.set(gx, 0, gz);
+    sandboxRoot.add(charMesh);
+    placedObjects.set(objId, charMesh);
+
+    playSound('place');
+    showToast("🧍 Karakter Ranger (1.92 Blok) ditempatkan!");
+  } else if (tool === 'house') {
+    const minX = gx - 3, maxX = gx + 3;
+    const minZ = gz - 3, maxZ = gz + 3;
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        const item = worldGrid.get(K(x, z));
+        if (item && (item.type === 'castle' || item.type === 'fence' || item.type === 'fenceGate')) {
+          showToast("❌ Rumah kayu tidak bisa menimpa kastil atau pagar!");
+          playSound('delete');
+          return;
+        }
+      }
+    }
+
+    let hostHouse = null;
+    for (let x = minX - 1; x <= maxX + 1; x++) {
+      for (let z = minZ - 1; z <= maxZ + 1; z++) {
+        const item = worldGrid.get(K(x, z));
+        if (item && item.type === 'house') {
+          hostHouse = item;
+          break;
+        }
+      }
+    }
+
+    if (hostHouse) {
+      const rootRec = hostHouse;
+      rootRec.cells.push({ bx: minX, bz: minZ });
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          worldGrid.set(K(x, z), rootRec);
+        }
+      }
+      rebuildHouses();
+      playSound('place');
+      showToast("🏠✨ Rumah kayu BERGABUNG dengan sesama rumah kayu!");
+    } else {
+      const objId = nextObjectId++;
+      const rec = { type: 'house', id: objId, isRoot: true, cells: [{ bx: minX, bz: minZ }] };
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          worldGrid.set(K(x, z), rec);
+        }
+      }
+      rebuildHouses();
+      playSound('place');
+      showToast("🏠 Rumah kayu (7×7) dibangun mandiri dengan pintu ganda animasi.");
+    }
+  } else if (tool === 'delete') {
+    deleteGridObject(K(gx, gz));
+    playSound('delete');
+    showToast("⛏️ Struktur berhasil dibongkar.");
+    rebuildFences();
+  }
+}
+
+function demoStraightFences() {
+  clearSandbox();
+  // 1. Baris A: 2 Pagar Berdampingan (ada 2 pilar di kedua ujung)
+  placeObjectAt(-5, -2, 'fence1');
+  placeObjectAt(-4, -2, 'fence1');
+
+  // 2. Baris B: 3 Pagar Lurus (pilar tengah hilang, hanya ada di ujung ke ujung!)
+  placeObjectAt(1, -2, 'fence1');
+  placeObjectAt(2, -2, 'fence1');
+  placeObjectAt(3, -2, 'fence1');
+
+  // 3. Baris C: Deretan pagar yang dipasangi gerbang lebar seketika!
+  for (let x = -4; x <= 4; x++) {
+    placeObjectAt(x, 2, 'fence2');
+  }
+  // Pasang gerbang langsung di atas pagar pada x = 0 (seketika berubah jadi gerbang lebar dengan sambungan biasa)!
+  placeObjectAt(0, 2, 'gate2');
+
+  placeObjectAt(0.5, 4, 'character');
+
+  showToast("📏 Demo Gerbang Pagar: Pagar langsung berubah jadi gerbang lebar dengan sambungan biasa!");
+}
+
+function demoCornerFences() {
+  clearSandbox();
+  placeObjectAt(-3, 0, 'fence3');
+  placeObjectAt(-2, 0, 'fence3');
+  placeObjectAt(-1, 0, 'fence3');
+  placeObjectAt(0, 0, 'fence3'); // Sudut
+  placeObjectAt(0, 1, 'fence3');
+  placeObjectAt(0, 2, 'fence3');
+  placeObjectAt(0, 3, 'fence3');
+
+  // Pasang gerbang T3 di salah satu lengan pagar
+  placeObjectAt(-3, 0, 'gate3');
+
+  placeObjectAt(-1, 2, 'character');
+  showToast("📐 Demo Belokan & Gerbang T3: Gerbang lebar terpasang mulus di pagar belokan!");
+}
+
+function loadFortressPreset() {
+  clearSandbox();
+  placeObjectAt(0, -6, 'castle1');
+
+  // Pagar T3 mengelilingi kastil
+  for (let z = -14; z <= 10; z++) placeObjectAt(-10, z, 'fence3');
+  for (let z = -14; z <= 10; z++) placeObjectAt(10, z, 'fence3');
+
+  // Dinding depan benteng pagar memanjang penuh
+  for (let x = -10; x <= 10; x++) placeObjectAt(x, 10, 'fence3');
+  // Pasang gerbang T3 langsung di atas pagar pada x = -1 (menempati x = -1 dan 0)!
+  placeObjectAt(-1, 10, 'gate3');
+
+  for (let x = -9; x <= -8; x++) placeObjectAt(x, -14, 'fence3');
+  for (let x = 8; x <= 9; x++) placeObjectAt(x, -14, 'fence3');
+
+  placeObjectAt(0, -6, 'character');
+  placeObjectAt(0, 12, 'character');
+
+  showToast("🌟 Benteng Agung Dimuat: Gerbang Pagar T3 Lebar 2 Blok terpasang mulus di pagar!");
+}
+
+function clearSandbox() {
+  placedObjects.forEach(mesh => {
+    if (mesh.userData && mesh.userData.gateParts) animatedDoors.delete(mesh.userData.gateParts);
+    sandboxRoot.remove(mesh);
+  });
+  placedObjects.clear();
+  worldGrid.clear();
+  showToast("🧹 Grid simulator dikosongkan.");
+  playSound('delete');
+}
+
+/* =========================================================================
+   RAYCASTING & INTERAKSI GRID
+   ========================================================================= */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const planeIntersect = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const hitPoint = new THREE.Vector3();
+
+const ghostBox = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 0.4, 1),
+  new THREE.MeshBasicMaterial({ color: 0xf5c862, wireframe: true, transparent: true, opacity: 0.6 })
+);
+ghostBox.visible = false;
+sandboxRoot.add(ghostBox);
+
+window.addEventListener('pointermove', (e) => {
+  if (!sandboxRoot.visible) return;
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  if (raycaster.ray.intersectPlane(planeIntersect, hitPoint)) {
+    const gx = Math.round(hitPoint.x);
+    const gz = Math.round(hitPoint.z);
+
+    if (Math.abs(gx) < GRID_SIZE / 2 && Math.abs(gz) < GRID_SIZE / 2) {
+      ghostBox.visible = true;
+      if (currentTool.startsWith('castle')) {
+        const tier = parseInt(currentTool.replace('castle', ''));
+        const size = CastleBuilder.getCastleSize(tier);
+        ghostBox.scale.set(size, 2, size);
+        const shift = (size % 2 === 0) ? -0.5 : 0;
+        ghostBox.position.set(gx + shift, 1, gz + shift);
+      } else if (currentTool === 'house') {
+        ghostBox.scale.set(7, 2, 7);
+        ghostBox.position.set(gx, 1, gz);
+      } else if (currentTool === 'character') {
+        ghostBox.scale.set(0.6, 1.92, 0.6);
+        ghostBox.position.set(gx, 0.96, gz);
+      } else if (currentTool.startsWith('gate')) {
+        let isZAxis = false;
+        const existing = worldGrid.get(K(gx, gz));
+        if (existing && (existing.type === 'fence' || existing.type === 'fenceGate')) {
+          if (isFenceOrCastle(gx, gz - 1) || isFenceOrCastle(gx, gz + 1)) isZAxis = true;
+        } else {
+          if (isFenceOrCastle(gx, gz - 1) || isFenceOrCastle(gx, gz + 1)) isZAxis = true;
+        }
+        const isT3 = (currentTool === 'gate3');
+        const ghSpan = isT3 ? 6.0 : 2.0;
+        const ghW = isT3 ? 1.4 : 0.6;
+        const ghH = isT3 ? 8.6 : 3.6;
+        if (isZAxis) {
+          ghostBox.scale.set(ghW, ghH, ghSpan);
+          ghostBox.position.set(gx, ghH / 2, gz + 0.5);
+        } else {
+          ghostBox.scale.set(ghSpan, ghH, ghW);
+          ghostBox.position.set(gx + 0.5, ghH / 2, gz);
+        }
+      } else if (currentTool === 'fence3') {
+        ghostBox.scale.set(1.4, 3.8, 1.4);
+        ghostBox.position.set(gx, 1.9, gz);
+      } else {
+        ghostBox.scale.set(1, 1, 1);
+        ghostBox.position.set(gx, 0.5, gz);
+      }
+    } else {
+      ghostBox.visible = false;
+    }
+  }
+});
+
+window.addEventListener('pointerdown', (e) => {
+  if (e.target.tagName === 'BUTTON' || e.target.closest('#sandbox-panel') || e.target.closest('#header') || e.target.closest('#mode-tabs')) return;
+
+  if (e.button === 0) {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    if (sandboxRoot.visible) {
+      if (raycaster.ray.intersectPlane(planeIntersect, hitPoint)) {
+        const gx = Math.round(hitPoint.x);
+        const gz = Math.round(hitPoint.z);
+        if (Math.abs(gx) < GRID_SIZE / 2 && Math.abs(gz) < GRID_SIZE / 2) {
+          placeObjectAt(gx, gz, currentTool);
+        }
+      }
+    }
+  }
+});
+
+/* =========================================================================
+   UI EVENT HANDLERS
+   ========================================================================= */
+const tabInspector = document.getElementById('tab-inspector');
+const tabSandbox = document.getElementById('tab-sandbox');
+const tabSpec = document.getElementById('tab-spec');
+const inspectorPanel = document.getElementById('inspector-panel');
+const sandboxPanel = document.getElementById('sandbox-panel');
+const specModal = document.getElementById('spec-modal');
+
+tabInspector.onclick = () => {
+  tabInspector.classList.add('active');
+  tabSandbox.classList.remove('active');
+  inspectorPanel.style.display = 'flex';
+  sandboxPanel.style.display = 'none';
+  inspectorRoot.visible = true;
+  sandboxRoot.visible = false;
+  controls.target.set(0, 4, 0);
+  camera.position.set(26, 24, 36);
+  playSound('click');
+  showToast("🔍 Mode Inspeksi Model 3D");
+};
+
+tabSandbox.onclick = () => {
+  tabSandbox.classList.add('active');
+  tabInspector.classList.remove('active');
+  inspectorPanel.style.display = 'none';
+  sandboxPanel.style.display = 'flex';
+  inspectorRoot.visible = false;
+  sandboxRoot.visible = true;
+  controls.target.set(0, 0, 0);
+  camera.position.set(30, 38, 42);
+  playSound('click');
+  showToast("🏗️ Mode Simulator: Bangun kastil, pagar &amp; gerbang animasi, dan taruh karakter!");
+};
+
+tabSpec.onclick = () => {
+  specModal.style.display = 'flex';
+  playSound('click');
+};
+
+document.getElementById('btn-close-modal').onclick = () => {
+  specModal.style.display = 'none';
+  playSound('click');
+};
+
+document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTool = btn.dataset.tool;
+    playSound('click');
+  };
+});
+
+document.getElementById('btn-demo-straight').onclick = demoStraightFences;
+document.getElementById('btn-demo-corner').onclick = demoCornerFences;
+document.getElementById('btn-preset-fort').onclick = loadFortressPreset;
+document.getElementById('btn-clear-grid').onclick = clearSandbox;
+
+// TOMBOL ANIMASI GERBANG & PINTU SMOOTH
+const btnDoor = document.getElementById('btn-door');
+btnDoor.onclick = () => {
+  isDoorOpen = !isDoorOpen;
+  btnDoor.classList.toggle('active', isDoorOpen);
+  playSound('gate');
+  showToast(isDoorOpen ? "🚪 Membuka Pintu Kastil (Kanan-Kiri), Pintu Rumah &amp; Gerbang Pagar (Ke Atas) secara smooth!" : "🔒 Menutup Pintu Kastil, Rumah &amp; Gerbang Pagar secara smooth.");
+};
+
+// Tombol Roof Cutaway
+const btnRoof = document.getElementById('btn-roof');
+btnRoof.onclick = () => {
+  openRoof = !openRoof;
+  btnRoof.classList.toggle('active', openRoof);
+  playSound('click');
+  renderTierButtons();
+  updateInspector();
+  showToast(openRoof ? "🏛️ Atap Dibuka: Menampilkan Interior Aula & Tahta!" : "🏰 Atap Ditutup: Menampilkan Atap Rapat Tertutup 100%.");
+};
+
+// Tombol Simulasi Karakter
+const btnChar = document.getElementById('btn-char');
+btnChar.onclick = () => {
+  showCharacter = !showCharacter;
+  btnChar.classList.toggle('active', showCharacter);
+  playSound('click');
+  updateInspector();
+  showToast(showCharacter ? "🧍 Simulasi Karakter AKTIF (Tinggi 1.92 Blok)" : "🚫 Karakter DISEMBUNYIKAN");
+};
+
+const btnRuler = document.getElementById('btn-ruler');
+btnRuler.onclick = () => {
+  showRuler = !showRuler;
+  btnRuler.classList.toggle('active', showRuler);
+  playSound('click');
+  updateInspector();
+  showToast(showRuler ? "📏 Penggaris Ketinggian Blok DITAMPILKAN" : "📏 Penggaris DISEMBUNYIKAN");
+};
+
+const btnWalk = document.getElementById('btn-walk');
+btnWalk.onclick = () => {
+  isWalking = !isWalking;
+  btnWalk.classList.toggle('active', isWalking);
+  playSound('click');
+  showToast(isWalking ? "🚶 Animasi Berjalan DIAKTIFKAN" : "🧍 Animasi Idle DIAKTIFKAN");
+};
+
+const btnSun = document.getElementById('btn-sun');
+btnSun.onclick = () => {
+  setLighting(!isDay);
+  btnSun.innerHTML = isDay ? '☀️' : '🌙';
+  playSound('click');
+  showToast(isDay ? "☀️ Pencahayaan Siang Diaktifkan" : "🌙 Suasana Malam Fantasi Diaktifkan");
+};
+
+const btnSpin = document.getElementById('btn-spin');
+btnSpin.onclick = () => {
+  controls.autoRotate = !controls.autoRotate;
+  btnSpin.classList.toggle('active', controls.autoRotate);
+  playSound('click');
+};
+
+document.getElementById('btn-reset-cam').onclick = () => {
+  if (inspectorRoot.visible) {
+    camera.position.set(26, 24, 36);
+    controls.target.set(0, 4, 0);
+  } else {
+    camera.position.set(30, 38, 42);
+    controls.target.set(0, 0, 0);
+  }
+  playSound('click');
+};
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =========================================================================
+   ANIMATION LOOP (DENGAN INTERPOLASI GERBANG SMOOTH)
+   ========================================================================= */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const elapsed = clock.getElapsedTime();
+
+  // 1. Interpolasi Halus Status Pintu / Gerbang (Smooth Easing)
+  const targetDoorProgress = isDoorOpen ? 1.0 : 0.0;
+  const doorSpeed = 2.6; // Membuka penuh dalam ~0.38 detik
+  if (currentDoorProgress < targetDoorProgress) {
+    currentDoorProgress = Math.min(targetDoorProgress, currentDoorProgress + dt * doorSpeed);
+  } else if (currentDoorProgress > targetDoorProgress) {
+    currentDoorProgress = Math.max(targetDoorProgress, currentDoorProgress - dt * doorSpeed);
+  }
+
+  // Easing Cubic In-Out
+  const ease = currentDoorProgress < 0.5
+    ? 4 * currentDoorProgress * currentDoorProgress * currentDoorProgress
+    : 1 - Math.pow(-2 * currentDoorProgress + 2, 3) / 2;
+
+  // Terapkan ke semua gerbang dan pintu terdaftar
+  animatedDoors.forEach(d => {
+    if (d.type === 'castle') {
+      // Pintu kastil terbuka KANAN dan KIRI (daun pintu ganda berayun membuka)
+      if (d.leafL) d.leafL.rotation.y = -ease * (Math.PI * 0.55);
+      if (d.leafR) d.leafR.rotation.y = ease * (Math.PI * 0.55);
+    } else if (d.type === 'house') {
+      // Pintu rumah biasa terbuka kanan dan kiri
+      if (d.leafL) d.leafL.rotation.y = -ease * (Math.PI * 0.55);
+      if (d.leafR) d.leafR.rotation.y = ease * (Math.PI * 0.55);
+    } else if (d.type === 'fenceGate') {
+      // Gerbang pagar TERANGKAT KE ATAS secara halus (lifting portcullis)
+      if (d.gatePanel) d.gatePanel.position.y = (d.baseY || 0) + ease * d.liftH;
+    }
+  });
+
+  // 2. Efek Api & Kristal
+  const flicker = 0.9 + Math.sin(elapsed * 12) * 0.08 + Math.cos(elapsed * 7) * 0.05;
+  MATS.fire.color.setRGB(1.0, 0.48 * flicker, 0.14 * flicker);
+
+  // 3. Animasi Karakter
+  if (inspectorCharacter && showCharacter) {
+    const activeWalk = isWalking || (charPositionMode === 'patrol');
+    CharacterBuilder.animate(inspectorCharacter, elapsed, activeWalk ? 'walk' : 'idle');
+
+    if (charPositionMode === 'patrol' && currentCat === 'castle') {
+      const size = CastleBuilder.getCastleSize(currentTier);
+      const half = size / 2;
+      const minWalkZ = -half + 3.2;
+      const maxWalkZ = half + 2.5;
+      const cycle = (Math.sin(elapsed * 0.7) + 1) / 2;
+      const patrolZ = THREE.MathUtils.lerp(minWalkZ, maxWalkZ, cycle);
+
+      inspectorCharacter.position.z = patrolZ;
+      const goingIn = Math.cos(elapsed * 0.7) < 0;
+      inspectorCharacter.rotation.y = goingIn ? 0 : Math.PI;
+    }
+  }
+
+  placedObjects.forEach(mesh => {
+    if (mesh && mesh.name === 'ForecraftPlayerCharacter') {
+      CharacterBuilder.animate(mesh, elapsed, isWalking ? 'walk' : 'idle');
+    }
+  });
+
+  inspectorRoot.traverse(child => {
+    if (child.name === "ArcaneCrystal") {
+      child.rotation.y = elapsed * 1.5;
+      child.rotation.z = Math.sin(elapsed * 2) * 0.2;
+    }
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+renderTierButtons();
+updateInspector();
+animate();
+
+console.log("Forecraft Castle & Smooth Animated Doors Ready.");
+</script>
+
+</body>
+</html>

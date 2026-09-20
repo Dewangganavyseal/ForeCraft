@@ -1,0 +1,148 @@
+================================================================================
+     DAFTAR PENAMBAHAN EXP PROFICIENCY & EFEK LEVEL - PROJECT FORECRAFT
+================================================================================
+Proficiency ("belajar dengan melakukan" ala Durango) naik BERDAMPINGAN dengan
+level karakter. Tiap aksi produktif memberi XP proficiency ke sub-skill terkait,
+lalu level sub-skill memberi BONUS % permanen.
+
+RUMUS DASAR:
+- XP kebutuhan naik level: need(level) = round(base * level^exp), maks Lv 50.
+- XP masuk aktual = baseXP x graying x 2.16 (1.5 global x 1.44, SAMA untuk
+  SEMUA proficiency termasuk mining — tidak ada lagi yang seret).
+- Graying (anti-grinding): aksi yang level-aksinya jauh di bawah level
+  proficiency memberi XP berkurang: gray = clamp(1 - selisih*0.12, 0.1, 1).
+
+KURVA KEBUTUHAN XP PER SUB-SKILL (base / exp):
+- Penebangan (logging)   : base 40, exp 1.30  -> Lv1 butuh 40 XP
+- Penambangan (mining)   : base 50, exp 1.35  -> Lv1 butuh 50 XP
+- Pemanenan (harvesting) : base 35, exp 1.30  -> Lv1 butuh 35 XP
+- Pertarungan (combat)   : base 60, exp 1.35  -> Lv1 butuh 60 XP
+- Penangkisan (blocking) : base 55, exp 1.32  -> Lv1 butuh 55 XP
+- Kriya (crafting)       : base 80, exp 1.40  -> Lv1 butuh 80 XP
+- Memasak (cooking)      : base 45, exp 1.30  -> Lv1 butuh 45 XP
+- Pertanian (farming)    : base 55, exp 1.35  -> Lv1 butuh 55 XP
+- Kelincahan (agility)   : base 50, exp 1.35  -> Lv1 butuh 50 XP
+================================================================================
+
+--------------------------------------------------------------------------------
+1. PENEBANGAN (logging) 🪓 — "Makin sering menebang, makin cepat & banyak kayu"
+--------------------------------------------------------------------------------
+Sumber XP (angka = baseXP per aksi, sebelum pengali 1.5x):
+- Tebang KAYU (batang pohon)          : 5 XP/pohon  (level aksi 1)
+- Tebang PAPAN (plank bangunan)       : 3 XP/blok   (level aksi 1)
+- Tebang ATAP (roof bangunan)         : 3 XP/blok   (level aksi 1)
+
+Efek per level:
+- Peluang hasil tambahan kayu  : Lv5 = +1%, +1% per level, MAKS +25% (Lv29+)
+- Kecepatan menebang           : +1% per level, MAKS +50% (Lv51, praktis cap Lv50 = +49%)
+
+--------------------------------------------------------------------------------
+2. PENAMBANGAN (mining) ⛏️ — "Makin sering menambang, makin cepat & sering dobel"
+--------------------------------------------------------------------------------
+Sumber XP (baseXP per blok hancur, sebelum 1.5 x 1.44 = 2.16x):
+- BATU biasa (stone)                  : 10 XP  (level aksi 1)
+- Bongkahan BATU (ore stone)          : 10 XP  (level aksi 1)
+- Bijih BATU BARA (coal, butuh Lv 2)  : 12 XP  (level aksi 2)
+- Bijih TEMBAGA (copper, butuh Lv 7)  : 15 XP  (level aksi 7)
+- Bijih BESI (iron, butuh Lv 12)      : 18 XP  (level aksi 12)
+- Bijih BAJA (steel, butuh Lv 18)     : 29 XP  (level aksi 18)
+- Bijih EMAS (gold, butuh Lv 22)      : 27 XP  (level aksi 22)
+- Bijih TUNGSTEN (butuh Lv 26)        : 32 XP  (level aksi 26)
+- KRISTAL (butuh Lv 32)               : 36 XP  (level aksi 32)
+- BAJA TUNGSTEN (butuh Lv 38)         : 41 XP  (level aksi 38)
+
+Efek per level:
+- Peluang hasil tambahan ore   : Lv5 = +1%, +1% per level, MAKS +25%
+- Kecepatan menambang          : +1% per level, MAKS +50%
+- Syarat level ore + peluang sukses per pukulan juga naik +1.5%/level di atas syarat
+
+--------------------------------------------------------------------------------
+3. PEMANENAN (harvesting) 🌿 — "Makin sering memetik, makin sering dapat bonus"
+--------------------------------------------------------------------------------
+Sumber XP:
+- Petik tanaman liar (rumput/bunga/jamur/beri/tebu) : 4 XP/panen (level aksi 1)
+- Hancurkan DAUN (leaf block)                       : 2 XP/blok  (level aksi 1)
+- Cangkul RUMPUT jadi tanah (grass -> dirt)         : XP leaf (2) per blok
+
+Efek per level:
+- Peluang panen bonus +1            : Lv5 = +1%, +1% per level, MAKS +25%
+- Kecepatan memanen/memecah daun    : +1% per level, MAKS +50%
+
+--------------------------------------------------------------------------------
+4. PERTARUNGAN (combat) ⚔️ — "Makin sering membunuh, serangan makin sakit"
+--------------------------------------------------------------------------------
+Sumber XP:
+- Membunuh monster: base = 6 + round(mobXP x 0.5), dikali kontribusi damage
+  pemain (0-100%), lalu x 1.5 global. Level aksi = 30 bila mobXP>=40,
+  20 bila >=25, 10 bila >=15, 1 bila di bawahnya.
+  Contoh: bunuh golem (90 XP, kontribusi 100%) -> base 51 XP x 1.5 = 76.5 XP.
+
+Efek per level:
+- Tambahan DAMAGE serangan : +1% per level, MAKS +50% (Lv51/cap Lv50 = +49%)
+- Peluang CRITICAL        : +0.3% per level, MAKS +15% (Lv51/cap Lv50 = +14.7%)
+
+--------------------------------------------------------------------------------
+5. PENANGKISAN (blocking) 🛡️ — "Perisai menguat karena benar-benar dipakai"
+--------------------------------------------------------------------------------
+Sumber XP:
+- BERHASIL menangkis serangan dengan tameng: 6 XP base (level aksi =
+  clamp(round(damage/3), 1, 40)). Menahan pukulan besar = XP & level aksi besar.
+  Contoh: menahan damage 30 -> level aksi 10, 6 x graying x 1.5 = ~9 XP.
+
+Efek per level:
+- Peluang BLOCK (menahan serangan) : +0.5% per level, MAKS +20% (Lv41+)
+- Kekuatan BLOCK (damage diserap)  : +0.6% per level, MAKS +25% (Lv~42+)
+
+--------------------------------------------------------------------------------
+6. KRIYA (crafting) 🔨 — "Makin sering membuat barang, makin efisien"
+--------------------------------------------------------------------------------
+Sumber XP (level aksi 10 untuk resep lanjutan / skill, 1 untuk resep dasar):
+- Crafting barang apa pun : 12 XP x jumlah dibuat (level aksi 10 bila resep
+  pakai skill/stasiun, 1 bila resep tas dasar), lalu x 1.5 global.
+  Contoh: buat 5 tali (resep dasar) -> 12x5 = 60 x 1.5 = 90 XP.
+- Tempa di ANVIL (naik level equipment) : 20 XP/tempa (level aksi 2), x 1.5 = 30 XP.
+
+Efek per level: (saat ini bonus gathering umum — kecepatan aksi + hasil)
+
+--------------------------------------------------------------------------------
+7. MEMASAK (cooking) 🍳 — "Koki yang sering memasak"
+--------------------------------------------------------------------------------
+Sumber XP:
+- Crafting MAKANAN apa pun (roti, daging panggang, salad, kue, dsb):
+  15 XP x jumlah dibuat (level aksi sama seperti crafting), x 1.5 global.
+  Contoh: masak 4 roti -> 15x4 = 60 x 1.5 = 90 XP cooking (+ 90-an XP crafting).
+
+Efek per level: (bonus gathering umum — kecepatan aksi + hasil)
+
+--------------------------------------------------------------------------------
+8. PERTANIAN (farming) 🌾 — "Petani yang rajin panen"
+--------------------------------------------------------------------------------
+Sumber XP:
+- Panen ladang (gandum/wortel/kubis/tomat/semangka): 8 XP/panen
+  (level aksi 1), x 1.5 = 12 XP per panen.
+
+Efek per level:
+- Peluang hasil panen bonus +1   : Lv5 = +1%, +1% per level, MAKS +25%
+- Kecepatan bertani              : +1% per level, MAKS +50%
+
+--------------------------------------------------------------------------------
+9. KELINCAHAN (agility) 💨 — "Gerakan membuka skill gerak"
+--------------------------------------------------------------------------------
+Sumber XP:
+- LOMPAT (tiap lompatan dari tanah) : 2 XP (level aksi 1), x 1.5 = 3 XP.
+- DODGE/DASH (skill menghindar)     : 5 XP (level aksi 1), x 1.5 = 7.5 XP.
+
+Efek per level: dipakai untuk meng-gate (membuka) skill gerak lanjutan.
+Belum ada bonus % tempur — murni progres mobilitas.
+
+================================================================================
+CONTOH PERHITUNGAN LENGKAP:
+- Menambang 1 bijih BESI (18 base) saat mining Lv 1: 18 x gray(1 vs 12 -> diff
+  negatif -> 1.0) x 1.5 x 1.44 = 38.88 XP masuk (kebutuhan Lv1 = 50 XP).
+- Menambang 1 BATU (10 base) saat mining Lv 20: gray = 1 - 19*0.12 = negatif ->
+  floor 0.1 -> 10 x 0.1 x 1.5 x 1.44 = 2.16 XP saja (terkena graying berat).
+- Membunuh golem kontribusi penuh saat combat Lv 1: base 51 x 1.0 x 1.5 = 76.5 XP
+  (kebutuhan Lv1 = 60 XP -> langsung naik ke Lv 2 sisa 16.5 XP).
+================================================================================
+Dokumen disusun langsung dari js/skills.js, js/world.js, js/rpg.js,
+js/farming.js, js/monsters.js, js/player.js, js/anvil.js (versi game terbaru).

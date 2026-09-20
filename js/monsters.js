@@ -30,10 +30,10 @@ const Monsters={
        dengan peluang menjadi mini boss raksasa (HP x6). */
     trex:{hp:360,dmg:22,xp:55,speed:2.4,r:0.85,aggro:24,noBossScale:true},
     /* MAMMOTH (🦣): Behemoth purba pegunungan dari NEW MODEL/mammoth.html.
-       Ukuran & kekuatan setara T-Rex (HP 360, Lv 50-75) dengan peluang mini boss raksasa (HP x6).
+       Ukuran & kekuatan raksasa setara Naga Merah (HP 420, Lv 50-75) dengan peluang mini boss raksasa (HP x6).
        Jurus: Seruduk Langit (uppercut), Hantaman Seismik (rearing slam AoE), Sapuan Belalai (swipe),
        dan Auman Sang Raja (taunt/roar). */
-    mammoth:{hp:360,dmg:22,xp:55,speed:2.2,r:0.85,aggro:24,noBossScale:true},
+    mammoth:{hp:420,dmg:22,xp:60,speed:2.0,r:1.1,aggro:26,noBossScale:true},
     /* LIZARD RAWA: predator tepi sungai. Serangannya gigitan (jarak dekat),
        sapuan ekor (AoE), dan semburan asam (proyektil jarak jauh). Hanya
        muncul di tepi sungai/danau (lihat spawnLizard). Radius tabrakan kecil
@@ -1746,12 +1746,12 @@ const Monsters={
          seluruh mob yang memiliki animasi lari ikut berlari kencang mendekat */
       const pSpeed = (typeof Player !== 'undefined' && Player.vel) ? Math.hypot(Player.vel.x, Player.vel.z) : 0;
       const targetRunning = pSpeed > 3.4;
-      const mReach=(m.type==='dragon'?3.4:(m.type==='trex'||m.type==='mammoth')?3.2:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
+      const mReach=((m.type==='dragon'||m.type==='mammoth')?3.8:m.type==='trex'?3.2:m.type==='golem'?3.0:m.type==='lizard'?2.2:1.6);
       const distFar = dp > (mReach * 1.25);
 
       if((targetRunning || distFar) && !m.inWater){
-        if(m.type==='dragon') sp *= 2.3;
-        else if(m.type==='trex'||m.type==='mammoth') sp *= 2.2;
+        if(m.type==='dragon'||m.type==='mammoth') sp *= 2.3;
+        else if(m.type==='trex') sp *= 2.2;
         else if(m.type==='wolf') sp *= 1.45;
         else if(m.type==='boar') sp *= 1.45;
         else if(m.type==='lizard') sp *= 1.4;
@@ -3149,20 +3149,25 @@ const Monsters={
   /* =========================================================================
      AI MAMMOTH PURBA (RAJAGADING) — 4 aksi tempur (port dari mammoth.html)
      -------------------------------------------------------------------------
-     'upper' (Seruduk Langit)   : sabetan gading ke atas meledak (knockup tinggi).
-     'slam'  (Hantaman Seismik) : angkat 2 kaki depan ke udara (rearing) lalu hantam tanah (AoE gempa).
-     'swipe' (Sapuan Belalai)   : sapuan horizontal belalai merusak musuh di depan.
-     'taunt' (Auman Sang Raja)  : angkat belalai tegak melepaskan 3 cincin auman (roar shockwave).
+     Serangan Utama:
+     - 'swipe' (Sapuan Belalai) : sapuan horizontal belalai merusak musuh di depan.
+     - 'upper' (Tandukan Langit): sabetan gading ke atas meledak (knockup tinggi).
+
+     Skill Khusus (Peluang Muncul 50%):
+     - 'slam'  (Hantaman Seismik): angkat 2 kaki depan ke udara lalu hantam tanah (AoE gempa).
+     - 'taunt' (Teriakan / Auman Sang Raja): auman menggelegar melepas 3 gelombang kejut AoE luas.
      ========================================================================= */
   pickMammothAtk(d){
-    if(d<=2.4) return Math.random()<0.65 ? 'upper' : 'swipe';
-    if(d<=5.5) {
-      const r=Math.random();
-      if(r<0.50) return 'slam';
-      if(r<0.80) return 'swipe';
-      return 'upper';
+    // Skill muncul dengan peluang 50%
+    const isSkill = Math.random() < 0.50;
+    if(isSkill){
+      // SKILL (50%): Hantaman ('slam') atau Teriakan ('taunt')
+      if(d > 6.0) return 'taunt';
+      return Math.random() < 0.50 ? 'slam' : 'taunt';
+    }else{
+      // SERANGAN UTAMA: Sapuan Belalai ('swipe') atau Tandukan Langit ('upper')
+      return Math.random() < 0.50 ? 'swipe' : 'upper';
     }
-    return Math.random()<0.50 ? 'taunt' : 'slam';
   },
 
   aiMammoth(m,dt,dp,angP){
@@ -3224,7 +3229,7 @@ const Monsters={
               (tgtIn||(m.pet?null:this.aimTarget(m)));
 
     if(m.mAct==='upper'){
-      // SERUDUK LANGIT (UPPERCUT TUSK SLASH)
+      // TANDUKAN LANGIT (UPPERCUT TUSK SLASH — SERANGAN UTAMA)
       if(tA<0.30){
         if(dp>0.5)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
         m.vel.x*=0.8;m.vel.z*=0.8;
@@ -3240,16 +3245,16 @@ const Monsters={
         m._mHit=true;
         if(M&&M.upperFX)M.upperFX(m);
         const yaw=m.mesh.rotation.y;
-        const hx=m.pos.x+Math.sin(yaw)*1.8, hz=m.pos.z+Math.cos(yaw)*1.8;
-        const hit=this.hitTarget(m,tgt,Math.round(m.dmg*1.25),2.6,hx,hz,7);
+        const hx=m.pos.x+Math.sin(yaw)*2.8, hz=m.pos.z+Math.cos(yaw)*2.8;
+        const hit=this.hitTarget(m,tgt,Math.round(m.dmg*1.35),3.4,hx,hz,8);
         if(hit&&tgt&&tgt.vel){
-          tgt.vel.y=Math.max(tgt.vel.y||0,7.0);
+          tgt.vel.y=Math.max(tgt.vel.y||0,8.0);
           if(tgt===Player)Player.onGround=false;
         }
       }
     }
     else if(m.mAct==='slam'){
-      // HANTAMAN SEISMIK (REARING SEISMIC SLAM)
+      // HANTAMAN SEISMIK (REARING SEISMIC SLAM — SKILL 50%)
       if(tA<1.24){
         m.vel.x*=0.75;m.vel.z*=0.75;
       }else if(tA<1.55){
@@ -3262,12 +3267,12 @@ const Monsters={
         m._mHit=true;
         if(M&&M.slamFX)M.slamFX(m);
         const yaw=m.mesh.rotation.y;
-        const cx=m.pos.x+Math.sin(yaw)*1.4, cz=m.pos.z+Math.cos(yaw)*1.4;
-        this.areaHit(m,cx,cz,4.2,Math.round(m.dmg*1.6),11);
+        const cx=m.pos.x+Math.sin(yaw)*2.2, cz=m.pos.z+Math.cos(yaw)*2.2;
+        this.areaHit(m,cx,cz,5.8,Math.round(m.dmg*1.75),13);
       }
     }
     else if(m.mAct==='swipe'){
-      // SAPUAN BELALAI (TRUNK SWEEP)
+      // SAPUAN BELALAI (TRUNK SWEEP — SERANGAN UTAMA)
       if(tA<0.30){
         if(dp>0.5)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
         m.vel.x*=0.8;m.vel.z*=0.8;
@@ -3279,20 +3284,27 @@ const Monsters={
         m._mHit=true;
         if(M&&M.swipeFX)M.swipeFX(m);
         const yaw=m.mesh.rotation.y;
-        const hx=m.pos.x+Math.sin(yaw)*2.0, hz=m.pos.z+Math.cos(yaw)*2.0;
-        this.hitTarget(m,tgt,Math.round(m.dmg*1.15),2.8,hx,hz,8);
+        const hx=m.pos.x+Math.sin(yaw)*3.2, hz=m.pos.z+Math.cos(yaw)*3.2;
+        this.hitTarget(m,tgt,Math.round(m.dmg*1.20),3.6,hx,hz,9.5);
       }
     }
     else if(m.mAct==='taunt'){
-      // AUMAN SANG RAJA (KING ROAR)
+      // AUMAN SANG RAJA / TERIAKAN (KING ROAR — SKILL 50%)
       m.vel.x*=0.8;m.vel.z*=0.8;
       const times=[0.70, 1.05, 1.45];
+      const rads=[4.5, 6.0, 7.5];
+      const dmgs=[0.70, 0.85, 1.05];
+      const kbs=[6, 8, 12];
+      const yaw=m.mesh.rotation.y;
+      const hx=m.pos.x+Math.sin(yaw)*1.5, hz=m.pos.z+Math.cos(yaw)*1.5;
+
       for(let i=0;i<3;i++){
         if(!m._mFired[i]&&tA>=times[i]){
           m._mFired[i]=true;
           if(M&&M.tauntFX)M.tauntFX(m);
+          this.areaHit(m,hx,hz,rads[i],Math.round(m.dmg*dmgs[i]),kbs[i]);
           if(i===0&&typeof FX!=='undefined'){
-            FX.text(m.pos.clone().add(new THREE.Vector3(0,3.2,0)),'🦣 AUMAN RAJA!','#ffd489');
+            FX.text(m.pos.clone().add(new THREE.Vector3(0,4.2,0)),'🦣 AUMAN RAJA!','#ffd489');
           }
         }
       }
@@ -4078,7 +4090,7 @@ const Monsters={
 };
 /* tinggi kira-kira model, dipakai untuk posisi teks damage & aura boss */
 function meshHeight(type){
-  return type==='golem'?3:type==='dragon'?4.2:type==='trex'?3.8:type==='mammoth'?3.8:type==='cow'?1.8:type==='horse'?2.1:
+  return type==='golem'?3:type==='dragon'?4.2:type==='mammoth'?4.2:type==='trex'?3.8:type==='cow'?1.8:type==='horse'?2.1:
     type==='lizard'?1.2:type==='boar'?1.1:
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:

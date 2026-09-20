@@ -300,6 +300,30 @@ const Altar={
     return best;
   },
 
+  /* Cari posisi altar terdekat di dunia dari koordinat (x, z) untuk Log Pass */
+  findNearestAltar(x, z){
+    const C = this.CELL || 88;
+    const gx = Math.floor(x / C), gz = Math.floor(z / C);
+    let best = null, bestD = Infinity;
+    for (let r = 0; r <= 10; r++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+          const pos = this.cellPos(gx + dx, gz + dz);
+          if (pos) {
+            const d = Math.hypot(pos.x - x, pos.z - z);
+            if (d < bestD) {
+              bestD = d;
+              best = pos;
+            }
+          }
+        }
+      }
+      if (best && r >= 3) break;
+    }
+    return best;
+  },
+
   /* =========================================================================
      TABRAKAN ALTAR
      -------------------------------------------------------------------------

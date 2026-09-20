@@ -508,7 +508,8 @@ const WGEN={
        World grass dekoratif juga tidak menyentuh gurun (mesher hanya menumbuhkan
        di FOREST & REDLANDS). */
     if(b===BIOME.DESERT){
-      if(r<0.022)return 8;                       // kaktus
+      /* jumlah kaktus dikurangi 30%: 0.022 -> 0.0154 */
+      if(r<0.0154)return 8;                      // kaktus
       return 0;
     }
     /* REDLANDS: rumput utama (voxel merah) berumpun + semak beri langka.
@@ -1127,38 +1128,82 @@ function genChunk(cx,cz){
     const biome=WGEN.biomeAt(wx,wz);
     const BI=BIOME_INFO[biome];
 
-    /* desa: ratakan permukaan ke tinggi tetap agar bangunan tidak miring */
+    /* desa: ratakan permukaan bangunan ke tinggi tetap CFG.SEA (lantai desa),
+       dengan gradasi ketinggian halus (smooth ramp lereng 8 blok) di tepinya
+       sehingga bukit sekitarnya tidak terpotong vertikal sedalam 4 blok. */
     let village=null;
+    let vBlendK=1.0;
     for(const v of villages){
-      if(Math.max(Math.abs(wx-v.x),Math.abs(wz-v.z))<=v.r){village=v;break;}
+      const d=Math.max(Math.abs(wx-v.x),Math.abs(wz-v.z));
+      if(d<=v.r){village=v;vBlendK=0;break;}
+      const blendDist=8.0;
+      if(d<=v.r+blendDist){
+        const k=(d-v.r)/blendDist;
+        if(k<vBlendK)vBlendK=k;
+      }
     }
     /* dungeon: lantainya juga diratakan seperti desa */
     let dung=null;
     for(const d of dungeons){
       if(Math.max(Math.abs(wx-d.x),Math.abs(wz-d.z))<=d.r+2){dung=d;break;}
     }
-    /* Desa & dungeon diratakan ke tinggi tetap = CFG.SEA (permukaan air),
-       supaya lantainya selalu di atas air apa pun terrain aslinya. */
-    const h=(village||dung)?CFG.SEA:WGEN.height(wx,wz);
 
-    /* Di puncak bukit pegunungan, permukaan memakai blok rumput (B.GRASS)
-       dan tanah (B.DIRT) di bawahnya, namun klasifikasi biome tetap BIOME.MOUNTAIN */
-    const isMntHill = WGEN.isMountainHillTop(wx,wz,h);
-    const colSurf = isMntHill ? B.GRASS : (h>=CFG.SEA ? BI.surface : BI.sub);
-    const colSub  = isMntHill ? B.DIRT : BI.sub;
-
-    for(let y=0;y<h;y++){
-      let id;
-      if(y===0)id=B.STONE;
-      else if(y===h-1)id=colSurf;
-      else if(isMntHill && y>=h-3)id=colSub; // 2 lapis tanah subur di bawah rumput
-      else if(isMntHill)id=B.STONE;          // dasar bukit tetap batu pegunungan kokoh
-      else id=colSub;
-      /* Ore TIDAK lagi tersebar sebagai urat bawah tanah — kini hanya
-         node permukaan (lihat oreNodeAt). Lapisan bawah = batu polos. */
-      data[idx(x,y,z)]=id;
+    const rawH=WGEN.height(wx,wz);
+    let h=rawH;
+    if(village||dung){
+      h=CFG.SEA;
+    }else if(vBlendK<1.0){
+      const smoothK=vBlendK*vBlendK*(3-2*vBlendK);
+      h=Math.round(CFG.SEA+(rawH-CFG.SEA)*smoothK);
     }
-    for(let y=h;y<CFG.SEA;y++)data[idx(x,y,z)]=B.WATER;
+
+    /* Fitur Biome Laut: Tebing Batu Raksasa 15-20 Blok & Jembatan Alami */
+    const oceanCol = (biome === BIOME.OCEAN && typeof OceanCliffs !== 'undefined')
+      ? OceanCliffs.columnAt(wx, wz) : null;
+
+    if (oceanCol) {
+      if (oceanCol.type === 'solid') {
+        h = oceanCol.h;
+        for (let y = 0; y < h; y++) {
+          let id = B.STONE;
+          if (y === h - 1) id = B.GRASS;
+          else if (y === h - 2) id = B.DIRT;
+          data[idx(x, y, z)] = id;
+        }
+      } else if (oceanCol.type === 'arch') {
+        h = oceanCol.h;
+        // Dasar laut
+        data[idx(x, 0, z)] = B.STONE;
+        data[idx(x, 1, z)] = B.STONE;
+        // Air laut di bawah kolong jembatan
+        for (let y = 2; y < CFG.SEA; y++) data[idx(x, y, z)] = B.WATER;
+        // Kolong bolong jembatan (AIR) — rongga clearance yang dapat dilayari
+        for (let y = CFG.SEA; y < oceanCol.archBottom; y++) data[idx(x, y, z)] = B.AIR;
+        // Struktur batu jembatan tebing di atas kolong
+        for (let y = oceanCol.archBottom; y < h - 2; y++) data[idx(x, y, z)] = B.STONE;
+        if (h - 2 >= oceanCol.archBottom) data[idx(x, h - 2, z)] = B.DIRT;
+        if (h - 1 >= oceanCol.archBottom) data[idx(x, h - 1, z)] = B.GRASS;
+      }
+    } else {
+      /* Di puncak bukit pegunungan, permukaan memakai blok rumput (B.GRASS)
+         dan tanah (B.DIRT) di bawahnya, namun klasifikasi biome tetap BIOME.MOUNTAIN */
+      const isMntHill = WGEN.isMountainHillTop(wx,wz,h);
+      const colSurf = isMntHill ? B.GRASS : (h>=CFG.SEA ? BI.surface : BI.sub);
+      const colSub  = isMntHill ? B.DIRT : BI.sub;
+
+      for(let y=0;y<h;y++){
+        let id;
+        if(y===0)id=B.STONE;
+        else if(y===h-1)id=colSurf;
+        else if(isMntHill && y>=h-3)id=colSub; // 2 lapis tanah subur di bawah rumput
+        else if(isMntHill)id=B.STONE;          // dasar bukit tetap batu pegunungan kokoh
+        else id=colSub;
+        /* Ore TIDAK lagi tersebar sebagai urat bawah tanah — kini hanya
+           node permukaan (lihat oreNodeAt). Lapisan bawah = batu polos. */
+        data[idx(x,y,z)]=id;
+      }
+      for(let y=h;y<CFG.SEA;y++)data[idx(x,y,z)]=B.WATER;
+    }
 
     const safe=x>=2&&x<=13&&z>=2&&z<=13;
     let occupied=false;

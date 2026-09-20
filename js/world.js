@@ -124,6 +124,11 @@ const World={
         const ot=Env_Ore.topAt(x+ox,z+oz);
         if(ot>gy&&ot<=yTop+1.5)gy=ot;
       }
+      /* BANGKAI KAPAL KARAM (OceanCliffs): geladak, tanjakan & buritan kapal bisa dinaiki pemain */
+      if(typeof OceanCliffs!=='undefined'&&OceanCliffs.topAt){
+        const wt=OceanCliffs.topAt(x+ox,z+oz);
+        if(wt>gy&&wt<=yTop+2.0)gy=wt;
+      }
       if(gy>g)g=gy;
     }
     return g;
@@ -200,6 +205,10 @@ const World={
     if(typeof Env_Ore!=='undefined'&&Env_Ore.solidAt&&
        samples.some(([ox,oz])=>Env_Ore.solidAt(x+ox,y+0.45,z+oz)||
                                 Env_Ore.solidAt(x+ox,y+1.15,z+oz)))return true;
+    /* BANGKAI KAPAL KARAM (OceanCliffs): lambung bawah & dinding luar kapal padat */
+    if(typeof OceanCliffs!=='undefined'&&OceanCliffs.solidAt&&
+       samples.some(([ox,oz])=>OceanCliffs.solidAt(x+ox,y+0.45,z+oz)||
+                                OceanCliffs.solidAt(x+ox,y+1.15,z+oz)))return true;
     return samples.some(([ox,oz])=>{
       const id1=this.getBlock(Math.floor(x+ox),by,Math.floor(z+oz));
       const id2=this.getBlock(Math.floor(x+ox),by2,Math.floor(z+oz));

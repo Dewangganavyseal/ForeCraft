@@ -1,0 +1,501 @@
+================================================================================
+          DAFTAR LENGKAP DROP ITEM MOB & MONSTER - PROJECT FORECRAFT
+================================================================================
+File ini menyajikan informasi lengkap dan detail mengenai seluruh item yang
+dapat dijatuhkan (drop) oleh monster, mob hewan, mini boss, dan boss di dalam game,
+mencakup nama item, ikon/emoji, tingkat kelangkaan (rarity), persentase peluang drop,
+jumlah perolehan, serta deskripsi dan fungsi kegunaan masing-masing item.
+
+ATURAN INTI BOSS [boss_core] (berlaku untuk SEMUA mob — HANYA 4 sumber ini):
+1. Mob BIASA (tipe apa pun, termasuk trex & naga biasa): peluang 7% drop 1 inti.
+2. MINI BOSS (mob raksasa bertitik emas, tipe apa pun): peluang 10% drop 1 inti
+   + seluruh jumlah drop reguler digandakan (+100% drop ganda).
+3. PETI BOSS DUNGEON (peti emas Penjaga Agung): peluang 12% berisi 1 inti.
+4. BOSS ALTAR (kelabang raksasa): peluang 50% drop 1-2 inti.
+TIDAK ADA SUMBER LAIN (leviathan, loot peti biasa, hadiah dungeon, quest SUDAH
+dihapus dari game).
+================================================================================
+
+--------------------------------------------------------------------------------
+1. SLIME (Gelatinous Ooze)
+   Habitat: Dataran Hijau, Hutan, Gua
+   Perilaku Khusus: Saat mati membelah menjadi 3 Slime Kecil.
+--------------------------------------------------------------------------------
+• [gel] Gel Slime 💧
+  - Rarity     : Common
+  - Peluang    : 100% (Peluang 50% mendapat 1 buah, 50% mendapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Bahan utama pembuatan obor (torch), perekat ramuan, lilin,
+                 bahan pakan pet Slime, dan resep alkimia.
+
+• [green_blood] Darah Hijau 🧪
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Salah satu dari 4 bahan sakral untuk mengaktifkan ritual Altar
+                 pemanggilan Boss Kelabang Raksasa (Giant Centipede); bahan ramuan
+                 mutasi langka.
+
+--------------------------------------------------------------------------------
+2. BABI HUTAN (Wild Boar) 🐗
+   Habitat: Biome Hutan & Savana
+   Keahlian: Serudukan kencang & Uppercut sabetan gading (knockup)
+--------------------------------------------------------------------------------
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100% (50% mendapat 1 buah, 50% mendapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Sumber makanan pokok. Dapat dimasak di Campfire / Stove menjadi
+                 Daging Panggang yang memulihkan kelaparan dan HP dalam jumlah besar;
+                 pakan penjinak dan pakan level up pet karnivora.
+
+• [fiber] Serat Alami 🌾
+  - Rarity     : Common
+  - Peluang    : 40%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan tekstil penting untuk merajut Tali (Rope) penangkap mob,
+                 Perban (Bandage) penyembuh luka, Kain Sadel (Saddle), dan Kasur (Bed).
+
+--------------------------------------------------------------------------------
+3. SERIGALA (Dire Wolf) 🐺
+   Habitat: Biome Salju (Tundra), Hutan Gelap (Malam Hari)
+   Perilaku: Muncul dalam kawanan (pack hunting), lari gesit dan gigitan cepat
+--------------------------------------------------------------------------------
+• [pelt] Bulu Serigala 🐺
+  - Rarity     : Uncommon
+  - Peluang    : 100% (55% mendapat 1 buah, 45% mendapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Bahan utama penempaan Baju Zirah Kulit Bulu (Leather Armor Set),
+                 Karpet Bulu dekorasi rumah/tavern, serta material tempa senjata
+                 Pedang Berserker (Sword of Berserker) di Anvil.
+
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Makanan dan pakan pet.
+
+--------------------------------------------------------------------------------
+4. KALAJENGKING (Scorpion) 🦂
+   Habitat: Biome Gurun Pasir (Desert)
+   Keahlian: Sengatan ekor beracun yang memberikan efek racun berkelanjutan (DoT)
+--------------------------------------------------------------------------------
+• [venom] Racun Kalajengking 🧪
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Pembuatan bilah racun Pedang Venom (Sword of Venom), pelapis panah
+                 beracun, dan racun pembasmi hama.
+
+• [fiber] Serat Alami 🌾
+  - Rarity     : Common
+  - Peluang    : 50%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan rajut tali dan perban.
+
+• [toxic_venom] Racun Berbisa ☠
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual sakral Altar untuk memanggil Boss Kelabang Raksasa;
+                 racun tingkat paling mematikan.
+
+• [hard_shell] Kulit Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar; pelat zirah keras eksotis.
+
+• [insect_leg] Kaki Serangga 🦵
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Boss Kelabang Raksasa.
+
+--------------------------------------------------------------------------------
+5. KELINCI (Rabbit) 🐰
+   Habitat: Hutan, Tundra, Gurun (Hewan Pasif)
+   Perilaku: Berlari cepat menjauhi bahaya
+--------------------------------------------------------------------------------
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan makanan pemula.
+
+• [fiber] Serat Alami 🌾
+  - Rarity     : Common
+  - Peluang    : 25%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bulu serat lembut kelinci untuk merajut tali dan perban.
+
+--------------------------------------------------------------------------------
+6. SAPI TERNAK (Cow) 🐄
+   Habitat: Padang Rumput & Desa (Hewan Ternak Pasif)
+--------------------------------------------------------------------------------
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Daging sapi bernutrisi tinggi.
+
+• [leather] Kulit Samak 🟫
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Bahan pembuatan Sadel Tunggangan (Saddle), peningkatan kapasitas
+                 Tas Karakter (Bag Upgrade), dan Baju Zirah Kulit.
+
+--------------------------------------------------------------------------------
+7. KUDA TERNAK (Horse) 🐴
+   Habitat: Padang Rumput Terbuka (Bisa Dijinakkan Menjadi Tunggangan Cepat)
+--------------------------------------------------------------------------------
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Bahan konsumsi.
+
+• [leather] Kulit Samak 🟫
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Bahan kerajinan sadel dan pelindung kulit.
+
+--------------------------------------------------------------------------------
+8. KUMBANG TANDUK (Horned Beetle) 🪲
+   Habitat: Biome Tanah Merah (Redlands)
+   Keahlian: Menyeruduk dengan tanduk bercabang & mengangkat serta melempar balok batu
+--------------------------------------------------------------------------------
+• [centipede_shell] Kulit / Cangkang Keras 🐛
+  - Rarity     : Uncommon
+  - Peluang    : 100% (60% dapat 1 buah, 40% dapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Material pembuatan Zirah Khitin dan Perisai Khitin pelindung tebal.
+
+• [fiber] Serat Alami 🌾
+  - Rarity     : Common
+  - Peluang    : 50%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan tali dan anyaman.
+
+• [hard_shell] Kulit Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Salah satu dari 4 bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [insect_leg] Kaki Serangga 🦵
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Salah satu dari 4 bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [green_blood] Darah Hijau 🧪
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Salah satu dari 4 bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+--------------------------------------------------------------------------------
+9. SEMUT RAKSASA (Giant Ant) 🐜
+   Habitat: Biome Tanah Merah (Redlands)
+   Keahlian: Terjangan cepat lurus & gigitan rahang mandibel beruntun
+--------------------------------------------------------------------------------
+• [centipede_shell] Cangkang Khitin 🐛
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Kerajinan baju zirah khitin.
+
+• [fiber] Serat Alami 🌾
+  - Rarity     : Common
+  - Peluang    : 50%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Tali penangkap mob dan perban.
+
+• [insect_leg] Kaki Serangga 🦵
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [green_blood] Darah Hijau 🧪
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [toxic_venom] Racun Berbisa ☠
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+--------------------------------------------------------------------------------
+10. TARANTULA RAKSASA (Giant Tarantula) 🕷️
+    Habitat: Predator Puncak Biome Tanah Merah (Redlands)
+    Keahlian: Semburan jaring stun 5 detik, lompatan sergap AoE, dan gigitan taring
+    Pengawal: Didampingi 3 ekor Tarantula Mini saat menjadi Mini Boss
+--------------------------------------------------------------------------------
+• [centipede_shell] Karapas Khitin Tebal 🐛
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Pembuatan Zirah Khitin berkekuatan tinggi.
+
+• [fiber] Sutra Jaring Halus 🌾
+  - Rarity     : Common
+  - Peluang    : 100% (50% dapat 1 buah, 50% dapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Sutra tarantula yang sangat kuat untuk tali pancing legendaris,
+                 jaring perangkap, dan tali kekang tahan putus.
+
+• [insect_leg] Kaki Serangga 🦵
+  - Rarity     : Mythic
+  - Peluang    : 32% (2x lipat lebih tinggi dari mob biasa)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [hard_shell] Kulit Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 32% (2x lipat lebih tinggi dari mob biasa)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [green_blood] Darah Hijau 🧪
+  - Rarity     : Mythic
+  - Peluang    : 32% (2x lipat lebih tinggi dari mob biasa)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [toxic_venom] Racun Berbisa ☠
+  - Rarity     : Mythic
+  - Peluang    : 32% (2x lipat lebih tinggi dari mob biasa)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+--------------------------------------------------------------------------------
+11. YETI SALJU (Frost Yeti) ❄️
+    Habitat: Puncak Salju Biome Tundra
+    Keahlian: Hantaman tanah ganda, sapuan cakar badai, dan pusaran salju 360°
+--------------------------------------------------------------------------------
+• [pelt] Bulu Tebal Salju 🐺
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Pakaian penahan dingin ekstrem dan karpet tebal.
+
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Bahan makanan pemulih lapar.
+
+--------------------------------------------------------------------------------
+12. REAPER (Penjaga Dungeon / Black Wraith) 👻
+    Habitat: Ruang Tahanan & Koridor Dungeon Bawah Tanah
+    Keahlian: Tebasan sabit ganda, hempasan aura gelap, pemanggilan 3 arwah penasaran
+--------------------------------------------------------------------------------
+• [soul_shard] Pecahan Jiwa 👻
+  - Rarity     : Rare
+  - Peluang    : 100% (55% dapat 1 buah, 45% dapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Bahan penempaan Pedang Reaper (Sword of the Reaper), jimat mistis,
+                 dan enchant perlengkapan sihir gelap di Anvil.
+
+• [crystal] Kristal Murni 💎
+  - Rarity     : Rare
+  - Peluang    : 35%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan tempa Armor Kristal (Crystal Armor Set), Pedang Kristal,
+                 dan tongkat sihir Elf Mage.
+
+--------------------------------------------------------------------------------
+13. LIZARD RAWA (Swamp Lizard) 🦎
+    Habitat: Tepi Sungai, Rawa, dan Danau
+    Keahlian: Sapuan ekor berputar, gigitan rahang bawah, semburan asam meluncur
+--------------------------------------------------------------------------------
+• [meat] Daging Mentah 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Makanan.
+
+• [stone] Batu Granit 🪨
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Konstruksi bangunan dan tungku peleburan.
+
+• [hard_shell] Kulit Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [green_blood] Darah Hijau 🧪
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+--------------------------------------------------------------------------------
+14. GOLEM (Moss Rock Golem) 🗿
+    Habitat: Lereng Bebatuan & Pegunungan
+    Keahlian: Hantaman palu batu tanah ber-telegraph (AoE luas)
+--------------------------------------------------------------------------------
+• [stone] Batu Granit 🪨
+  - Rarity     : Common
+  - Peluang    : 100% (50% dapat 2 buah, 50% dapat 3 buah)
+  - Jumlah     : 2 - 3 pcs
+  - Kegunaan   : Pondasi batu, dinding benteng, stasiun kerja Anvil dan Smelter.
+
+• [meat] Inti Organik Lumut 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Pakan mob atau konsumsi darurat.
+
+--------------------------------------------------------------------------------
+15. T-REX (Apex Ancient Predator) 🦖
+    Habitat: Lembah Purba Pegunungan Tinggi
+    Keahlian: Raungan menggetarkan layar (screen shake), gigitan penghancur tulang,
+              dan injakan kaki raksasa
+--------------------------------------------------------------------------------
+• [meat] Daging Purba 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 4 pcs
+  - Kegunaan   : Daging berenergi sangat tinggi untuk pemain dan tunggangan buas.
+
+• [hard_shell] Sisik Purba Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar pemanggilan Kelabang Raksasa.
+
+• [boss_core] Inti Boss Purba 🔮
+  - Rarity     : Epic
+  - Peluang    : 7% (rate mob biasa — sama seperti semua mob lain)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan tempa senjata tier tertinggi (Pedang Titan, Pedang Naga),
+                 dan material peningkat zirah tier Legendary ke Mythic.
+
+--------------------------------------------------------------------------------
+16. NAGA MERAH (Red Mountain Dragon) 🐉
+    Habitat: Puncak Gunung Tertinggi di Dunia
+    Keahlian: Semburan api neraka membakar sambil terbang melayang di angkasa,
+              cakaran cakar maut berdamage tinggi
+--------------------------------------------------------------------------------
+• [boss_core] Inti Boss Naga 🔮
+  - Rarity     : Epic
+  - Peluang    : 7% (rate mob biasa; naga yang jadi MINI BOSS ikut rate 10%)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Inti api murni penempa Pedang Naga (Dragon Sword) dan armor legendaris.
+
+• [stone] Batu Gunung 🪨
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 2 - 3 pcs
+  - Kegunaan   : Material batu gunung keras.
+
+• [meat] Daging Naga 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Makanan berkalori tinggi.
+
+--------------------------------------------------------------------------------
+17. KELABANG RAKSASA (Giant Centipede - Boss Ritual Altar) 🐛
+    Habitat: Dipanggil secara khusus melalui Altar di Biome Tanah Merah (Redlands)
+    Keahlian: Melata cepat membelah medan, terbelah menjadi 2 tubuh saat HP 50%,
+              dan tubuhnya rontok menjadi ruas-ruas menggelinding saat mati
+--------------------------------------------------------------------------------
+• [centipede_shell] Cangkang Kelabang Purba 🐛
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 2 pcs
+  - Kegunaan   : Pembuatan Zirah Khitin legendaris.
+
+• [venom] Racun Murni 🧪
+  - Rarity     : Uncommon
+  - Peluang    : 100%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Alkimia dan senjata racun.
+
+• [toxic_venom] Racun Berbisa ☠
+  - Rarity     : Mythic
+  - Peluang    : 32%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar berikutnya.
+
+• [hard_shell] Kulit Keras 🛡
+  - Rarity     : Mythic
+  - Peluang    : 32%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar berikutnya.
+
+• [insect_leg] Kaki Serangga 🦵
+  - Rarity     : Mythic
+  - Peluang    : 32%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar berikutnya.
+
+• [boss_core] Inti Boss Kelabang 🔮
+  - Rarity     : Epic
+  - Peluang    : 50% (rate khusus boss altar)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Pembuatan equipment dan senjata kelas tertinggi.
+
+--------------------------------------------------------------------------------
+18. RUAS KELABANG (Centipede Body Segment) 🐛
+    Habitat: Terlepas di tanah saat Kelabang Raksasa mati / terbelah
+    Perilaku: Menggelinding di tanah, dapat diserang pemain untuk dipanen
+--------------------------------------------------------------------------------
+• [centipede_shell] Kulit Kelabang 🐛
+  - Rarity     : Uncommon
+  - Peluang    : 100% (50% dapat 1 buah, 50% dapat 2 buah)
+  - Jumlah     : 1 - 2 pcs
+  - Kegunaan   : Bahan zirah khitin.
+
+• [toxic_venom] Racun Berbisa ☠
+  - Rarity     : Mythic
+  - Peluang    : 16%
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan ritual Altar.
+
+--------------------------------------------------------------------------------
+19. MAMMOTH PURBA (Woolly Mammoth / Rajagading) 🦣
+    Habitat: Biome Pegunungan Tinggi (Mountain)
+    Kekuatan & Ukuran: Setara T-Rex Purba (HP 360, DMG 22)
+    Keahlian: Seruduk Langit (uppercut knockup), Hantaman Seismik (AoE gempa),
+              Sapuan Belalai (trunk sweep), dan Auman Sang Raja (roar rings)
+--------------------------------------------------------------------------------
+• [meat] Daging Purba 🥩
+  - Rarity     : Common
+  - Peluang    : 100%
+  - Jumlah     : 4 pcs
+  - Kegunaan   : Sumber makanan berkalori tinggi untuk petualang dan tunggangan buas.
+
+• [leather] Kulit Samak Tebal 🟫
+  - Rarity     : Common
+  - Peluang    : 100% (50% dapat 2 buah, 50% dapat 3 buah)
+  - Jumlah     : 2 - 3 pcs
+  - Kegunaan   : Bahan sadel tunggangan dan pembuatan perlengkapan kulit.
+
+• [tusk] Gading Mammoth 🦣
+  - Rarity     : Epic
+  - Peluang    : 5% (Drop langka berharga tinggi)
+  - Jumlah     : 1 pcs
+  - Kegunaan   : Bahan utama pembuatan Pedang Legendaris Dragonfang Greatsword!
+
+================================================================================
+RANGKUMAN 4 BAHAN SAKRAL RITUAL ALTAR (MYTHIC):
+Untuk memanggil Boss Kelabang Raksasa di Altar, pemain memerlukan tepat 1 buah dari:
+1. [toxic_venom] Racun Berbisa ☠ — Diperoleh dari: Kalajengking (16%), Semut (16%), Tarantula (32%), Kelabang/Ruas (16-32%).
+2. [hard_shell]  Kulit Keras 🛡  — Diperoleh dari: Kalajengking (16%), Kumbang (16%), Tarantula (32%), T-Rex (16%), Lizard (16%), Kelabang (32%).
+3. [insect_leg]  Kaki Serangga 🦵 — Diperoleh dari: Kalajengking (16%), Kumbang (16%), Semut (16%), Tarantula (32%), Kelabang (32%).
+4. [green_blood] Darah Hijau 🧪   — Diperoleh dari: Slime (16%), Kumbang (16%), Semut (16%), Tarantula (32%), Lizard (16%).
+================================================================================
+Dokumen diperbarui secara otomatis dan selaras dengan versi game terbaru.
