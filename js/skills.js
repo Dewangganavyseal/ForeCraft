@@ -58,6 +58,9 @@ BLOCK_PROF[B.ORE_CRYSTAL] ={sk:'mining',     xp:36, lvl:32};
 BLOCK_PROF[B.ORE_TUNGSTENSTEEL]={sk:'mining',xp:41, lvl:38};
 BLOCK_PROF[B.LEAF]        ={sk:'harvesting', xp:2,  lvl:1};
 BLOCK_PROF[B.RED_SOIL]    ={sk:'harvesting', xp:4,  lvl:1};
+BLOCK_PROF[B.CASTLE_WALL]={sk:'mining',     xp:14, lvl:5};
+BLOCK_PROF[B.FENCE]      ={sk:'logging',    xp:6,  lvl:1};
+BLOCK_PROF[B.GATE]       ={sk:'logging',    xp:8,  lvl:3};
 
 /* =========================================================================
    PROF — objek utama proficiency

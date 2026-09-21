@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /* ================= util global ================= */
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.32',
+  VERSION:'0.2.33',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -270,7 +270,8 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
      tier puncak, serta ORE_STONE (bongkahan granit/batu). Tiap ore punya
      syarat level Penambangan & peluang gagal per pukulan — lihat ORE_INFO di bawah. */
   ORE_COAL:16,ORE_COPPER:17,ORE_STEEL:18,ORE_TUNGSTEN:19,ORE_TUNGSTENSTEEL:20,
-  ORE_STONE:21};
+  ORE_STONE:21,
+  CASTLE_WALL:22,FENCE:23,GATE:24};
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
@@ -297,6 +298,9 @@ const BLOCK_INFO={
   [B.FARM] :{name:'Ladang',hp:2.0,drop:null,color:0x6f4a26},
   /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
   [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
+  [B.CASTLE_WALL]:{name:'Tembok Kastil',hp:8.0,drop:null,color:0x7d8590},
+  [B.FENCE]:{name:'Pagar Kayu',hp:3.0,drop:null,color:0x8a5f35},
+  [B.GATE]:{name:'Gerbang',hp:5.0,drop:null,color:0x6e4a2a},
 };
 /* pemetaan blok dunia ke ID item voxel di tas (hanya blok biome alami) */
 const BLOCK_TO_ITEM={
@@ -306,6 +310,9 @@ const BLOCK_TO_ITEM={
   [B.SAND]:'blk_sand',
   [B.SNOW]:'blk_snow',
   [B.RED_SOIL]:'blk_red_soil',
+  [B.CASTLE_WALL]:'blk_castle_wall',
+  [B.FENCE]:'blk_fence',
+  [B.GATE]:'blk_gate',
 };
 /* blok bijih → dipakai worldgen & UI penambangan. */
 const ORE_BLOCKS=[B.ORE_STONE,B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
@@ -631,6 +638,10 @@ const ITEMS={
   blk_snow:    {n:'Blok Salju',      e:'❄️', isBlock:true, blockId:B.SNOW,     rarity:'common', desc:'Blok salju beku. Bisa dipasang dan ditata di dunia.'},
   blk_plank:   {n:'Blok Papan',      e:'📦', isBlock:true, blockId:B.PLANK,    rarity:'common', desc:'Papan kayu olahan. Cocok untuk lantai & dinding rumah.'},
   blk_roof:    {n:'Blok Atap',       e:'🏠', isBlock:true, blockId:B.ROOF,     rarity:'common', desc:'Blok genteng atap bangunan.'},
+
+  blk_castle_wall:{n:'Tembok Kastil',e:'?', isBlock:true, blockId:B.CASTLE_WALL, rarity:'uncommon', desc:'Tembok batu kastil yang kokoh. Pasang lewat mode building.'},
+  blk_fence:{n:'Pagar Kayu',e:'?', isBlock:true, blockId:B.FENCE, rarity:'common', desc:'Pagar kayu pembatas. Pasang lewat mode building.'},
+  blk_gate:{n:'Gerbang',e:'?', isBlock:true, blockId:B.GATE, rarity:'uncommon', desc:'Gerbang yang bisa dibuka-tutup. Pasang lewat mode building.'},
   blk_red_soil:{n:'Blok Tanah Merah',e:'🟥', isBlock:true, blockId:B.RED_SOIL, rarity:'common', desc:'Tanah merah beracun dari biome Redlands.'},
   blk_farm:    {n:'Blok Ladang',     e:'🌾', isBlock:true, blockId:B.FARM,     rarity:'common', desc:'Blok tanah ladang siap tanam bibit.'},
 
@@ -969,6 +980,7 @@ const DROP_COLOR={
   blk_grass:0x5d9e3f, blk_dirt:0x7a5a3a, blk_stone:0x8a8f98, blk_wood:0x6e4f2f,
   blk_leaf:0x3f7d2f, blk_sand:0xe3d29a, blk_snow:0xe8f2fa, blk_plank:0xb98a55,
   blk_roof:0x9c5a3c, blk_red_soil:0x9e3b2c, blk_farm:0x6f4a26,
+  blk_castle_wall:0x7d8590, blk_fence:0x8a5f35, blk_gate:0x6e4a2a,
   wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
   rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,bomb:0x1a1a1e,
   meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,potion_stam:0xffd24d,
@@ -1658,7 +1670,10 @@ RECIPES.push(
   {out:'f_anvil',need:{iron_ingot:6,stone:6,wood:2},skill:'smith',prof:{mining:8},name:'Landasan Tempa'},
   {out:'f_smelter',need:{stone:12,iron_ore:4,coal:4},skill:'smith',prof:{mining:4},name:'Smelter Industri'},
   /* Rumah modular 5×5: satu modul per craft; disusun bebas & digabung di dunia */
-  {out:'f_house',need:{wood:20,fiber:8,stone:6},name:'Rumah Kayu'}
+  {out:'f_house',need:{wood:20,fiber:8,stone:6},name:'Rumah Kayu'},
+  {out:'blk_castle_wall',need:{stone:4},name:'Tembok Kastil'},
+  {out:'blk_fence',need:{wood:2},name:'Pagar Kayu'},
+  {out:'blk_gate',need:{wood:4,iron_ingot:1},name:'Gerbang'}
 );
 
 
@@ -1796,3 +1811,4 @@ const NPC_REJOIN_LINES=[
 function NPC_REJOIN_LINE(){
   return NPC_REJOIN_LINES[(Math.random()*NPC_REJOIN_LINES.length)|0];
 }
+

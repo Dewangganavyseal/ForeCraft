@@ -2533,6 +2533,22 @@ const Action={
       });
     }
 
+    /* ---------- GERBANG: buka/tutup (prioritas tinggi, setara NPC) ---------- */
+    if(typeof World!=="undefined"&&World.nearestGate){
+      const g=World.nearestGate(pPos,pFacing,3.2);
+      if(g){
+        const open=World.isGateOpen(g.x,g.y,g.z);
+        candidates.push({
+          score:g.d-0.35,
+          action:{
+            kind:"gate",gate:g,
+            label:(open?"Buka Gerbang":"Tutup Gerbang"),
+            pos:new THREE.Vector3(g.x+0.5,g.y+1.6,g.z+0.5)
+          }
+        });
+      }
+    }
+
     const f = Furni.nearest(pPos);
     if(f){
       const dx = f.x - pPos.x, dz = f.z - pPos.z;
@@ -2627,6 +2643,11 @@ const Action={
     else if(a.kind==='pet-ride'&&typeof Capture!=='undefined')Capture.startRide();
     else if(a.kind==='pet-dismount'&&typeof Capture!=='undefined')Capture.stopRide();
     else if(a.kind==='talk')NPCS.talk(a.npc);
+    else if(a.kind==='gate'&&typeof World!=="undefined"){
+      const wasOpen=World.isGateOpen(a.gate.x,a.gate.y,a.gate.z);
+      World.toggleGate(a.gate.x,a.gate.y,a.gate.z);
+      if(typeof UI!=="undefined"&&UI.toast)UI.toast(wasOpen?"Gerbang ditutup":"Gerbang dibuka");
+    }
     else if(a.kind==='furni')Furni.interact(a.furni);
     else if(a.kind==='altar'&&typeof Altar!=='undefined')Altar.open(a.altar);
     else if(a.kind==='place')Furni.placeFromHand();

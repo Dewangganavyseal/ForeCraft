@@ -31,6 +31,9 @@ const BuildSys = {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(this.SAVE_KEY, JSON.stringify(this.customBlocks));
+        /* state gerbang terbuka ikut tersimpan agar tetap terbuka setelah relog */
+        if(typeof World!=="undefined"&&World.openGates)
+          localStorage.setItem(this.SAVE_KEY+"_gates", JSON.stringify(World.openGates));
       }
     } catch (e) {}
   },
@@ -51,6 +54,20 @@ const BuildSys = {
         World.setBlock(p[0], p[1], p[2], this.customBlocks[key]);
       }
     }
+    /* kembalikan state gerbang terbuka yang tersimpan */
+    try {
+      if (typeof localStorage !== 'undefined' && typeof World !== 'undefined') {
+        const raw = localStorage.getItem(this.SAVE_KEY+"_gates");
+        if (raw) {
+          const gates = JSON.parse(raw) || {};
+          for (const k in gates) {
+            const p = k.split(',').map(Number);
+            if (p.length === 3 && World.getBlock(p[0],p[1],p[2])===B.GATE)
+              World.openGates[k] = 1;
+          }
+        }
+      }
+    } catch (e) {}
   },
 
   init() {

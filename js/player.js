@@ -820,6 +820,7 @@ const Player={
       [B.WOOD]:-0.25,[B.STONE]:0,[B.PLANK]:0,[B.ROOF]:0,
       [B.SAND]:0.25,[B.SNOW]:0.25,[B.GRASS]:0.45,[B.DIRT]:0.45,
       [B.RED_SOIL]:0.45,[B.FARM]:0.45,
+      [B.CASTLE_WALL]:0.1,[B.FENCE]:0.3,[B.GATE]:0.2,
     };
     const pcx=Math.floor(this.pos.x),pcz=Math.floor(this.pos.z);
     let blkHit=null,bestScore=Infinity;

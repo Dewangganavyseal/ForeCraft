@@ -1850,6 +1850,9 @@ const UI={
       blk_plank:   {top:'#c89b5d', left:'#b4884c', right:'#976f38', planks:true},
       blk_roof:    {top:'#b46543', left:'#9c5334', right:'#7e3e23'},
       blk_red_soil:{top:'#b44534', left:'#9c3b2c', right:'#7d2b1e'},
+      blk_castle_wall:{top:'#8d95a0', left:'#7d8590', right:'#5f666f'},
+      blk_fence:{top:'#9a6b40', left:'#8a5f35', right:'#644324', planks:true},
+      blk_gate:{top:'#7d5633', left:'#6e4a2a', right:'#4a2f1a'},
       blk_farm:    {top:'#5a3d1e', left:'#6f4a26', right:'#4e3318'}
     };
 
@@ -2908,6 +2911,7 @@ const UI={
     if(it.food)return{k:'food',t:'🍖 Makanan & Obat'};
     if(it.weapon)return{k:'weapon',t:'⚔️ Senjata'};
     if(it.armor)return{k:'armor',t:'🛡️ Armor'};
+    if(it.isBlock)return{k:'furni',t:'Furnitur'};
     if(it.place)return{k:'furni',t:'🪑 Furnitur'};
     return{k:'mat',t:'📦 Bahan & Lainnya'};
   },
