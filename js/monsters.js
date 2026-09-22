@@ -3970,10 +3970,30 @@ const Monsters={
   },
 
   physics(m,dt){
-    /* bila naga sedang terbang, lewati gravitasi & ground clamp agar melayang bebas */
+    /* bila naga sedang terbang, terbang leluasa di atas rintangan atau tabrak bila lebih tinggi */
     if(m.type==='dragon' && (m.flying || (m.flyT||0)>0)){
-      m.pos.x+=m.vel.x*dt;
-      m.pos.z+=m.vel.z*dt;
+      const nx = m.pos.x + m.vel.x * dt;
+      const nz = m.pos.z + m.vel.z * dt;
+      const groundAtTarget = (typeof World !== 'undefined' && World.groundAt) ? World.groundAt(nx, nz, CFG.WORLD_H - 1) : 0;
+      const castleHeight = (typeof FurniCastle !== 'undefined' && FurniCastle.castleHeightAt) ? FurniCastle.castleHeightAt(nx, nz) : 0;
+      const topAtTarget = Math.max(groundAtTarget, castleHeight);
+
+      // Bila naga lebih tinggi dari puncak rintangan (kastil/atap/tebing): terbang leluasa melewati atasnya
+      if (topAtTarget <= 0 || m.pos.y >= topAtTarget - 0.4) {
+        m.pos.x = nx;
+        m.pos.z = nz;
+      } else {
+        // Bila rintangan di depan lebih tinggi dari jalur terbang: tabrak & jangan tembus dinding
+        const blockX = (typeof Furni !== 'undefined' && Furni.solidAt && Furni.solidAt(nx, m.pos.y, m.pos.z)) ||
+                       (typeof World !== 'undefined' && World.blockedAt && World.blockedAt(nx, m.pos.y, m.pos.z, 0.65)) ||
+                       (castleHeight > 0 && m.pos.y < castleHeight);
+        const blockZ = (typeof Furni !== 'undefined' && Furni.solidAt && Furni.solidAt(m.pos.x, m.pos.y, nz)) ||
+                       (typeof World !== 'undefined' && World.blockedAt && World.blockedAt(m.pos.x, m.pos.y, nz, 0.65)) ||
+                       (castleHeight > 0 && m.pos.y < castleHeight);
+
+        if (!blockX) m.pos.x = nx; else m.vel.x = 0;
+        if (!blockZ) m.pos.z = nz; else m.vel.z = 0;
+      }
       return;
     }
     m._stepCd=Math.max(0,(m._stepCd||0)-dt);

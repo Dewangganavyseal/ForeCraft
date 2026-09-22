@@ -55,8 +55,20 @@ const Furni={
      DEF.solidBoxes=[{x,z,w,d,h}] untuk bentuk GANDA (mis. meja + badan kios)
      — koordinat & ukuran dalam satuan MODEL (belum dikali skala build). */
   solidAt(x,y,z){
-    if(!this.list.length)return false;
+    if(!this.list.length&&(!this.houses||!this.houses.length))return false;
+    /* Pintu rumah kayu tertutup memblokir gerakan */
+    if(this.houses){
+      for(const h of this.houses){
+        if(!h.doorOpen&&h.doorMeshPos){
+          const ddx=x-h.doorMeshPos.x, ddz=z-h.doorMeshPos.z;
+          if(Math.hypot(ddx,ddz)<=0.85&&y>=h.y&&y<=h.y+2.0)return true;
+        }
+      }
+    }
     for(const f of this.list){
+      if(typeof FurniCastle!=='undefined'&&f.def&&(f.def.startsWith('castle')||f.def.startsWith('fence')||f.def.startsWith('gate'))){
+        if(FurniCastle.solidAt(f,x,y,z))return true;
+      }
       const def=this.DEFS[f.def];
       if(!def||!def.solid)continue;
       /* kumpulkan kotak-kotak padat perabot ini */
@@ -150,6 +162,34 @@ const Furni={
        tidak punya aksi `use` dan tidak masuk Furni.list. */
     house:{n:'Rumah Kayu',e:'🏠',item:'f_house',r:2.2,decor:true,
       build(){return Furni.buildHouse();}},
+
+    /* ---------- KASTIL, PAGAR & GERBANG (port NEW MODEL/Kastil dan Pagar.html) ---------- */
+    castle1:{n:'Kastil T1 (14×14)',e:'🏰',item:'f_castle1',r:6.0,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildCastle(1):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
+    castle2:{n:'Kastil T2 (17×17)',e:'🏰',item:'f_castle2',r:7.5,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildCastle(2):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
+    castle3:{n:'Kastil T3 (20×20)',e:'🏰',item:'f_castle3',r:9.0,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildCastle(3):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
+
+    fence1:{n:'Pagar Kayu T1',e:'🛡️',item:'f_fence1',r:1.0,decor:true,
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFence(1):new THREE.Group();}},
+    fence2:{n:'Pagar Batu T2',e:'🛡️',item:'f_fence2',r:1.0,decor:true,
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFence(2):new THREE.Group();}},
+    fence3:{n:'Benteng Imperial T3',e:'🛡️',item:'f_fence3',r:1.8,decor:true,
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFence(3):new THREE.Group();}},
+
+    gate1:{n:'Gerbang Pagar T1',e:'🚪',item:'f_gate1',r:2.4,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFenceGate(1):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
+    gate2:{n:'Gerbang Pagar T2',e:'🚪',item:'f_gate2',r:2.4,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFenceGate(2):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
+    gate3:{n:'Gerbang Benteng T3',e:'🚪',item:'f_gate3',r:4.2,label:'🚪 Buka/Tutup Gerbang',
+      build(){return (typeof FurniCastle!=='undefined')?FurniCastle.buildFenceGate(3):new THREE.Group();},
+      use(f){if(typeof FurniCastle!=='undefined')FurniCastle.toggleGate(f);}},
   },
 
   /* Ukuran satu modul rumah dalam blok (kotak 7×7).
@@ -784,6 +824,19 @@ const Furni={
                       door.side==='e'?!inF(x+1,z):!inF(x-1,z);
         if(inF(x,z)&&outward)doorBlocks.add(K(x,z));
       }
+
+      /* Pintu ganda kayu Forecraft (daun pintu ganda dengan engsel) */
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.buildHouseDoor){
+        const dm=FurniCastle.buildHouseDoor();
+        let dx0=0,dz0=0,rotY=0;
+        if(door.side==='s'){dx0=door.x+1.0-ox;dz0=door.z+0.5-oz;rotY=0;}
+        else if(door.side==='n'){dx0=door.x+1.0-ox;dz0=door.z+0.5-oz;rotY=Math.PI;}
+        else if(door.side==='e'){dx0=door.x+0.5-ox;dz0=door.z+1.0-oz;rotY=Math.PI/2;}
+        else if(door.side==='w'){dx0=door.x+0.5-ox;dz0=door.z+1.0-oz;rotY=-Math.PI/2;}
+        dm.position.set(dx0,0,dz0);
+        dm.rotation.y=rotY;
+        g.add(dm);
+      }
     }
 
     /* ---- DINDING per kolom blok tepi (meniru buildVillagePart) ----
@@ -869,12 +922,33 @@ const Furni={
   /* kunci stabil untuk perabot desa: dipakai mengingat mana yang sudah
      dihancurkan pemain & menyimpan isi petinya antar kunjungan */
   autoKey(defId,x,z){return defId+'@'+x.toFixed(1)+','+z.toFixed(1);},
-  place(defId,x,y,z,yaw,auto){
+  place(defId,x,y,z,yaw,auto,fromLoad){
     const def=this.DEFS[defId];
     if(!def)return null;
     /* RUMAH MODULAR: ditangani jalur khusus (snap ke grid + auto-merge);
        yaw dipakai untuk mengarahkan pintu (diputar per 90°). */
     if(defId==='house'&&!auto)return this.placeHouse(x,z,yaw);
+    /* KASTIL: validasi kelayakan tanah (harus rata, bebas pohon & ore) — HANYA saat dipasang baru, BUKAN saat relog/load */
+    if(defId.startsWith('castle')&&!auto&&!fromLoad&&typeof FurniCastle!=='undefined'){
+      const tier=parseInt(defId.replace('castle',''))||1;
+      const site=FurniCastle.castleSiteCheck(x,z,tier);
+      if(!site.ok){
+        if(typeof UI!=='undefined'&&UI.toast)UI.toast(site.reason);
+        return null;
+      }
+      y=site.y;
+      x=Math.round(x);
+      z=Math.round(z);
+
+      // Geser pemain, NPC, dan monster ke luar area kastil (depan gerbang) agar tidak terjepit di pilar/dinding
+      const size=FurniCastle.getCastleSize(tier);
+      const half=size/2;
+      const safeDist=half+2.5;
+      const safeX=x+Math.sin(yaw||0)*safeDist;
+      const safeZ=z+Math.cos(yaw||0)*safeDist;
+      const safeY=(typeof World!=='undefined'&&World.groundAt)?World.groundAt(safeX,safeZ,y+4):y;
+      this.displaceEntitiesFromBuilding(x,y,z,size,size,safeX,safeY,safeZ);
+    }
     /* perabot desa yang pernah dihancurkan tidak dibangkitkan lagi */
     const akey=auto?this.autoKey(defId,x,z):null;
     if(akey&&this.dead[akey])return null;
@@ -904,6 +978,7 @@ const Furni={
         }
     }
     this.list.push(f);
+    if(defId.startsWith('fence')&&typeof FurniCastle!=='undefined')FurniCastle.rebuildFences();
 
     if(!auto)this.save();
     return f;
@@ -951,13 +1026,15 @@ const Furni={
         if(id===B.AIR||id===B.WATER||id===B.ROOF){ty--;continue;}
         base=id;break;
       }
+      const waterLevel=(typeof CFG!=='undefined'&&CFG.WATER_Y)?CFG.WATER_Y:4.82;
       if(base===B.AIR)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
-      if(ty+1<=CFG.SEA)return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
-      if(base===B.PLANK||base===B.WOOD)
+      if(base===B.WATER||ty+1<waterLevel||World.getBlock(cx2,ty+1,cz2)===B.WATER)
+        return {ok:false,reason:'🌊 Tidak bisa membangun di air'};
+      if(base===B.WOOD)
         return {ok:false,reason:'🌳 Ada halangan di petak ini (tebang dulu)'};
       const natural=(base===B.GRASS||base===B.DIRT||base===B.SAND||
-                     base===B.SNOW||base===B.STONE||base===B.FARM);
-      if(!natural)return {ok:false,reason:'🌳 Ada halangan di petak ini (tebang dulu)'};
+                     base===B.SNOW||base===B.STONE||base===B.RED_SOIL||base===B.FARM||base===B.PLANK);
+      if(!natural)return {ok:false,reason:'🌳 Ada halangan di petak ini (bersihkan dulu)'};
       const t=ty+1;
       if(y===null)y=t;
       else if(t!==y)return {ok:false,reason:'⛰️ Daratan tidak rata — ratakan dulu'};
@@ -1122,6 +1199,37 @@ const Furni={
         if((dx||dz)&&inF(x+dx,z+dz))near=true;
       if(near)put(x,h+H,z,B.ROOF);                          // lisplang
     }
+
+    /* Kelola objek 3D daun pintu ganda rumah di scene */
+    if(erase){
+      if(rec.doorMesh&&this.scene){
+        this.scene.remove(rec.doorMesh);
+        rec.doorMesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
+        rec.doorMesh=null;
+      }
+    }else if(door&&typeof FurniCastle!=='undefined'&&FurniCastle.buildHouseDoor&&this.scene){
+      if(rec.doorMesh){
+        this.scene.remove(rec.doorMesh);
+        rec.doorMesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
+        rec.doorMesh=null;
+      }
+      const dm=FurniCastle.buildHouseDoor();
+      let rotY=0,dx0=0,dz0=0;
+      if(door.side==='s'){dx0=door.x+1.0;dz0=door.z+0.5;rotY=0;}
+      else if(door.side==='n'){dx0=door.x+1.0;dz0=door.z+0.5;rotY=Math.PI;}
+      else if(door.side==='e'){dx0=door.x+0.5;dz0=door.z+1.0;rotY=Math.PI/2;}
+      else if(door.side==='w'){dx0=door.x+0.5;dz0=door.z+1.0;rotY=-Math.PI/2;}
+
+      dm.position.set(dx0,h,dz0);
+      dm.rotation.y=rotY;
+      dm.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+      this.scene.add(dm);
+      rec.doorMesh=dm;
+      rec.doorMeshPos={x:dx0,y:h,z:dz0};
+      if(rec.doorOpen===undefined)rec.doorOpen=false;
+      rec.targetDoorProgress=rec.doorOpen?1.0:0.0;
+      rec.doorProgress=rec.doorOpen?1.0:0.0;
+    }
   },
   /* Pasang satu modul: blok (x,z) yang diklik menjadi BLOK TENGAH modul.
      Modul boleh bersinggungan ATAU bertumpuk sebagian dengan rumah yang sudah
@@ -1184,7 +1292,60 @@ const Furni={
     this.writeHouseBlocks(rec,false);
     this.houses.push(rec);
     this.save();
+
+    // Geser entitas keluar dari dalam rumah agar tidak terjebak di dinding/tiang
+    let safeX=bx+S/2, safeZ=bz+S/2;
+    if(rec.door){
+      safeX=rec.door.x+1.0; safeZ=rec.door.z+0.5;
+      if(rec.door.side==='s') safeZ+=2.0;
+      else if(rec.door.side==='n') safeZ-=2.0;
+      else if(rec.door.side==='e') safeX+=2.0;
+      else if(rec.door.side==='w') safeX-=2.0;
+    }
+    const safeY=(typeof World!=='undefined'&&World.groundAt)?World.groundAt(safeX,safeZ,site.y+4):site.y;
+    this.displaceEntitiesFromBuilding(bx+S/2,site.y,bz+S/2,S,S,safeX,safeY,safeZ);
+
     return rec;
+  },
+
+  /* Geser karakter pemain, NPC, dan monster yang berada di dalam tapak bangunan baru ke luar area aman */
+  displaceEntitiesFromBuilding(cx,cy,cz,sizeX,sizeZ,safeX,safeY,safeZ){
+    const halfX=sizeX/2, halfZ=sizeZ/2;
+    // 1. Karakter pemain
+    if(typeof Player!=='undefined'&&Player.pos){
+      if(Math.abs(Player.pos.x-cx)<=halfX+0.3 && Math.abs(Player.pos.z-cz)<=halfZ+0.3){
+        Player.pos.set(safeX,safeY,safeZ);
+        if(Player.vel)Player.vel.set(0,0,0);
+        if(Player.mesh)Player.mesh.position.copy(Player.pos);
+        if(typeof UI!=='undefined'&&UI.toast)UI.toast('🛡️ Karakter digeser ke area aman di luar bangunan');
+      }
+    }
+    // 2. Penduduk desa / NPC rekan
+    if(typeof NPCS!=='undefined'&&NPCS.list){
+      for(const n of NPCS.list){
+        if(!n.pos||n.dead)continue;
+        if(Math.abs(n.pos.x-cx)<=halfX+0.5 && Math.abs(n.pos.z-cz)<=halfZ+0.5){
+          const sx=safeX+(Math.random()-0.5)*3.0, sz=safeZ+(Math.random()-0.5)*3.0;
+          const sy=(typeof World!=='undefined'&&World.groundAt)?World.groundAt(sx,sz,cy+4):safeY;
+          n.pos.set(sx,sy,sz);
+          if(n.vel)n.vel.set(0,0,0);
+          if(n.mesh)n.mesh.position.copy(n.pos);
+        }
+      }
+    }
+    // 3. Mob / Pet
+    if(typeof Monsters!=='undefined'&&Monsters.list){
+      for(const m of Monsters.list){
+        if(!m.pos||m.dead)continue;
+        if(Math.abs(m.pos.x-cx)<=halfX+0.5 && Math.abs(m.pos.z-cz)<=halfZ+0.5){
+          const sx=safeX+(Math.random()-0.5)*3.0, sz=safeZ+(Math.random()-0.5)*3.0;
+          const sy=(typeof World!=='undefined'&&World.groundAt)?World.groundAt(sx,sz,cy+4):safeY;
+          m.pos.set(sx,sy,sz);
+          if(m.vel)m.vel.set(0,0,0);
+          if(m.mesh)m.mesh.position.copy(m.pos);
+        }
+      }
+    }
   },
 
   remove(f,drop){
@@ -1253,6 +1414,7 @@ const Furni={
       this.save();
     }else if(!f.auto)this.save();
 
+    if(f.def&&f.def.startsWith('fence')&&typeof FurniCastle!=='undefined')FurniCastle.rebuildFences();
   },
   /* perabot terdekat yang masih dalam radius interaksinya sangat dekat & searah hadap pemain
      (perabot dekorasi tanpa aksi dilewati) */
@@ -1312,11 +1474,12 @@ const Furni={
     this.beginPlace(ITEMS[s.id].place);
     return true;
   },
-  beginPlace(defId){
+  beginPlace(defId, sourceSlot){
     const def=this.DEFS[defId];
     if(!def)return;
     this.cancelPlace();                       // pastikan tidak ada ghost tersisa
     this.placing=defId;
+    this.placingSlot=(sourceSlot!==undefined)?sourceSlot:null;
     /* orientasi awal menghadap pemain; bisa diputar. Posisi awal di depan
        pemain, lalu dipindah-pindah lewat klik. */
     this.placeYaw=Math.round((Cam.yaw+Math.PI)/(Math.PI/2))*(Math.PI/2);
@@ -1345,13 +1508,19 @@ const Furni={
     bar.querySelector('#pb-ok').addEventListener('click',e=>{e.stopPropagation();this.confirmPlace();});
     bar.querySelector('#pb-x').addEventListener('click',e=>{e.stopPropagation();this.cancelPlace();});
     this.placeBar=bar;
-    UI.toast(`📦 Memasang ${def.n} — klik tanah utk geser (maks ${this.PLACE_R} blok) · Putar/Pasang/Batal di bawah`);
+    UI.toast(`📦 Memasang ${def.n} — klik tanah utk geser · Putar/Pasang/Batal di bawah`);
     this.updateGhost();
   },
   /* posisi awal ghost: di depan pemain mengikuti arah kamera */
   defaultTarget(){
     const yaw=Cam.yaw;
-    const dist=this.placing==='boat'?3.4:1.6;
+    let dist=1.6;
+    if(this.placing==='boat') dist=3.4;
+    else if(this.placing&&this.placing.startsWith('castle')){
+      const tier=parseInt(this.placing.replace('castle',''))||1;
+      const size=(typeof FurniCastle!=='undefined')?FurniCastle.getCastleSize(tier):14;
+      dist=size*0.6;
+    }
     const tx=Math.floor(Player.pos.x-Math.sin(yaw)*dist)+0.5;
     const tz=Math.floor(Player.pos.z-Math.cos(yaw)*dist)+0.5;
     return {x:tx,y:this.surfaceAt(tx,tz),z:tz};
@@ -1395,14 +1564,14 @@ const Furni={
     const p=this.placeTarget;
     if(!p||!this.placing)return {valid:false,reason:''};
     let valid=true,reason='';
+    const isCastle=this.placing&&this.placing.startsWith('castle');
+    const maxR=isCastle?28:(this.PLACE_R+0.6);
     /* pemasangan harus dalam jangkauan pemain (PLACE_R) */
-    if(Math.hypot(p.x-Player.pos.x,p.z-Player.pos.z)>this.PLACE_R+0.6){
-      valid=false;reason=`Terlalu jauh dari pemain (maks ${this.PLACE_R} blok)`;
+    if(Math.hypot(p.x-Player.pos.x,p.z-Player.pos.z)>maxR){
+      valid=false;reason=`Terlalu jauh dari pemain (maks ${Math.round(maxR)} blok)`;
     }
-    /* jangkauan TEGAK: dulu hanya jarak mendatar yang diperiksa, sehingga
-       perabot bisa "sah" dipasang di atap 6 blok di atas kepala (ghost tetap
-       hijau). Perabot harus berada pada permukaan yang bisa dijangkau tangan. */
-    else if(this.placing!=='boat'&&p.y>=0&&Math.abs(p.y-Player.pos.y)>2.6){
+    /* jangkauan TEGAK */
+    else if(this.placing!=='boat'&&!isCastle&&p.y>=0&&Math.abs(p.y-Player.pos.y)>2.6){
       valid=false;reason='📏 Terlalu tinggi/rendah — dekati permukaannya';
     }
     else if(this.placing==='house'){
@@ -1429,13 +1598,39 @@ const Furni={
       if(!site.ok){valid=false;reason=site.reason;}
       return {valid,reason};
     }
+    else if(isCastle){
+      const tier=parseInt(this.placing.replace('castle',''))||1;
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.castleSiteCheck){
+        const site=FurniCastle.castleSiteCheck(p.x,p.z,tier);
+        if(!site.ok){valid=false;reason=site.reason;}
+      }
+    }
+    else if(this.placing.startsWith('fence')){
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.fenceSiteCheck){
+        const site=FurniCastle.fenceSiteCheck(p.x,p.z);
+        if(!site.ok){valid=false;reason=site.reason;}
+      }
+    }
+    else if(this.placing.startsWith('gate')){
+      const tier=parseInt(this.placing.replace('gate',''))||1;
+      const axis=(Math.abs(Math.cos(this.placeYaw)) > 0.7)?'x':'z';
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.gateSiteCheck){
+        const site=FurniCastle.gateSiteCheck(p.x,p.z,tier,axis);
+        if(!site.ok){valid=false;reason=site.reason;}
+      }
+    }
     else if(this.placing==='boat'){
       if(!World.inWaterAt(p.x,CFG.WATER_Y-0.2,p.z)){valid=false;reason='🛶 Perahu hanya bisa di air';}
     }else if(p.y<0){valid=false;reason='Tidak ada permukaan di sini';}
     else if(p.y<CFG.WATER_Y){valid=false;reason='🌊 Tidak bisa memasang di dalam air';}
     if(valid){
-      for(const f of this.list)
-        if(Math.hypot(f.x-p.x,f.z-p.z)<0.9){valid=false;reason='Sudah ada perabot di situ';break;}
+      for(const f of this.list){
+        if(isCastle&&f.def&&f.def.startsWith('castle')){
+          if(Math.hypot(f.x-p.x,f.z-p.z)<12){valid=false;reason='Terlalu dekat dengan kastil lain';break;}
+        }else if(!isCastle&&Math.hypot(f.x-p.x,f.z-p.z)<0.9){
+          valid=false;reason='Sudah ada perabot di situ';break;
+        }
+      }
     }
     return {valid,reason};
   },
@@ -1444,9 +1639,21 @@ const Furni={
     /* kondisi tak lagi memungkinkan → batalkan */
     if(Player.dead||this.riding){this.cancelPlace();return;}
     if(typeof UI!=='undefined'&&UI.open){this.cancelPlace();return;}
-    /* item di tangan berubah/habis → batalkan otomatis */
-    const s=RPG.hotbar[RPG.sel];
-    if(!s||!ITEMS[s.id].place||ITEMS[s.id].place!==this.placing){this.cancelPlace();return;}
+    /* item di tangan atau slot furnitur berubah/habis → batalkan otomatis */
+    let s=null;
+    if(this.placingSlot!==null&&this.placingSlot!==undefined&&RPG.furniBag&&RPG.furniBag[this.placingSlot]){
+      const cs=RPG.furniBag[this.placingSlot];
+      if(cs&&ITEMS[cs.id]&&ITEMS[cs.id].place===this.placing)s=cs;
+    }
+    if(!s&&RPG.furniBag){
+      const fi=RPG.furniBag.findIndex(cs=>cs&&ITEMS[cs.id]&&ITEMS[cs.id].place===this.placing);
+      if(fi>=0){s=RPG.furniBag[fi];this.placingSlot=fi;}
+    }
+    if(!s&&RPG.hotbar){
+      const hs=RPG.hotbar[RPG.sel];
+      if(hs&&ITEMS[hs.id]&&ITEMS[hs.id].place===this.placing)s=hs;
+    }
+    if(!s){this.cancelPlace();return;}
     if(!this.placeTarget)this.placeTarget=this.defaultTarget();
     const v=this.computeValid();
     this.placeValid=v.valid;
@@ -1468,6 +1675,16 @@ const Furni={
         gy=site.ok?site.y:Player.pos.y;
       }
       this.ghost.position.set(c.x,gy,c.z);
+      this.ghost.rotation.y=this.placeYaw;
+    }else if(this.placing&&this.placing.startsWith('castle')){
+      const tier=parseInt(this.placing.replace('castle',''))||1;
+      const snapX=Math.round(p.x), snapZ=Math.round(p.z);
+      let gy=p.y;
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.castleSiteCheck){
+        const site=FurniCastle.castleSiteCheck(snapX,snapZ,tier);
+        if(site.ok)gy=site.y;
+      }
+      this.ghost.position.set(snapX,gy,snapZ);
       this.ghost.rotation.y=this.placeYaw;
     }else{
       this.ghost.position.set(p.x,p.y>=0?p.y:Player.pos.y,p.z);
@@ -1550,8 +1767,9 @@ const Furni={
     const tx=bx+0.5,tz=bz+0.5;
     /* jarak pasang maksimum dari pemain */
     const dp=Math.hypot(tx-Player.pos.x,tz-Player.pos.z);
-    if(dp>this.PLACE_R){
-      UI.toast(`📏 Terlalu jauh — mendekatlah (maks ${this.PLACE_R} blok)`);
+    const maxR=(this.placing&&this.placing.startsWith('castle'))?28:this.PLACE_R;
+    if(dp>maxR){
+      UI.toast(`📏 Terlalu jauh — mendekatlah (maks ${Math.round(maxR)} blok)`);
       return;
     }
     this.placeTarget={x:tx,y:this.surfaceAt(tx,tz),z:tz};
@@ -1569,18 +1787,43 @@ const Furni={
     const v=this.computeValid();
     if(!v.valid){UI.toast('❌ '+(v.reason||'Tidak bisa meletakkan di sini'));return;}
     const defId=this.placing;
-    const s=RPG.hotbar[RPG.sel];
-    if(!s||!ITEMS[s.id].place||ITEMS[s.id].place!==defId){this.cancelPlace();return;}
+
+    // Cari sumber item: dari RPG.furniBag (placingSlot) atau fallback hotbar
+    let s=null, sourceArr=null, sourceIdx=-1;
+    if(this.placingSlot!==null&&this.placingSlot!==undefined&&RPG.furniBag&&RPG.furniBag[this.placingSlot]){
+      const cs=RPG.furniBag[this.placingSlot];
+      if(cs&&ITEMS[cs.id]&&ITEMS[cs.id].place===defId){
+        s=cs;sourceArr=RPG.furniBag;sourceIdx=this.placingSlot;
+      }
+    }
+    if(!s&&RPG.furniBag){
+      const fi=RPG.furniBag.findIndex(cs=>cs&&ITEMS[cs.id]&&ITEMS[cs.id].place===defId);
+      if(fi>=0){s=RPG.furniBag[fi];sourceArr=RPG.furniBag;sourceIdx=fi;this.placingSlot=fi;}
+    }
+    if(!s){
+      const hs=RPG.hotbar[RPG.sel];
+      if(hs&&ITEMS[hs.id]&&ITEMS[hs.id].place===defId){
+        s=hs;sourceArr=RPG.hotbar;sourceIdx=RPG.sel;
+      }
+    }
+    if(!s){this.cancelPlace();return;}
+
     const p=this.placeTarget;
     this.place(defId,p.x,p.y,p.z,this.placeYaw,false);
-    s.n--;if(s.n<=0)RPG.hotbar[RPG.sel]=null;
+    s.n--;
+    if(s.n<=0){
+      sourceArr[sourceIdx]=null;
+      if(sourceArr===RPG.furniBag&&RPG.selectedFurniSlot===sourceIdx)RPG.selectedFurniSlot=-1;
+    }
     Sfx.craft();
     FX.debris(new THREE.Vector3(p.x,p.y+0.4,p.z),0xd6b06a,8,1.6);
     UI.toast(`${this.DEFS[defId].e} ${this.DEFS[defId].n} diletakkan`);
     UI.renderHotbar();
-    /* RUMAH: pertahankan mode pasang selama masih ada modul di tangan supaya
-       pemain bisa langsung menyusun petak berikutnya (modular). */
-    if(defId==='house'&&RPG.hotbar[RPG.sel]&&ITEMS[RPG.hotbar[RPG.sel].id].place==='house'){
+    if(sourceArr===RPG.furniBag&&UI.renderFurniBag)UI.renderFurniBag();
+
+    /* Struktur modular/berantai (pagar, gerbang, rumah): pertahankan mode pasang jika masih ada modul di tangan */
+    const isModular = defId==='house'||defId.startsWith('fence')||defId.startsWith('gate');
+    if(isModular && s && s.n>0){
       this.placeTarget=this.defaultTarget();
       this.updateGhost();
       return;
@@ -1598,7 +1841,7 @@ const Furni={
     }
     this.ghostMats=[];
     if(this.placeBar){this.placeBar.remove();this.placeBar=null;}
-    this.placing=null;this.placePos=null;this.placeTarget=null;this.placeValid=false;
+    this.placing=null;this.placingSlot=null;this.placePos=null;this.placeTarget=null;this.placeValid=false;
   },
 
   /* =========================================================================
@@ -1621,6 +1864,39 @@ const Furni={
      pola yang sudah dipakai bar penempatan perabot, jadi terasa konsisten dan
      tidak menambah hal baru untuk dipelajari.
      ========================================================================= */
+  /* Interaksi pintu ganda rumah kayu (buka / tutup dengan animasi smooth) */
+  nearestHouseDoor(pos, facing, maxD=3.2){
+    if(!this.houses||!this.houses.length)return null;
+    let best=null, bd=1e9;
+    for(const h of this.houses){
+      if(!h.doorMeshPos)continue;
+      const dx=h.doorMeshPos.x-pos.x, dz=h.doorMeshPos.z-pos.z;
+      const d=Math.hypot(dx,dz);
+      if(d>maxD)continue;
+      if(facing!==undefined){
+        let diff=Math.abs(Math.atan2(dx,dz)-facing);
+        if(diff>Math.PI)diff=Math.PI*2-diff;
+        if(diff>1.4)continue;
+      }
+      if(d<bd){
+        bd=d;
+        best={house:h, d, pos:new THREE.Vector3(h.doorMeshPos.x, h.doorMeshPos.y+1.2, h.doorMeshPos.z)};
+      }
+    }
+    return best;
+  },
+
+  toggleHouseDoor(h){
+    if(!h)return;
+    h.doorOpen=!h.doorOpen;
+    h.targetDoorProgress=h.doorOpen?1.0:0.0;
+    if(typeof Sfx!=='undefined'&&Sfx.craft)Sfx.craft();
+    if(typeof UI!=='undefined'&&UI.toast){
+      UI.toast(h.doorOpen?"🚪 Pintu rumah dibuka":"🔒 Pintu rumah ditutup");
+    }
+    this.save();
+  },
+
   doorEdit:null,
   /* apakah pemain berada di dalam / menempel rumahnya sendiri? (untuk
      memunculkan aksi "Atur Pintu"). Margin 1 blok supaya berdiri di depan
@@ -2032,6 +2308,31 @@ const Furni={
     if(this.sleepT>0)this.sleepT-=dt;
     /* mode penempatan: perbarui posisi & warna ghost tiap frame */
     if(this.placing)this.updateGhost();
+    /* --- Kastil & Gerbang: animasi halus pintu ganda / gerbang angkat & cutaway atap --- */
+    if(typeof FurniCastle!=='undefined')FurniCastle.update(dt);
+    /* --- Pintu Rumah Kayu: animasi buka-tutup berayun ganda halus --- */
+    if(this.houses){
+      for(const h of this.houses){
+        if(!h.doorMesh||!h.doorMesh.userData||!h.doorMesh.userData.gateParts)continue;
+        if(h.doorProgress===undefined)h.doorProgress=h.doorOpen?1.0:0.0;
+        if(h.targetDoorProgress===undefined)h.targetDoorProgress=h.doorOpen?1.0:0.0;
+
+        if(h.doorProgress!==h.targetDoorProgress){
+          const speed=2.6;
+          if(h.doorProgress<h.targetDoorProgress){
+            h.doorProgress=Math.min(h.targetDoorProgress,h.doorProgress+dt*speed);
+          }else{
+            h.doorProgress=Math.max(h.targetDoorProgress,h.doorProgress-dt*speed);
+          }
+          const ease=h.doorProgress<0.5
+            ?4*h.doorProgress*h.doorProgress*h.doorProgress
+            :1-Math.pow(-2*h.doorProgress+2,3)/2;
+          const parts=h.doorMesh.userData.gateParts;
+          if(parts.leafL)parts.leafL.rotation.y=-ease*(Math.PI*0.55);
+          if(parts.leafR)parts.leafR.rotation.y=ease*(Math.PI*0.55);
+        }
+      }
+    }
     /* tutup peti berayun terbuka/menutup seperti prototipe Chest.html:
        easeOutBack saat membuka (memantul), easeInOut saat menutup. Sudut
        penuh -1.92 rad ≈ 110°. Glow & harta di dalam ikut berdenyut.
@@ -2271,18 +2572,40 @@ const Furni={
      menjatuhkan kembali itemnya, sehingga isi rumah desa bisa dipanen.
      ========================================================================= */
   HP:{table:18,chair:12,bed:18,chest:24,boat:30,board:15,
-    workbench:24,anvil:30,stove:24,campfire:12,smelter:30},
+    workbench:24,anvil:30,stove:24,campfire:12,smelter:30,
+    /* Pagar & Gerbang: Tier 1 = 100 pukulan, Tier 2 = 200 pukulan, Tier 3 = 300 pukulan */
+    fence1:100,gate1:100,
+    fence2:200,gate2:200,
+    fence3:300,gate3:300,
+    /* Kastil: Tier 1 = 500 pukulan, Tier 2 = 750 pukulan, Tier 3 = 1000 pukulan */
+    castle1:500,castle2:750,castle3:1000},
   hitNearest(pos,facing,dmg = 3){
     const reach = (typeof RPG !== 'undefined' && RPG.weaponReach) ? Math.max(2.6, RPG.weaponReach() + 0.4) : 2.6;
     let best=null,bd=1e9;
     for(const f of this.list){
       const dx=f.x-pos.x,dz=f.z-pos.z;
-      const d=Math.hypot(dx,dz);
-      if(d>reach||Math.abs(f.y-pos.y)>2.5)continue;
+      let d=Math.hypot(dx,dz);
+
+      // Hitbox kastil: periksa jarak ke tepi perimeter dinding luar terdekat
+      if(f.def && f.def.startsWith('castle')){
+        const tier = parseInt(f.def.replace('castle','')) || 1;
+        const size = (typeof FurniCastle !== 'undefined') ? FurniCastle.getCastleSize(tier) : 14;
+        const half = size / 2;
+        const c = Math.cos(f.yaw || 0), s = Math.sin(f.yaw || 0);
+        const lx = dx * c - dz * s;
+        const lz = dx * s + dz * c;
+        const clampedX = clamp(lx, -half, half);
+        const clampedZ = clamp(lz, -half, half);
+        d = Math.hypot(lx - clampedX, lz - clampedZ);
+      }
+
+      const isBig = f.def && (f.def.startsWith('castle') || f.def.startsWith('gate3'));
+      if(d > reach || Math.abs(f.y - pos.y) > (isBig ? 6.0 : 2.5)) continue;
+
       /* hanya perabot yang berada di arah hadap pemain */
       let diff=Math.abs(Math.atan2(dx,dz)-facing);
       if(diff>Math.PI)diff=Math.PI*2-diff;
-      if(diff>1.20)continue;
+      if(!f.def.startsWith('castle') && diff>1.35)continue;
       if(d<bd){bd=d;best=f;}
     }
     if(!best)return false;
@@ -2296,7 +2619,10 @@ const Furni={
   damage(f,dmg){
     if(!this.DEFS[f.def])return false;
     const max=this.HP[f.def]||24;
-    f.hp=(f.hp===undefined?max:f.hp)-dmg;
+    // Pagar, gerbang & kastil: dihitung presisi 1 pukulan per ayunan
+    const isFortress = f.def.startsWith('fence') || f.def.startsWith('gate') || f.def.startsWith('castle');
+    const hitDamage = isFortress ? 1 : (dmg || 3);
+    f.hp=(f.hp===undefined?max:f.hp)-hitDamage;
     f.regenT=10; // Reset hitungan mundur regenerasi 10 detik setiap kali diserang
     const col=DROP_COLOR[this.DEFS[f.def].item]||0x8a5a2b;
     const c=new THREE.Vector3(f.x,f.y+0.5,f.z);
@@ -2304,7 +2630,7 @@ const Furni={
     Sfx.chop();
     if(typeof FX!=='undefined'&&FX.text){
       const rem=Math.max(0,f.hp);
-      FX.text(new THREE.Vector3(f.x,f.y+1.2,f.z),`🔨 ${rem}/${max}`,rem<=0?'#ff4d4d':'#ffd24d');
+      FX.text(new THREE.Vector3(f.x,f.y+1.2,f.z),`🔨 ${rem}/${max} ${isFortress?'Pukulan':''}`,rem<=0?'#ff4d4d':'#ffd24d');
     }
     if(f.hp>0){
       /* getar sebagai umpan balik lalu kembali ke posisi semula */
@@ -2333,6 +2659,7 @@ const Furni={
       const data=this.list.filter(f=>!f.auto)
         .map(f=>{
           const o={d:f.def,x:f.x,y:f.y,z:f.z,r:f.yaw};
+          if(f.doorOpen!==undefined)o.doorOpen=f.doorOpen;
           /* isi peti ikut disimpan (slot kosong tetap null agar posisinya tetap) */
           if(f.inv)o.inv=f.inv.map(s=>s?this._vaultSlot(s):null);
           /* status tungku & peleburan smelter */
@@ -2429,7 +2756,13 @@ const Furni={
   applyFurniList(data){
     if(!Array.isArray(data))return;
     for(const f of data){
-      const o=this.place(f.d,f.x,f.y,f.z,f.r,false);
+      const o=this.place(f.d,f.x,f.y,f.z,f.r,false,true);
+      if(o&&f.doorOpen!==undefined){
+        o.doorOpen=f.doorOpen;
+        if(typeof FurniCastle!=='undefined'&&FurniCastle.applyDoorState){
+          FurniCastle.applyDoorState(o, o.doorOpen?1.0:0.0);
+        }
+      }
       /* pulihkan data smelter */
       if(o&&f.smelter)o.smelter=Object.assign({},f.smelter);
       /* pulihkan isi peti pada slot aslinya (l = level tempa, m = tanda Log Pass) */
@@ -2442,6 +2775,17 @@ const Furni={
           if(v.m)slot.mark=v.m;
           o.inv[i]=slot;
         }
+    }
+  },
+  /* Pulihkan mesh kastil ke scene bila scene dibersihkan saat relog */
+  restoreCastles(){
+    if(!this.list||!this.list.length||!this.scene)return;
+    for(const f of this.list){
+      if(f.def&&f.def.startsWith('castle')){
+        if(f.mesh&&!this.scene.children.includes(f.mesh)){
+          this.scene.add(f.mesh);
+        }
+      }
     }
   },
   /* Tulis ulang blok rumah modular ke dunia dari record yang sudah termuat.
@@ -2533,20 +2877,32 @@ const Action={
       });
     }
 
-    /* ---------- GERBANG: buka/tutup (prioritas tinggi, setara NPC) ---------- */
-    if(typeof World!=="undefined"&&World.nearestGate){
-      const g=World.nearestGate(pPos,pFacing,3.2);
+    /* ---------- GERBANG KASTIL & PAGAR: buka/tutup (prioritas tinggi) ---------- */
+    if(typeof FurniCastle!=="undefined"){
+      const g=FurniCastle.nearestGate(pPos,pFacing,3.6);
       if(g){
-        const open=World.isGateOpen(g.x,g.y,g.z);
         candidates.push({
-          score:g.d-0.35,
+          score:g.d-0.45,
           action:{
-            kind:"gate",gate:g,
-            label:(open?"Buka Gerbang":"Tutup Gerbang"),
-            pos:new THREE.Vector3(g.x+0.5,g.y+1.6,g.z+0.5)
+            kind:"furni-gate",furni:g.furni,
+            label:(g.furni.doorOpen?"Tutup Gerbang":"Buka Gerbang"),
+            pos:new THREE.Vector3(g.x,g.furni.y+1.6,g.z)
           }
         });
       }
+    }
+
+    /* ---------- PINTU RUMAH KAYU: buka/tutup ---------- */
+    const hd=Furni.nearestHouseDoor(pPos,pFacing,3.2);
+    if(hd){
+      candidates.push({
+        score:hd.d-0.42,
+        action:{
+          kind:"house-door",house:hd.house,
+          label:(hd.house.doorOpen?"Tutup Pintu":"Buka Pintu"),
+          pos:hd.pos
+        }
+      });
     }
 
     const f = Furni.nearest(pPos);
@@ -2643,10 +2999,11 @@ const Action={
     else if(a.kind==='pet-ride'&&typeof Capture!=='undefined')Capture.startRide();
     else if(a.kind==='pet-dismount'&&typeof Capture!=='undefined')Capture.stopRide();
     else if(a.kind==='talk')NPCS.talk(a.npc);
-    else if(a.kind==='gate'&&typeof World!=="undefined"){
-      const wasOpen=World.isGateOpen(a.gate.x,a.gate.y,a.gate.z);
-      World.toggleGate(a.gate.x,a.gate.y,a.gate.z);
-      if(typeof UI!=="undefined"&&UI.toast)UI.toast(wasOpen?"Gerbang ditutup":"Gerbang dibuka");
+    else if(a.kind==='furni-gate'&&typeof FurniCastle!=="undefined"){
+      FurniCastle.toggleGate(a.furni);
+    }
+    else if(a.kind==='house-door'){
+      Furni.toggleHouseDoor(a.house);
     }
     else if(a.kind==='furni')Furni.interact(a.furni);
     else if(a.kind==='altar'&&typeof Altar!=='undefined')Altar.open(a.altar);

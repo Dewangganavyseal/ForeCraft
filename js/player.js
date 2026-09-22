@@ -363,6 +363,28 @@ const Player={
     const ceil=this.leapCeilingY();
     const peak=Math.max(this.pos.y,targetGy)+arc;
     if(peak>ceil)arc=Math.max(0.6,arc-(peak-ceil));
+
+    /* CEGAH TEMBUS DINDING: telusuri jalur lompatan, hentikan sebelum tembok */
+    const stepDist=0.25;
+    const steps=Math.max(1,Math.floor(dist/stepDist));
+    let validTx=tx,validTz=tz;
+    for(let i=1;i<=steps;i++){
+      const frac=i/steps;
+      const cx=lerp(this.pos.x,tx,frac);
+      const cz=lerp(this.pos.z,tz,frac);
+      const cy=lerp(this.pos.y,targetGy,frac)+Math.sin(frac*Math.PI)*arc;
+      const isWall=(typeof World!=='undefined'&&World.blockedAt&&World.blockedAt(cx,cy,cz,0.26))||
+                   (typeof Furni!=='undefined'&&Furni.solidAt&&Furni.solidAt(cx,cy,cz))||
+                   (typeof World!=='undefined'&&World.solidBody&&World.solidBody(World.getBlock(Math.floor(cx),Math.floor(cy+0.3),Math.floor(cz))));
+      if(isWall){
+        const prevFrac=Math.max(0,(i-1)/steps);
+        validTx=lerp(this.pos.x,tx,prevFrac);
+        validTz=lerp(this.pos.z,tz,prevFrac);
+        break;
+      }
+    }
+    tx=validTx;tz=validTz;
+
     this.slamLeap={sx:this.pos.x,sy:this.pos.y,sz:this.pos.z,tx,tz,t:0,
       targetGy,
       dur:clamp(dist/13,0.32,0.62),arc};
@@ -377,16 +399,28 @@ const Player={
     const L=this.slamLeap;
     L.t+=dt;
     const p=clamp(L.t/L.dur,0,1);
-    this.pos.x=lerp(L.sx,L.tx,p);
-    this.pos.z=lerp(L.sz,L.tz,p);
+    const nextX=lerp(L.sx,L.tx,p);
+    const nextZ=lerp(L.sz,L.tz,p);
     const targetY=(L.targetGy!==undefined)?L.targetGy:World.groundAt(L.tx,L.tz,CFG.WORLD_H-1);
-    const gy=World.groundAt(this.pos.x,this.pos.z,Math.max(L.sy+6,targetY+4))||targetY;
-    this.pos.y=lerp(L.sy,targetY,p)+Math.sin(p*Math.PI)*L.arc;
+    const gy=World.groundAt(nextX,nextZ,Math.max(L.sy+6,targetY+4))||targetY;
+    const nextY=lerp(L.sy,targetY,p)+Math.sin(p*Math.PI)*L.arc;
+
+    /* Jaring pengaman udara: bila di tengah lompatan menyentuh dinding, hentikan gerak horizontal */
+    const hitWall=(typeof World!=='undefined'&&World.blockedAt&&World.blockedAt(nextX,nextY,nextZ,0.28))||
+                  (typeof Furni!=='undefined'&&Furni.solidAt&&Furni.solidAt(nextX,nextY,nextZ));
+    if(hitWall){
+      L.t=L.dur; // Paksa mendarat di posisi sekarang tanpa menembus
+    }else{
+      this.pos.x=nextX;
+      this.pos.z=nextZ;
+      this.pos.y=nextY;
+    }
+
     this.vel.set(0,0,0);
     this.onGround=false;this.inWater=false;
     this.animate(dt,false,0,false);
     if(this.mesh){this.mesh.position.copy(this.pos);this.mesh.rotation.y=this.facing;}
-    if(p>=1){
+    if(p>=1||hitWall){
       this.pos.y=gy;this.onGround=true;this.airJumped=false;
       this.slamLeap=null;
       if(this.playSkillAnim)this.playSkillAnim('slam');   // pose hantaman saat mendarat
@@ -820,7 +854,6 @@ const Player={
       [B.WOOD]:-0.25,[B.STONE]:0,[B.PLANK]:0,[B.ROOF]:0,
       [B.SAND]:0.25,[B.SNOW]:0.25,[B.GRASS]:0.45,[B.DIRT]:0.45,
       [B.RED_SOIL]:0.45,[B.FARM]:0.45,
-      [B.CASTLE_WALL]:0.1,[B.FENCE]:0.3,[B.GATE]:0.2,
     };
     const pcx=Math.floor(this.pos.x),pcz=Math.floor(this.pos.z);
     let blkHit=null,bestScore=Infinity;

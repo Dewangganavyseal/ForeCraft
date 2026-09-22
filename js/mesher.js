@@ -172,20 +172,6 @@ const Mesher=(()=>{
       [[3,5],[10,4],[5,10],[11,11],[8,8]].forEach(p=>{
         px(p[0],p[1],'#5e6c7c');px(p[0]+1,p[1],'#8fa2b5');px(p[0],p[1]+1,'#c4d6e4');
         px(p[0]+1,p[1]+1,'#ffffff');});});
-    /* ---------- TILE BLOK KASTIL (port NEW MODEL/Kastil dan Pagar.html) ----------
-       Tembok abu batu bata berlapis, pagar bilah kayu vertikal, gerbang papan
-       kayu gelap berpalang besi. Tile 34..36 masih kosong di atlas 8x8. */
-    T(34,()=>{noiseFill("#7d8590",["#6e7681","#8d95a0","#5f666f"],110);
-      for(let y=2;y<16;y+=5){for(let x=0;x<16;x++){px(x,y,"#565d66");}}
-      for(let k=0;k<5;k++){const x=(rr()*14)|0,y=(rr()*12)|0;px(x,y,"#565d66");px(x+1,y,"#565d66");px(x,y+1,"#565d66");px(x+1,y+1,"#9aa2ac");}});
-    T(35,()=>{c.fillStyle="#5a4128";c.fillRect(0,0,16,16);
-      for(let x=1;x<16;x+=4){for(let y=1;y<15;y++)px(x,y,(x+y)%2?"#8a5f35":"#9a6b40");}
-      for(let x=0;x<16;x++){px(x,0,"#4a3320");px(x,15,"#4a3320");}
-      for(let k=0;k<10;k++)px((rr()*16)|0,(rr()*16)|0,"#6e4a2a");});
-    T(36,()=>{for(let x=0;x<16;x++)for(let y=0;y<16;y++)px(x,y,(x%4<2)?"#6e4a2a":"#5f3d22");
-      for(let y=3;y<16;y+=5){for(let x=0;x<16;x++)px(x,y,"#3a3a40");}
-      for(let y=4;y<16;y+=5){for(let x=0;x<16;x++)px(x,y,"#565660");}
-      for(let k=0;k<14;k++)px((rr()*16)|0,(rr()*16)|0,"#4a2f1a");});
     T(21,()=>{for(let y=0;y<16;y++){const col=(y%5===0)?'#8a6236':(y%2?'#b98a55':'#c49560');
         for(let x=0;x<16;x++)px(x,y,col);}
       for(let k=0;k<18;k++)px((rr()*16)|0,(rr()*16)|0,'#a37a48');});             // papan
@@ -694,9 +680,6 @@ const Mesher=(()=>{
     if(id===B.ORE_TUNGSTEN)return[32,32,32];
     if(id===B.ORE_TUNGSTENSTEEL)return[33,33,33];
     if(id===B.PLANK)return[21,21,21];
-    if(id===B.CASTLE_WALL)return[34,34,34];
-    if(id===B.FENCE)return[35,35,35];
-    if(id===B.GATE)return[36,36,36];
     /* ladang: atas tanah bajakan, samping/bawah tanah biasa */
     if(id===B.FARM)return[22,2,2];
     /* tanah merah biome REDLANDS */
@@ -849,13 +832,6 @@ const Mesher=(()=>{
   /* KAYU: variasi tipis saja supaya pohon tetap terlihat sejenis */
   P_TOP [B.WOOD ]=pal('wood' ,[0x7a5636,0x6e4c2f,0x624329,0x573b24]);
   P_SIDE[B.WOOD ]=P_TOP[B.WOOD];
-  /* BLOK KASTIL: abu batu, cokelat kayu pagar, cokelat gelap gerbang */
-  P_TOP [B.CASTLE_WALL]=pal('stone',[0x8d95a0,0x7d8590,0x6e7681,0x5f666f]);
-  P_SIDE[B.CASTLE_WALL]=P_TOP[B.CASTLE_WALL];
-  P_TOP [B.FENCE]=pal('wood' ,[0x9a6b40,0x8a5f35,0x75502c,0x644324]);
-  P_SIDE[B.FENCE]=P_TOP[B.FENCE];
-  P_TOP [B.GATE ]=pal('wood' ,[0x7d5633,0x6e4a2a,0x5f3d22,0x502f1c]);
-  P_SIDE[B.GATE ]=P_TOP[B.GATE];
   /* KAYU BIOME KHUSUS: batang putih seperti pohon birch (Redlands) */
   const P_WOOD_BIRCH=pal('wood' ,[0xf4f0e6,0xeae6dc,0xdfdad0,0xd4cfc4]);
 
@@ -1001,7 +977,6 @@ const Mesher=(()=>{
   PAL_CAP[B.SNOW ]=cap('snow');  PAL_CAP[B.STONE]=cap('stone');
   PAL_CAP[B.LEAF]=cap('leaf');
   PAL_CAP[B.WOOD ]=cap('wood');
-  PAL_CAP[B.CASTLE_WALL]=cap('stone');PAL_CAP[B.FENCE]=cap('wood');PAL_CAP[B.GATE]=cap('wood');
 
   /* jumlah tingkat palet & jarak pengaruh tepi air (blok) */
   const TIER_N=4, SHORE_R=3;
@@ -1082,7 +1057,7 @@ const Mesher=(()=>{
     const isSpecialTree=(id===B.LEAF&&(bio===BIOME.TUNDRA||bio===BIOME.REDLANDS))||
                         (id===B.WOOD&&bio===BIOME.REDLANDS);
     const bb=(bio===BIOME.MOUNTAIN&&(id===B.GRASS||id===B.DIRT))?BIOME_BIAS[BIOME.FOREST]:BIOME_BIAS[bio];
-    if(bb&&id!==B.PLANK&&id!==B.ROOF&&id!==B.FARM&&id!==B.CASTLE_WALL&&id!==B.FENCE&&id!==B.GATE&&!isSpecialTree){
+    if(bb&&id!==B.PLANK&&id!==B.ROOF&&id!==B.FARM&&!isSpecialTree){
       tr*=bb[0];tg*=bb[1];tb*=bb[2];
       sr*=bb[0];sg*=bb[1];sb*=bb[2];
       const cp=PAL_CAP[id];
@@ -1347,8 +1322,6 @@ const Mesher=(()=>{
     for(let y=0;y<H;y++)for(let z=0;z<C;z++)for(let x=0;x<C;x++){
       const id=chunk.data[idx(x,y,z)];
       if(!id)continue;
-      /* gerbang TERBUKA tidak dirender: jalan tembus pandang */
-      if(id===B.GATE&&typeof World!=="undefined"&&World.isGateOpen&&World.isGateOpen(chunk.cx*C+x,y,chunk.cz*C+z))continue;
       const wx=chunk.cx*C+x,wz=chunk.cz*C+z;
       if(id===B.WATER){
         if(getB(wx,y+1,wz)!==B.WATER){

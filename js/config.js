@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.33',
+  VERSION:'0.2.34',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -270,8 +270,7 @@ const B={AIR:0,GRASS:1,DIRT:2,STONE:3,WOOD:4,LEAF:5,WATER:6,
      tier puncak, serta ORE_STONE (bongkahan granit/batu). Tiap ore punya
      syarat level Penambangan & peluang gagal per pukulan — lihat ORE_INFO di bawah. */
   ORE_COAL:16,ORE_COPPER:17,ORE_STEEL:18,ORE_TUNGSTEN:19,ORE_TUNGSTENSTEEL:20,
-  ORE_STONE:21,
-  CASTLE_WALL:22,FENCE:23,GATE:24};
+  ORE_STONE:21};
 const BLOCK_INFO={
   [B.GRASS]:{name:'Rumput',hp:2.2,drop:null,color:0x5d9e3f},
   [B.DIRT] :{name:'Tanah', hp:2.0,drop:null,color:0x7a5a3a},
@@ -298,9 +297,6 @@ const BLOCK_INFO={
   [B.FARM] :{name:'Ladang',hp:2.0,drop:null,color:0x6f4a26},
   /* tanah merah biome REDLANDS: subur beracun tempat kelabang raksasa bersarang */
   [B.RED_SOIL]:{name:'Tanah Merah',hp:2.2,drop:null,color:0x9e3b2c},
-  [B.CASTLE_WALL]:{name:'Tembok Kastil',hp:8.0,drop:null,color:0x7d8590},
-  [B.FENCE]:{name:'Pagar Kayu',hp:3.0,drop:null,color:0x8a5f35},
-  [B.GATE]:{name:'Gerbang',hp:5.0,drop:null,color:0x6e4a2a},
 };
 /* pemetaan blok dunia ke ID item voxel di tas (hanya blok biome alami) */
 const BLOCK_TO_ITEM={
@@ -310,9 +306,6 @@ const BLOCK_TO_ITEM={
   [B.SAND]:'blk_sand',
   [B.SNOW]:'blk_snow',
   [B.RED_SOIL]:'blk_red_soil',
-  [B.CASTLE_WALL]:'blk_castle_wall',
-  [B.FENCE]:'blk_fence',
-  [B.GATE]:'blk_gate',
 };
 /* blok bijih → dipakai worldgen & UI penambangan. */
 const ORE_BLOCKS=[B.ORE_STONE,B.ORE_COAL,B.ORE_COPPER,B.ORE_IRON,B.ORE_STEEL,
@@ -638,10 +631,6 @@ const ITEMS={
   blk_snow:    {n:'Blok Salju',      e:'❄️', isBlock:true, blockId:B.SNOW,     rarity:'common', desc:'Blok salju beku. Bisa dipasang dan ditata di dunia.'},
   blk_plank:   {n:'Blok Papan',      e:'📦', isBlock:true, blockId:B.PLANK,    rarity:'common', desc:'Papan kayu olahan. Cocok untuk lantai & dinding rumah.'},
   blk_roof:    {n:'Blok Atap',       e:'🏠', isBlock:true, blockId:B.ROOF,     rarity:'common', desc:'Blok genteng atap bangunan.'},
-
-  blk_castle_wall:{n:'Tembok Kastil',e:'?', isBlock:true, blockId:B.CASTLE_WALL, rarity:'uncommon', desc:'Tembok batu kastil yang kokoh. Pasang lewat mode building.'},
-  blk_fence:{n:'Pagar Kayu',e:'?', isBlock:true, blockId:B.FENCE, rarity:'common', desc:'Pagar kayu pembatas. Pasang lewat mode building.'},
-  blk_gate:{n:'Gerbang',e:'?', isBlock:true, blockId:B.GATE, rarity:'uncommon', desc:'Gerbang yang bisa dibuka-tutup. Pasang lewat mode building.'},
   blk_red_soil:{n:'Blok Tanah Merah',e:'🟥', isBlock:true, blockId:B.RED_SOIL, rarity:'common', desc:'Tanah merah beracun dari biome Redlands.'},
   blk_farm:    {n:'Blok Ladang',     e:'🌾', isBlock:true, blockId:B.FARM,     rarity:'common', desc:'Blok tanah ladang siap tanam bibit.'},
 
@@ -980,7 +969,6 @@ const DROP_COLOR={
   blk_grass:0x5d9e3f, blk_dirt:0x7a5a3a, blk_stone:0x8a8f98, blk_wood:0x6e4f2f,
   blk_leaf:0x3f7d2f, blk_sand:0xe3d29a, blk_snow:0xe8f2fa, blk_plank:0xb98a55,
   blk_roof:0x9c5a3c, blk_red_soil:0x9e3b2c, blk_farm:0x6f4a26,
-  blk_castle_wall:0x7d8590, blk_fence:0x8a5f35, blk_gate:0x6e4a2a,
   wood:0x8a6a3f,stone:0x9aa0a8,fiber:0xc9c26a,berry:0x4d6bd6,mush:0xb5652a,gel:0x7de06a,
   rope:0xc9b98a,saddle:0x8a5f35,pet_charm:0x7fd8ff,bomb:0x1a1a1e,
   meat:0xc94f43,cmeat:0x9c5a2e,bread:0xd6a55a,salad:0x7ac96a,pie:0xc98a4d,bandage:0xe8e4da,potion_stam:0xffd24d,
@@ -1642,13 +1630,29 @@ Object.assign(ITEMS,{
   /* Rumah modular 5×5: diletakkan seperti perabot, bisa disusun & digabung
      satu sama lain menjadi bangunan besar berbentuk bebas. */
   f_house:    {n:'Rumah Kayu', e:'🏠', place:'house', rarity:'uncommon'},
+
+  /* ---------- KASTIL, PAGAR & GERBANG (port NEW MODEL/Kastil dan Pagar.html) ---------- */
+  f_castle1: {n:'Kastil T1 (14×14)', e:'🏰', place:'castle1', rarity:'rare', desc:'Benteng batu kokoh dengan aula tahta interior dan gerbang animasi.'},
+  f_castle2: {n:'Kastil T2 (17×17)', e:'🏰', place:'castle2', rarity:'epic', desc:'Citadel megah dengan ruang tahta agung, menara tinggi, dan gerbang berukir.'},
+  f_castle3: {n:'Kastil T3 (20×20)', e:'🏰', place:'castle3', rarity:'legendary', desc:'Istana kekaisaran raksasa berkatedral tinggi, mahkota emas, dan kristal arcane.'},
+
+  f_fence1: {n:'Pagar Kayu T1', e:'🛡️', place:'fence1', rarity:'common', desc:'Pagar kayu pembatas yang otomatis menyambung secara organik.'},
+  f_fence2: {n:'Pagar Batu T2', e:'🛡️', place:'fence2', rarity:'uncommon', desc:'Pagar batu berkrenelasi dengan obor api.'},
+  f_fence3: {n:'Benteng Imperial T3', e:'🛡️', place:'fence3', rarity:'rare', desc:'Pagar benteng imperial 2x lebih tinggi dengan mahkota emas & mangkuk api.'},
+
+  f_gate1: {n:'Gerbang Pagar T1', e:'🚪', place:'gate1', rarity:'uncommon', desc:'Gerbang kayu berengsel ganda yang terangkat membuka secara halus.'},
+  f_gate2: {n:'Gerbang Pagar T2', e:'🚪', place:'gate2', rarity:'rare', desc:'Gerbang kisi besi tempa dengan obor dan katrol.'},
+  f_gate3: {n:'Gerbang Benteng T3', e:'🚪', place:'gate3', rarity:'epic', desc:'Gerbang akbar selebar 6 blok dengan katrol rantai ganda & api abadi.'},
 });
 
 Object.assign(DROP_COLOR,{f_table:0x8a5a2b,f_chair:0x8a5a2b,f_bed:0xc23b3b,
   f_chest:0x9a6b3c,f_boat:0xb07c46,f_board:0x8a5a2b,
   f_workbench:0xb8894f,f_anvil:0x474c52,f_stove:0x8f4a38,f_campfire:0x5a4128,
   f_smelter:0x3b3e46,
-  f_house:0x9d6a35});
+  f_house:0x9d6a35,
+  f_castle1:0x7d8590,f_castle2:0x7d8590,f_castle3:0x4c525a,
+  f_fence1:0x8a5f35,f_fence2:0x7d8590,f_fence3:0x4c525a,
+  f_gate1:0x6e4a2a,f_gate2:0x34383f,f_gate3:0x4c525a});
 
 
 RECIPES.push(
@@ -1671,9 +1675,19 @@ RECIPES.push(
   {out:'f_smelter',need:{stone:12,iron_ore:4,coal:4},skill:'smith',prof:{mining:4},name:'Smelter Industri'},
   /* Rumah modular 5×5: satu modul per craft; disusun bebas & digabung di dunia */
   {out:'f_house',need:{wood:20,fiber:8,stone:6},name:'Rumah Kayu'},
-  {out:'blk_castle_wall',need:{stone:4},name:'Tembok Kastil'},
-  {out:'blk_fence',need:{wood:2},name:'Pagar Kayu'},
-  {out:'blk_gate',need:{wood:4,iron_ingot:1},name:'Gerbang'}
+
+  /* Kastil, Pagar, dan Gerbang */
+  {out:'f_castle1',need:{stone:40,wood:20,iron_ingot:4},skill:'smith',prof:{mining:5},name:'Kastil T1 (14×14)'},
+  {out:'f_castle2',need:{stone:80,wood:40,iron_ingot:10},skill:'smith',prof:{mining:10},name:'Kastil T2 (17×17)'},
+  {out:'f_castle3',need:{stone:150,steel_ingot:10,iron_ingot:20},skill:'smith',prof:{mining:15},name:'Kastil T3 (20×20)'},
+
+  {out:'f_fence1',need:{wood:4},name:'Pagar Kayu T1'},
+  {out:'f_fence2',need:{stone:4,iron_ingot:1},name:'Pagar Batu T2'},
+  {out:'f_fence3',need:{stone:8,iron_ingot:2},name:'Benteng Imperial T3'},
+
+  {out:'f_gate1',need:{wood:6,iron_ingot:1},name:'Gerbang Pagar T1'},
+  {out:'f_gate2',need:{stone:6,iron_ingot:4},name:'Gerbang Pagar T2'},
+  {out:'f_gate3',need:{stone:12,iron_ingot:8},name:'Gerbang Benteng T3'}
 );
 
 

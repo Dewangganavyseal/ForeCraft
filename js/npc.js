@@ -2162,7 +2162,7 @@ const NPCS={
      ========================================================================= */
   isStructureBlock(x,y,z){
     const b=World.getBlock(x,y,z);
-    if(b===B.PLANK||b===B.ROOF||b===B.CASTLE_WALL||b===B.FENCE||b===B.GATE)return true;
+    if(b===B.PLANK||b===B.ROOF)return true;
     /* rumah modular milik pemain */
     if(typeof Furni!=='undefined'&&Furni.houses&&Furni.houses.length&&
        Furni.houseFpAt&&Furni.houseFpAt(x,z))return true;

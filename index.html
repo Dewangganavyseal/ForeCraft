@@ -104,14 +104,30 @@
         </div>
         <p class="tip">Blok yang dihancurkan di dunia otomatis terkumpul di sini. Aktifkan Mode Bangun untuk menata dan memasang blok di dunia.</p>
       </div>
+
+      <div id="bag-page-furniture" class="bag-page" style="display:none">
+        <div class="sub">Penyimpanan Furnitur · <span id="furni-bag-count">0/21</span> · Klik furnitur untuk memilih</div>
+        <div class="grid" id="furni-grid"></div>
+        <div id="furni-ctrl-bar" style="margin-top:10px;padding:8px 10px;background:rgba(0,0,0,0.35);border:1px solid #3a4459;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div id="furni-sel-desc" style="font-size:12px;color:#ffd24d;display:flex;align-items:center;gap:6px;">
+            <span id="furni-sel-icon" style="font-size:18px;">🪑</span>
+            <span id="furni-sel-name">Pilih furnitur untuk dipasang</span>
+          </div>
+          <button id="btn-place-furni" type="button" class="btn" style="background:#2e7d32;color:#fff;border:1px solid #66bb6a;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:bold;display:flex;align-items:center;gap:6px;">
+            <span>📦</span> Pasang Furnitur
+          </button>
+        </div>
+        <p class="tip">Semua furnitur &amp; struktur sekali pasang tersimpan di sini. Pilih furnitur lalu klik Pasang untuk meletakkan di dunia.</p>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- tombol melayang Bag / Block / Pet di sisi kiri panel tas -->
+<!-- tombol melayang Bag / Block / Furnitur / Pet di sisi kiri panel tas -->
 <div id="bag-float-menu">
   <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span><img class="menu-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"></span>Bag</button>
   <button type="button" class="bag-menu-btn" data-bagpage="blocks"><span><img class="menu-ico" src="buttons/build.png" alt="" onerror="this.outerHTML='🧱'"></span>Block</button>
+  <button type="button" class="bag-menu-btn" data-bagpage="furniture"><span><img class="menu-ico" src="buttons/f_chair.png" alt="" onerror="this.outerHTML='🪑'"></span>Furnitur</button>
   <button type="button" class="bag-menu-btn" data-bagpage="pet"><span><img class="menu-ico" src="buttons/pet_slime.png" alt="" onerror="this.outerHTML='🐾'"></span>Pet</button>
 </div>
 
@@ -404,6 +420,7 @@
 <script src="js/environment/env_structures.js"></script>
 <script src="js/environment/env_chest.js"></script>
 <script src="js/environment/env_fish.js"></script>
+<script src="js/environment/env_pigeon.js"></script>
 <script src="js/environment/env_ocean_cliffs.js"></script>
 
 <script src="js/player.js"></script>
@@ -429,6 +446,8 @@
 <script src="js/smelter.js"></script>
 <!-- Sistem Memancing (port joran & animasi dari NEW MODEL/Smelter, Rod.html) -->
 <script src="js/fishing.js"></script>
+<!-- Model 3D Kastil, Pagar, dan Gerbang (port NEW MODEL/Kastil dan Pagar.html). Dimuat sebelum furni.js. -->
+<script src="js/furni_castle.js"></script>
 <script src="js/furni.js"></script>
 <!-- Landasan Tempa: panel enchant equipment (butuh UI/RPG/ITEMS di atas). -->
 <script src="js/anvil.js"></script>

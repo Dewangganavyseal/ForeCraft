@@ -10,6 +10,13 @@
 
 const BuildSys = {
   active: false,
+  mode: 'block',       // 'block' atau 'furniture'
+  furniYaw: 0,
+  furniGhost: null,
+  furniGhostMats: [],
+  furniTarget: null,
+  furniInvalidReason: '',
+
   ghostGroup: null,
   ghostMesh: null,
   ghostLines: null,
@@ -31,9 +38,6 @@ const BuildSys = {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(this.SAVE_KEY, JSON.stringify(this.customBlocks));
-        /* state gerbang terbuka ikut tersimpan agar tetap terbuka setelah relog */
-        if(typeof World!=="undefined"&&World.openGates)
-          localStorage.setItem(this.SAVE_KEY+"_gates", JSON.stringify(World.openGates));
       }
     } catch (e) {}
   },
@@ -54,20 +58,6 @@ const BuildSys = {
         World.setBlock(p[0], p[1], p[2], this.customBlocks[key]);
       }
     }
-    /* kembalikan state gerbang terbuka yang tersimpan */
-    try {
-      if (typeof localStorage !== 'undefined' && typeof World !== 'undefined') {
-        const raw = localStorage.getItem(this.SAVE_KEY+"_gates");
-        if (raw) {
-          const gates = JSON.parse(raw) || {};
-          for (const k in gates) {
-            const p = k.split(',').map(Number);
-            if (p.length === 3 && World.getBlock(p[0],p[1],p[2])===B.GATE)
-              World.openGates[k] = 1;
-          }
-        }
-      }
-    } catch (e) {}
   },
 
   init() {
@@ -130,6 +120,10 @@ const BuildSys = {
           <span class="bh-title">🏗️ MODE BANGUN</span>
           <button id="bh-close-btn" type="button" class="bh-btn-x" title="Keluar Mode Bangun">✕</button>
         </div>
+        <div class="bh-tabs">
+          <button id="bh-tab-block" type="button" class="bh-tab active" data-bmode="block">🧱 Blok</button>
+          <button id="bh-tab-furni" type="button" class="bh-tab" data-bmode="furniture">🪑 Furnitur</button>
+        </div>
         <div class="bh-body">
           <div id="bh-slot" class="bh-slot">
             <div id="bh-block-ico" class="bh-ico">🧱</div>
@@ -138,6 +132,7 @@ const BuildSys = {
               <div id="bh-block-cnt" class="bh-cnt">×0</div>
             </div>
           </div>
+          <button id="bh-rot-btn" type="button" class="bh-rot-btn" style="display:none;" title="Putar Arah (Tekan R)">🔄 Putar</button>
           <button id="bh-bag-btn" type="button" class="bh-bag-btn">🎒 Ganti Blok</button>
         </div>
         <div class="bh-tip" id="bh-tip-text">Klik atau seret (drag) di permukaan dunia untuk menata blok</div>
@@ -154,6 +149,33 @@ const BuildSys = {
       });
     }
 
+    const tabBlk = document.getElementById('bh-tab-block');
+    if (tabBlk) {
+      tabBlk.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        BuildSys.setMode('block');
+      });
+    }
+
+    const tabFur = document.getElementById('bh-tab-furni');
+    if (tabFur) {
+      tabFur.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        BuildSys.setMode('furniture');
+      });
+    }
+
+    const rotBtn = document.getElementById('bh-rot-btn');
+    if (rotBtn) {
+      rotBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        BuildSys.rotateFurni();
+      });
+    }
+
     const bagBtn = document.getElementById('bh-bag-btn');
     if (bagBtn) {
       bagBtn.addEventListener('click', (e) => {
@@ -161,21 +183,111 @@ const BuildSys = {
         e.stopPropagation();
         if (typeof UI !== 'undefined') {
           UI.toggle('bag');
-          UI.setBagPage('blocks');
+          UI.setBagPage(BuildSys.mode === 'furniture' ? 'furniture' : 'blocks');
         }
       });
     }
   },
 
-  toggle(force) {
+  setMode(mode) {
+    this.mode = (mode === 'furniture') ? 'furniture' : 'block';
+    this.clearDragSelection();
+    this.isDragging = false;
+
+    const tabBlk = document.getElementById('bh-tab-block');
+    const tabFur = document.getElementById('bh-tab-furni');
+    if (tabBlk) tabBlk.classList.toggle('active', this.mode === 'block');
+    if (tabFur) tabFur.classList.toggle('active', this.mode === 'furniture');
+
+    const rotBtn = document.getElementById('bh-rot-btn');
+    if (rotBtn) rotBtn.style.display = (this.mode === 'furniture') ? 'block' : 'none';
+
+    const bagBtn = document.getElementById('bh-bag-btn');
+    if (bagBtn) bagBtn.textContent = (this.mode === 'furniture') ? '🎒 Ganti Furnitur' : '🎒 Ganti Blok';
+
+    const tipEl = document.getElementById('bh-tip-text');
+    if (tipEl) {
+      tipEl.textContent = (this.mode === 'furniture')
+        ? 'Klik tanah untuk meletakkan furnitur · Putar dengan tombol 🔄 / tekan R'
+        : 'Klik atau seret (drag) di permukaan dunia untuk menata blok';
+    }
+
+    if (this.mode === 'furniture') {
+      if (this.ghostGroup) this.ghostGroup.visible = false;
+      if (this.multiGhostGroup) this.multiGhostGroup.visible = false;
+      this.ensureSelectedFurni();
+      this.updateFurniGhostModel();
+    } else {
+      this.clearFurniGhost();
+      if (this.ghostGroup) this.ghostGroup.visible = this.active;
+      this.ensureSelectedBlock();
+    }
+    this.updateHUD();
+  },
+
+  rotateFurni() {
+    this.furniYaw = (this.furniYaw + Math.PI / 2) % (Math.PI * 2);
+    if (this.furniGhost) this.furniGhost.rotation.y = this.furniYaw;
+    if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
+    if (typeof UI !== 'undefined' && UI.toast) UI.toast('🔄 Arah furnitur diputar 90°');
+  },
+
+  updateFurniGhostModel() {
+    if (!Game.scene || typeof THREE === 'undefined') return;
+    this.clearFurniGhost();
+    const held = this.getHeldFurni();
+    if (!held || !ITEMS[held.id] || !ITEMS[held.id].place) return;
+    const defId = ITEMS[held.id].place;
+    const def = (typeof Furni !== 'undefined') ? Furni.DEFS[defId] : null;
+    if (!def) return;
+
+    const g = def.build();
+    this.furniGhostMats = [];
+    g.traverse(o => {
+      if (o.isMesh) {
+        o.castShadow = false;
+        o.receiveShadow = false;
+        if (o.material) {
+          o.material = o.material.clone();
+          o.material.transparent = true;
+          o.material.opacity = 0.55;
+          o.material.depthWrite = false;
+          this.furniGhostMats.push(o.material);
+        }
+      }
+    });
+    this.furniGhost = g;
+    this.furniGhost.rotation.y = this.furniYaw;
+    this.furniGhost.visible = this.active && this.mode === 'furniture';
+    Game.scene.add(this.furniGhost);
+  },
+
+  clearFurniGhost() {
+    if (this.furniGhost && Game.scene) {
+      Game.scene.remove(this.furniGhost);
+      this.furniGhost.traverse(o => {
+        if (o.isMesh) {
+          if (o.geometry) o.geometry.dispose();
+          if (o.material && o.material.dispose) o.material.dispose();
+        }
+      });
+      this.furniGhost = null;
+    }
+    this.furniGhostMats = [];
+  },
+
+  toggle(force, targetMode) {
     if (!this.initialized) this.init();
 
     this.active = (force !== undefined) ? !!force : !this.active;
     this.clearDragSelection();
     this.isDragging = false;
 
-    if (this.ghostGroup) this.ghostGroup.visible = this.active;
+    if (targetMode) this.setMode(targetMode);
+
+    if (this.ghostGroup) this.ghostGroup.visible = this.active && this.mode === 'block';
     if (this.multiGhostGroup) this.multiGhostGroup.visible = false;
+    if (this.furniGhost) this.furniGhost.visible = this.active && this.mode === 'furniture';
 
     const mBtn = document.getElementById('m-build');
     if (mBtn) mBtn.classList.toggle('active', this.active);
@@ -184,16 +296,29 @@ const BuildSys = {
     if (hud) hud.style.display = this.active ? 'block' : 'none';
 
     if (this.active) {
-      this.ensureSelectedBlock();
+      if (this.mode === 'furniture') {
+        this.ensureSelectedFurni();
+        this.updateFurniGhostModel();
+      } else {
+        this.ensureSelectedBlock();
+      }
       this.updateHUD();
       if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
       if (typeof UI !== 'undefined' && UI.toast) {
-        const blk = this.getHeldBlock();
-        const bName = blk && ITEMS[blk.id] ? ITEMS[blk.id].n : 'Blok';
-        UI.toast(`🏗️ Mode Bangun: ${bName}`);
+        if (this.mode === 'furniture') {
+          const fn = this.getHeldFurni();
+          const fName = fn && ITEMS[fn.id] ? ITEMS[fn.id].n : 'Furnitur';
+          UI.toast(`🏗️ Mode Bangun (Furnitur): ${fName}`);
+        } else {
+          const blk = this.getHeldBlock();
+          const bName = blk && ITEMS[blk.id] ? ITEMS[blk.id].n : 'Blok';
+          UI.toast(`🏗️ Mode Bangun (Blok): ${bName}`);
+        }
       }
     } else {
       this.currentTarget = null;
+      this.furniTarget = null;
+      this.clearFurniGhost();
       if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
     }
   },
@@ -214,6 +339,22 @@ const BuildSys = {
     return null;
   },
 
+  getHeldFurni() {
+    if (!RPG.furniBag) return null;
+    if (RPG.selectedFurniSlot >= 0 && RPG.selectedFurniSlot < RPG.furniBag.length) {
+      const s = RPG.furniBag[RPG.selectedFurniSlot];
+      if (s && s.n > 0) return s;
+    }
+    for (let i = 0; i < RPG.furniBag.length; i++) {
+      const s = RPG.furniBag[i];
+      if (s && s.n > 0) {
+        RPG.selectedFurniSlot = i;
+        return s;
+      }
+    }
+    return null;
+  },
+
   ensureSelectedBlock() {
     const s = this.getHeldBlock();
     if (!s) {
@@ -224,19 +365,36 @@ const BuildSys = {
     return s;
   },
 
+  ensureSelectedFurni() {
+    const s = this.getHeldFurni();
+    if (!s) {
+      if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast('🪑 Belum ada furnitur di tas! Buat furnitur di panel Craft terlebih dahulu.');
+      }
+    }
+    return s;
+  },
+
   updateHUD() {
-    const s = this.getHeldBlock();
+    const isFurni = this.mode === 'furniture';
+    const s = isFurni ? this.getHeldFurni() : this.getHeldBlock();
     const icoEl = document.getElementById('bh-block-ico');
     const nameEl = document.getElementById('bh-block-name');
     const cntEl = document.getElementById('bh-block-cnt');
+    const rotBtn = document.getElementById('bh-rot-btn');
+    const bagBtn = document.getElementById('bh-bag-btn');
+
+    if (rotBtn) rotBtn.style.display = isFurni ? 'block' : 'none';
+    if (bagBtn) bagBtn.textContent = isFurni ? '🎒 Ganti Furnitur' : '🎒 Ganti Blok';
+
     if (!s) {
-      if (icoEl) icoEl.textContent = '🧱';
-      if (nameEl) nameEl.textContent = 'Tidak ada blok';
+      if (icoEl) icoEl.textContent = isFurni ? '🪑' : '🧱';
+      if (nameEl) nameEl.textContent = isFurni ? 'Tidak ada furnitur' : 'Tidak ada blok';
       if (cntEl) cntEl.textContent = '×0';
       return;
     }
     const it = ITEMS[s.id];
-    if (icoEl) icoEl.innerHTML = (typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(s.id) : (it ? it.e : '🧱');
+    if (icoEl) icoEl.innerHTML = (typeof UI !== 'undefined' && UI.itemIcon) ? UI.itemIcon(s.id) : (it ? it.e : (isFurni ? '🪑' : '🧱'));
     if (nameEl) nameEl.textContent = it ? it.n : s.id;
     if (cntEl) cntEl.textContent = `×${s.n}`;
     if (typeof UI !== 'undefined' && UI.applyItemIcons) UI.applyItemIcons(document.getElementById('build-hud'));
@@ -324,8 +482,147 @@ const BuildSys = {
     if (typeof UI !== 'undefined' && UI.open) {
       if (this.ghostGroup) this.ghostGroup.visible = false;
       if (this.multiGhostGroup) this.multiGhostGroup.visible = false;
+      if (this.furniGhost) this.furniGhost.visible = false;
       return;
     }
+
+    if (this.isDragging) {
+      if (this.mode === 'furniture') {
+        const target = this.raycastTarget();
+        if (target) {
+          this.dragCurrent = { ...target };
+          this.updateFenceDragSelection();
+        }
+      }
+      return;
+    }
+
+    if (this.mode === 'furniture') {
+      if (this.ghostGroup) this.ghostGroup.visible = false;
+      if (this.multiGhostGroup) this.multiGhostGroup.visible = false;
+
+      const target = this.raycastTarget();
+      const held = this.getHeldFurni();
+      if (!target || !held || !ITEMS[held.id] || !ITEMS[held.id].place) {
+        if (this.furniGhost) this.furniGhost.visible = false;
+        this.furniTarget = null;
+        return;
+      }
+
+      const it = ITEMS[held.id];
+      const defId = it.place;
+      const pt = target.point;
+      let tx = Math.floor(pt.x) + 0.5;
+      let tz = Math.floor(pt.z) + 0.5;
+      let ty = (typeof World !== 'undefined' && World.groundAt)
+        ? World.groundAt(tx, tz, Math.floor(Player.pos.y) + 2) : pt.y;
+
+      let valid = true;
+      let reason = '';
+      const isCastle = defId.startsWith('castle');
+      const maxDist = isCastle ? 28 : 11;
+      const dp = Math.hypot(tx - Player.pos.x, tz - Player.pos.z);
+
+      if (dp > maxDist) {
+        valid = false;
+        reason = `Terlalu jauh (maks ${Math.round(maxDist)} blok)`;
+      } else if (!isCastle && ty >= 0 && Math.abs(ty - Player.pos.y) > 2.8) {
+        valid = false;
+        reason = 'Terlalu tinggi/rendah dari karakter';
+      } else if (isCastle) {
+        const tier = parseInt(defId.replace('castle', '')) || 1;
+        const snapX = Math.round(pt.x);
+        const snapZ = Math.round(pt.z);
+        tx = snapX;
+        tz = snapZ;
+        if (typeof FurniCastle !== 'undefined' && FurniCastle.castleSiteCheck) {
+          const site = FurniCastle.castleSiteCheck(snapX, snapZ, tier);
+          if (!site.ok) {
+            valid = false;
+            reason = site.reason;
+          } else {
+            ty = site.y;
+          }
+        }
+      } else if (defId === 'house') {
+        const { bx, bz } = (typeof Furni !== 'undefined') ? Furni.cellAt(tx, tz) : { bx: Math.floor(tx), bz: Math.floor(tz) };
+        const c = (typeof Furni !== 'undefined') ? Furni.cellCenter(bx, bz) : { x: tx, z: tz };
+        tx = c.x;
+        tz = c.z;
+        if (typeof Furni !== 'undefined') {
+          const site = Furni.houseSiteCheck(bx, bz);
+          if (!site.ok) {
+            valid = false;
+            reason = site.reason;
+          } else {
+            ty = site.y;
+          }
+        }
+      } else if (defId.startsWith('fence')) {
+        if (typeof FurniCastle !== 'undefined' && FurniCastle.fenceSiteCheck) {
+          const site = FurniCastle.fenceSiteCheck(tx, tz);
+          if (!site.ok) {
+            valid = false;
+            reason = site.reason;
+          } else {
+            ty = site.y;
+          }
+        }
+      } else if (defId.startsWith('gate')) {
+        const tier = parseInt(defId.replace('gate', '')) || 1;
+        const axis = (Math.abs(Math.cos(this.furniYaw)) > 0.7) ? 'x' : 'z';
+        if (typeof FurniCastle !== 'undefined' && FurniCastle.gateSiteCheck) {
+          const site = FurniCastle.gateSiteCheck(tx, tz, tier, axis);
+          if (!site.ok) {
+            valid = false;
+            reason = site.reason;
+          } else if (site.y !== undefined) {
+            ty = site.y;
+          }
+        }
+      } else if (defId === 'boat') {
+        if (typeof World !== 'undefined' && !World.inWaterAt(tx, (CFG.WATER_Y || 4.82) - 0.2, tz)) {
+          valid = false;
+          reason = '🛶 Perahu hanya bisa diletakkan di air';
+        }
+      } else if (!isCastle && defId !== 'house' && defId !== 'boat' && ty < (CFG.WATER_Y || 4.82)) {
+        valid = false;
+        reason = '🌊 Tidak bisa memasang di air';
+      }
+
+      if (valid && typeof Furni !== 'undefined' && Furni.list) {
+        for (const f of Furni.list) {
+          if (isCastle && f.def && f.def.startsWith('castle')) {
+            if (Math.hypot(f.x - tx, f.z - tz) < 12) {
+              valid = false;
+              reason = 'Terlalu dekat dengan kastil lain';
+              break;
+            }
+          } else if (!isCastle && Math.hypot(f.x - tx, f.z - tz) < 0.9) {
+            valid = false;
+            reason = 'Sudah ada perabot di situ';
+            break;
+          }
+        }
+      }
+
+      this.furniTarget = { x: tx, y: ty, z: tz, defId, valid, reason };
+      this.furniInvalidReason = reason;
+
+      if (!this.furniGhost) this.updateFurniGhostModel();
+      if (this.furniGhost) {
+        this.furniGhost.visible = true;
+        this.furniGhost.position.set(tx, ty, tz);
+        this.furniGhost.rotation.y = this.furniYaw;
+        const em = valid ? 0x245c24 : 0x6b1a12;
+        for (const m of this.furniGhostMats) {
+          if (m && m.emissive) m.emissive.setHex(em);
+        }
+      }
+      return;
+    }
+
+    if (this.furniGhost) this.furniGhost.visible = false;
 
     if (this.isDragging) {
       // Saat drag sedang berjalan, posisi area diperbarui di onPointerMove
@@ -363,11 +660,76 @@ const BuildSys = {
   },
 
   /* =========================================================================
-     SISTEM DRAG HORIZONTAL & KONFIRMASI PEMASANGAN BLOK
+     SISTEM DRAG HORIZONTAL & KONFIRMASI PEMASANGAN BLOK / FURNITUR
      ========================================================================= */
 
   onPointerDown(screenX, screenY) {
     if (!this.active || this.isConfirming) return false;
+
+    if (this.mode === 'furniture') {
+      const held = this.getHeldFurni();
+      if (!held || held.n <= 0) {
+        if (typeof UI !== 'undefined' && UI.toast) {
+          UI.toast('🪑 Pilih furnitur di tab Furnitur terlebih dahulu!');
+        }
+        return false;
+      }
+
+      // Drag khusus pagar menyambung panjang
+      if (held.id.startsWith('f_fence')) {
+        const t = this.raycastTarget(screenX, screenY);
+        if (!t) return false;
+        this.isDragging = true;
+        this.dragStart = { ...t };
+        this.dragCurrent = { ...t };
+        this.updateFenceDragSelection();
+        return true;
+      }
+
+      if (!this.furniTarget) return false;
+      if (!this.furniTarget.valid) {
+        if (typeof UI !== 'undefined' && UI.toast) {
+          UI.toast('❌ ' + (this.furniInvalidReason || 'Tidak bisa meletakkan di sini'));
+        }
+        if (typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
+        return false;
+      }
+
+      const { x, y, z, defId } = this.furniTarget;
+      if (typeof Furni !== 'undefined' && Furni.place) {
+        const placed = Furni.place(defId, x, y, z, this.furniYaw, false);
+        if (!placed) return false;
+      }
+
+      // Potong 1 item dari furniBag
+      held.n--;
+      if (held.n <= 0) {
+        if (RPG.selectedFurniSlot >= 0 && RPG.furniBag) {
+          RPG.furniBag[RPG.selectedFurniSlot] = null;
+        }
+      }
+
+      if (typeof Sfx !== 'undefined' && Sfx.craft) Sfx.craft();
+      if (typeof FX !== 'undefined' && FX.debris) {
+        FX.debris(new THREE.Vector3(x, y + 0.4, z), 0xd6b06a, 8, 1.6);
+      }
+      const def = (typeof Furni !== 'undefined') ? Furni.DEFS[defId] : null;
+      if (typeof UI !== 'undefined' && UI.toast && def) {
+        UI.toast(`${def.e || '📦'} ${def.n || 'Furnitur'} diletakkan`);
+      }
+
+      this.updateHUD();
+      if (typeof UI !== 'undefined' && UI.renderFurniBag) UI.renderFurniBag();
+
+      if (held.n > 0) {
+        this.updateFurniGhostModel();
+      } else {
+        this.ensureSelectedFurni();
+        this.updateFurniGhostModel();
+      }
+      return true;
+    }
+
     const held = this.getHeldBlock();
     if (!held || held.n <= 0) {
       if (typeof UI !== 'undefined' && UI.toast) {
@@ -391,6 +753,12 @@ const BuildSys = {
     const t = this.raycastTarget(screenX, screenY);
     if (!t) return;
 
+    if (this.mode === 'furniture') {
+      this.dragCurrent = { ...t };
+      this.updateFenceDragSelection();
+      return;
+    }
+
     // KUNCI HORIZONTAL: Ketinggian py dikunci sama persis dengan dragStart.py
     this.dragCurrent = {
       px: t.px,
@@ -401,6 +769,97 @@ const BuildSys = {
       bz: t.bz,
     };
     this.updateDragSelection();
+  },
+
+  updateFenceDragSelection() {
+    if (!this.dragStart || !this.dragCurrent) return;
+    const held = this.getHeldFurni();
+    if (!held || !held.id.startsWith('f_fence')) return;
+    const defId = ITEMS[held.id].place;
+    const tier = parseInt(defId.replace('fence', '')) || 1;
+
+    const x0 = Math.floor(this.dragStart.px);
+    const z0 = Math.floor(this.dragStart.pz);
+    const x1 = Math.floor(this.dragCurrent.px);
+    const z1 = Math.floor(this.dragCurrent.pz);
+
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const isXMajor = Math.abs(dx) >= Math.abs(dz);
+
+    const available = (typeof RPG !== 'undefined' && RPG.countFurni) ? RPG.countFurni(held.id) : (held.n || 1);
+    const points = [];
+
+    if (isXMajor) {
+      const stepX = dx >= 0 ? 1 : -1;
+      const span = Math.min(Math.abs(dx), Math.min(available - 1, 30));
+      for (let i = 0; i <= span; i++) {
+        points.push({ x: x0 + i * stepX, z: z0 });
+      }
+    } else {
+      const stepZ = dz >= 0 ? 1 : -1;
+      const span = Math.min(Math.abs(dz), Math.min(available - 1, 30));
+      for (let i = 0; i <= span; i++) {
+        points.push({ x: x0, z: z0 + i * stepZ });
+      }
+    }
+
+    this.dragSelection = [];
+    if (this.furniGhost) this.furniGhost.visible = false;
+    if (this.ghostGroup) this.ghostGroup.visible = false;
+    this.multiGhostGroup.visible = true;
+
+    while (this.multiGhostGroup.children.length > 0) {
+      this.multiGhostGroup.remove(this.multiGhostGroup.children[0]);
+    }
+
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      let site = { ok: true, y: World.groundAt(pt.x + 0.5, pt.z + 0.5, Math.floor(Player.pos.y) + 2) };
+      if (typeof FurniCastle !== 'undefined' && FurniCastle.fenceSiteCheck) {
+        site = FurniCastle.fenceSiteCheck(pt.x + 0.5, pt.z + 0.5);
+      }
+      const valid = site.ok;
+      const py = site.y || 1;
+      this.dragSelection.push({ px: pt.x + 0.5, py, pz: pt.z + 0.5, valid, defId });
+
+      const conn = {
+        n: (i > 0 && !isXMajor && dz < 0) || (i < points.length - 1 && !isXMajor && dz > 0),
+        s: (i > 0 && !isXMajor && dz > 0) || (i < points.length - 1 && !isXMajor && dz < 0),
+        w: (i > 0 && isXMajor && dx > 0) || (i < points.length - 1 && isXMajor && dx < 0),
+        e: (i > 0 && isXMajor && dx < 0) || (i < points.length - 1 && isXMajor && dx > 0)
+      };
+
+      const g = new THREE.Group();
+      g.position.set(pt.x + 0.5, py, pt.z + 0.5);
+
+      // Kotak panduan voxel dinamis + garis tepi kawat (persis seperti mode block drag)
+      const bColor = valid ? 0x58b868 : 0xdd3333;
+      const boxMesh = new THREE.Mesh(this.sharedBoxGeo, valid ? this.sharedValidMat : this.sharedInvalidMat);
+      boxMesh.position.set(0, 0.5, 0);
+      if (valid) boxMesh.material.color.setHex(bColor);
+      g.add(boxMesh);
+
+      const lines = new THREE.LineSegments(this.sharedEdgesGeo, this.sharedLineMat);
+      lines.position.set(0, 0.5, 0);
+      g.add(lines);
+
+      // Model 3D pagar bersambung di dalam kotak
+      if (typeof FurniCastle !== 'undefined' && FurniCastle.buildFence) {
+        const previewMesh = FurniCastle.buildFence(tier, conn);
+        previewMesh.traverse(o => {
+          if (o.isMesh && o.material) {
+            o.material = o.material.clone();
+            o.material.transparent = true;
+            o.material.opacity = 0.7;
+            if (o.material.emissive) o.material.emissive.setHex(valid ? 0x245c24 : 0x6b1a12);
+          }
+        });
+        g.add(previewMesh);
+      }
+
+      this.multiGhostGroup.add(g);
+    }
   },
 
   updateDragSelection() {
@@ -475,6 +934,43 @@ const BuildSys = {
   onPointerUp(screenX, screenY) {
     if (!this.active || !this.isDragging) return;
     this.isDragging = false;
+
+    if (this.mode === 'furniture') {
+      if (this.dragSelection && this.dragSelection.length > 0) {
+        const held = this.getHeldFurni();
+        if (held && held.id.startsWith('f_fence')) {
+          let placed = 0;
+          for (const item of this.dragSelection) {
+            if (!item.valid) continue;
+            if (held.n <= 0) break;
+            const res = (typeof Furni !== 'undefined' && Furni.place)
+              ? Furni.place(item.defId, item.px, item.py, item.pz, 0, false) : null;
+            if (res) {
+              held.n--;
+              placed++;
+            }
+          }
+          if (placed > 0) {
+            if (held.n <= 0 && RPG.selectedFurniSlot >= 0 && RPG.furniBag) {
+              RPG.furniBag[RPG.selectedFurniSlot] = null;
+            }
+            if (typeof Sfx !== 'undefined' && Sfx.craft) Sfx.craft();
+            if (typeof UI !== 'undefined') {
+              UI.toast(`🛡️ ${placed} pagar terpasang menyambung rapi`);
+              if (UI.renderFurniBag) UI.renderFurniBag();
+            }
+            if (typeof FurniCastle !== 'undefined' && FurniCastle.rebuildFences) {
+              FurniCastle.rebuildFences();
+            }
+            this.updateHUD();
+          }
+        }
+      }
+      this.clearDragSelection();
+      if (this.multiGhostGroup) this.multiGhostGroup.visible = false;
+      if (this.furniGhost) this.furniGhost.visible = true;
+      return;
+    }
 
     if (!this.dragSelection || this.dragSelection.length === 0) {
       this.clearDragSelection();

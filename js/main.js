@@ -89,6 +89,7 @@ const Game={
     Furni.init(this.scene);
     if(typeof Altar!=='undefined')Altar.init(this.scene);
     if(typeof OceanCliffs!=='undefined')OceanCliffs.init(this.scene);
+    if(typeof Env_Pigeon!=='undefined')Env_Pigeon.init(this.scene);
     Dungeon.init();
     SaveGame.init();
     Music.initUI();
@@ -380,6 +381,23 @@ const Game={
       RPG.blockBag=(save&&Array.isArray(save.blockBag))?save.blockBag:new Array(21).fill(null);
       while(RPG.blockBag.length<21)RPG.blockBag.push(null);
       RPG.selectedBlockSlot=(save&&typeof save.selectedBlockSlot==='number')?save.selectedBlockSlot:-1;
+      RPG.furniBag=(save&&Array.isArray(save.furniBag))?save.furniBag:new Array(21).fill(null);
+      while(RPG.furniBag.length<21)RPG.furniBag.push(null);
+      RPG.selectedFurniSlot=(save&&typeof save.selectedFurniSlot==='number')?save.selectedFurniSlot:-1;
+
+      /* Migrasi perabot lama dari hotbar/tas ke tab furnitur */
+      for(const arr of [RPG.hotbar, RPG.bag]){
+        for(let i=0; i<arr.length; i++){
+          const s = arr[i];
+          if(s && RPG.isFurniItem(s.id)){
+            const left = RPG.addFurniItem(s.id, s.n);
+            if(left <= 0) arr[i] = null;
+            else s.n = left;
+      }
+    }
+    if(typeof Env_Pigeon!=='undefined'&&Env_Pigeon.clear)Env_Pigeon.clear();
+      }
+
       RPG.mobSlots=save.mobSlots||new Array(4).fill(null);
       RPG.deployedPet=(typeof save.deployedPet==='number')?save.deployedPet:-1;
 
@@ -400,6 +418,8 @@ const Game={
       RPG.addItem(RPG.START_WEAPON,1);
       RPG.blockBag=new Array(21).fill(null);
       RPG.selectedBlockSlot=-1;
+      RPG.furniBag=new Array(21).fill(null);
+      RPG.selectedFurniSlot=-1;
       RPG.mobSlots=new Array(4).fill(null);
       RPG.deployedPet=-1;
     }
@@ -423,6 +443,7 @@ const Game={
        keluar-masuk game (record-nya tetap ada, jadi bloknya seolah "hantu":
        tak terlihat & tak bisa disentuh sampai pintu dipindah). */
     if(typeof Furni!=='undefined'&&Furni.restoreHouses)Furni.restoreHouses();
+    if(typeof Furni!=='undefined'&&Furni.restoreCastles)Furni.restoreCastles();
     if(typeof BuildSys!=='undefined'&&BuildSys.restoreBlocks)BuildSys.restoreBlocks();
 
     UI.renderHotbar();
@@ -512,6 +533,7 @@ const Game={
       if(typeof Altar!=='undefined'){try{Altar.update(dt);}catch(e){console.error('[Altar error]',e);}}
       try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
       if(typeof OceanCliffs!=='undefined'){try{OceanCliffs.update(dt);}catch(e){console.error('[OceanCliffs error]',e);}}
+      if(typeof Env_Pigeon!=='undefined'){try{Env_Pigeon.update(dt,Player.pos);}catch(e){console.error('[Env_Pigeon error]',e);}}
       if(UI.hudExtra){try{UI.hudExtra(dt);}catch(e){console.error('[hudExtra error]',e);}}
       try{World.update(dt,Player.pos);}catch(e){console.error('[World error]',e);}
       if(typeof BombSys!=='undefined'){try{BombSys.update(dt);}catch(e){console.error('[BombSys error]',e);}}

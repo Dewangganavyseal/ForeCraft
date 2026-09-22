@@ -10,6 +10,9 @@ const RPG={
   /* slot khusus blok voxel bangunan (tab terpisah di tas) */
   blockBag:new Array(21).fill(null),
   selectedBlockSlot:-1,
+  /* slot khusus furnitur sekali pasang (tab terpisah di tas) */
+  furniBag:new Array(21).fill(null),
+  selectedFurniSlot:-1,
   /* slot khusus mob hasil tangkapan (bukan item biasa; tidak bisa di-drop) */
   mobSlots:new Array(4).fill(null),
   deployedPet:-1,
@@ -703,6 +706,12 @@ const RPG={
      habis ditempatkan di hotbar, satu slot tas ikut terisi `{id,n:0}` — slot
      hantu yang tampak kosong tapi memakan tempat. Kini pengisian berhenti
      total lewat flag `done`. */
+  isFurniItem(id){
+    if(!id)return false;
+    if(typeof ITEMS!=='undefined'&&ITEMS[id]&&ITEMS[id].place)return true;
+    if(typeof id==='string'&&(id.startsWith('f_')||id.startsWith('castle')||id.startsWith('fence')||id.startsWith('gate')))return true;
+    return false;
+  },
   addItem(id,n,lvl,mark){
     n=n||1;
     /* Blok bangunan (voxel) diarahkan khusus ke tab penampungan blok (blockBag) */
@@ -715,6 +724,18 @@ const RPG={
         }
         if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
         if(typeof BuildSys!=='undefined'&&BuildSys.active)BuildSys.updateHUD();
+      }
+      return left;
+    }
+    /* Furnitur & struktur sekali pasang diarahkan khusus ke tab furnitur (furniBag) */
+    if(this.isFurniItem(id)){
+      const left=this.addFurniItem(id,n);
+      if(left<(n||1)){
+        if(this.selectedFurniSlot===-1||!this.furniBag[this.selectedFurniSlot]){
+          const idx=this.furniBag.findIndex(s=>s&&s.id===id);
+          if(idx>=0)this.selectedFurniSlot=idx;
+        }
+        if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
       }
       return left;
     }
@@ -795,14 +816,71 @@ const RPG={
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
     return qty<=0;
   },
+  /* ---------- penampung khusus furnitur ---------- */
+  addFurniItem(id,n){
+    n=n||1;
+    const cap=(typeof stackCap==='function')?stackCap(id):64;
+    for(let i=0;i<this.furniBag.length;i++){
+      const s=this.furniBag[i];
+      if(s&&s.id===id&&s.n<cap){
+        const add=Math.min(n,cap-s.n);s.n+=add;n-=add;
+        if(n<=0)break;
+      }
+    }
+    if(n>0){
+      for(let i=0;i<this.furniBag.length;i++){
+        if(!this.furniBag[i]){
+          const add=Math.min(n,cap);
+          this.furniBag[i]={id,n:add};
+          n-=add;
+          if(n<=0)break;
+        }
+      }
+    }
+    return n;
+  },
+  countFurni(id){
+    let c=0;
+    for(const s of this.furniBag)if(s&&s.id===id)c+=s.n;
+    return c;
+  },
+  removeFurni(id,qty){
+    qty=qty||1;
+    for(let i=0;i<this.furniBag.length;i++){
+      const s=this.furniBag[i];
+      if(s&&s.id===id){
+        const take=Math.min(qty,s.n);s.n-=take;qty-=take;
+        if(s.n<=0){
+          this.furniBag[i]=null;
+          if(this.selectedFurniSlot===i)this.selectedFurniSlot=-1;
+        }
+        if(qty<=0)break;
+      }
+    }
+    if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    return qty<=0;
+  },
   countItem(id){
     let c=0;
     for(const arr of[this.hotbar,this.bag])for(const s of arr)if(s&&s.id===id)c+=s.n;
+    if(this.isFurniItem(id)){
+      for(const s of this.furniBag)if(s&&s.id===id)c+=s.n;
+    }
     return c;
   },
   removeItems(need){
     for(const id in need){
       let left=need[id];
+      if(this.isFurniItem(id)){
+        for(let i=0;i<this.furniBag.length;i++){
+          const s=this.furniBag[i];
+          if(s&&s.id===id){
+            const take=Math.min(left,s.n);s.n-=take;left-=take;
+            if(s.n<=0)this.furniBag[i]=null;
+            if(left<=0)break;
+          }
+        }
+      }
       for(const arr of[this.hotbar,this.bag])
         for(let i=0;i<arr.length;i++){
           const s=arr[i];
@@ -827,6 +905,16 @@ const RPG={
       let freeCount = 0;
       for(let i = 0; i < this.blockBag.length; i++){
         const s = this.blockBag[i];
+        if(!s) freeCount += cap;
+        else if(s.id === r.out) freeCount += Math.max(0, cap - s.n);
+      }
+      return freeCount >= count;
+    }
+    // Furnitur diarahkan ke furniBag
+    if(this.isFurniItem(r.out)){
+      let freeCount = 0;
+      for(let i = 0; i < this.furniBag.length; i++){
+        const s = this.furniBag[i];
         if(!s) freeCount += cap;
         else if(s.id === r.out) freeCount += Math.max(0, cap - s.n);
       }
@@ -1078,6 +1166,7 @@ const RPG={
         spawnP:[Player.spawnP.x,Player.spawnP.y,Player.spawnP.z],
         sp:this.sp,skills:this.skills,hotbar:this.hotbar,bag:this.bag,
         blockBag:this.blockBag,selectedBlockSlot:this.selectedBlockSlot,
+        furniBag:this.furniBag,selectedFurniSlot:this.selectedFurniSlot,
         equip:this.equip,coin:this.coin,bagTier:this.bagTier,
         mobSlots:(typeof Capture!=='undefined'&&Capture.serialize)?Capture.serialize():this.mobSlots,
         deployedPet:(typeof Capture!=='undefined'&&typeof Capture.deployedSlot==='number')?Capture.deployedSlot:this.deployedPet,

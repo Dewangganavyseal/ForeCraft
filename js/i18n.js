@@ -27,10 +27,7 @@ const I18N_ITEMS={
   blk_plank:{en:'Plank Block',zh:'木板方块',ja:'木板ブロック'},
   blk_roof:{en:'Roof Block',zh:'屋顶方块',ja:'屋根ブロック'},
   blk_red_soil:{en:'Red Soil Block',zh:'红土方块',ja:'赤土ブロック'},
-  blk_castle_wall:{en:'Castle Wall Block',zh:'??',ja:'??????'},
-  blk_fence:{en:'Wooden Fence Block',zh:'???',ja:'???????'},
-  blk_gate:{en:'Gate Block',zh:'??',ja:'?????'},
-    blk_farm:{en:'Farmland Block',zh:'耕地方块',ja:'耕地ブロック'},
+  blk_farm:{en:'Farmland Block',zh:'耕地方块',ja:'耕地ブロック'},
   wood:{en:'Wood',zh:'木头',ja:'木材'},
   stone:{en:'Stone',zh:'石头',ja:'石'},
   fiber:{en:'Fiber',zh:'纤维',ja:'繊維'},
@@ -211,6 +208,15 @@ const I18N_ITEMS={
   f_campfire:{en:'Campfire',zh:'营火',ja:'焚き火'},
   f_smelter:{en:'Industrial Smelter',zh:'工业熔炼炉',ja:'工業用製錬炉'},
   f_house:{en:'Wooden House',zh:'木屋',ja:'木の家'},
+  f_castle1:{en:'Castle T1 (14x14)',zh:'1级城堡',ja:'城T1'},
+  f_castle2:{en:'Castle T2 (17x17)',zh:'2级城堡',ja:'城T2'},
+  f_castle3:{en:'Castle T3 (20x20)',zh:'3级城堡',ja:'城T3'},
+  f_fence1:{en:'Wooden Fence T1',zh:'1级木栅栏',ja:'木の柵T1'},
+  f_fence2:{en:'Stone Fence T2',zh:'2级石栅栏',ja:'石の柵T2'},
+  f_fence3:{en:'Imperial Fence T3',zh:'3级帝国要塞栅栏',ja:'要塞の柵T3'},
+  f_gate1:{en:'Fence Gate T1',zh:'1级栅栏门',ja:'柵の門T1'},
+  f_gate2:{en:'Fence Gate T2',zh:'2级铁栅栏门',ja:'鉄の門T2'},
+  f_gate3:{en:'Fortress Gate T3',zh:'3级帝国大门',ja:'要塞の大門T3'},
 };
 
 /* ----------------------------------------------------------------- MOB NAMES */

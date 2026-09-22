@@ -678,6 +678,10 @@ const FX={
      opts.lvl / opts.mark = DATA PER-INSTANCE yang ikut jatuh bersama item
      (level tempa & tanda lokasi Log Pass), lalu dipulihkan saat dipungut.
      Tanpa ini, membuang Log Pass akan menghapus tandanya. */
+  /* drop milik pemain (dibuang dari tas) membawa `opts.owner=true` sehingga
+     mendapat jeda ambil sebelum bisa disedot balik ke tas.
+     `opts.lvl` / `opts.mark` membawa data per-instance (level tempa & tanda
+     lokasi Log Pass) supaya tidak hilang saat item dibuang lalu dipungut. */
   LOCAL_ID:'player',DROP_LOCK_OWNER:3,DROP_LOCK_OTHER:5,
   spawnDrop(pos,id,n,opts){
     if(n<=0)return;
@@ -743,7 +747,7 @@ const FX={
       this.dummy.updateMatrix();
       this.debMesh.setMatrixAt(i,this.dummy.matrix);
     }
-    this.debMesh.instanceMatrix.needsUpdate=true;
+    if(this.debMesh)this.debMesh.instanceMatrix.needsUpdate=true;
     /* getaran blok */
     for(let i=this.shakes.length-1;i>=0;i--){
       const s=this.shakes[i];s.life-=dt;
@@ -856,9 +860,61 @@ const FX={
       }
     }
 
+    /* auto-merge item di tanah dalam radius 4 blok jika item sama dan dapat di-stack */
+    for(let i=this.drops.length-1;i>=0;i--){
+      const d1=this.drops[i];
+      if(!d1||d1.n<=0)continue;
+      const cap=(typeof stackCap==='function')?stackCap(d1.id):64;
+      if(cap<=1)continue; // Item yang tidak bisa di-stack jangan di-merge
+
+      for(let j=i-1;j>=0;j--){
+        const d2=this.drops[j];
+        if(!d2||d2.n<=0)continue;
+        if(d1.id!==d2.id)continue;
+        if(d1.lvl!==d2.lvl||d1.mark||d2.mark)continue; // Beda level atau ada mark jangan di-merge
+
+        const dx=d2.mesh.position.x-d1.mesh.position.x;
+        const dz=d2.mesh.position.z-d1.mesh.position.z;
+        const dy=Math.abs(d2.mesh.position.y-d1.mesh.position.y);
+        const dist=Math.hypot(dx,dz);
+
+        if(dist<=4.0&&dy<=3.0){
+          if(dist>0.35){
+            // Tarik d2 mendekat ke d1 secara halus
+            const pullSpeed=Math.max(5.5,dist*4.0);
+            const step=Math.min(dist,pullSpeed*dt);
+            d2.mesh.position.x-=(dx/dist)*step;
+            d2.mesh.position.z-=(dz/dist)*step;
+            d2.mesh.position.y+=(d1.mesh.position.y-d2.mesh.position.y)*Math.min(1,dt*6.0);
+          }else{
+            // Gabungkan menjadi 1 model tunggal
+            d1.n+=d2.n;
+            d1.t=Math.min(d1.t,d2.t);
+            if(d2.ownerId&&!d1.ownerId){
+              d1.ownerId=d2.ownerId;
+              d1.lockOwner=d2.lockOwner;
+              d1.lockOther=d2.lockOther;
+            }
+            d1.popScale=1.35;
+            if(this.ring){
+              this.ring(d1.mesh.position.x,d1.mesh.position.y+0.05,d1.mesh.position.z,0xffffff,0.45,2);
+            }
+            this.disposeDrop(d2.mesh,d2.isModel);
+            this.drops.splice(j,1);
+            i--; // Sesuaikan indeks luar karena j < i
+          }
+        }
+      }
+    }
+
     for(let i=this.drops.length-1;i>=0;i--){
       const d=this.drops[i];d.t+=dt;
       d.mesh.rotation.y+=dt*2.4;
+      if(d.popScale&&d.popScale>1.0){
+        d.popScale=Math.max(1.0,d.popScale-dt*2.2);
+        const baseScale=d.isModel?1.5:1.0;
+        d.mesh.scale.setScalar(baseScale*d.popScale);
+      }
       /* lantai dicari dari ketinggian item saat ini ke bawah, supaya item
          yang jatuh di ambang pintu mendarat di lantai — bukan menempel di
          ambang pintu yang letaknya jauh di atas lantai */

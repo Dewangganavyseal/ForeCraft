@@ -25,18 +25,6 @@ const World={
     const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
     return this.getChunk(cx,cz).data[this.idx(wx-cx*16,wy,wz-cz*16)];
   },
-  /* ---------- GERBANG BUKA/TUTUP (blok B.GATE) ----------
-     State terbuka disimpan per kolom "x,y,z" di openGates. Gerbang TERBUKA
-     tidak dirender mesher (jalan tembus) & tidak menabrak; TERTUTUP padat
-     penuh seperti tembok. State ikut save/load blok custom BuildSys. */
-  openGates:{},
-  isGateOpen(wx,wy,wz){return !!this.openGates[wx+","+wy+","+wz];},
-  setGateOpen(wx,wy,wz,open){
-    const k=wx+","+wy+","+wz;
-    if(open)this.openGates[k]=1;
-    else delete this.openGates[k];
-    this.markDirty(Math.floor(wx/16),Math.floor(wz/16));
-  },
   setBlock(wx,wy,wz,id){
     if(wy<0||wy>=CFG.WORLD_H)return;
     const cx=Math.floor(wx/16),cz=Math.floor(wz/16);
@@ -47,8 +35,6 @@ const World={
     if(old===B.FARM&&id!==B.FARM&&typeof Farming!=='undefined')
       Farming.removeAt(wx,wy,wz,true);
     c.data[this.idx(lx,wy,lz)]=id;
-    /* gerbang yang dihancurkan/diubah menghapus state terbukanya */
-    if(old===B.GATE&&id!==B.GATE)delete this.openGates[wx+","+wy+","+wz];
     /* daftar blok ladang untuk NPC farmer & sistem farming */
     if(typeof Farming!=='undefined'){
       if(id===B.FARM)Farming.registerFarm(wx,wy,wz);
@@ -143,6 +129,12 @@ const World={
         const wt=OceanCliffs.topAt(x+ox,z+oz);
         if(wt>gy&&wt<=yTop+2.0)gy=wt;
       }
+      /* KASTIL & TAHTA (FurniCastle): lantai aula tahta, undakan panggung, atap & menara */
+      if(typeof FurniCastle!=='undefined'&&FurniCastle.topAt){
+        const ct=FurniCastle.topAt(x+ox,z+oz,fromY);
+        const maxH=(fromY===undefined)?(CFG.WORLD_H+32):(fromY+1.5);
+        if(ct>gy&&ct<=maxH)gy=ct;
+      }
       if(gy>g)g=gy;
     }
     return g;
@@ -227,9 +219,7 @@ const World={
       const id1=this.getBlock(Math.floor(x+ox),by,Math.floor(z+oz));
       const id2=this.getBlock(Math.floor(x+ox),by2,Math.floor(z+oz));
       /* papan dinding & atap rumah ikut memblokir supaya pemain masuk lewat pintu; ore memblokir agar tidak ditembus */
-      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK||id===B.ROOF||
-        id===B.CASTLE_WALL||id===B.FENCE||(id===B.GATE&&!this.isGateOpen(Math.floor(x+ox),by,Math.floor(z+oz))&&!this.isGateOpen(Math.floor(x+ox),by2,Math.floor(z+oz)))||
-        (typeof ORE_INFO!=='undefined'&&!!ORE_INFO[id]);
+      const solid=id=>id===B.WOOD||id===B.STONE||id===B.PLANK||id===B.ROOF||(typeof ORE_INFO!=='undefined'&&!!ORE_INFO[id]);
       return solid(id1)||solid(id2);
     });
   },
@@ -250,47 +240,6 @@ const World={
      tembok � misalnya dari dalam rumah mereka tak melihat apa pun di luar.
      ========================================================================= */
   blocksSight(id){return id!==B.AIR&&id!==B.WATER&&id!==B.LEAF;},
-  /* ---------- GERBANG TERDEKAT (untuk aksi buka/tutup, tombol F) ----------
-     Memindai kotak 3x3x3 di sekitar pemain, mengembalikan gerbang TERDEKAT
-     dalam radius yang juga terlihat dari arah hadap pemain. */
-  nearestGate(pos,facing,maxD){
-    maxD=maxD||3.2;
-    let best=null,bd=1e9;
-    const px=Math.floor(pos.x),py=Math.floor(pos.y),pz=Math.floor(pos.z);
-    for(let dy=-1;dy<=2;dy++)for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
-      const wx=px+dx,wy=py+dy,wz=pz+dz;
-      if(this.getBlock(wx,wy,wz)!==B.GATE)continue;
-      const cx=wx+0.5-pos.x,cz=wz+0.5-pos.z;
-      const d=Math.hypot(cx,cz);
-      if(d>maxD)continue;
-      if(facing!==undefined){
-        let diff=Math.abs(Math.atan2(cx,cz)-facing);
-        if(diff>Math.PI)diff=Math.PI*2-diff;
-        if(diff>1.35)continue;
-      }
-      if(d<bd){bd=d;best={x:wx,y:wy,z:wz,d};}
-    }
-    return best;
-  },
-  toggleGate(wx,wy,wz){
-    if(this.getBlock(wx,wy,wz)!==B.GATE)return false;
-    /* toggle SELURUH kolom gerbang vertikal yang bersambung (pintu ganda
-       setinggi 2 blok ikut terbuka/tertutup bersama, ala prototipe). */
-    const open=!this.isGateOpen(wx,wy,wz);
-    const ys=[wy];
-    for(let y=wy+1;y<wy+3&&y<CFG.WORLD_H;y++){
-      if(this.getBlock(wx,y,wz)!==B.GATE)break;
-      ys.push(y);
-    }
-    for(let y=wy-1;y>wy-3&&y>=0;y--){
-      if(this.getBlock(wx,y,wz)!==B.GATE)break;
-      ys.push(y);
-    }
-    for(const y of ys)this.setGateOpen(wx,y,wz,open);
-    if(typeof Sfx!=="undefined"&&Sfx.craft)Sfx.craft();
-    if(typeof BuildSys!=="undefined"&&BuildSys.saveBlocks)BuildSys.saveBlocks();
-    return true;
-  },
   /* true bila ada blok padat di antara titik A dan B (pandangan terhalang).
       Marching sampel tiap 0.5 blok sepanjang garis � cukup rapat agar tidak ada
       blok tipis yang terlewat. Titik ujung (blok tempat A/B berdiri) sengaja

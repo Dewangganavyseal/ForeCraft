@@ -687,7 +687,7 @@ img.iico{
   pointer-events:none;
   image-rendering:auto;
 }
-img.block-3d-ico{
+img.block-3d-ico,img.furni-3d-ico{
   width:88%!important;height:88%!important;
   object-fit:contain;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));
@@ -2517,18 +2517,18 @@ body.touch #portrait{width:58px;height:58px}
 .altar-go:disabled{opacity:.5;cursor:not-allowed}
 
 /* ================= BUILD MODE & BLOCKS TAB ================= */
-#bag-page-blocks {
+#bag-page-blocks, #bag-page-furniture {
   display: flex;
   flex-direction: column;
 }
 
-/* Tab blok memakai kelas .grid + .slot yang SAMA dengan tas biasa, jadi
+/* Tab blok & furnitur memakai kelas .grid + .slot yang SAMA dengan tas biasa, jadi
    ukuran, jarak (gap) & responsif media query mengikuti tanpa saling menabrak.
    Hanya perlu memastikan tidak ada override kolom sendiri yang bentrok. */
-#block-grid { margin-top: 6px; }
-.slot.block-slot { cursor: pointer; }
-.slot.block-slot.picked { border-color: #ffd24d; box-shadow: 0 0 10px rgba(255, 210, 77, .6); }
-.slot.block-slot.empty { opacity: .5; }
+#block-grid, #furni-grid { margin-top: 6px; }
+.slot.block-slot, .slot.furni-slot { cursor: pointer; }
+.slot.block-slot.picked, .slot.furni-slot.picked { border-color: #ffd24d; box-shadow: 0 0 10px rgba(255, 210, 77, .6); }
+.slot.block-slot.empty, .slot.furni-slot.empty { opacity: .5; }
 
 /* HUD Mode Bangun (di atas tengah layar) */
 #build-hud {
@@ -2583,6 +2583,56 @@ body.touch #portrait{width:58px;height:58px}
 
 .bh-btn-x:hover {
   color: #ff6b6b;
+}
+
+.bh-tabs {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.bh-tab {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid #7c2d12;
+  color: #fdba74;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.bh-tab:hover {
+  background: rgba(234, 88, 12, 0.25);
+  color: #ffffff;
+}
+
+.bh-tab.active {
+  background: #ea580c;
+  border-color: #ffd24d;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(234, 88, 12, 0.45);
+}
+
+.bh-rot-btn {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1.5px solid #7c2d12;
+  color: #ffd24d;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bh-rot-btn:hover {
+  background: rgba(234, 88, 12, 0.35);
+  border-color: #ffd24d;
+  color: #ffffff;
 }
 
 .bh-body {
@@ -2688,7 +2738,7 @@ body.touch #portrait{width:58px;height:58px}
   .bh-tip {
     font-size: 9px;
   }
-  body.touch #block-grid {
+  body.touch #block-grid, body.touch #furni-grid {
     grid-template-columns: repeat(auto-fill, 40px);
     gap: 4px;
   }

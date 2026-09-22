@@ -1199,6 +1199,7 @@ const Capture={
       let gx=Player.pos.x,gz=Player.pos.z,gy=Player.pos.y;
       if(this.pet&&this.pet.pos){gx=this.pet.pos.x;gz=this.pet.pos.z;gy=this.pet.pos.y;}
       else if(this.dismountTargetPos){gx=this.dismountTargetPos.x;gz=this.dismountTargetPos.z;}
+
       if(typeof World!=='undefined'&&World.groundAt){
         gy=Math.max(gy,World.groundAt(gx,gz,gy+3));
       }
@@ -1227,9 +1228,11 @@ const Capture={
         if(m.petSlot!==undefined&&RPG.mobSlots[m.petSlot]){
           RPG.mobSlots[m.petSlot].flyCd=6.0;
         }
-        const gy=World.groundAt(m.pos.x,m.pos.z,m.pos.y+6);
-        m.pos.y=gy;
-        m.vel.y=0;
+
+        let targetX=m.pos.x, targetZ=m.pos.z;
+        const gy=World.groundAt(targetX,targetZ,m.pos.y+3);
+        m.pos.set(targetX,gy,targetZ);
+        m.vel.set(0,0,0);
         m.onGround=true;
       }
       /* animasi turun: pemain melompat ke samping mount lalu mendarat. */
@@ -1240,7 +1243,7 @@ const Capture={
       const landX=m.pos.x+Math.cos(m.mesh.rotation.y+0.6)*1.3;
       const landZ=m.pos.z-Math.sin(m.mesh.rotation.y+0.6)*1.3;
       const gy=World.groundAt(landX,landZ,m.pos.y+3);
-      this.dismountTargetPos=new THREE.Vector3(landX,Math.max(gy,m.pos.y),landZ);
+      this.dismountTargetPos=new THREE.Vector3(landX,gy,landZ);
       if(Player.animator)Player.animator.setAnimation('ride_dismount');
       if(typeof Sfx!=='undefined'&&Sfx.jump)Sfx.jump();
     }
@@ -1350,9 +1353,13 @@ const Capture={
       return; // SELESAI: input joystick / WASD diblokir penuh saat stun!
     }
 
-    /* lompat saat menunggangi: 2 blok, naga 3 blok (nonaktif saat naik/turun/terbang) */
-    if(this.jumpQ&&!this.mounting&&(m.type!=='dragon'||((m.flyT||0)<=0&&!m.flying))){
+    /* lompat saat menunggangi: 2 blok, naga 3 blok; saat naga sedang terbang, lompat memicu turun/dismount */
+    if(this.jumpQ&&!this.mounting){
       this.jumpQ=false;
+      if(m.type==='dragon'&&((m.flyT||0)>0||m.flying)){
+        this.stopRide();
+        return;
+      }
       if(m.onGround){
         m.vel.y=m.type==='dragon'?12.5:10.3;
         m.onGround=false;
@@ -1384,9 +1391,22 @@ const Capture={
           m.pos.y=lerp(m.takeoffY,m.flyAlt,smoothK);
         }else if(elapsed<dur-1.5){
           // Fase 2: Ketinggian terbang konstan tenang lurus tanpa terpengaruh naik-turun balok di bawah.
-          // Hanya jika tanah/tebing di depan lebih tinggi dari jalur terbang, naikkan perlahan agar aman
-          if(groundUnder+1.2>m.flyAlt){
-            m.flyAlt=lerp(m.flyAlt,groundUnder+1.2,clamp(5*dt,0,1));
+          // Deteksi rintangan tinggi (kastil, tembok, tebing) di bawah & di depan jalur naga
+          const fwdX=m.pos.x+Math.sin(m.mesh.rotation.y)*3.5;
+          const fwdZ=m.pos.z+Math.cos(m.mesh.rotation.y)*3.5;
+          const castleTop=Math.max(
+            (typeof FurniCastle!=='undefined'&&FurniCastle.castleHeightAt)?FurniCastle.castleHeightAt(m.pos.x,m.pos.z):0,
+            (typeof FurniCastle!=='undefined'&&FurniCastle.castleHeightAt)?FurniCastle.castleHeightAt(fwdX,fwdZ):0
+          );
+          const obstHigh=Math.max(
+            groundUnder,
+            Math.max(
+              (typeof World!=='undefined'&&World.groundAt)?World.groundAt(fwdX,fwdZ,CFG.WORLD_H-1):0,
+              castleTop
+            )
+          );
+          if(obstHigh+1.8>m.flyAlt){
+            m.flyAlt=lerp(m.flyAlt,obstHigh+1.8,clamp(6*dt,0,1));
           }
           m.pos.y=m.flyAlt+Math.sin(elapsed*2.2)*0.08;
         }else{

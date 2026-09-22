@@ -1829,6 +1829,16 @@ const UI={
     tungstensteel_ingot:'buttons/tungstensteel_ingot.png',
     fishing_rod:'buttons/fishing_rod.png',
     rod:'buttons/rod.png',
+    f_house:'buttons/f_house.png',
+    f_castle1:'buttons/f_castle1.png',
+    f_castle2:'buttons/f_castle2.png',
+    f_castle3:'buttons/f_castle3.png',
+    f_fence1:'buttons/f_fence1.png',
+    f_fence2:'buttons/f_fence2.png',
+    f_fence3:'buttons/f_fence3.png',
+    f_gate1:'buttons/f_gate1.png',
+    f_gate2:'buttons/f_gate2.png',
+    f_gate3:'buttons/f_gate3.png',
   },
 
   /* Cache Data URL gambar 3D blok isometrik */
@@ -1950,11 +1960,270 @@ const UI={
     return dataUrl;
   },
 
-  /* HTML ikon satu item: <img> bila ada PNG/3D Block, emoji bila tidak */
+  /* Cache Data URL gambar 3D furnitur & struktur (kastil, pagar, gerbang, rumah) */
+  _furniIconCache:{},
+  isFurniStructure(id){
+    return id==='f_house'||(typeof id==='string'&&(id.startsWith('f_castle')||id.startsWith('f_fence')||id.startsWith('f_gate')));
+  },
+  furniIconUrl(id){
+    if(this._furniIconCache[id])return this._furniIconCache[id];
+    const cv=document.createElement('canvas');
+    cv.width=64;cv.height=64;
+    const ctx=cv.getContext('2d');
+    ctx.imageSmoothingEnabled=false;
+
+    const drawIsoBox=(cx,cy,w,d,h,topCol,leftCol,rightCol,strokeCol)=>{
+      const xT=cx, yT=cy-h-d*0.5;
+      const xR=cx+w*0.866, yR=cy-h;
+      const xB=cx, yB=cy-h+d*0.5;
+      const xL=cx-w*0.866, yL=cy-h;
+      const yBL=yL+h, yBR=yR+h, yBC=yB+h;
+
+      // Sisi Kiri
+      ctx.fillStyle=leftCol;
+      ctx.beginPath();
+      ctx.moveTo(xL,yL);ctx.lineTo(xB,yB);ctx.lineTo(xB,yBC);ctx.lineTo(xL,yBL);
+      ctx.closePath();ctx.fill();
+
+      // Sisi Kanan
+      ctx.fillStyle=rightCol;
+      ctx.beginPath();
+      ctx.moveTo(xB,yB);ctx.lineTo(xR,yR);ctx.lineTo(xR,yBR);ctx.lineTo(xB,yBC);
+      ctx.closePath();ctx.fill();
+
+      // Sisi Atas
+      ctx.fillStyle=topCol;
+      ctx.beginPath();
+      ctx.moveTo(xT,yT);ctx.lineTo(xR,yR);ctx.lineTo(xB,yB);ctx.lineTo(xL,yL);
+      ctx.closePath();ctx.fill();
+
+      if(strokeCol){
+        ctx.strokeStyle=strokeCol;
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(xT,yT);ctx.lineTo(xR,yR);ctx.lineTo(xR,yBR);
+        ctx.lineTo(xB,yBC);ctx.lineTo(xL,yBL);ctx.lineTo(xL,yL);
+        ctx.closePath();ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(xB,yB);ctx.lineTo(xB,yBC);
+        ctx.moveTo(xL,yL);ctx.lineTo(xB,yB);ctx.lineTo(xR,yR);
+        ctx.stroke();
+      }
+    };
+
+    if(id==='f_house'){
+      // 1. RUMAH KAYU FORECRAFT
+      // Pondasi batu
+      drawIsoBox(32,56,22,14,4,'#8a8f98','#6e747c','#595e66','rgba(0,0,0,0.3)');
+      // Dinding kayu balok
+      drawIsoBox(32,52,18,12,18,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      // Garis plank pada dinding depan
+      ctx.strokeStyle='rgba(60,35,10,0.3)';ctx.lineWidth=1;
+      for(let ly=40;ly<=49;ly+=4){
+        ctx.beginPath();ctx.moveTo(17,ly);ctx.lineTo(32,ly+6);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(32,ly+6);ctx.lineTo(47,ly);ctx.stroke();
+      }
+      // Pintu kayu berengsel di depan kiri
+      ctx.fillStyle='#5c3a1e';
+      ctx.beginPath();ctx.moveTo(22,46);ctx.lineTo(28,49);ctx.lineTo(28,55);ctx.lineTo(22,52);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.fillRect(26,49,2,2); // gagang kuningan
+      // Jendela kaca berbingkai di depan kanan
+      ctx.fillStyle='#7ec0ee';
+      ctx.beginPath();ctx.moveTo(36,44);ctx.lineTo(43,41);ctx.lineTo(43,47);ctx.lineTo(36,50);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#3e2815';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(39.5,42.5);ctx.lineTo(39.5,48.5);ctx.moveTo(36,47);ctx.lineTo(43,44);ctx.stroke();
+      // Atap genteng terakota pelana (gable roof)
+      drawIsoBox(32,34,22,14,7,'#c0643b','#a04e28','#7e391b','rgba(0,0,0,0.35)');
+      drawIsoBox(32,27,15,9,5,'#d37044','#b45a2e','#8f4220','rgba(0,0,0,0.35)');
+      // Cerobong asap batu
+      drawIsoBox(42,22,4,4,8,'#9aa0a8','#858a92','#6c7178');
+      // Asap halus cerobong
+      ctx.fillStyle='rgba(230,235,245,0.75)';
+      ctx.beginPath();ctx.arc(42,11,3,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(44,7,2,0,Math.PI*2);ctx.fill();
+    }else if(id==='f_castle1'){
+      // 2. KASTIL T1 (Batu Kokoh 14x14)
+      drawIsoBox(32,56,24,16,5,'#8d95a0','#747b85','#5a606a','rgba(0,0,0,0.3)');
+      // Dinding benteng tengah
+      drawIsoBox(32,51,14,10,14,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      // Pintu gerbang kayu lengkung
+      ctx.fillStyle='#5c3a1e';
+      ctx.beginPath();ctx.moveTo(27,47);ctx.lineTo(32,49);ctx.lineTo(37,47);ctx.lineTo(37,53);ctx.lineTo(27,53);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#333';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(32,49);ctx.lineTo(32,53);ctx.moveTo(27,50);ctx.lineTo(37,50);ctx.stroke();
+      // 2 Menara Sudut Depan
+      drawIsoBox(17,54,8,8,22,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      drawIsoBox(47,54,8,8,22,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      // Atap runcing menara kayu/genteng
+      drawIsoBox(17,32,9,9,6,'#c0643b','#a04e28','#7e391b');
+      drawIsoBox(47,32,9,9,6,'#c0643b','#a04e28','#7e391b');
+      // Crenelations atas dinding tengah
+      ctx.fillStyle='#858a92';
+      ctx.fillRect(26,34,3,3);ctx.fillRect(31,35,3,3);ctx.fillRect(36,34,3,3);
+      // Bendera merah kastil T1
+      ctx.fillStyle='#e74c3c';
+      ctx.beginPath();ctx.moveTo(32,28);ctx.lineTo(40,31);ctx.lineTo(32,34);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#f1c40f';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(32,37);ctx.lineTo(32,27);ctx.stroke();
+    }else if(id==='f_castle2'){
+      // 3. KASTIL T2 (Citadel Megah 17x17)
+      drawIsoBox(32,57,25,16,6,'#7d8590','#69707a','#535a64','rgba(0,0,0,0.3)');
+      // Dinding benteng
+      drawIsoBox(32,51,16,11,16,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      // Menara sudut tinggi bersegi
+      drawIsoBox(16,54,8,8,26,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      drawIsoBox(48,54,8,8,26,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.25)');
+      // Spire kerucut biru menara sudut
+      ctx.fillStyle='#2980b9';
+      ctx.beginPath();ctx.moveTo(16,16);ctx.lineTo(10,27);ctx.lineTo(22,27);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(48,16);ctx.lineTo(42,27);ctx.lineTo(54,27);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#f1c40f';
+      ctx.fillRect(15,14,2,3);ctx.fillRect(47,14,2,3); // finial emas
+      // Gerbang besi portcullis berkisi
+      ctx.fillStyle='#2c3e50';
+      ctx.beginPath();ctx.moveTo(26,45);ctx.lineTo(32,48);ctx.lineTo(38,45);ctx.lineTo(38,53);ctx.lineTo(26,53);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#bdc3c7';ctx.lineWidth=1;
+      for(let x=28;x<=36;x+=2.5){ctx.beginPath();ctx.moveTo(x,46);ctx.lineTo(x,53);ctx.stroke();}
+      // Spire agung menara pusat
+      drawIsoBox(32,35,10,8,12,'#858a92','#6c7178','#535a64');
+      ctx.fillStyle='#3498db';
+      ctx.beginPath();ctx.moveTo(32,12);ctx.lineTo(26,23);ctx.lineTo(38,23);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.fillRect(31,9,2,4);
+    }else if(id==='f_castle3'){
+      // 4. KASTIL T3 (Istana Imperial 20x20)
+      drawIsoBox(32,58,26,17,7,'#34383f','#272a30','#1d1f24','rgba(0,0,0,0.4)');
+      // Badan katedral imperial batu hitam
+      drawIsoBox(32,51,18,12,18,'#434850','#34383f','#272a30','rgba(0,0,0,0.3)');
+      // Aksen lis emas imperial
+      ctx.strokeStyle='#f1c40f';ctx.lineWidth=1.5;
+      ctx.strokeRect(24,38,16,2);
+      // Menara sudut akbar dengan mahkota emas
+      drawIsoBox(15,55,9,9,28,'#34383f','#272a30','#1d1f24','rgba(0,0,0,0.3)');
+      drawIsoBox(49,55,9,9,28,'#34383f','#272a30','#1d1f24','rgba(0,0,0,0.3)');
+      // Spire kubah lancip ungu/emas
+      ctx.fillStyle='#2c3e50';
+      ctx.beginPath();ctx.moveTo(15,13);ctx.lineTo(9,26);ctx.lineTo(21,26);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(49,13);ctx.lineTo(43,26);ctx.lineTo(55,26);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.fillRect(14,10,3,4);ctx.fillRect(48,10,3,4);
+      // Spire katedral pusat tertinggi
+      drawIsoBox(32,33,11,9,14,'#272a30','#1d1f24','#14161a');
+      ctx.fillStyle='#f39c12';
+      ctx.beginPath();ctx.moveTo(32,6);ctx.lineTo(25,19);ctx.lineTo(39,19);ctx.closePath();ctx.fill();
+      // Kristal Arcane Ungu Bersinar di Puncak
+      ctx.fillStyle='#9b59b6';
+      ctx.beginPath();ctx.moveTo(32,2);ctx.lineTo(35,5);ctx.lineTo(32,8);ctx.lineTo(29,5);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#e056fd';ctx.fillRect(31,4,2,2);
+      // Gerbang akbar emas berapi
+      ctx.fillStyle='#f1c40f';
+      ctx.beginPath();ctx.moveTo(27,45);ctx.lineTo(32,47);ctx.lineTo(37,45);ctx.lineTo(37,53);ctx.lineTo(27,53);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#111';ctx.fillRect(29,48,6,5);
+      // Api abadi di pilar
+      ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(22,46,2.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(42,46,2.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(22,46,1.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(42,46,1.2,0,Math.PI*2);ctx.fill();
+    }else if(id==='f_fence1'){
+      // 5. PAGAR KAYU T1
+      drawIsoBox(22,50,5,5,22,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      drawIsoBox(42,50,5,5,22,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      // Ujung tiang runcing
+      ctx.fillStyle='#c4995f';
+      ctx.beginPath();ctx.moveTo(22,25);ctx.lineTo(19,28);ctx.lineTo(25,28);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(42,25);ctx.lineTo(39,28);ctx.lineTo(45,28);ctx.closePath();ctx.fill();
+      // Palang kayu ganda horizontal
+      drawIsoBox(32,45,20,3,4,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      drawIsoBox(32,36,20,3,4,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+    }else if(id==='f_fence2'){
+      // 6. PAGAR BATU T2
+      drawIsoBox(32,54,24,9,14,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.3)');
+      // Crenelations atas
+      ctx.fillStyle='#9aa0a8';
+      ctx.fillRect(16,35,7,5);ctx.fillRect(41,35,7,5);
+      // Obor api di tengah pagar
+      ctx.fillStyle='#7f8c8d';ctx.fillRect(31,38,2,6);
+      ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(32,36,3,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(32,36,1.5,0,Math.PI*2);ctx.fill();
+    }else if(id==='f_fence3'){
+      // 7. BENTENG IMPERIAL T3
+      drawIsoBox(32,55,25,10,20,'#434850','#34383f','#272a30','rgba(0,0,0,0.35)');
+      // Lis atas emas
+      drawIsoBox(32,35,26,11,3,'#f1c40f','#d4ac0d','#b7950b');
+      // Mahkota krenelasi emas
+      ctx.fillStyle='#f1c40f';
+      ctx.fillRect(15,27,6,5);ctx.fillRect(43,27,6,5);
+      // Mangkuk api kencana
+      ctx.fillStyle='#d4ac0d';ctx.fillRect(29,31,6,3);
+      ctx.fillStyle='#e74c3c';ctx.beginPath();ctx.arc(32,28,3.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f39c12';ctx.beginPath();ctx.arc(32,28,2,0,Math.PI*2);ctx.fill();
+    }else if(id==='f_gate1'){
+      // 8. GERBANG PAGAR T1 (Kayu)
+      drawIsoBox(17,52,6,6,26,'#8e6633','#704d23','#523616','rgba(0,0,0,0.3)');
+      drawIsoBox(47,52,6,6,26,'#8e6633','#704d23','#523616','rgba(0,0,0,0.3)');
+      // Daun pintu kayu ganda
+      drawIsoBox(25,48,7,3,16,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      drawIsoBox(39,48,7,3,16,'#c4995f','#b4884c','#8e6633','rgba(0,0,0,0.25)');
+      // Engsel dan palang besi hitam
+      ctx.fillStyle='#2c3e50';
+      ctx.fillRect(20,38,10,2);ctx.fillRect(20,46,10,2);
+      ctx.fillRect(34,38,10,2);ctx.fillRect(34,46,10,2);
+      // Balok palang atas
+      drawIsoBox(32,27,24,4,3,'#8e6633','#704d23','#523616');
+    }else if(id==='f_gate2'){
+      // 9. GERBANG PAGAR T2 (Kisi Besi Portcullis)
+      drawIsoBox(16,54,7,7,30,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.3)');
+      drawIsoBox(48,54,7,7,30,'#9aa0a8','#858a92','#6c7178','rgba(0,0,0,0.3)');
+      // Balok penopang atas batu
+      drawIsoBox(32,25,26,7,5,'#858a92','#6c7178','#535a64');
+      // Kisi besi portcullis terangkat/tertutup
+      ctx.strokeStyle='#34495e';ctx.lineWidth=2;
+      for(let x=22;x<=42;x+=4){ctx.beginPath();ctx.moveTo(x,27);ctx.lineTo(x,50);ctx.stroke();}
+      for(let y=32;y<=48;y+=5){ctx.beginPath();ctx.moveTo(21,y);ctx.lineTo(43,y);ctx.stroke();}
+      // Obor di tiang kiri & kanan
+      ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(16,33,2.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#e67e22';ctx.beginPath();ctx.arc(48,33,2.5,0,Math.PI*2);ctx.fill();
+    }else if(id==='f_gate3'){
+      // 10. GERBANG BENTENG T3 (Imperial Agung)
+      drawIsoBox(15,56,8,8,34,'#434850','#34383f','#272a30','rgba(0,0,0,0.35)');
+      drawIsoBox(49,56,8,8,34,'#434850','#34383f','#272a30','rgba(0,0,0,0.35)');
+      // Mahkota emas pilar
+      drawIsoBox(15,22,9,9,4,'#f1c40f','#d4ac0d','#b7950b');
+      drawIsoBox(49,22,9,9,4,'#f1c40f','#d4ac0d','#b7950b');
+      // Lintel lengkung imperial akbar
+      drawIsoBox(32,23,26,8,6,'#34383f','#272a30','#1d1f24');
+      ctx.fillStyle='#f1c40f';ctx.fillRect(29,19,6,4); // lambang singa emas tengah
+      // Daun gerbang besi bertatahkan emas
+      drawIsoBox(25,50,8,4,22,'#2c3e50','#202d3a','#17202a','rgba(0,0,0,0.3)');
+      drawIsoBox(39,50,8,4,22,'#2c3e50','#202d3a','#17202a','rgba(0,0,0,0.3)');
+      ctx.fillStyle='#f1c40f';
+      ctx.fillRect(21,38,7,2);ctx.fillRect(21,46,7,2);
+      ctx.fillRect(36,38,7,2);ctx.fillRect(36,46,7,2);
+      // Api obor membara
+      ctx.fillStyle='#e74c3c';ctx.beginPath();ctx.arc(15,35,3,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#e74c3c';ctx.beginPath();ctx.arc(49,35,3,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(15,35,1.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(49,35,1.5,0,Math.PI*2);ctx.fill();
+    }
+
+    const dataUrl=cv.toDataURL('image/png');
+    this._furniIconCache[id]=dataUrl;
+    return dataUrl;
+  },
+
+  /* HTML ikon satu item: <img> bila ada PNG/3D Block/Furnitur, emoji bila tidak */
   itemIcon(id){
     const it=ITEMS[id];
     if(!it)return '';
     if(it.isBlock || (typeof id==='string'&&id.startsWith('blk_'))){
+      const bUrl = this.blockIconUrl(id);
+      return `<img class="iico block-3d-ico" src="${bUrl}" alt="" onerror="this.outerHTML='${it.e||'🧱'}'">`;
+    }
+    let src=this.ITEM_IMG[id];
+    if(!src&&id){
+      src='buttons/'+id+'.png';
+    }
+    const fallback = this.isFurniStructure(id) ? `this.src='${this.furniIconUrl(id)}'` : `this.outerHTML='${it.e}'`;
+    return `<img class="iico" src="${src}" data-iico="${src}" alt="" onerror="${fallback}">`;
+  },
       const bUrl = this.blockIconUrl(id);
       return `<img class="iico block-3d-ico" src="${bUrl}" alt="" onerror="this.outerHTML='${it.e||'🧱'}'">`;
     }
@@ -2185,6 +2454,7 @@ const UI={
     mk(RPG.bag,1,document.getElementById('bag-grid'));
     this.renderEquip();
     if(this.bagPage==='blocks')this.renderBlockBag();
+    if(this.bagPage==='furniture')this.renderFurniBag();
     if(typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
     if(this.open==='bag')this.positionBagMenu();
   },
@@ -2200,26 +2470,33 @@ const UI={
     requestAnimationFrame(()=>{
       this._invDirty=false;
       this.renderHotbar();
-      if(this.open==='bag')this.renderBag();
+      if(this.open==='bag'){
+        this.renderBag();
+        if(this.bagPage==='blocks')this.renderBlockBag();
+        if(this.bagPage==='furniture')this.renderFurniBag();
+      }
       if(this.open==='chest')this.renderChest();
       if(this.open==='shop')this.renderShop&&this.renderShop();
     });
   },
 
-  /* ---------- halaman kiri panel tas: Bag / Block / Pet ---------- */
+  /* ---------- halaman kiri panel tas: Bag / Block / Furnitur / Pet ---------- */
   bagPage:'bag',
   setBagPage(page){
-    this.bagPage=(page==='pet')?'pet':(page==='blocks'?'blocks':'bag');
+    this.bagPage=(page==='pet')?'pet':(page==='blocks'?'blocks':(page==='furniture'?'furniture':'bag'));
     const bag=document.getElementById('bag-page-bag');
     const pet=document.getElementById('bag-page-pet');
     const blk=document.getElementById('bag-page-blocks');
+    const furni=document.getElementById('bag-page-furniture');
     if(bag)bag.style.display=(this.bagPage==='bag')?'':'none';
     if(pet)pet.style.display=(this.bagPage==='pet')?'':'none';
     if(blk)blk.style.display=(this.bagPage==='blocks')?'':'none';
+    if(furni)furni.style.display=(this.bagPage==='furniture')?'':'none';
     document.querySelectorAll('.bag-menu-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.bagpage===this.bagPage);
     });
     if(this.bagPage==='blocks')this.renderBlockBag();
+    if(this.bagPage==='furniture')this.renderFurniBag();
     if(this.bagPage==='pet'&&typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
   },
   renderBlockBag(){
@@ -2278,16 +2555,54 @@ const UI={
           if(this._blockSkipClick){this._blockSkipClick=false;return;}
           RPG.selectedBlockSlot=i;
           this.renderBlockBag();
-          if(typeof BuildSys!=='undefined')BuildSys.updateHUD();
+          if(typeof BuildSys!=='undefined'&&BuildSys.active){
+            BuildSys.setMode('block');
+            BuildSys.updateHUD();
+          }
           if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
         });
       }else{
         d.classList.add('empty');
+        d.addEventListener('click',()=>{
+          if(this._blockSkipClick){this._blockSkipClick=false;return;}
+          if(RPG.selectedBlockSlot>=0&&RPG.blockBag&&RPG.blockBag[RPG.selectedBlockSlot]){
+            this.moveBlockStack(RPG.selectedBlockSlot,i);
+            this.renderBlockBag();
+            if(typeof BuildSys!=='undefined'&&BuildSys.active){
+              BuildSys.updateHUD();
+            }
+            if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+          }
+        });
       }
       gEl.appendChild(d);
     });
     this.applyItemIcons(gEl);
     this.initBlockDrag();
+  },
+  /* Pindah / swap / gabung slot di tas blok */
+  moveBlockStack(fromI, toI) {
+    if (fromI === toI) return false;
+    if (!RPG.blockBag) return false;
+    const a = RPG.blockBag[fromI], b = RPG.blockBag[toI];
+    if (!a) return false;
+    const cap = (typeof stackCap === 'function') ? stackCap(a.id) : 64;
+    if (b && b.id === a.id && b.n < cap) {
+      const mv = Math.min(a.n, cap - b.n);
+      b.n += mv;
+      a.n -= mv;
+      if (a.n <= 0) RPG.blockBag[fromI] = null;
+    } else {
+      RPG.blockBag[toI] = a;
+      RPG.blockBag[fromI] = b;
+    }
+    if (RPG.selectedBlockSlot === fromI) {
+      RPG.selectedBlockSlot = toI;
+    } else if (RPG.selectedBlockSlot === toI) {
+      RPG.selectedBlockSlot = fromI;
+    }
+    if (typeof RPG.save === 'function') RPG.save();
+    return true;
   },
   /* konfirmasi membuang BLOK dari tas blok; sama seperti item biasa (jumlah bisa
      diubah, blok jatuh ke dunia sebagai drop). */
@@ -2317,7 +2632,7 @@ const UI={
       }
     });
   },
-  /* drag blok di tas blok: seret keluar panel = buang (pola sama seperti tas item). */
+  /* drag blok di tas blok: seret ke slot lain = pindah/swap, seret keluar panel = buang. */
   initBlockDrag(){
     if(this._blockDragInit)return;
     this._blockDragInit=true;
@@ -2325,6 +2640,7 @@ const UI={
     let d=null;
     const cleanup=()=>{
       if(!d)return;
+      document.querySelectorAll('.slot.block-slot.drop-hint').forEach(el=>el.classList.remove('drop-hint'));
       if(d.ghost)d.ghost.remove();
       if(d.sl)d.sl.classList.remove('dragging');
       d=null;
@@ -2353,15 +2669,244 @@ const UI={
         this._blockSkipClick=true;        // cegah click 'pilih' ikut jalan
       }
       d.ghost.style.left=e.clientX+'px';d.ghost.style.top=e.clientY+'px';
+      const under=document.elementFromPoint(e.clientX,e.clientY);
+      const t=under?under.closest('.slot.block-slot'):null;
+      document.querySelectorAll('.slot.block-slot.drop-hint').forEach(el=>{
+        if(el!==t)el.classList.remove('drop-hint');
+      });
+      if(t&&t!==d.sl)t.classList.add('drop-hint');
     });
     window.addEventListener('pointerup',e=>{
       if(!d||e.pointerId!==d.pid)return;
       if(d.moved){
-        const panelB=document.getElementById('panel-bag');
+        document.querySelectorAll('.slot.block-slot.drop-hint').forEach(el=>el.classList.remove('drop-hint'));
         const under=document.elementFromPoint(e.clientX,e.clientY);
-        if(!under||!panelB.contains(under)){
-          const s=RPG.blockBag[d.i];
-          if(s)this.confirmDropBlock(d.i,s);
+        const t=under?under.closest('.slot.block-slot'):null;
+        if(t){
+          const targetIdx=+t.dataset.bi;
+          if(targetIdx!==d.i&&targetIdx>=0&&targetIdx<RPG.blockBag.length){
+            this.moveBlockStack(d.i,targetIdx);
+            this.renderBlockBag();
+            if(typeof BuildSys!=='undefined'&&BuildSys.active)BuildSys.updateHUD();
+            if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+          }
+        }else{
+          const panelB=document.getElementById('panel-bag');
+          if(!under||!panelB.contains(under)){
+            const s=RPG.blockBag[d.i];
+            if(s)this.confirmDropBlock(d.i,s);
+          }
+        }
+      }
+      cleanup();
+    });
+    window.addEventListener('pointercancel',cleanup);
+  },
+  /* ---------- tab furnitur di tas ---------- */
+  renderFurniBag(){
+    const gEl=document.getElementById('furni-grid');
+    const cntEl=document.getElementById('furni-bag-count');
+    const descIcon=document.getElementById('furni-sel-icon');
+    const descName=document.getElementById('furni-sel-name');
+    const btnPlace=document.getElementById('btn-place-furni');
+
+    if(!gEl||!RPG.furniBag)return;
+    const used=RPG.furniBag.filter(s=>s&&s.n>0).length;
+    if(cntEl)cntEl.textContent=`${used}/${RPG.furniBag.length}`;
+
+    if(RPG.selectedFurniSlot>=0&&(!RPG.furniBag[RPG.selectedFurniSlot]||RPG.furniBag[RPG.selectedFurniSlot].n<=0)){
+      RPG.selectedFurniSlot=-1;
+    }
+    if(RPG.selectedFurniSlot===-1){
+      const firstIdx=RPG.furniBag.findIndex(s=>s&&s.n>0);
+      if(firstIdx>=0)RPG.selectedFurniSlot=firstIdx;
+    }
+
+    const curSel=(RPG.selectedFurniSlot>=0)?RPG.furniBag[RPG.selectedFurniSlot]:null;
+    if(curSel&&ITEMS[curSel.id]){
+      const it=ITEMS[curSel.id];
+      if(descIcon)descIcon.innerHTML=this.itemIcon(curSel.id);
+      if(descName)descName.innerHTML=`Furnitur: <b>${it.n}</b> (×${curSel.n})`;
+      if(btnPlace){btnPlace.disabled=false;btnPlace.style.opacity='1';}
+    }else{
+      if(descIcon)descIcon.textContent='🪑';
+      if(descName)descName.textContent='Pilih furnitur untuk dipasang';
+      if(btnPlace){btnPlace.disabled=true;btnPlace.style.opacity='0.5';}
+    }
+
+    if(btnPlace){
+      btnPlace.onclick=()=>{
+        if(RPG.selectedFurniSlot<0||!RPG.furniBag[RPG.selectedFurniSlot])return;
+        const s=RPG.furniBag[RPG.selectedFurniSlot];
+        const it=ITEMS[s.id];
+        if(!it||!it.place)return;
+        this.closeAll();
+        if(typeof BuildSys!=='undefined')BuildSys.toggle(true, 'furniture');
+        else if(typeof Furni!=='undefined')Furni.beginPlace(it.place, RPG.selectedFurniSlot);
+      };
+    }
+
+    gEl.innerHTML='';
+    RPG.furniBag.forEach((s,i)=>{
+      const d=document.createElement('div');
+      d.className='slot furni-slot';
+      d.dataset.fi=i;
+      if(RPG.selectedFurniSlot===i&&s)d.classList.add('picked');
+      if(s&&s.n>0){
+        const it=ITEMS[s.id];
+        d.innerHTML=`<span class="emo">${this.itemIcon(s.id)}</span><span class="cnt">${s.n>1?s.n:''}</span>`;
+        d.title=`${it?it.n:s.id} (×${s.n})\nKlik = pilih · Klik ganda = pasang · Seret keluar = buang`;
+        if(it&&it.rarity&&RARITY[it.rarity]){
+          d.classList.add('r-'+it.rarity);
+          d.style.borderColor=RARITY[it.rarity].css;
+        }
+        d.addEventListener('click',()=>{
+          if(this._furniSkipClick){this._furniSkipClick=false;return;}
+          RPG.selectedFurniSlot=i;
+          this.renderFurniBag();
+          if(typeof BuildSys!=='undefined'&&BuildSys.active){
+            BuildSys.setMode('furniture');
+            BuildSys.updateHUD();
+          }
+          if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+        });
+        d.addEventListener('dblclick',()=>{
+          if(!it||!it.place)return;
+          this.closeAll();
+          if(typeof BuildSys!=='undefined')BuildSys.toggle(true, 'furniture');
+          else if(typeof Furni!=='undefined')Furni.beginPlace(it.place, i);
+        });
+      }else{
+        d.classList.add('empty');
+        d.addEventListener('click',()=>{
+          if(this._furniSkipClick){this._furniSkipClick=false;return;}
+          if(RPG.selectedFurniSlot>=0&&RPG.furniBag&&RPG.furniBag[RPG.selectedFurniSlot]){
+            this.moveFurniStack(RPG.selectedFurniSlot,i);
+            this.renderFurniBag();
+            if(typeof BuildSys!=='undefined'&&BuildSys.active){
+              BuildSys.updateHUD();
+            }
+            if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+          }
+        });
+      }
+      gEl.appendChild(d);
+    });
+    this.applyItemIcons(gEl);
+    this.initFurniDrag();
+  },
+  /* Pindah / swap / gabung slot di tas furnitur */
+  moveFurniStack(fromI, toI) {
+    if (fromI === toI) return false;
+    if (!RPG.furniBag) return false;
+    const a = RPG.furniBag[fromI], b = RPG.furniBag[toI];
+    if (!a) return false;
+    const cap = (typeof stackCap === 'function') ? stackCap(a.id) : 64;
+    if (b && b.id === a.id && b.n < cap) {
+      const mv = Math.min(a.n, cap - b.n);
+      b.n += mv;
+      a.n -= mv;
+      if (a.n <= 0) RPG.furniBag[fromI] = null;
+    } else {
+      RPG.furniBag[toI] = a;
+      RPG.furniBag[fromI] = b;
+    }
+    if (RPG.selectedFurniSlot === fromI) {
+      RPG.selectedFurniSlot = toI;
+    } else if (RPG.selectedFurniSlot === toI) {
+      RPG.selectedFurniSlot = fromI;
+    }
+    if (typeof RPG.save === 'function') RPG.save();
+    return true;
+  },
+  confirmDropFurni(i,s){
+    const it=ITEMS[s.id];
+    this.modal({
+      icon:this.itemIcon(s.id),
+      text:`Buang <b>${it?it.n:s.id}</b> ke tanah?`,
+      input:{value:s.n,min:1,max:s.n},
+      okLabel:'✔ Buang',cancelLabel:'✖ Batal',
+      onOk:(n)=>{
+        if(n<=0)return;
+        const cur=RPG.furniBag[i];
+        if(!cur||cur.id!==s.id)return;
+        const take=Math.min(n,cur.n);
+        cur.n-=take;
+        if(cur.n<=0)RPG.furniBag[i]=null;
+        const fx=Player.pos.x+Math.sin(Player.facing)*1.2;
+        const fz=Player.pos.z+Math.cos(Player.facing)*1.2;
+        World.dropItem(fx,Player.pos.y+0.6,fz,s.id,take,{owner:true});
+        this.toast(`🗑️ Membuang ${this.itemIcon(s.id)} ${it?it.n:s.id} ×${take}`);
+        if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+        if(RPG.selectedFurniSlot===i&&(!RPG.furniBag[i]||RPG.furniBag[i].n<=0))
+          RPG.selectedFurniSlot=-1;
+        this.renderFurniBag();
+      }
+    });
+  },
+  /* drag furnitur di tas furnitur: seret ke slot lain = pindah/swap, seret keluar panel = buang. */
+  initFurniDrag(){
+    if(this._furniDragInit)return;
+    this._furniDragInit=true;
+    const DEAD=8;
+    let d=null;
+    const cleanup=()=>{
+      if(!d)return;
+      document.querySelectorAll('.slot.furni-slot.drop-hint').forEach(el=>el.classList.remove('drop-hint'));
+      if(d.ghost)d.ghost.remove();
+      if(d.sl)d.sl.classList.remove('dragging');
+      d=null;
+    };
+    document.body.addEventListener('pointerdown',e=>{
+      if(this.open!=='bag'||this.bagPage!=='furniture')return;
+      if(e.button)return;
+      const sl=e.target.closest('.slot.furni-slot');
+      if(!sl)return;
+      const s=RPG.furniBag[+sl.dataset.fi];
+      if(!s||!s.n)return;
+      d={sl,i:+sl.dataset.fi,x0:e.clientX,y0:e.clientY,moved:false,ghost:null,pid:e.pointerId};
+    });
+    window.addEventListener('pointermove',e=>{
+      if(!d||e.pointerId!==d.pid)return;
+      if(!d.moved){
+        if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)<DEAD)return;
+        d.moved=true;
+        const s=RPG.furniBag[d.i];
+        if(!s){cleanup();return;}
+        d.ghost=document.createElement('div');d.ghost.className='drag-ghost';
+        d.ghost.innerHTML=this.itemIcon(s.id);document.body.appendChild(d.ghost);
+        this.applyItemIcons(d.ghost);
+        d.sl.classList.add('dragging');
+        this._furniSkipClick=true;
+      }
+      d.ghost.style.left=e.clientX+'px';d.ghost.style.top=e.clientY+'px';
+      const under=document.elementFromPoint(e.clientX,e.clientY);
+      const t=under?under.closest('.slot.furni-slot'):null;
+      document.querySelectorAll('.slot.furni-slot.drop-hint').forEach(el=>{
+        if(el!==t)el.classList.remove('drop-hint');
+      });
+      if(t&&t!==d.sl)t.classList.add('drop-hint');
+    });
+    window.addEventListener('pointerup',e=>{
+      if(!d||e.pointerId!==d.pid)return;
+      if(d.moved){
+        document.querySelectorAll('.slot.furni-slot.drop-hint').forEach(el=>el.classList.remove('drop-hint'));
+        const under=document.elementFromPoint(e.clientX,e.clientY);
+        const t=under?under.closest('.slot.furni-slot'):null;
+        if(t){
+          const targetIdx=+t.dataset.fi;
+          if(targetIdx!==d.i&&targetIdx>=0&&targetIdx<RPG.furniBag.length){
+            this.moveFurniStack(d.i,targetIdx);
+            this.renderFurniBag();
+            if(typeof BuildSys!=='undefined'&&BuildSys.active)BuildSys.updateHUD();
+            if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+          }
+        }else{
+          const panelB=document.getElementById('panel-bag');
+          if(!under||!panelB.contains(under)){
+            const s=RPG.furniBag[d.i];
+            if(s)this.confirmDropFurni(d.i,s);
+          }
         }
       }
       cleanup();
@@ -2911,7 +3456,6 @@ const UI={
     if(it.food)return{k:'food',t:'🍖 Makanan & Obat'};
     if(it.weapon)return{k:'weapon',t:'⚔️ Senjata'};
     if(it.armor)return{k:'armor',t:'🛡️ Armor'};
-    if(it.isBlock)return{k:'furni',t:'Furnitur'};
     if(it.place)return{k:'furni',t:'🪑 Furnitur'};
     return{k:'mat',t:'📦 Bahan & Lainnya'};
   },

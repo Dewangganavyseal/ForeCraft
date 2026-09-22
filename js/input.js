@@ -48,9 +48,15 @@ const Input={
       }
       /* MODE PENEMPATAN: R memutar ghost 90°, Escape membatalkan. Tombol gerak
          tetap aktif supaya pemain bisa berpindah posisi untuk mengarahkan. */
+      if(k==='KeyR'){
+        if(typeof BuildSys!=='undefined'&&BuildSys.active&&BuildSys.mode==='furniture'){
+          BuildSys.rotateFurni();
+          return;
+        }
+        if(typeof Furni!=='undefined'&&Furni.placing){Furni.rotatePlace();return;}
+      }
       if(typeof Furni!=='undefined'&&Furni.placing){
         if(k==='Escape'){Furni.cancelPlace();return;}
-        if(k==='KeyR'){Furni.rotatePlace();return;}
       }
       /* ATUR PINTU: Q/E (atau ◀ ▶ di bar) melangkah antar posisi pintu yang sah,
          Enter menerapkan, Escape membatalkan. Sengaja memakai tombol yang sama
