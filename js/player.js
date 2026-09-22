@@ -402,7 +402,15 @@ const Player={
     const nextX=lerp(L.sx,L.tx,p);
     const nextZ=lerp(L.sz,L.tz,p);
     const targetY=(L.targetGy!==undefined)?L.targetGy:World.groundAt(L.tx,L.tz,CFG.WORLD_H-1);
-    const gy=World.groundAt(nextX,nextZ,Math.max(L.sy+6,targetY+4))||targetY;
+    /* Di dalam goa dungeon: lantai pendaratan HARUS dipindai dari BAWAH
+       (innerFloorY). groundAt dari atas kubah selalu menemukan tanah DI ATAS
+       goa sehingga pemain "ditaruh" di atas kubah dan efek hentakannya
+       meledak di sana, bukan di lantai dalam tempat pemain berdiri. */
+    const inCaveLeap=(typeof World!=="undefined"&&World.inDungeonCave==="function")
+      ?World.inDungeonCave(Math.floor(nextX),Math.floor(this.pos.y)+1,Math.floor(nextZ)):null;
+    const gy=(inCaveLeap&&(typeof Dungeon!=="undefined")&&Dungeon.innerFloorY)
+      ?Dungeon.innerFloorY(nextX,nextZ,this.pos.y+2)
+      :(World.groundAt(nextX,nextZ,Math.max(L.sy+6,targetY+4))||targetY);
     const nextY=lerp(L.sy,targetY,p)+Math.sin(p*Math.PI)*L.arc;
 
     /* Jaring pengaman udara: bila di tengah lompatan menyentuh dinding, hentikan gerak horizontal */

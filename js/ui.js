@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /* HUD & semua panel */
 const UI={
   open:null,picked:null,hotEls:[],activeSig:'',
@@ -2224,17 +2224,6 @@ const UI={
     const fallback = this.isFurniStructure(id) ? `this.src='${this.furniIconUrl(id)}'` : `this.outerHTML='${it.e}'`;
     return `<img class="iico" src="${src}" data-iico="${src}" alt="" onerror="${fallback}">`;
   },
-      const bUrl = this.blockIconUrl(id);
-      return `<img class="iico block-3d-ico" src="${bUrl}" alt="" onerror="this.outerHTML='${it.e||'🧱'}'">`;
-    }
-    let src=this.ITEM_IMG[id];
-    if(!src&&id){
-      src='buttons/'+id+'.png';
-    }
-    return `<img class="iico" src="${src}" data-iico="${src}" alt="" onerror="this.outerHTML='${it.e}'">`;
-  },
-
-  /* HTML ikon potret NPC team (render 3D bust portrait) */
   npcIcon(roleId, fallbackEmoji = '👤'){
     if(!roleId)return fallbackEmoji;
     return `<img class="tico" src="buttons/npc_${roleId}.png" alt="" onerror="this.outerHTML='${fallbackEmoji}'">`;

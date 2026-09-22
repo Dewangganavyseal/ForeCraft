@@ -234,6 +234,62 @@ const Env_Pigeon = (() => {
       this.root.position.copy(pos);
       this.shadow.position.set(pos.x, pos.y + 0.015, pos.z);
     }
+    /* Burung yang baru hinggap di pohon saat malam langsung tidur. */
+    restIfNight() {
+      const nightNow = (typeof Weather !== 'undefined') ? (Weather.nightF > 0.5) : false;
+      if (nightNow && this.perchType === 'tree' && this.state !== 'SLEEP') this.sleepOnTree();
+    }
+
+    /* ---------- TIDUR MALAM DI POHON ----------
+       Dipanggil manager saat malam tiba: burung yang sedang hinggap di pohon
+       (perchType tree) masuk state SLEEP - diam menunduk, tidak jalan/matuk/
+       pindah, dan tidak kabur saat pemain mendekat. Terbangun otomatis saat
+       pagi (wakeUp) atau saat pohonnya dihancurkan (flushFromTree). */
+    sleepOnTree() {
+      if (this.state === 'TAKEOFF' || this.state === 'FLY') return false;
+      if (this.perchType !== 'tree') return false;
+      if (this.sleeping) return true;
+      this.sleeping = true;
+      this.state = 'SLEEP';
+      this.stateT = 0;
+      this.pecking = false;
+      return true;
+    }
+    wakeUp(flyAway) {
+      if (!this.sleeping && this.state !== 'SLEEP') return;
+      this.sleeping = false;
+      if (flyAway) {
+        this.flyAway = true;
+        this.flightStart.copy(this.pos);
+        this.flightTarget = new THREE.Vector3(this.pos.x, this.pos.y + rand(25, 40), this.pos.z);
+        this.flightDur = 4.0;
+        this.flightPeakH = this.pos.y + 35;
+        this.state = 'TAKEOFF';
+        this.stateT = 0;
+      } else {
+        this.state = 'IDLE';
+        this.stateT = 0;
+        this.dur = rand(2.0, 5.0);
+      }
+    }
+    /* Pohon tempat hinggap dihancurkan: langsung terbang kabur ke hinggap
+       baru (atau ke langit bila tidak ada), tanpa peduli malam/siang. */
+    flushFromTree() {
+      this.sleeping = false;
+      if (this.state === 'TAKEOFF' || this.state === 'FLY') return;
+      const perch = Env_Pigeon.findPerch(this.pos.x, this.pos.z, 8, 26);
+      if (perch) {
+        this.takeOffTo(perch.pos, perch.type, true);
+      } else {
+        this.flyAway = true;
+        this.flightStart.copy(this.pos);
+        this.flightTarget = new THREE.Vector3(this.pos.x, this.pos.y + 30, this.pos.z);
+        this.flightDur = 4.0;
+        this.flightPeakH = this.pos.y + 30;
+        this.state = 'TAKEOFF';
+        this.stateT = 0;
+      }
+    }
 
     takeOffTo(targetPos, targetType = 'ground', isEscape = false) {
       this.flightStart.copy(this.pos);
@@ -290,7 +346,7 @@ const Env_Pigeon = (() => {
       let headPitch = 0, headYaw = 0, headTilt = 0, headThrust = 0, headLift = 0;
       let bob = 0, walkPitch = 0, spread = 0.1;
 
-      if (playerPos && (this.state === 'IDLE' || this.state === 'WALK')) {
+      if (playerPos && !this.sleeping && (this.state === 'IDLE' || this.state === 'WALK')) {
         const dPlayer = Math.hypot(this.pos.x - playerPos.x, this.pos.z - playerPos.z);
         const dyPlayer = Math.abs(this.pos.y - playerPos.y);
         if (dPlayer < 4.8 && dyPlayer < 3.8) {
@@ -299,6 +355,15 @@ const Env_Pigeon = (() => {
       }
 
       switch (this.state) {
+        case 'SLEEP': {
+          /* tidur: menunduk diam, kaki terlipat, ekor turun, mata "merem"
+             (kepala menunduk dalam ke bulu). Tidak jalan/matuk/pindah. */
+          tCrouch = 0.55; tThigh = -0.5; tShin = 0.55; tTail = 0.3;
+          headPitch = 1.1; headThrust = 0.5;
+          tFreq = 0.25; tAmp = 0.03; tAlt = 0;
+          bob = Math.sin(t * 1.1 + this.seed) * 0.03;
+          break;
+        }
         case 'IDLE': {
           if (this.stateT > this.dur) {
             // Burung hanya jalan jika di tanah (ground); jika di pohon/ore/atap, mereka diam atau terbang
@@ -461,6 +526,14 @@ const Env_Pigeon = (() => {
               this.pos.copy(this.flightTarget);
               this.surfaceY = this.flightTarget.y;
               this.perchType = this.nextPerchType || 'ground';
+              const nightNow = (typeof Weather !== 'undefined') ? (Weather.nightF > 0.5) : false;
+              if (nightNow && this.perchType === 'tree') {
+                this.sleepOnTree();
+                this.headingTarget = this.heading;
+                this.landDip = 0.4;
+                this.stateT = 0;
+                this.dur = rand(3.0, 7.0);
+              }
               this.headingTarget = this.heading;
               this.landDip = 0.4;
               this.state = 'IDLE';
@@ -716,6 +789,7 @@ const Env_Pigeon = (() => {
         const pigeon = new Pigeon(pal);
         const spawnPos = flockPerch.pos.clone().add(new THREE.Vector3(rand(-0.6, 0.6), 0, rand(-0.6, 0.6)));
         pigeon.setPerch(spawnPos, flockPerch.type);
+        pigeon.restIfNight();
 
         this.scene.add(pigeon.root);
         this.scene.add(pigeon.shadow);
@@ -723,9 +797,33 @@ const Env_Pigeon = (() => {
       }
     },
 
+    /* Burung yang hinggap di pohon yang ditebang/dihancurkan langsung
+       terbang kabur. Dipanggil World.fellTree/leafDecay/setBlock. */
+    flushTree(tx, tz) {
+      for (const p of this.pigeons) {
+        if (p.despawned || p.perchType !== 'tree') continue;
+        if (Math.floor(p.pos.x) !== tx || Math.floor(p.pos.z) !== tz) continue;
+        p.flushFromTree();
+      }
+    },
+
     update(dt, playerPos) {
       if (!this.scene || !playerPos) return;
       this.time += dt;
+      /* SIKLUS TIDUR MALAM: saat malam, burung yang hinggap di pohon tidur
+         (state SLEEP); saat pagi, yang tidur bangun (terbang pagi singkat). */
+      const isNight = (typeof Weather !== 'undefined') ? (Weather.nightF > 0.5) : false;
+      if (isNight !== this._wasNight) {
+        this._wasNight = isNight;
+        for (const p of this.pigeons) {
+          if (p.despawned) continue;
+          if (isNight) {
+            if (p.perchType === 'tree') p.sleepOnTree();
+          } else {
+            if (p.sleeping || p.state === 'SLEEP') p.wakeUp(true);
+          }
+        }
+      }
 
       for (let i = this.pigeons.length - 1; i >= 0; i--) {
         const p = this.pigeons[i];

@@ -1181,6 +1181,8 @@ const World={
       trunk.push(y);
     }
     if(!trunk.length)return;
+    /* burung yang tidur/hinggap di pohon ini langsung terbang kabur */
+    if(typeof Env_Pigeon!=="undefined"&&Env_Pigeon.flushTree)Env_Pigeon.flushTree(wx,wz);
     const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
     const d=dirs[(Math.random()*4)|0];
     trunk.forEach((y,i)=>{
@@ -1195,6 +1197,7 @@ const World={
   },
 
   leafDecay(wx,wy,wz){
+    if(typeof Env_Pigeon!=="undefined"&&Env_Pigeon.flushTree)Env_Pigeon.flushTree(wx,wz);
     for(let dy=-2;dy<=2;dy++)for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const x=wx+dx,y=wy+dy,z=wz+dz;
       if(this.getBlock(x,y,z)!==B.LEAF)continue;

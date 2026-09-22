@@ -2609,15 +2609,20 @@ const Furni={
       if(d<bd){bd=d;best=f;}
     }
     if(!best)return false;
-    /* PETI HARTA KARUN (dchest, wreck_chest, bchest): klik atau serang langsung membuka peti! */
+    /* PETI HARTA KARUN (dchest, wreck_chest, bchest): HANYA via tombol F
+       (interaksi), bukan attack. Serangan ditahan + Critical pesan panduan
+       supaya pemain tahu cara yang benar. Peti juga kebal damage. */
     if(best.def==='dchest'||best.def==='wreck_chest'||best.def==='bchest'){
-      this.interact(best);
+      if(typeof UI!=="undefined"&&UI.toast)UI.toast("Tekan F untuk membuka peti harta!");
+      if(typeof Sfx!=="undefined"&&Sfx.noStamina)Sfx.noStamina();
       return true;
     }
     return this.damage(best,dmg||3);
   },
   damage(f,dmg){
     if(!this.DEFS[f.def])return false;
+    /* PETI HARTA KARUN kebal damage: hanya bisa dibuka via tombol F. */
+    if(f.def==='dchest'||f.def==='wreck_chest'||f.def==='bchest')return true;
     const max=this.HP[f.def]||24;
     // Pagar, gerbang & kastil: dihitung presisi 1 pukulan per ayunan
     const isFortress = f.def.startsWith('fence') || f.def.startsWith('gate') || f.def.startsWith('castle');

@@ -529,6 +529,7 @@ const Game={
       if(typeof Fishing!=='undefined'){try{Fishing.update(dt);}catch(e){console.error('[Fishing error]',e);}}
       if(typeof PortFX!=='undefined'){try{PortFX.update(dt);}catch(e){console.error('[PortFX error]',e);}}
       try{Furni.update(dt);}catch(e){console.error('[Furni error]',e);}
+      if(typeof CastleVillage!=='undefined'){try{CastleVillage.update(dt);}catch(e){console.error('[CastleVillage error]',e);}}
       if(typeof BuildSys!=='undefined'){try{BuildSys.update(dt);}catch(e){console.error('[BuildSys error]',e);}}
       if(typeof Altar!=='undefined'){try{Altar.update(dt);}catch(e){console.error('[Altar error]',e);}}
       try{Dungeon.update(dt);}catch(e){console.error('[Dungeon error]',e);}
