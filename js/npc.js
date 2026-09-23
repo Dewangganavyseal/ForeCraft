@@ -107,9 +107,21 @@ const NPCS={
   },
 
   /* Permintaan rekrut: jumlah & variasi bahan SCALING dengan level NPC.
-     Makin besar level NPC, makin banyak & makin berat permintaannya. */  rollDemand(role, lvl=1){
+     Makin besar level NPC, makin banyak & makin berat permintaannya. */
+  rollDemand(role, lvl=1){
     if(!role.recruit||!role.ask.length)return null;
     const L=Math.max(1,Math.round(lvl||1));
+
+    /* LICH MYTHIC: permintaan barang top-tier semua */
+    if(role.id==='lich'){
+      return {
+        soul_shard: Math.max(10, Math.round(10 * (1 + 0.05 * (L - 1)))),
+        crystal: Math.max(8, Math.round(8 * (1 + 0.05 * (L - 1)))),
+        steel_ingot: Math.max(12, Math.round(12 * (1 + 0.05 * (L - 1)))),
+        tungstensteel_ingot: Math.max(6, Math.round(6 * (1 + 0.04 * (L - 1))))
+      };
+    }
+
     const pool=role.ask.slice();
     const need={};
     /* NPC level tinggi meminta lebih banyak macam bahan (3-4 jenis untuk Lv 40+) */
@@ -525,6 +537,18 @@ const NPCS={
     if(!n.role.recruit||!n.demand){
       UI.bubble.show(n,npcLine(n.role.id,'chat'));
       return;
+    }
+    /* LICH MYTHIC: Syarat mutlak harus pernah mengalahkan minimal 500 Reaper (gelar God of Death) */
+    if(n.role.id==='lich'){
+      const reaperKills=(typeof RPG!=='undefined'&&RPG.getMobKills)?RPG.getMobKills('reaper'):0;
+      if(reaperKills<500){
+        UI.bubble.show(n,`Jiwa-jiwa kematian belum tunduk padamu!<br>`+
+          `Buktikan dirimu dengan membunuh setidaknya <b>500 Reaper</b> (saat ini: <b>${reaperKills}/500</b>) dan sandang gelar <b>"God of Death"</b>, barulah kau pantas memanggilku!`);
+        if(typeof UI!=='undefined'&&UI.toast)
+          UI.toast(`☠️ Lich menolak: Kamu baru membunuh ${reaperKills}/500 Reaper!`);
+        if(typeof Sfx!=='undefined'&&Sfx.hit)Sfx.hit();
+        return;
+      }
     }
     /* ATURAN REKRUT LEVEL: pemain tidak bisa merekrut NPC dengan level > Player.level + 10 */
     const pLvl=(typeof Player!=='undefined')?Player.level:1;
@@ -1338,27 +1362,29 @@ const NPCS={
   stepFree(n,x,z){
     const hy=n.pos.y+1.8;
     const gy=World.groundAt(x,z,hy);
+    const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+    const refBaseY = n.inWater ? Math.max(n.pos.y, waterBase) : n.pos.y;
     /* 1. HALANGAN TINGGI 2+ BLOK (tebing, dinding batu/tanah/kayu):
-       Bila tanah di depan > 1.25 blok, anggap BUNTU agar steer() repath mencari jalan memutar. */
-    if(gy > n.pos.y + 1.25) return false;
+       Bila tanah di depan > 1.35 blok di atas pijakan/air, anggap BUNTU agar steer() repath mencari jalan memutar. */
+    if(gy > refBaseY + 1.35) return false;
 
     /* CEK BLOK RINTANGAN (batang pohon, perabot, tembok bangunan) */
     if(World.blockedAt(x,n.pos.y,z,this.BODY_R)){
       /* jika rintangan ada di ketinggian kepala/dada (2 blok), pasti buntu */
       if(World.blockedAt(x,n.pos.y+1,z,this.BODY_R)) return false;
       /* jika rintangan 1 blok tapi tanahnya terlalu tinggi */
-      if(gy > n.pos.y + 1.25) return false;
+      if(gy > refBaseY + 1.35) return false;
     }
 
     /* Target NPC (musuh, atau Player bila anggota tim) */
     const target=(n.target&&!n.target.dead)?n.target:(this.isTeam(n)?Player:null);
+    const isChasing = !!target || n.state==='chase' || this.isTeam(n);
 
     /* 2. AIR: bila titik tujuan adalah air dan NPC saat ini di darat,
-       repath/hindari air KECUALI targetnya memang ada di dalam air */
+       repath/hindari air KECUALI sedang mengejar atau mengikuti target */
     const inWater=(typeof World.inWaterAt==='function')&&World.inWaterAt(x,gy+0.2,z);
     if(inWater&&!n.inWater){
-      const targetInWater=target&&(target.inWater||(target.pos&&target.pos.y<=CFG.WATER_Y+0.3));
-      if(!targetInWater) return false;
+      if(!isChasing) return false;
     }
 
     /* 3. TURUN: tidak ada batasan turun (bisa menuruni 2 blok / lereng bebas) */
@@ -1636,18 +1662,20 @@ const NPCS={
     if((n._stepCd||0)>0)return false;
     const hy=n.pos.y+1.8;
     const step=World.groundAt(tx,tz,hy);
-    /* pijakan harus lebih tinggi, tapi tidak lebih dari 1 blok penuh */
-    if(step<=n.pos.y+0.12||step>n.pos.y+1.3)return false;
+    const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+    const refBaseY = n.inWater ? Math.max(n.pos.y, waterBase) : n.pos.y;
+    /* pijakan harus lebih tinggi, tapi tidak lebih dari 1 blok penuh (dari permukaan air bila di air) */
+    if(step<=n.pos.y+0.12||step>refBaseY+1.35)return false;
     /* ruang setinggi badan di atas pijakan harus bebas */
     if(World.blockedAt(tx,step+0.05,tz,this.BODY_R))return false;
-    n.vel.y=n.inWater?5.4:6.2;
+    n.vel.y=n.inWater?6.2:6.2;
     /* dorongan mendatar ke arah pijakan supaya benar-benar naik ke atas, bukan
        melompat lurus lalu jatuh kembali. Di air dorongannya lebih besar karena
        kecepatan naik dibatasi clamp ±3.5 (physics air). */
     const dx=tx-n.pos.x,dz=tz-n.pos.z;
     const dl=Math.hypot(dx,dz);
     if(dl>0.001){
-      const push=n.inWater?4.2:2.4;
+      const push=n.inWater?4.8:2.4;
       n.vel.x+=(dx/dl)*push;
       n.vel.z+=(dz/dl)*push;
     }

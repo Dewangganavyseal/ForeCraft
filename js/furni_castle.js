@@ -991,20 +991,45 @@ const FurniCastle = (() => {
       const group = new THREE.Group();
       group.name = "HouseDoubleDoor";
 
+      // 1. Kusen pintu (door frame) kayu yang membingkai lubang 2 blok
+      group.add(createBox(2.00, 0.08, 0.22, MATS.woodLog, 0, 1.96, 0)); // Balok atas (lintel)
+      group.add(createBox(0.08, 1.98, 0.22, MATS.woodLog, -0.96, 0.99, 0)); // Tiang kusen kiri
+      group.add(createBox(0.08, 1.98, 0.22, MATS.woodLog,  0.96, 0.99, 0)); // Tiang kusen kanan
+      group.add(createBox(2.00, 0.05, 0.26, MATS.woodLog, 0, 0.025, 0)); // Ambang bawah (sill)
+
+      // 2. Daun pintu kiri & kanan berengsel (pivot tepat di kusen luar)
       const doorLeafL = new THREE.Group();
       doorLeafL.name = "HouseDoorLeafL";
       const doorLeafR = new THREE.Group();
       doorLeafR.name = "HouseDoorLeafR";
 
-      // Engsel kiri & kanan (daun pintu ganda 2 blok)
-      doorLeafL.position.set(-0.48, 0, 0);
-      doorLeafR.position.set(0.48, 0, 0);
+      // Engsel kiri di x = -0.92, daun pintu memanjang ke kanan (+X) menuju titik tengah x = 0
+      doorLeafL.position.set(-0.92, 0.05, 0);
+      doorLeafL.add(createBox(0.91, 1.86, 0.10, MATS.plank, 0.455, 0.93, 0));
+      // Palang kayu penguat horizontal
+      doorLeafL.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, 0.455, 1.55, 0));
+      doorLeafL.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, 0.455, 0.35, 0));
+      doorLeafL.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, 0.455, 0.95, 0));
+      // Plat engsel besi di sisi kusen kiri
+      doorLeafL.add(createBox(0.20, 0.08, 0.14, MATS.iron, 0.10, 1.55, 0));
+      doorLeafL.add(createBox(0.20, 0.08, 0.14, MATS.iron, 0.10, 0.35, 0));
+      // Gagang pintu besi & kuningan di sisi pertemuan tengah
+      doorLeafL.add(createBox(0.08, 0.28, 0.16, MATS.iron, 0.81, 0.95, 0));
+      doorLeafL.add(createBox(0.06, 0.06, 0.20, MATS.gold, 0.81, 0.95, 0));
 
-      doorLeafL.add(createBox(0.96, 1.95, 0.12, MATS.plank, -0.48, 0.98, 0));
-      doorLeafL.add(createBox(0.12, 0.35, 0.18, MATS.iron, -0.15, 0.98, 0));
-
-      doorLeafR.add(createBox(0.96, 1.95, 0.12, MATS.plank, 0.48, 0.98, 0));
-      doorLeafR.add(createBox(0.12, 0.35, 0.18, MATS.iron, 0.15, 0.98, 0));
+      // Engsel kanan di x = +0.92, daun pintu memanjang ke kiri (-X) menuju titik tengah x = 0
+      doorLeafR.position.set(0.92, 0.05, 0);
+      doorLeafR.add(createBox(0.91, 1.86, 0.10, MATS.plank, -0.455, 0.93, 0));
+      // Palang kayu penguat horizontal
+      doorLeafR.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, -0.455, 1.55, 0));
+      doorLeafR.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, -0.455, 0.35, 0));
+      doorLeafR.add(createBox(0.89, 0.12, 0.13, MATS.woodLog, -0.455, 0.95, 0));
+      // Plat engsel besi di sisi kusen kanan
+      doorLeafR.add(createBox(0.20, 0.08, 0.14, MATS.iron, -0.10, 1.55, 0));
+      doorLeafR.add(createBox(0.20, 0.08, 0.14, MATS.iron, -0.10, 0.35, 0));
+      // Gagang pintu besi & kuningan di sisi pertemuan tengah
+      doorLeafR.add(createBox(0.08, 0.28, 0.16, MATS.iron, -0.81, 0.95, 0));
+      doorLeafR.add(createBox(0.06, 0.06, 0.20, MATS.gold, -0.81, 0.95, 0));
 
       group.add(doorLeafL);
       group.add(doorLeafR);
@@ -1165,6 +1190,29 @@ const FurniCastle = (() => {
       return bestTop;
     },
 
+    /* Posisi dudukan singgasana tahta agung di dalam kastil */
+    throneSeat(f) {
+      if (!f || !f.def || !f.def.startsWith('castle')) return null;
+      const tier = parseInt(f.def.replace('castle', '')) || 1;
+      const size = CastleBuilder.getCastleSize(tier);
+      const half = size / 2;
+      const wallThick = tier === 1 ? 1.0 : (tier === 2 ? 1.2 : 1.5);
+      const wallOffset = half - wallThick / 2;
+      const daisZ = -wallOffset + 2.0;
+      const localZ = daisZ - 0.3;
+      const c = Math.cos(f.yaw || 0), s = Math.sin(f.yaw || 0);
+      const radius = (typeof CastleVillage !== 'undefined' && CastleVillage.radiusOf)
+        ? CastleVillage.radiusOf(f) : (tier === 1 ? 40 : (tier === 2 ? 60 : 80));
+      return {
+        x: f.x + localZ * s,
+        y: f.y + 1.25,
+        z: f.z + localZ * c,
+        yaw: (f.yaw || 0),
+        tier,
+        radius
+      };
+    },
+
     toggleGate(f) {
       if (!f) return;
       f.doorOpen = !f.doorOpen;
@@ -1187,6 +1235,9 @@ const FurniCastle = (() => {
       if (parts.type === 'castle') {
         if (parts.leafL) parts.leafL.rotation.y = -ease * (Math.PI * 0.55);
         if (parts.leafR) parts.leafR.rotation.y = ease * (Math.PI * 0.55);
+      } else if (parts.type === 'house') {
+        if (parts.leafL) parts.leafL.rotation.y = ease * (Math.PI * 0.55);
+        if (parts.leafR) parts.leafR.rotation.y = -ease * (Math.PI * 0.55);
       } else if (parts.type === 'fenceGate') {
         if (parts.gatePanel) parts.gatePanel.position.y = (parts.baseY || 0) + ease * parts.liftH;
       }

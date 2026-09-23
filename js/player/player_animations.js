@@ -347,8 +347,41 @@ class PlayerAnimator {
     }
   }
   /* POSE DUDUK: paha ke depan (horizontal), tulang kering turun, badan sedikit
-     condong & tangan bertumpu di panggul — diposisikan agar pas di kursi. */
+     condong & tangan bertumpu di panggul — diposisikan agar pas di kursi / tahta. */
   animSit(t, P) {
+    if (typeof Player !== 'undefined' && Player.thronePose) {
+      const br = Math.sin(t * 1.6) * 0.012;
+      if (P.body) P.body.position.y = -0.15 + br;
+      if (P.torso) {
+        P.torso.position.y = 0.66 + br;
+        P.torso.rotation.set(0.06, 0, 0);
+      }
+      /* Kaki menekuk seperti menaiki pet */
+      if (P.legL) {
+        P.legL.rotation.x = -1.32;
+        P.legL.rotation.z = 0.38;
+        if (P.legL.userData.shin) P.legL.userData.shin.rotation.set(1.32, 0, 0);
+      }
+      if (P.legR) {
+        P.legR.rotation.x = -1.32;
+        P.legR.rotation.z = -0.38;
+        if (P.legR.userData.shin) P.legR.userData.shin.rotation.set(1.32, 0, 0);
+      }
+      /* Tangan bertumpu gagah di sandaran lengan tahta emas */
+      if (P.armL) {
+        P.armL.rotation.x = -0.72;
+        P.armL.rotation.z = 0.35;
+        if (P.armL.userData.fore) P.armL.userData.fore.rotation.x = -0.55;
+      }
+      if (P.armR) {
+        P.armR.rotation.x = -0.72;
+        P.armR.rotation.z = -0.35;
+        if (P.armR.userData.fore) P.armR.userData.fore.rotation.x = -0.55;
+      }
+      if (P.head) { P.head.rotation.y = 0; P.head.rotation.x = 0.02; }
+      return;
+    }
+
     const br = Math.sin(t * 1.4) * 0.01;           // napas duduk halus
     if (P.body) P.body.position.y = -0.05;
     if (P.torso) {

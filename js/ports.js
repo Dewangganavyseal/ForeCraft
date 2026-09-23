@@ -1402,7 +1402,7 @@ const SkillsPort={
      npc_stonegiant.js, npc_rabbitwarrior.js). SkillsPort hanya meneruskan
      panggilan dari npc.js (aiFight / onMeleeHit) dan PortFX (shard/meteor).
      --------------------------------------------------------------------- */
-  poseKinds:{elf:1,giant:1,rabbit:1,goblin:1,lion:1,magesupport:1,royalguard:1},
+  poseKinds:{elf:1,giant:1,rabbit:1,goblin:1,lion:1,magesupport:1,royalguard:1,lich:1},
   _ent(n){
     const kind=n.parts.rare&&n.parts.rare.kind;
     if(kind==='elf')return window.NPC_Elfmage;
@@ -1412,6 +1412,7 @@ const SkillsPort={
     if(kind==='lion')return window.NPC_Lionknight;
     if(kind==='magesupport')return window.NPC_Magesupport;
     if(kind==='royalguard')return window.NPC_Royalguard;
+    if(kind==='lich')return window.NPC_Lich;
     return null;
   },
   combat(n,dt){const e=this._ent(n);return e&&e.combat?e.combat(n,dt):false;},

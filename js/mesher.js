@@ -358,21 +358,23 @@ const Mesher=(()=>{
     mat.customProgramCacheKey=()=>U?'localfade':'occfade';
   }
 
-  /* ---------- ANGIN TUMBUHAN VOXEL ----------
+  /* ---------- ANGIN TUMBUHAN VOXEL & TERINJAK (SAMA DENGAN WORLDGRASS) ----------
      Diporting dari "NEW MODEL/tumbuhan.html". Goyangan dihitung di VERTEX
      SHADER, jadi ribuan semak/tebu bergerak tanpa biaya CPU sama sekali.
      Amplitudo per verteks datang dari atribut `aSway` yang sudah dihitung
      Env_Plants (naik dari pangkal ke ujung, dan berbeda per jenis tumbuhan),
      sehingga pangkal tetap diam & ujung paling lentur.
-
-     Dipakai menumpuk DI ATAS applyLocalFade: fungsi ini membungkus
-     onBeforeCompile yang sudah ada supaya fade/oklusi tetap berlaku. */
+     Ditambahkan pula respons TERINJAK (uTr) persis seperti worldgrass:
+     jamur, grass, hingga bunga akan merebah menjauh saat dilangkahi pemain, mob, dan NPC. */
   function applyFloraWind(mat){
     const prev=mat.onBeforeCompile;
     mat.onBeforeCompile=sh=>{
       if(prev)prev(sh);
       sh.uniforms.uFT=FLORA_T;
-      sh.vertexShader=('attribute float aSway;\nuniform float uFT;\n'+sh.vertexShader)
+      sh.uniforms.uTr=TRAMPLE;
+      sh.uniforms.uTrN=TRAMPLE_N;
+      sh.vertexShader=('attribute float aSway;\nuniform float uFT;\n'+
+        'uniform vec4 uTr['+MAX_TRAMPLE+'];\nuniform int uTrN;\n'+sh.vertexShader)
         .replace('#include <begin_vertex>',
           '#include <begin_vertex>\n'+
           '  {\n'+
@@ -384,6 +386,24 @@ const Mesher=(()=>{
           '    float fl=sin(uFT*3.10+wp.x*2.2+wp.y*1.4+wp.z*2.6);\n'+
           '    transformed.x+=(s1*0.55+s2*0.28+s3*0.35+fl*0.10)*aSway;\n'+
           '    transformed.z+=(s2*0.45+s3*0.30-s1*0.20+fl*0.08)*aSway*0.75;\n'+
+          /* --- terinjak: tekuk menjauh dari penginjak terdekat (pemain, mob, NPC) --- */
+          '    vec2 push=vec2(0.0);\n'+
+          '    float press=0.0;\n'+
+          '    for(int i=0;i<'+MAX_TRAMPLE+';i++){\n'+
+          '      if(i>=uTrN)break;\n'+
+          '      vec4 t=uTr[i];\n'+
+          '      if(t.z<=0.0)continue;\n'+
+          '      vec2 d=wp.xz-t.xy;\n'+
+          '      float dist=length(d);\n'+
+          '      if(dist>=t.z)continue;\n'+
+          '      float k=1.0-smoothstep(0.0,t.z,dist);\n'+
+          '      k*=t.w;\n'+
+          '      push+=normalize(d+vec2(1e-4,0.0))*k;\n'+
+          '      press=max(press,k);\n'+
+          '    }\n'+
+          '    float trBend=clamp(aSway*12.0, 0.0, 1.0);\n'+
+          '    transformed.xz+=push*trBend*0.42;\n'+
+          '    transformed.y-=press*trBend*0.30;\n'+
           '  }');
     };
     mat.customProgramCacheKey=()=>'florawind';

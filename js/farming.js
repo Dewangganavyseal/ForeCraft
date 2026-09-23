@@ -370,55 +370,119 @@ const Farming={
   },
 
   /* ---------- aksi pemain: cangkul / tanam / panen ---------- */
-  tryUse(player){
-    const t=this.targetTile(player);
-    if(!t)return false;
-    const {x:bx,y:by,z:bz,k,p}=t;
-    const block=t.block;
+  useAtBlock(bx, by, bz, block, player = (typeof Player !== 'undefined' ? Player : null)){
+    const k = this.key(bx, by, bz);
+    const p = this.map.get(k);
 
     /* panen dulu bila sudah matang */
-    if(p&&p.stage===3){this.harvest(p);return true;}
+    if(p && p.stage === 3){ this.harvest(p); return true; }
 
-    const slot=RPG.hotbar[RPG.sel];
-    const id=slot&&slot.id;
+    const slot = (typeof RPG !== 'undefined') ? RPG.hotbar[RPG.sel] : null;
+    const id = slot && slot.id;
 
     /* cangkul: rumput/tanah -> ladang */
-    if(id==='hoe'){
-      if(block===B.GRASS||block===B.DIRT){
+    if(id === 'hoe'){
+      if(block === B.GRASS || block === B.DIRT){
         /* buang tanaman liar di atas blok yang dicangkul */
-        const cx=Math.floor(bx/16),cz=Math.floor(bz/16);
-        const c=World.getChunk(cx,cz),lx=bx-cx*16,lz=bz-cz*16;
-        c.plants=c.plants.filter(p=>!(p.x===lx&&p.z===lz&&p.y>=by));
-        World.setBlock(bx,by,bz,B.FARM);
-        FX.debris(new THREE.Vector3(bx+0.5,by+1,bz+0.5),0x6f4a26,8,2);
-        if(typeof Sfx!=='undefined'&&Sfx.chop)Sfx.chop();
+        const cx = Math.floor(bx / 16), cz = Math.floor(bz / 16);
+        const c = World.getChunk(cx, cz), lx = bx - cx * 16, lz = bz - cz * 16;
+        if(c && c.plants) {
+          c.plants = c.plants.filter(pl => !(pl.x === lx && pl.z === lz && pl.y >= by));
+        }
+        World.setBlock(bx, by, bz, B.FARM);
+        if(typeof FX !== 'undefined' && FX.debris) {
+          FX.debris(new THREE.Vector3(bx + 0.5, by + 1, bz + 0.5), 0x6f4a26, 8, 2);
+        }
+        if(typeof Sfx !== 'undefined' && Sfx.chop) Sfx.chop();
         /* kadang menemukan benih liar saat mencangkul (SEED_CHANCE = 10%) */
-        if(Math.random()<this.SEED_CHANCE){
-          FX.spawnDrop(new THREE.Vector3(bx+0.5,by+1.1,bz+0.5),this.randomSeed(),1);
+        if(Math.random() < this.SEED_CHANCE && typeof FX !== 'undefined' && FX.spawnDrop){
+          FX.spawnDrop(new THREE.Vector3(bx + 0.5, by + 1.1, bz + 0.5), this.randomSeed(), 1);
         }
         this.save();
+        if(player && player.attack){
+          player.attack = { active: true, combo: 0, t: 0, hitDone: true, queued: false, sinceEnd: 0, moveMul: 0.45, recover: false };
+        }
         return true;
       }
-      if(block===B.FARM){UI.toast('⛏️ Ladang sudah siap — pilih benih');return true;}
+      if(block === B.FARM){
+        if(typeof UI !== 'undefined' && UI.toast) UI.toast('⛏️ Ladang sudah siap — pilih benih');
+        return true;
+      }
       return false;
     }
 
-    /* benih: pegang benih lalu klik/sentuh area lahan untuk menanam.
-       Bila target bukan lahan ladang -> muncul notif (tidak menyerang). */
-    if(id&&this.SEED_TO_CROP[id]){
-      if(p&&p.stage<3){UI.toast('🌿 Tanaman masih tumbuh');return true;}
-      if(block===B.FARM&&!p){
-        if(this.plant(bx,by,bz,this.SEED_TO_CROP[id])){
-          slot.n--;if(slot.n<=0)RPG.hotbar[RPG.sel]=null;
-          UI.renderHotbar();
+    /* benih: pegang benih lalu klik/sentuh area lahan untuk menanam */
+    if(id && this.SEED_TO_CROP[id]){
+      if(p && p.stage < 3){
+        if(typeof UI !== 'undefined' && UI.toast) UI.toast('🌿 Tanaman masih tumbuh');
+        return true;
+      }
+      if(block === B.FARM && !p){
+        if(this.plant(bx, by, bz, this.SEED_TO_CROP[id])){
+          slot.n--;
+          if(slot.n <= 0) RPG.hotbar[RPG.sel] = null;
+          if(typeof UI !== 'undefined' && UI.renderHotbar) UI.renderHotbar();
         }
         return true;
       }
-      UI.toast('🌾 Tidak ada lahan di sini — cangkul tanah dulu');
+      if(typeof UI !== 'undefined' && UI.toast) UI.toast('🌾 Tidak ada lahan di sini — cangkul tanah dulu');
       return true;
     }
 
     return false;
+  },
+
+  /* Klik / sentuh langsung ke blok di dunia 3D (PC & mobile) */
+  tryClickBlock(screenX, screenY, player = (typeof Player !== 'undefined' ? Player : null)){
+    if(!player || player.dead) return false;
+    const slot = (typeof RPG !== 'undefined') ? RPG.hotbar[RPG.sel] : null;
+    const id = slot && slot.id;
+    if(id !== 'hoe' && !(id && this.SEED_TO_CROP[id])) return false;
+    if(typeof Cam === 'undefined' || !Cam.cam || typeof World === 'undefined') return false;
+
+    const nx = (screenX / window.innerWidth) * 2 - 1;
+    const ny = -(screenY / window.innerHeight) * 2 + 1;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(nx, ny), Cam.cam);
+
+    const groups = [];
+    for (const c of World.chunks.values()) {
+      if (c.group) groups.push(c.group);
+    }
+    const hits = ray.intersectObjects(groups, true);
+    if(!hits || !hits.length) return false;
+
+    for(const hit of hits){
+      if(hit.object && hit.object.geometry && hit.face){
+        const pt = hit.point;
+        const norm = hit.face.normal;
+        const bx = Math.floor(pt.x - norm.x * 0.1);
+        const by = Math.floor(pt.y - norm.y * 0.1);
+        const bz = Math.floor(pt.z - norm.z * 0.1);
+
+        const block = World.getBlock(bx, by, bz);
+        if(block === B.AIR || block === B.WATER) continue;
+
+        // Jangkauan mencangkul (hingga 5.2 blok)
+        const dist = Math.hypot(bx + 0.5 - player.pos.x, bz + 0.5 - player.pos.z);
+        if(dist > 5.2 || Math.abs(by - player.pos.y) > 3.5){
+          if(typeof UI !== 'undefined' && UI.toast) UI.toast('🌾 Terlalu jauh untuk dicangkul — dekati blok');
+          return true;
+        }
+
+        // Hadapkan karakter ke blok yang diklik
+        player.facing = Math.atan2(bx + 0.5 - player.pos.x, bz + 0.5 - player.pos.z);
+
+        return this.useAtBlock(bx, by, bz, block, player);
+      }
+    }
+    return false;
+  },
+
+  tryUse(player){
+    const t=this.targetTile(player);
+    if(!t)return false;
+    return this.useAtBlock(t.x, t.y, t.z, t.block, player);
   },
 
   /* ---------- update pertumbuhan ---------- */

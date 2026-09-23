@@ -249,12 +249,17 @@
 </div>
 
 <!-- ================= PANEL KARAKTER =================
-     Dibuka dari bingkai potret di kiri atas. Kiri = daftar stat detail,
+     Dibuka dari bingkai potret di kiri atas. Kiri = daftar stat detail / lencana,
      kanan = render full-body karakter beserta equipment yang dipakai. -->
 <div class="panel hidden" id="panel-char">
   <h2><img class="ph-ico" src="buttons/ui_char.png" alt="" onerror="this.outerHTML='🧍'"> Karakter <button class="x" data-close="char">✕</button></h2>
+  <div class="char-tabs" id="char-tabs">
+    <button type="button" class="char-tab-btn active" id="char-tab-stats" data-tab="stats">📊 Statistik</button>
+    <button type="button" class="char-tab-btn" id="char-tab-badges" data-tab="badges">🎖️ Gelar & Lencana (20)</button>
+  </div>
   <div id="char-layout">
     <div id="char-stats"></div>
+    <div id="char-badges" style="display:none;"></div>
     <div id="char-view">
       <canvas id="char-cv" width="320" height="440"></canvas>
       <div id="char-view-hint">Geser untuk memutar</div>
@@ -412,6 +417,7 @@
 <script src="js/entities/npc_goblin.js"></script>
 <script src="js/entities/npc_magesupport.js"></script>
 <script src="js/entities/npc_royalguard.js"></script>
+<script src="js/entities/npc_lich.js"></script>
 
 <!-- Environment 3D Models -->
 <script src="js/environment/env_trees.js"></script>

@@ -429,6 +429,10 @@ const BuildSys = {
     const hits = ray.intersectObjects(groups, true);
     if (!hits || !hits.length) return null;
 
+    const pPos = (typeof Player !== 'undefined' && Player.pos) ? Player.pos : { x: 0, y: 5, z: 0 };
+    const inside = !!(typeof World !== 'undefined' && World.insideHouse) ||
+                   !!(typeof Furni !== 'undefined' && Furni.houseNear && Furni.houseNear(pPos));
+
     for (const hit of hits) {
       if (hit.object && hit.object.geometry && hit.face) {
         const pt = hit.point;
@@ -440,6 +444,19 @@ const BuildSys = {
 
         const hitBid = World.getBlock(bx, by, bz);
         if (hitBid === B.AIR || hitBid === B.WATER) continue;
+
+        // 1. Lewati atap genteng (B.ROOF) agar tidak menutupi lantai interior di bawah kursor
+        if (hitBid === B.ROOF) continue;
+
+        // 2. Saat berada di dalam ruangan / rumah atau memasang furnitur di dalam rumah:
+        // lewati dinding atas, balok atas, atau langit-langit yang tingginya di atas tubuh pemain
+        // (bagian yang dibuat transparan oleh shader oklusi) agar raycast menembus langsung ke lantai
+        if (inside || this.mode === 'furniture') {
+          const inHouse = (typeof Furni !== 'undefined' && Furni.houseNear) ? Furni.houseNear({ x: bx, z: bz }, 2) : null;
+          if (inHouse || inside) {
+            if (by > pPos.y + 1.25 || pt.y > pPos.y + 1.35) continue;
+          }
+        }
 
         const px = bx + Math.round(norm.x);
         const py = by + Math.round(norm.y);

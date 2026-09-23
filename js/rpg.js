@@ -1172,6 +1172,9 @@ const RPG={
         deployedPet:(typeof Capture!=='undefined'&&typeof Capture.deployedSlot==='number')?Capture.deployedSlot:this.deployedPet,
         /* proficiency "belajar dengan melakukan" (ala Durango) */
         prof:Prof.serialize(),
+        /* tracking kill per tipe mob & lencana (badge) */
+        mobKills:this.mobKills||{},
+        badges:this.badges||{},
         /* rekan yang sedang ikut; penduduk desa biasa tidak perlu disimpan
            karena akan dibangkitkan lagi oleh generator desa */
         team:(typeof NPCS!=='undefined'&&NPCS.serializeTeam)?NPCS.serializeTeam():[],
@@ -1188,6 +1191,41 @@ const RPG={
       };
       this.saveSlotsMeta(meta);
     }catch(e){}
+  },
+
+  /* ---------- SISTEM TRACKING MOB KILLS & LENCANA (BADGES) ---------- */
+  mobKills:{},
+  badges:{},
+  getMobKills(type){
+    if(!this.mobKills) this.mobKills = {};
+    return this.mobKills[type] || 0;
+  },
+  hasBadge(id){
+    if(!this.badges) this.badges = {};
+    return !!this.badges[id];
+  },
+  unlockBadge(id, title){
+    if(!this.badges) this.badges = {};
+    if(this.badges[id]) return false;
+    this.badges[id] = Date.now();
+    const bName = title || (typeof CharView !== 'undefined' && CharView.getBadgeName ? CharView.getBadgeName(id) : id);
+    if(typeof UI !== 'undefined' && UI.toast){
+      UI.toast(`🎖️ Lencana Terbuka: ${bName}!`);
+    }
+    if(typeof Sfx !== 'undefined' && Sfx.craft) Sfx.craft();
+    this.save();
+    return true;
+  },
+  onMobKilled(type, isBoss){
+    if(!this.mobKills) this.mobKills = {};
+    this.mobKills[type] = (this.mobKills[type] || 0) + 1;
+    if(isBoss) this.mobKills['_boss'] = (this.mobKills['_boss'] || 0) + 1;
+    this.checkBadges();
+  },
+  checkBadges(){
+    if(typeof CharView !== 'undefined' && CharView.checkAllBadges){
+      CharView.checkAllBadges();
+    }
   },
 
   /* compat: load(slot) */

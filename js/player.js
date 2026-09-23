@@ -1142,6 +1142,13 @@ const Player={
       this.animate(dt,moving,0,false);
       return;
     }
+    /* DUDUK DI SINGGASANA TAHTA KASTIL: pemain diam bertumpu di tahta, kamera tinjau wilayah aktif */
+    if(typeof Furni!=='undefined'&&Furni.sittingThrone){
+      this.vel.set(0,0,0);
+      this.onGround=true;
+      this.animate(dt,false,0,false);
+      return;
+    }
     /* lompatan Hantam Bumi terarah: terbang ke target, hantam saat mendarat */
     if(this.slamLeap){this.updateSlamLeap(dt);return;}
     const A=this.attack,D=this.dodge;

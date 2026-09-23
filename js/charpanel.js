@@ -104,7 +104,33 @@ const CharView={
       e.preventDefault();
       if(typeof UI!=='undefined')UI.toggle('char');
     });
+    this.initTabs();
     this.ready=true;
+  },
+
+  activeTab:'stats',
+  initTabs(){
+    const tabStats=document.getElementById('char-tab-stats');
+    const tabBadges=document.getElementById('char-tab-badges');
+    if(!tabStats||!tabBadges)return;
+    if(this._tabsBound)return;
+    this._tabsBound=true;
+    tabStats.addEventListener('click',()=>{this.setTab('stats');});
+    tabBadges.addEventListener('click',()=>{this.setTab('badges');});
+  },
+  setTab(tab){
+    this.activeTab=(tab==='badges')?'badges':'stats';
+    const tabStats=document.getElementById('char-tab-stats');
+    const tabBadges=document.getElementById('char-tab-badges');
+    const elStats=document.getElementById('char-stats');
+    const elBadges=document.getElementById('char-badges');
+    if(tabStats)tabStats.classList.toggle('active',this.activeTab==='stats');
+    if(tabBadges)tabBadges.classList.toggle('active',this.activeTab==='badges');
+    if(elStats)elStats.style.display=(this.activeTab==='stats')?'':'none';
+    if(elBadges)elBadges.style.display=(this.activeTab==='badges')?'':'none';
+    if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+    if(this.activeTab==='badges')this.renderBadges();
+    else this.renderStats();
   },
 
   /* ---------- pindahkan Player.mesh ke scene render, render, kembalikan ---- */
@@ -164,9 +190,13 @@ const CharView={
     this.initScene();
     if(!this.ensureGL())return;
     this.initDrag(cv);
-    /* render pertama ditunda satu frame (panel baru lepas .hidden →
-       clientWidth masih 0 saat toggle) */
-    this.renderStats();
+    this.initTabs();
+    this.checkAllBadges();
+    if(this.activeTab==='badges'){
+      this.renderBadges();
+    }else{
+      this.renderStats();
+    }
     requestAnimationFrame(()=>{
       if(typeof UI!=='undefined'&&UI.open!=='char')return;
       this.sizePanel();
@@ -209,7 +239,8 @@ const CharView={
     this.drawFull();
     if(now-(this._statT||0)>250){
       this._statT=now;
-      this.renderStats();
+      if(this.activeTab==='badges')this.renderBadges();
+      else this.renderStats();
     }
   },
 
@@ -363,6 +394,73 @@ const CharView={
       }
     }
     el.innerHTML=h;
+    if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(el,I18N.lang);
+  },
+
+  /* ================= 20 GELAR & LENCANA (BADGES) ================= */
+  BADGES:[
+    {id:'god_of_death',title:'God of Death',icon:'☠️',tag:'Mythic',desc:'Bantai 500 mob Reaper di dunia kegelapan (Syarat Rekrut Lich)',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('reaper')>=500),progress:()=>`${Math.min(500,(typeof RPG!=='undefined'?RPG.getMobKills('reaper'):0))}/500`},
+    {id:'dragon_slayer',title:'Dragon Slayer',icon:'🐉',tag:'Mythic',desc:'Tumbangkan 300 Naga Kuno di angkasa',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('dragon')>=300),progress:()=>`${Math.min(300,(typeof RPG!=='undefined'?RPG.getMobKills('dragon'):0))}/300`},
+    {id:'high_king',title:'High King',icon:'👑',tag:'Royal',desc:'Duduk di singgasana tahta agung kastil kerajaan',check:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('high_king')),progress:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('high_king'))?'1/1':'0/1'},
+    {id:'dragon_rider',title:'Dragon Rider',icon:'🪽',tag:'Legend',desc:'Terbang mengarungi cakrawala bersama Naga peliharaan',check:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('dragon_rider')),progress:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('dragon_rider'))?'1/1':'0/1'},
+    {id:'village_founder',title:'Village Founder',icon:'🏰',tag:'Royal',desc:'Bangun teritori kastil dan aula desa hingga diakui penduduk',check:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('village_founder')),progress:()=>(typeof RPG!=='undefined'&&RPG.hasBadge('village_founder'))?'1/1':'0/1'},
+    {id:'first_blood',title:'First Blood',icon:'🩸',desc:'Kalahkan monster pertamamu di alam liar',check:()=>(typeof Player!=='undefined'&&(Player.kills||0)>=1),progress:()=>`${Math.min(1,typeof Player!=='undefined'?(Player.kills||0):0)}/1`},
+    {id:'centurion',title:'Centurion',icon:'⚔️',desc:'Kalahkan 100 monster di medan tempur',check:()=>(typeof Player!=='undefined'&&(Player.kills||0)>=100),progress:()=>`${Math.min(100,typeof Player!=='undefined'?(Player.kills||0):0)}/100`},
+    {id:'monster_hunter',title:'Monster Hunter',icon:'🏹',desc:'Kalahkan 1.000 monster di seluruh biome',check:()=>(typeof Player!=='undefined'&&(Player.kills||0)>=1000),progress:()=>`${Math.min(1000,typeof Player!=='undefined'?(Player.kills||0):0)}/1000`},
+    {id:'boss_slayer',title:'Apex Predator',icon:'👹',desc:'Tumbangkan 50 Boss raksasa di dungeon dan alam liar',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('_boss')>=50),progress:()=>`${Math.min(50,typeof RPG!=='undefined'?RPG.getMobKills('_boss'):0)}/50`},
+    {id:'slime_crusher',title:'Slime Crusher',icon:'🟢',desc:'Kalahkan 200 Slime hijau pembelah',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('slime')>=200),progress:()=>`${Math.min(200,typeof RPG!=='undefined'?RPG.getMobKills('slime'):0)}/200`},
+    {id:'wolf_bane',title:'Alpha Wolf',icon:'🐺',desc:'Kalahkan 150 Serigala malam',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('wolf')>=150),progress:()=>`${Math.min(150,typeof RPG!=='undefined'?RPG.getMobKills('wolf'):0)}/150`},
+    {id:'golem_breaker',title:'Titan Breaker',icon:'🗿',desc:'Hancurkan 100 Golem batu peremuk tanah',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('golem')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('golem'):0)}/100`},
+    {id:'scorpion_hunter',title:'Venom Conqueror',icon:'🦂',desc:'Taklukkan 150 Kalajengking gurun',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('scorpion')>=150),progress:()=>`${Math.min(150,typeof RPG!=='undefined'?RPG.getMobKills('scorpion'):0)}/150`},
+    {id:'tarantula_bane',title:'Web Weaver',icon:'🕷️',desc:'Basmi 100 Tarantula pelompat',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('tarantula')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('tarantula'):0)}/100`},
+    {id:'centipede_bane',title:'Dune Leviathan',icon:'🐛',desc:'Kalahkan 50 Kelabang raksasa tanah merah',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('kelabang')>=50),progress:()=>`${Math.min(50,typeof RPG!=='undefined'?RPG.getMobKills('kelabang'):0)}/50`},
+    {id:'yeti_slayer',title:'Frost Lord',icon:'❄️',desc:'Tumbangkan 100 Yeti raksasa tundra salju',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('yeti')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('yeti'):0)}/100`},
+    {id:'trex_dominator',title:'Dino Tamer',icon:'🦖',desc:'Tumbangkan 100 T-Rex buas pemangsa',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('trex')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('trex'):0)}/100`},
+    {id:'mammoth_hunter',title:'Colossus Hunter',icon:'🦣',desc:'Kalahkan 100 Mammoth bertaring raksasa',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('mammoth')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('mammoth'):0)}/100`},
+    {id:'angler_master',title:'Master Angler',icon:'🎣',desc:'Kalahkan / tangkap 100 ikan perairan',check:()=>(typeof RPG!=='undefined'&&RPG.getMobKills('fish')>=100),progress:()=>`${Math.min(100,typeof RPG!=='undefined'?RPG.getMobKills('fish'):0)}/100`},
+    {id:'legendary_hero',title:'Legendary Hero',icon:'⭐',tag:'Honor',desc:'Capai Level 50 sebagai petualang sejati Forecraft',check:()=>(typeof Player!=='undefined'&&(Player.level||1)>=50),progress:()=>`${Math.min(50,typeof Player!=='undefined'?(Player.level||1):1)}/50`}
+  ],
+  getBadgeName(id){
+    const b=this.BADGES.find(x=>x.id===id);
+    return b?b.title:id;
+  },
+  checkAllBadges(){
+    if(typeof RPG==='undefined')return;
+    for(const b of this.BADGES){
+      if(!RPG.hasBadge(b.id)&&b.check&&b.check()){
+        RPG.unlockBadge(b.id,b.title);
+      }
+    }
+  },
+  renderBadges(){
+    const el=document.getElementById('char-badges');
+    if(!el)return;
+    this.checkAllBadges();
+    let unlockedCount=0;
+    let itemsHtml='';
+    for(const b of this.BADGES){
+      const isUnlocked=(typeof RPG!=='undefined'&&RPG.hasBadge(b.id));
+      if(isUnlocked)unlockedCount++;
+      const isMythic=(b.tag==='Mythic');
+      const cls='badge-card'+(isUnlocked?' unlocked':' locked')+(isMythic?' mythic':'');
+      const prog=b.progress?b.progress():(isUnlocked?'1/1':'0/1');
+      const tagHtml=b.tag?`<span class="badge-tag">${b.tag}</span>`:'';
+      const statusHtml=isUnlocked?'<span class="badge-status done">✔ DIBUKA</span>':'<span class="badge-status">🔒 TERKUNCI</span>';
+      itemsHtml+=`
+        <div class="${cls}">
+          <div class="badge-icon">${b.icon}</div>
+          <div class="badge-info">
+            <div class="badge-title">${b.title} ${tagHtml}</div>
+            <div class="badge-desc">${b.desc}</div>
+          </div>
+          <div class="badge-progress">${prog}<br>${statusHtml}</div>
+        </div>
+      `;
+    }
+    el.innerHTML=`
+      <div class="cs-head">🎖️ Lencana & Gelar Prestasi (${unlockedCount}/${this.BADGES.length})</div>
+      ${itemsHtml}
+    `;
     if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(el,I18N.lang);
   },
 };

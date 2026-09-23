@@ -169,6 +169,10 @@ const Input={
             else Furni.moveGhostTo(e.clientX,e.clientY);
           }
         }
+        /* saat mencangkul atau menanam benih, klik langsung ke blok */
+        else if(typeof Farming!=='undefined'&&Farming.tryClickBlock&&Farming.tryClickBlock(e.clientX,e.clientY)){
+          return;
+        }
         else this.attackQ=true;
       }
       if(e.button===2){this.rmb=true;this.lastMX=e.clientX;this.lastMY=e.clientY;}
@@ -210,8 +214,9 @@ const Input={
       /* main menu: zoom kamera dinonaktifkan (panorama terkunci) */
       if(this.inMenu())return;
       if(e.target&&e.target.closest&&e.target.closest('.panel,#team,#toast,#chat'))return;
-      const minZ=(typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5;
-      Cam.targetZoom=clamp(Cam.targetZoom*(1+e.deltaY*0.0012),minZ,16);
+      const minZ = (typeof Cam !== 'undefined' && Cam.throneMode) ? 12.0 : ((typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5);
+      const maxZ = (typeof Cam !== 'undefined' && Cam.throneMode) ? 45.0 : 16;
+      Cam.targetZoom=clamp(Cam.targetZoom*(1+e.deltaY*0.0012),minZ,maxZ);
       /* Bila zoom menjauh kembali ke isometrik (zoom >= 4.8), segera lepas lock mouse */
       if(Cam.targetZoom>=4.8&&this.pointerLocked&&document.exitPointerLock){
         try{document.exitPointerLock();}catch(err){}
@@ -312,8 +317,9 @@ const Input={
       if(cam.b!==null&&!this.inMenu()){
         const d=twoDist(),mx=twoMidX();
         if(d>10&&cam.dist>10){
-          const minZ=(typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5;
-          Cam.targetZoom=clamp(cam.zoom*cam.dist/d,minZ,16);
+          const minZ = (typeof Cam !== 'undefined' && Cam.throneMode) ? 12.0 : ((typeof Cam!=='undefined'&&(Cam.tppEnabled||Cam.fppEnabled))?0.8:5);
+          const maxZ = (typeof Cam !== 'undefined' && Cam.throneMode) ? 45.0 : 16;
+          Cam.targetZoom=clamp(cam.zoom*cam.dist/d,minZ,maxZ);
         }
         if(cam.midX)Cam.yaw-=(mx-cam.midX)*0.010;
         cam.midX=mx;
@@ -379,6 +385,19 @@ const Input={
       if(Furni.doorEdit)Furni.pickDoorAt(t.clientX,t.clientY);
       else Furni.moveGhostTo(t.clientX,t.clientY);
     },{passive:true});
+
+    /* MENCANGKUL / MENANAM LANGSUNG KE BLOK (mobile): ketuk langsung blok di layar */
+    window.addEventListener('touchstart',e=>{
+      if(typeof Game==='undefined'||!Game.started||this.inMenu())return;
+      if(typeof BuildSys!=='undefined'&&BuildSys.active)return;
+      if(typeof Furni!=='undefined'&&(Furni.placing||Furni.doorEdit))return;
+      const t=e.changedTouches[0];
+      const el=t.target;
+      if(el&&el.closest&&el.closest('#build-hud,#modal-ov,#mobile,.panel,#team,#hotbar,#toast,#bag-float-menu,#joy-zone,#actbtn'))return;
+      if(typeof Farming!=='undefined'&&Farming.tryClickBlock&&Farming.tryClickBlock(t.clientX,t.clientY)){
+        if(e.cancelable)e.preventDefault();
+      }
+    },{passive:false});
     const bind=(id,fn)=>{
       const el=document.getElementById(id);
       if(!el)return;

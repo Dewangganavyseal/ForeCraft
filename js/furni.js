@@ -1736,21 +1736,22 @@ const Furni={
                             Math.floor(p.z-n.z*0.5));
     };
     let h=null;
+    const pPos = (typeof Player !== 'undefined' && Player.pos) ? Player.pos : { x: 0, y: 5, z: 0 };
+    const inside = !!(typeof World !== 'undefined' && World.insideHouse) ||
+                   !!(typeof Furni !== 'undefined' && Furni.houseNear && Furni.houseNear(pPos));
+
     for(const cand of hits){
       const p2=cand.point;
       const cbx=Math.floor(p2.x),cbz=Math.floor(p2.z);
       if(this.placing==='house'&&inOwnedHouse(cbx,cbz))continue;
       /* ---------- ATAP DILEWATI ----------
          BUGFIX "properti terpasang di atas genteng": saat pemain berada DI DALAM
-         rumah, atap dibuat transparan oleh shader (CFG.ROOF_FADE) sehingga tidak
-         terlihat — tapi Raycaster tetap mengenai geometrinya, jadi klik di lantai
-         justru mendarat di genteng. Atap juga bukan permukaan yang sah untuk
-         perabot (World.isFloor pun mengecualikannya), maka ray diteruskan ke hit
-         berikutnya sampai menemukan blok nyata di bawahnya. */
+         rumah, atap dibuat transparan oleh shader sehingga tidak terlihat. */
       if(hitBlock(cand)===B.ROOF)continue;
-      /* langit-langit / blok di atas kepala juga dilewati: perabot selalu
-         dipasang pada permukaan setinggi pemain, bukan di atasnya */
-      if(p2.y>Player.pos.y+2.4)continue;
+      /* langit-langit / dinding atas di atas kepala juga dilewati */
+      const inHouse = inOwnedHouse(cbx, cbz) || inside;
+      if(inHouse && (p2.y > pPos.y + 1.25 || Math.floor(p2.y) > pPos.y + 1.15)) continue;
+      if(p2.y>pPos.y+2.4)continue;
       h=cand;break;
     }
     if(!h)return;
@@ -1876,7 +1877,7 @@ const Furni={
       if(facing!==undefined){
         let diff=Math.abs(Math.atan2(dx,dz)-facing);
         if(diff>Math.PI)diff=Math.PI*2-diff;
-        if(diff>1.4)continue;
+        if(d>1.8&&diff>1.45)continue;
       }
       if(d<bd){
         bd=d;
@@ -2069,6 +2070,53 @@ const Furni={
     Player.onGround=true;
     if(Player.animator)Player.animator.setAnimation('idle');
     UI.toast('🧍 Berdiri');
+  },
+
+  /* =========================================================================
+     AKSI: DUDUK DI SINGGASANA TAHTA KASTIL
+     ========================================================================= */
+  sittingThrone: null,
+  sitThrone(f){
+    if(this.sittingThrone && this.sittingThrone.furni === f){
+      this.standThrone();
+      return;
+    }
+    if(typeof FurniCastle === 'undefined' || !FurniCastle.throneSeat) return;
+    const seat = FurniCastle.throneSeat(f);
+    if(!seat) return;
+    this.sittingThrone = { furni: f, seat };
+    Player.pos.set(seat.x, seat.y, seat.z);
+    Player.facing = seat.yaw;
+    Player.vel.set(0, 0, 0);
+    Player.onGround = true;
+    Player.sittingPose = true;
+    Player.thronePose = true;
+    if(Player.animator) Player.animator.setAnimation('sit');
+    if(typeof Cam !== 'undefined' && Cam.enterThroneMode) Cam.enterThroneMode(f, seat);
+    if(typeof RPG !== 'undefined' && RPG.unlockBadge) RPG.unlockBadge('high_king');
+    if(typeof UI !== 'undefined' && UI.toast) UI.toast('👑 Duduk di Singgasana (WASD / Kursor untuk Tinjau Wilayah)');
+    if(typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
+  },
+  standThrone(){
+    if(!this.sittingThrone) return;
+    const { seat } = this.sittingThrone;
+    this.sittingThrone = null;
+    Player.sittingPose = false;
+    Player.thronePose = false;
+    const fwdX = Math.sin(seat.yaw) * 1.0;
+    const fwdZ = Math.cos(seat.yaw) * 1.0;
+    Player.pos.x = seat.x + fwdX;
+    Player.pos.z = seat.z + fwdZ;
+    Player.pos.y = seat.y;
+    if(typeof World !== 'undefined' && World.groundAt) {
+      Player.pos.y = Math.max(Player.pos.y, World.groundAt(Player.pos.x, Player.pos.z, seat.y + 2));
+    }
+    Player.vel.set(0, 0, 0);
+    Player.onGround = true;
+    if(Player.animator) Player.animator.setAnimation('idle');
+    if(typeof Cam !== 'undefined' && Cam.exitThroneMode) Cam.exitThroneMode();
+    if(typeof UI !== 'undefined' && UI.toast) UI.toast('🧍 Berdiri dari Singgasana');
+    if(typeof Sfx !== 'undefined' && Sfx.jump) Sfx.jump();
   },
 
   /* =========================================================================
@@ -2328,8 +2376,8 @@ const Furni={
             ?4*h.doorProgress*h.doorProgress*h.doorProgress
             :1-Math.pow(-2*h.doorProgress+2,3)/2;
           const parts=h.doorMesh.userData.gateParts;
-          if(parts.leafL)parts.leafL.rotation.y=-ease*(Math.PI*0.55);
-          if(parts.leafR)parts.leafR.rotation.y=ease*(Math.PI*0.55);
+          if(parts.leafL)parts.leafL.rotation.y=ease*(Math.PI*0.55);
+          if(parts.leafR)parts.leafR.rotation.y=-ease*(Math.PI*0.55);
         }
       }
     }
@@ -2384,8 +2432,29 @@ const Furni={
       f.mesh.rotation.x=Math.sin(ph)*0.035;
       f.mesh.rotation.z=Math.cos(ph*0.8)*0.03;
     }
-    /* --- duduk: pulihkan stamina, berdiri bila pemain bergerak --- */
-    if(this.sitting){
+    /* --- duduk di singgasana tahta kastil --- */
+    if(this.sittingThrone){
+      const st = this.sittingThrone;
+      if(Player.dead){
+        this.standThrone();
+      }else{
+        Player.pos.x = lerp(Player.pos.x, st.seat.x, clamp(dt * 10, 0, 1));
+        Player.pos.z = lerp(Player.pos.z, st.seat.z, clamp(dt * 10, 0, 1));
+        Player.pos.y = lerp(Player.pos.y, st.seat.y, clamp(dt * 10, 0, 1));
+        Player.vel.set(0, 0, 0);
+        Player.onGround = true;
+        Player.sittingPose = true;
+        Player.thronePose = true;
+        Player.facing = angLerp(Player.facing, st.seat.yaw, clamp(dt * 10, 0, 1));
+        Player.stamina = Math.min(Player.maxStamina(), Player.stamina + 25 * dt);
+        Player.hp = Math.min(Player.maxHp(), Player.hp + 2.0 * dt);
+
+        if(typeof Input !== 'undefined' && Input.jumpQ){
+          Input.jumpQ = false;
+          this.standThrone();
+        }
+      }
+    } else if(this.sitting){
 
       const f=this.sitting;
       if(Player.dead||Math.hypot(Player.pos.x-f.x,Player.pos.z-f.z)>1.4){
@@ -2850,6 +2919,8 @@ const Action={
     /* saat berlayar, satu-satunya aksi adalah turun dari perahu */
     if(Furni.riding)return {kind:'disembark',label:'🧍 Turun dari Perahu',
       pos:new THREE.Vector3(Furni.riding.x,CFG.WATER_Y+1.5,Furni.riding.z)};
+    if(Furni.sittingThrone)return {kind:'throne-stand',label:'🧍 Berdiri dari Singgasana',
+      pos:new THREE.Vector3(Player.pos.x,Player.pos.y+1.2,Player.pos.z)};
     if(Furni.sitting)return {kind:'stand',label:'🧍 Berdiri',
       pos:new THREE.Vector3(Furni.sitting.x,Furni.sitting.y+1.2,Furni.sitting.z)};
     /* ---------- MOB PELIHARAAN: TURUN ----------
@@ -2894,6 +2965,27 @@ const Action={
             pos:new THREE.Vector3(g.x,g.furni.y+1.6,g.z)
           }
         });
+      }
+
+      /* ---------- SINGGASANA TAHTA KASTIL: Duduk ---------- */
+      if(Furni.list && !Furni.sittingThrone){
+        for(const f of Furni.list){
+          if(!f.def || !f.def.startsWith('castle')) continue;
+          const seat = FurniCastle.throneSeat(f);
+          if(!seat) continue;
+          const dx = seat.x - pPos.x, dz = seat.z - pPos.z;
+          const d = Math.hypot(dx, dz);
+          if(d <= 2.6 && Math.abs(pPos.y - seat.y) <= 1.8){
+            candidates.push({
+              score: d - 0.52,
+              action: {
+                kind: "throne-sit", furni: f,
+                label: "👑 Duduk di Singgasana",
+                pos: new THREE.Vector3(seat.x, seat.y + 0.9, seat.z)
+              }
+            });
+          }
+        }
       }
     }
 
@@ -2999,7 +3091,9 @@ const Action={
     const a=this.current();
     if(!a){UI.toast('Tidak ada yang bisa diinteraksi di sini');return;}
     if(a.kind==='disembark')Furni.disembark();
+    else if(a.kind==='throne-stand')Furni.standThrone();
     else if(a.kind==='stand')Furni.stand();
+    else if(a.kind==='throne-sit')Furni.sitThrone(a.furni);
     else if(a.kind==='catch'&&typeof Capture!=='undefined'&&a.mob)Capture.start(a.mob);
     else if(a.kind==='pet-ride'&&typeof Capture!=='undefined')Capture.startRide();
     else if(a.kind==='pet-dismount'&&typeof Capture!=='undefined')Capture.stopRide();

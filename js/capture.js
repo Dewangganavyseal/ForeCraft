@@ -754,7 +754,7 @@ const Capture={
       const busy=target&&target.pos.distanceTo(m.pos)<14;
       if(!busy){
         const a=Cam.yaw+Math.PI;
-        const nx=Player.pos.x+Math.sin(a)*2,nz=Player.pos.z+Math.cos(a)*2;
+        const nx=Player.pos.x+Math.sin(a)*4.8,nz=Player.pos.z+Math.cos(a)*4.8;
         const g=World.groundAt(nx,nz,Player.pos.y+3);
         m.pos.set(nx,Math.max(g,Player.pos.y-1),nz);
         m.vel.set(0,0,0);
@@ -776,7 +776,7 @@ const Capture={
         if(m._followStuckT>2.5){
           m._followStuckT=0;
           const a=Cam.yaw+Math.PI;
-          const nx=Player.pos.x+Math.sin(a)*1.6,nz=Player.pos.z+Math.cos(a)*1.6;
+          const nx=Player.pos.x+Math.sin(a)*4.6,nz=Player.pos.z+Math.cos(a)*4.6;
           let g=Player.pos.y;
           if(typeof Dungeon!=='undefined'&&Dungeon.innerFloorY){
             const near=(typeof WGEN!=='undefined'&&WGEN.nearestDungeon)
@@ -961,14 +961,16 @@ const Capture={
     }
 
     const distTarget=m.pos.distanceTo(targetPos);
-    const stopDist=waitForPlayer?1.3:3.4;
+    // Beri jarak 5 blok dengan pemain agar leluasa dan tidak menempel
+    const minFollowDist = waitForPlayer ? 2.5 : 4.4;
+    const maxFollowDist = waitForPlayer ? 3.5 : 5.4;
 
-    if(distTarget>stopDist){
+    if(distTarget>maxFollowDist){
       const to=new THREE.Vector3().subVectors(targetPos,m.pos).setY(0);
       const ang=Math.atan2(to.x,to.z);
       m.mesh.rotation.y=angLerp(m.mesh.rotation.y,ang,dt*5);
       const pSpeed = (typeof Player !== 'undefined' && Player.vel) ? Math.hypot(Player.vel.x, Player.vel.z) : 0;
-      const playerRunning = pSpeed > 3.4 || distTarget > 5.5;
+      const playerRunning = pSpeed > 3.4 || distTarget > 7.5;
       m.inWater = World.inWaterAt(m.pos.x, m.pos.y + 0.3, m.pos.z);
       let spd = m.speed * 1.05;
       if(m.type==='dragon' && (m.flyT||0)>0){
@@ -983,6 +985,15 @@ const Capture={
       }
       m.vel.x=lerp(m.vel.x,Math.sin(ang)*spd,clamp(6*dt,0,1));
       m.vel.z=lerp(m.vel.z,Math.cos(ang)*spd,clamp(6*dt,0,1));
+    }else if(distTarget < minFollowDist && !waitForPlayer){
+      // Bila terlalu dekat (< 4.4 blok), pet melangkah mundur sedikit memberi jarak 5 blok ke pemain
+      const toP=new THREE.Vector3().subVectors(m.pos,targetPos).setY(0);
+      if(toP.lengthSq() > 0.04){
+        toP.normalize();
+        const backSpd = m.speed * 0.45;
+        m.vel.x=lerp(m.vel.x,toP.x*backSpd,clamp(5*dt,0,1));
+        m.vel.z=lerp(m.vel.z,toP.z*backSpd,clamp(5*dt,0,1));
+      }
     }else{
       m.vel.x*=Math.exp(-5*dt);
       m.vel.z*=Math.exp(-5*dt);
@@ -1376,6 +1387,7 @@ const Capture={
         }
       }
       if(m.flying||(m.flyT||0)>0){
+        if(typeof RPG!=='undefined'&&RPG.unlockBadge)RPG.unlockBadge('dragon_rider');
         const dur=m.flyDur||10.0;
         m.flyT=Math.max(0,m.flyT-dt);
         const elapsed=dur-m.flyT;

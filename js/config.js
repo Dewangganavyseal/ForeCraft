@@ -7,7 +7,7 @@ function angLerp(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-
 
 /* ================= konstanta dunia ================= */
 const CFG={
-  VERSION:'0.2.35',
+  VERSION:'0.2.36',
   /* WORLD_H harus menampung bangunan tertinggi (menara: lantai 4 + dinding 10
      + tembok atap) DAN pohon (terrain 5 + batang 6 + kanopi). Dengan nilai
      lama (10) atap barn/loft/menara serta puncak gable terpotong di batas
@@ -1405,6 +1405,15 @@ const NPC_ROLES=[
     skill:{id:'royalbash',name:'Shield Bash',e:'👑',
       desc:'BASH: hantaman perisai membuat mob di kerucut depan pingsan (stun) · PROVOKE: menantang mob di sekitar untuk menyerangnya · damage diterima -70% selama menantang'},
     ask:['iron_ingot','gold_ingot','pelt','leather']},
+  /* LICH: NPC Mythic (NEW MODEL/Lich.html). Ahli nujum kematian kuno.
+     Skill: Sambaran Petir Ungu, Bangkitkan 3 Zombie Pembantai (HP/Dmg/Durasi scaling level),
+     dan Sedot Nyawa (Life Drain). Syarat rekrut: kill 500 Reaper (gelar God of Death) + bahan top tier. */
+  {id:'lich', name:'Lich', e:'☠️', recruit:true, rare:true, mythic:true, weight:4,
+    robe:0x161a20, hood:0x2f8a4e,
+    hp:380, dmg:42, speed:3.2,
+    skill:{id:'lich_wrath',name:'Lich Wrath',e:'☠️',
+      desc:'⚡ Sambaran Petir Ungu beruntun · 🧟 Bangkitkan 3 Zombie Pembantai dari tanah kubur (HP, Damage & Durasi scaling level) · 🩸 Sedot Nyawa memulihkan HP'},
+    ask:['soul_shard','crystal','steel_ingot','tungstensteel_ingot']},
   /* Pedagang desa: tidak bisa direkrut. Menetap di desa dan membuka toko —
      pemain membeli item dengan koin atau menjual item untuk dapat koin. */
   {id:'merchant',name:'Pedagang',e:'🏪',recruit:false,
@@ -1783,6 +1792,14 @@ const NPC_DIALOG={
     intro:['Aku Royal Guard dari istana yang telah runtuh. Perisai ini masih bertugas.',
       'Butuh pengawal? Perisaiku bisa membius gerombolan monster, dan teriakanku memanggil semuanya padaku.',
       'Bawakan besi & emas untuk perisai ini, dan dia akan berdiri di depanmu selamanya.']},
+  lich:{
+    chat:['Kematian hanyalah awal dari pengabdian yang abadi.',
+      'Mendengar bisikan jiwa-jiwa di bawah tanah? Mereka menunggu perintahku.',
+      'Petir ungu menyambar bukan dari langit, tapi dari celah kehampaan.',
+      'Zombie-zombieku tidak kenal rasa takut ataupun lelah.'],
+    intro:['Aku sang penguasa kematian dari era kegelapan. Jiwamu memancarkan aroma 500 Reaper yang telah kau bantai.',
+      'Kau telah membuktikan dirimu sebagai "God of Death". Kehampaan ini akan melayanimu jika persembahanmu cukup.',
+      'Sediakan logam terkuat dan intisari jiwa, maka petir dan pasukan mayat hidupku akan menjadi milikmu.']},
 };
 
 

@@ -95,6 +95,37 @@ const Monsters={
     return !!WGEN.buildingAt(Math.floor(x),Math.floor(z),1);
   },
 
+  /* ---------- apakah titik ini berada di dalam bangunan pemain (interior rumah/kastil)? ----------
+     Mob liar dilarang muncul di dalam bangunan rumah maupun di dalam benteng kastil,
+     tetapi tetap boleh muncul di area luar/pekarangan/tanah dalam radius teritori kastil. */
+  inPlayerBuilding(x,z){
+    if(typeof Furni === 'undefined') return false;
+    // 1. Rumah pemain (di dalam footprint atau menempel dinding luar)
+    if(Furni.houses && Furni.houses.length){
+      for(const h of Furni.houses){
+        if(Furni.recHasBlock && Furni.recHasBlock(h, Math.floor(x), Math.floor(z))) return true;
+        if(Furni.houseNear && Furni.houseNear({ x, z })) return true;
+      }
+    }
+    // 2. Kastil pemain (di dalam perimeter dinding & interior kastil)
+    if(Furni.list && Furni.list.length){
+      for(const f of Furni.list){
+        if(f.def && f.def.startsWith('castle')){
+          const tier = parseInt(f.def.replace('castle', '')) || 1;
+          const size = (typeof CastleBuilder !== 'undefined') ? CastleBuilder.getCastleSize(tier) : (tier === 1 ? 14 : (tier === 2 ? 17 : 20));
+          const half = size / 2;
+          const dx = x - f.x, dz = z - f.z;
+          const c = Math.cos(f.yaw || 0), s = Math.sin(f.yaw || 0);
+          const lx = dx * c - dz * s;
+          const lz = dx * s + dz * c;
+          // Di dalam bentangan dinding kastil (+ margin 0.8m)
+          if(Math.abs(lx) <= half + 0.8 && Math.abs(lz) <= half + 0.8) return true;
+        }
+      }
+    }
+    return false;
+  },
+
   /* =========================================================================
      AREA DESA — PEREDAM SPAWN MONSTER
      -------------------------------------------------------------------------
@@ -126,12 +157,13 @@ const Monsters={
     }
     return null;
   },
-  /* Boleh spawn di titik ini? false bila di dalam bangunan, atau bila titiknya
+  /* Boleh spawn di titik ini? false bila di dalam bangunan desa/pemain, atau bila titiknya
      di area desa dan undian 20%-nya gagal. Satu pintu untuk SEMUA spawner
      (undian biome, kawanan, lizard, ternak) sehingga tidak ada jalur yang
-     lupa menghormati ketenangan desa. */
+     lupa menghormati ketenangan desa & benteng pemain. */
   spawnAllowed(x,z){
     if(this.inBuilding(x,z))return false;
+    if(this.inPlayerBuilding(x,z))return false;
     if(this.villageArea(x,z)&&Math.random()>=this.VILLAGE_SPAWN_CHANCE)return false;
     return true;
   },
@@ -952,6 +984,7 @@ const Monsters={
         if(xpShare>0){
           const xp=Math.max(1,Math.round(m.xp*xpShare*0.80*(RPG.xpMult?RPG.xpMult():1)));
           Player.addXP(xp);Player.kills++;
+          if(typeof RPG!=='undefined'&&RPG.onMobKilled)RPG.onMobKilled('fish',false);
           FX.text(m.pos.clone().add(new THREE.Vector3(0,2.2,0)),'+'+xp+' XP','#8fd4ff');
         }
         const fRef=m.fishRef||m;
@@ -1096,6 +1129,7 @@ const Monsters={
       const gapMul=this.xpGapMul(m.lvl,Player.level);
       const xp=Math.max(1,Math.round(m.xp*xpShare*XP_MOB_MUL*gapMul*(RPG.xpMult?RPG.xpMult():1)));
       Player.addXP(xp);Player.kills++;
+      if(typeof RPG!=='undefined'&&RPG.onMobKilled)RPG.onMobKilled(m.type,!!m.boss);
       /* label menerangkan asal XP: murni pemain, murni tim/pet, atau campuran */
       const tag=pShare<=0.001?' (tim)':aShare>0.001?` (${Math.round(pShare*100)}%+tim)`:
                 pShare>=0.999?'':` (${Math.round(pShare*100)}%)`;
@@ -3541,6 +3575,13 @@ const Monsters={
       const push=(min-d)*0.5,ux=dx/d,uz=dz/d;
       /* dorong lawan */
       if(target==='player'){
+        if(m.pet){
+          // Pet tidak boleh mendorong pemain; dorongan dialihkan ke pet agar mundur
+          const mx=m.pos.x+ux*push*1.5,mz=m.pos.z+uz*push*1.5;
+          if(this.canStand(m,mx,m.pos.z))m.pos.x=mx;
+          if(this.canStand(m,m.pos.x,mz))m.pos.z=mz;
+          return;
+        }
         const px=ox-ux*push,pz=oz-uz*push;
         if(!World.blockedAt(px,Player.pos.y,Player.pos.z,0.3))Player.pos.x=px;
         if(!World.blockedAt(Player.pos.x,Player.pos.y,pz,0.3))Player.pos.z=pz;
@@ -3828,14 +3869,16 @@ const Monsters={
 
   /* ---------- apakah langkah ke (x,z) bisa dilewati? ----------
      Dipakai bersama oleh fisika dan penghindar rintangan. */
-  canStand(m,x,z){
+  canStand(m,x,z,allowWater=false){
     const isTarantula = (m.type === 'tarantula');
     const hy = m.pos.y + (isTarantula ? 3.2 : 1.8);
     const gy = World.groundAt(x,z,hy);
     /* 1. Halangan 2+ blok ke ATAS dicegah jika tidak sedang melompat.
        Jika sedang melompat (misal pet loncat 2 blok), diperbolehkan sampai 2.5 blok (tarantula 2.8 blok). */
     const isJumping = (m.vel && m.vel.y > 1.5) || (isTarantula && (m._tJumping || (m.vel && m.vel.y > 0.5)));
-    const maxUp = isJumping ? (isTarantula ? 2.8 : 2.5) : (isTarantula ? 2.3 : 1.25);
+    const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+    const refBaseY = m.inWater ? Math.max(m.pos.y, waterBase) : m.pos.y;
+    const maxUp = isJumping ? (isTarantula ? 2.8 : 2.5) : (isTarantula ? 2.3 : (refBaseY - m.pos.y + 1.35));
     if(gy > m.pos.y + maxUp) return false;
 
     /* Cek blok penghalang fisik di tubuh */
@@ -3857,15 +3900,17 @@ const Monsters={
        - PET peliharaan pemain BEBAS MASUK KE AIR kapan saja saat mengikuti pemain maupun ditunggangi!
        - Mob yang sedang ditunggangi bebas bergerak di air.
        - Ikan bebas berenang di air.
-       - Hanya MONSTER LIAR biasa yang di daratan yang menghindari tercebur ke air,
-         kecuali monster liar tersebut sedang mengejar musuh yang ada di air. */
+       - Saat mengejar target: cari jalan alternatif darat dulu; bila 2x percobaan gagal tidak ada jalan alternatif, barulah boleh nyemplung ke air!
+       - Hanya saat berkeliaran santai (wander/idle tanpa target) monster darat menghindari tercebur ke air. */
     const beingRidden = (typeof Capture!=='undefined')&&Capture.riding&&(Capture.pet===m);
     if(!m.pet && !beingRidden && m.type!=='fish'){
       const inWater = (typeof World.inWaterAt==='function') && 
                       (World.inWaterAt(x,gy+0.2,z) || World.inWaterAt(x,CFG.WATER_Y-0.2,z));
       if(inWater && !m.inWater){
-        const targetInWater = target && (target.inWater || ((typeof World!=='undefined'&&World.inWaterAt)?World.inWaterAt(target.pos.x,target.pos.y+0.2,target.pos.z):(target.pos&&target.pos.y<CFG.WATER_Y)));
-        if(!targetInWater) return false;
+        const isChasing = (m.state === 'chase') || !!m.foe || !!m.target || (m.seeT > 0) || (m.alert > 0) || !!m.provokedBy;
+        if(!isChasing) return false;
+        const permitted = allowWater || ((m._waterAttempts || 0) >= 2);
+        if(!permitted) return false;
       }
     }
 
@@ -3882,9 +3927,9 @@ const Monsters={
 
      `want` = arah tujuan (radian). Mengembalikan arah yang aman, atau null
      bila semua arah dalam 120° tertutup. */
-  freeDir(m,want,dist=0.85){
+  freeDir(m,want,dist=0.85,allowWater=false){
     const test=a=>this.canStand(m,
-      m.pos.x+Math.sin(a)*dist, m.pos.z+Math.cos(a)*dist);
+      m.pos.x+Math.sin(a)*dist, m.pos.z+Math.cos(a)*dist, allowWater);
     if(test(want))return want;
     /* sudut coba: makin jauh dari arah tujuan makin akhir dicoba.
        Sisi yang dicoba lebih dulu dikunci per monster (m.side) supaya
@@ -3929,7 +3974,9 @@ const Monsters={
     let tx=m.pos.x+Math.sin(want)*stepDist,tz=m.pos.z+Math.cos(want)*stepDist;
     const checkH=isTarantula?(m.pos.y+3.2):(m.pos.y+1.8);
     let step=World.groundAt(tx,tz,checkH);
-    const maxStep=isTarantula?(m.pos.y+2.3):(m.pos.y+1.3);
+    const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+    const refBaseY = m.inWater ? Math.max(m.pos.y, waterBase) : m.pos.y;
+    const maxStep=isTarantula?(m.pos.y+2.3):(refBaseY+1.35);
 
     // Bila di jarak stepDist belum menemukan balok tinggi, cek jarak lebih dekat (menempel pada balok 2 blok)
     if(isTarantula&&(step<=m.pos.y+0.12||step>maxStep)){
@@ -3960,9 +4007,9 @@ const Monsters={
       return true;
     }
 
-    m.vel.y=m.inWater?5.4:6.2;
+    m.vel.y=m.inWater?6.5:6.2;
     /* dorongan mendatar: di air lebih kuat karena gerak vertikal dibatasi */
-    const push=m.inWater?4.2:2.4;
+    const push=m.inWater?4.8:2.4;
     m.vel.x+=Math.sin(want)*push;
     m.vel.z+=Math.cos(want)*push;
     m._stepCd=0.35;
@@ -4003,6 +4050,7 @@ const Monsters={
     if(m.inWater){
       if(m.pos.y<CFG.WATER_Y-0.5)m.vel.y+=18*dt;
       m.vel.y=clamp(m.vel.y,-3,3.5);
+      m._waterAttempts = 0;
     }
     /* NAIK SATU / DUA BLOK — dicoba LEBIH DULU daripada penghindar rintangan (lihat
        catatan di tryStepUp). Bila berhasil, penghindaran dilewati frame ini
@@ -4012,6 +4060,10 @@ const Monsters={
        Diperiksa saat monster benar-benar bergerak. Bila jalur di depan
        tertutup, kecepatan diputar ke arah bebas terdekat sehingga monster
        menyusuri tembok/pohon, bukan menempel lalu bergetar di sana. */
+    const isChasing = (m.state === 'chase') || !!m.foe || !!m.target || (m.seeT > 0) || (m.alert > 0) || !!m.provokedBy;
+    if(!isChasing) m._waterAttempts = 0;
+    const allowW = m.inWater || ((m._waterAttempts || 0) >= 2);
+
     const spd=Math.hypot(m.vel.x,m.vel.z);
     if(!stepped&&spd>0.2){
       const want=Math.atan2(m.vel.x,m.vel.z);
@@ -4019,12 +4071,23 @@ const Monsters={
          belokannya supaya tidak terlambat menghindar */
       const look=clamp(spd*0.35,0.6,1.4);
       if(!this.canStand(m,m.pos.x+Math.sin(want)*look,
-                          m.pos.z+Math.cos(want)*look)){
-        const alt=this.freeDir(m,want,look);
-        if(alt!==null){
+                          m.pos.z+Math.cos(want)*look, allowW)){
+        // Cari alternatif darat dulu bila sedang mengejar
+        let alt = this.freeDir(m,want,look,false);
+        if(alt!==null && isChasing && (m._waterAttempts || 0) < 2){
+          m._waterAttempts = (m._waterAttempts || 0) + 1;
           m.vel.x=Math.sin(alt)*spd;m.vel.z=Math.cos(alt)*spd;
-          m.dir=alt;m.altDir=alt;m.detourT=0.7;
-          m.mesh.rotation.y=angLerp(m.mesh.rotation.y,alt,clamp(dt*7,0,1));
+          m.dir=alt;m.altDir=alt;m.detourT=0.8;
+          if(m.mesh)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,alt,clamp(dt*7,0,1));
+        }else if(isChasing){
+          // 2x percobaan darat gagal / tidak ada alternatif darat -> boleh nyemplung ke air
+          m._waterAttempts = Math.max(2, (m._waterAttempts || 0) + 1);
+          const altW = this.freeDir(m,want,look,true);
+          if(altW!==null){
+            m.vel.x=Math.sin(altW)*spd;m.vel.z=Math.cos(altW)*spd;
+            m.dir=altW;m.altDir=altW;m.detourT=0.7;
+            if(m.mesh)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,altW,clamp(dt*7,0,1));
+          }
         }else if(m.state!=='chase'){
           /* benar-benar terkurung: pilih arah acak baru & jeda sejenak */
           m.dir=Math.random()*Math.PI*2;m.t=rand(0.4,1.1);
@@ -4034,14 +4097,14 @@ const Monsters={
     const px0=m.pos.x,pz0=m.pos.z,py0=m.pos.y;   // patokan sebelum gravitasi
     const nx=m.pos.x+m.vel.x*dt;
     /* monster juga berhenti di blok padat, tidak menembus tembok/pohon */
-    if(this.canStand(m,nx,m.pos.z))m.pos.x=nx;
+    if(this.canStand(m,nx,m.pos.z, allowW))m.pos.x=nx;
     else{
       if(!this.tryStepUp(m,dt)){
         m.vel.x=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;
       }
     }
     const nz=m.pos.z+m.vel.z*dt;
-    if(this.canStand(m,m.pos.x,nz))m.pos.z=nz;
+    if(this.canStand(m,m.pos.x,nz, allowW))m.pos.z=nz;
     else{
       if(!this.tryStepUp(m,dt)){
         m.vel.z=0;if(m.type!=='slime')m.dir+=Math.PI*0.5;
@@ -4057,8 +4120,10 @@ const Monsters={
     const mrefY=Math.max(py0,m.pos.y)+(isTarantula?3.2:1.8);
     let g=World.groundAt(m.pos.x,m.pos.z,mrefY);
     const isJumping=(m.vel&&m.vel.y>1.5)||(isTarantula&&m._tJumping);
-    const maxG=isJumping?(m.pos.y+(isTarantula?2.7:1.5)):(py0+(isTarantula?2.3:1.05));
-    if(g>maxG){
+    const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+    const refBaseY = m.inWater ? Math.max(py0, waterBase) : py0;
+    const maxG = isJumping ? (Math.max(m.pos.y, refBaseY) + (isTarantula ? 2.7 : 1.6)) : (refBaseY + (isTarantula ? 2.3 : 1.35));
+    if(g > maxG && m.pos.y < g - 0.25){
       m.pos.x=px0;m.pos.z=pz0;m.vel.x=0;m.vel.z=0;
       g=World.groundAt(px0,pz0,mrefY);
     }

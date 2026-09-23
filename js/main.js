@@ -400,6 +400,8 @@ const Game={
 
       RPG.mobSlots=save.mobSlots||new Array(4).fill(null);
       RPG.deployedPet=(typeof save.deployedPet==='number')?save.deployedPet:-1;
+      RPG.mobKills=save.mobKills||{};
+      RPG.badges=save.badges||{};
 
       const savedEq=save.equip||{};
       /* nilai slot bisa string (save lama) atau objek {id,lvl} hasil tempa */
@@ -422,6 +424,8 @@ const Game={
       RPG.selectedFurniSlot=-1;
       RPG.mobSlots=new Array(4).fill(null);
       RPG.deployedPet=-1;
+      RPG.mobKills={};
+      RPG.badges={};
     }
 
     /* proficiency: muat dari save, atau reset untuk permainan baru */

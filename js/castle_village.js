@@ -18,8 +18,8 @@
    ========================================================================= */
 
 const CastleVillage = (() => {
-  /* radius teritori per tier kastil (kelipatan 10) */
-  const TIER_RADIUS = { 1: 20, 2: 30, 3: 40 };
+  /* radius teritori per tier kastil (mulai 40, kelipatan 20: T1=40, T2=60, T3=80) */
+  const TIER_RADIUS = { 1: 40, 2: 60, 3: 80 };
 
   /* urutan kedatangan desa penuh ala desa biasa (tanpa dungeon master) */
   const VILLAGE_QUEUE = ['guard', 'merchant', 'farmer',
@@ -104,10 +104,9 @@ const CastleVillage = (() => {
     return out;
   }
 
-  /* rumah lengkap: kasur + meja + kursi + chest (masing-masing >= 1) */
+  /* rumah lengkap: kasur + meja + kursi (masing-masing >= 1, chest opsional) */
   function isCompleteHouse(counts) {
-    return counts.bed >= 1 && counts.table >= 1 &&
-           counts.chair >= 1 && counts.chest >= 1;
+    return counts.bed >= 1 && counts.table >= 1 && counts.chair >= 1;
   }
 
   /* syarat aula desa: gugus >= 4 modul + 4 meja + 8 kursi + 1 chest + 1 board */
@@ -118,27 +117,41 @@ const CastleVillage = (() => {
   }
 
   /* cari titik spawn tanah kosong di dekat rumah */
-  function groundNearHouse(c, minD, maxD) {
-    for (let t = 0; t < 16; t++) {
+  function groundNearHouse(c, minD = 2.8, maxD = 6.0) {
+    for (let t = 0; t < 24; t++) {
       const a = Math.random() * Math.PI * 2, d = minD + Math.random() * (maxD - minD);
       const x = c.x + Math.sin(a) * d, z = c.z + Math.cos(a) * d;
-      const y = World.topY(Math.floor(x), Math.floor(z));
-      if (y >= CFG.SEA) return { x, y, z };
+      // Pastikan titik spawn di luar dinding rumah
+      if (typeof Furni !== 'undefined' && Furni.houses) {
+        let inside = false;
+        for (const h of Furni.houses) {
+          if (Furni.recHasBlock(h, Math.floor(x), Math.floor(z))) { inside = true; break; }
+        }
+        if (inside) continue;
+      }
+      const y = (typeof World !== 'undefined' && World.groundAt) ? World.groundAt(x, z, (c.y || 5) + 3) : (c.y || 5);
+      const waterY = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
+      if (y >= waterY + 0.2) return { x, y, z };
     }
-    return null;
+    // Fallback aman di samping rumah
+    return { x: c.x + 3.2, y: (c.y || 5), z: c.z };
   }
 
   /* buat 1 NPC penduduk tetap di sekitar rumah */
-  function spawnSettler(roleId, c, castlePos) {
-    const role = NPC_ROLES.find(r => r.id === roleId);
+  function spawnSettler(roleId, c, castlePos, houseKey = null, castleKey = null) {
+    const role = (typeof NPC_ROLES !== 'undefined') ? NPC_ROLES.find(r => r.id === roleId) : null;
     if (!role) return null;
-    const p = groundNearHouse(c, 2.5, 6);
+    const p = groundNearHouse(c, 2.8, 6.0);
     if (!p) return null;
     const home = { x: Math.round(c.x), z: Math.round(c.z) };
     const npc = NPCS.make(role, p.x, p.y, p.z, home, null, null);
     npc.settleCastle = castlePos ? { x: Math.round(castlePos.x), z: Math.round(castlePos.z) } : null;
+    npc.settleHouseKey = houseKey;
+    npc.settleCastleKey = castleKey;
     NPCS.list.push(npc);
-    FX.debris(npc.pos.clone().add(new THREE.Vector3(0, 1.4, 0)), 0xffe066, 8, 2);
+    if (typeof FX !== 'undefined' && FX.debris) {
+      FX.debris(npc.pos.clone().add(new THREE.Vector3(0, 1.4, 0)), 0xffe066, 8, 2);
+    }
     return npc;
   }
 
@@ -186,6 +199,7 @@ const CastleVillage = (() => {
       st.villageDay = day;
       st.villageIdx = 0;
       save();
+      if (typeof RPG !== 'undefined' && RPG.unlockBadge) RPG.unlockBadge('village_founder');
       if (typeof UI !== 'undefined' && UI.toast)
         UI.toast('Desa kastil berdiri! Penduduk akan berdatangan hari demi hari');
     }
@@ -224,20 +238,29 @@ const CastleVillage = (() => {
       const claimedIds = Object.values(st.houseClaimed);
       for (const h of houses) {
         const hk = houseKey(h);
-        if (st.houseClaimed[hk]) continue;
         const c = houseCenter(h);
         if (!c) continue;
         if (dist2(c.x, c.z, f.x, f.z) > R) continue;
         const counts = furnInHouse(h);
         if (!isCompleteHouse(counts)) continue;
-        const roleId = nextBasicRole(claimedIds);
-        const npc = spawnSettler(roleId, c, f);
+
+        // Cek apakah NPC untuk rumah ini sudah hidup dan hadir di dunia
+        const existingNpc = (typeof NPCS !== 'undefined' && NPCS.list)
+          ? NPCS.list.find(n => !n.dead && (n.settleHouseKey === hk || (n.home && n.home.x === Math.round(c.x) && n.home.z === Math.round(c.z))))
+          : null;
+
+        if (existingNpc) continue;
+
+        // Belum ada NPC di dunia (baru memenuhi syarat atau baru load/relog): spawn sekarang!
+        const roleId = st.houseClaimed[hk] || nextBasicRole(claimedIds);
+        const npc = spawnSettler(roleId, c, f, hk, key);
         if (npc) {
+          const wasNew = !st.houseClaimed[hk];
           st.houseClaimed[hk] = roleId;
-          claimedIds.push(roleId);
+          if (wasNew) claimedIds.push(roleId);
           save();
-          if (typeof UI !== 'undefined' && UI.toast) {
-            const role = NPC_ROLES.find(r => r.id === roleId);
+          if (wasNew && typeof UI !== 'undefined' && UI.toast) {
+            const role = (typeof NPC_ROLES !== 'undefined') ? NPC_ROLES.find(r => r.id === roleId) : null;
             UI.toast((role ? role.e + ' ' + role.name : roleId) + ' datang dan menetap di rumahmu!');
           }
         }
@@ -246,17 +269,17 @@ const CastleVillage = (() => {
   }
 
   return {
-    /* radius teritori kastil (T1=20, T2=30, T3=40) */
+    /* radius teritori kastil (T1=40, T2=60, T3=80) */
     radiusOf(f) { return castleRadius(f); },
     tierOf(f) { return castleTier(f); },
 
-    /* dipanggil tiap frame dari main loop (guarded, murah: max 1 kastil/tick) */
+    /* dipanggil tiap frame dari main loop (guarded, dipercepat tiap 2 dtk agar responsif) */
     _tick: 0,
     update(dt) {
       if (typeof Game !== 'undefined' && !Game.started) return;
       this._tick -= dt;
       if (this._tick > 0) return;
-      this._tick = 5;
+      this._tick = 2.0;
       load();
       const castles = playerCastles();
       if (!castles.length) return;
