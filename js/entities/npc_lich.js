@@ -35,6 +35,177 @@ const NPC_Lich = (() => {
 
   const BOX = new THREE.BoxGeometry(1, 1, 1);
   const _mats = {};
+
+  /* ================= VERLET CLOTH PHYSICS (rok & jubah belakang) =================
+     Port 1:1 dari prototipe Lich.html: partikel verlet + stick constraint,
+     angin prosedural, tabrakan kaki/tubuh, panel & strip kain mengikuti. */
+  function VRope() { this.pts = []; this.sticks = []; }
+  VRope.prototype.point = function (x, y, z, pinned, anchor, follow) {
+    const p = {
+      pos: new THREE.Vector3(x, y, z), prev: new THREE.Vector3(x, y, z),
+      pinned: !!pinned, anchor: anchor || null, follow: follow || null,
+      seed: Math.random() * 10
+    };
+    this.pts.push(p); return p;
+  };
+  VRope.prototype.stick = function (a, b, stiff) {
+    this.sticks.push({ a, b, len: a.pos.distanceTo(b.pos), stiff: stiff == null ? 1 : stiff });
+  };
+  const _va = new THREE.Vector3(), _cb = new THREE.Vector3(), _cp = new THREE.Vector3();
+  const _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3(), _q = new THREE.Quaternion();
+  const _m4 = new THREE.Matrix4(), _right = new THREE.Vector3(), _upv = new THREE.Vector3(), _fwd = new THREE.Vector3();
+  const _wind = new THREE.Vector3();
+  function computeWind(t, s) {
+    _wind.set(Math.sin(t * 1.7) * 0.6 + Math.sin(t * 0.63) * 0.4, 0, -(s * 3.2 + 0.45) + Math.sin(t * 2.3) * 0.3);
+  }
+  function updateColliders(L, cds) {
+    if (L.legL) { L.legL.hip.getWorldPosition(cds[0].a); L.legL.foot.getWorldPosition(cds[0].b); }
+    if (L.legR) { L.legR.hip.getWorldPosition(cds[1].a); L.legR.foot.getWorldPosition(cds[1].b); }
+    if (L.body) {
+      L.body.getWorldPosition(cds[2].a); cds[2].a.y += 0.12;
+      cds[2].b.copy(cds[2].a); cds[2].b.y -= 0.8;
+    }
+  }
+  function collidePt(p, cds) {
+    for (const cd of cds) {
+      _cb.subVectors(cd.b, cd.a);
+      _cp.subVectors(p.pos, cd.a);
+      const tt = clamp(_cp.dot(_cb) / Math.max(1e-6, _cb.lengthSq()), 0, 1);
+      _cp.subVectors(p.pos, cd.a).addScaledVector(_cb, -tt);
+      const d = _cp.length();
+      if (d < cd.r && d > 1e-5) p.pos.addScaledVector(_cp.multiplyScalar(1 / d), (cd.r - d));
+    }
+  }
+  function physicsStep(ropes, cds, dt, t) {
+    for (const R of ropes) {
+      const wf = R.wind;
+      for (const p of R.r.pts) {
+        if (p.pinned) {
+          if (p.anchor) p.anchor.getWorldPosition(p.pos);
+          else if (p.follow) p.pos.copy(p.follow.pos);
+          p.prev.copy(p.pos); continue;
+        }
+        _va.subVectors(p.pos, p.prev).multiplyScalar(0.985);
+        p.prev.copy(p.pos);
+        p.pos.add(_va);
+        p.pos.y += -18 * dt * dt;
+        p.pos.x += (_wind.x * wf + Math.sin(t * 3.1 + p.seed) * 0.3 * wf) * dt * dt;
+        p.pos.z += (_wind.z * wf + Math.cos(t * 2.6 + p.seed * 1.7) * 0.3 * wf) * dt * dt;
+        p.pos.y += (Math.sin(t * 2.1 + p.seed * 2.3) * 0.18 * wf) * dt * dt;
+      }
+      for (let it = 0; it < 3; it++) {
+        for (const s of R.r.sticks) {
+          _va.subVectors(s.b.pos, s.a.pos);
+          const d = _va.length() || 1e-5;
+          const diff = (d - s.len) / d * 0.5 * s.stiff;
+          const dx = _va.x * diff, dy = _va.y * diff, dz = _va.z * diff;
+          if (!s.a.pinned) { s.a.pos.x += dx; s.a.pos.y += dy; s.a.pos.z += dz; }
+          if (!s.b.pinned) { s.b.pos.x -= dx; s.b.pos.y -= dy; s.b.pos.z -= dz; }
+        }
+        if (R.collide) for (const p of R.r.pts) if (!p.pinned) collidePt(p, cds);
+        for (const p of R.r.pts) if (!p.pinned && p.pos.y < 0.02) p.pos.y = 0.02;
+      }
+    }
+  }
+  function orientBox(mesh, a, b) {
+    _d.subVectors(b.pos, a.pos);
+    const len = _d.length(); if (len < 1e-5) return;
+    _d.multiplyScalar(1 / len);
+    mesh.position.copy(a.pos).addScaledVector(_d, len * 0.5);
+    _q.setFromUnitVectors(_up, _d);
+    mesh.quaternion.copy(_q); mesh.scale.y = len;
+  }
+  function orientPanel(mesh, tl, tr, bl, br) {
+    mesh.position.set(
+      (tl.x + tr.x + bl.x + br.x) * 0.25,
+      (tl.y + tr.y + bl.y + br.y) * 0.25,
+      (tl.z + tr.z + bl.z + br.z) * 0.25);
+    _upv.set((bl.x + br.x - tl.x - tr.x) * 0.5, (bl.y + br.y - tl.y - tr.y) * 0.5, (bl.z + br.z - tl.z - tr.z) * 0.5);
+    _right.set((tr.x + br.x - tl.x - bl.x) * 0.5, (tr.y + br.y - tl.y - bl.y) * 0.5, (tr.z + br.z - tl.z - bl.z) * 0.5);
+    const h = Math.max(1e-4, _upv.length()), w = Math.max(1e-4, _right.length());
+    _upv.multiplyScalar(1 / h); _right.multiplyScalar(1 / w);
+    _fwd.crossVectors(_right, _upv).normalize();
+    _m4.makeBasis(_right, _upv, _fwd);
+    mesh.quaternion.setFromRotationMatrix(_m4);
+    mesh.scale.set(w * 1.14, h * 1.14, 0.04);
+  }
+  function renderRopes(ropes) {
+    for (const R of ropes) for (const sg of R.segs) orientBox(sg.mesh, sg.a, sg.b);
+  }
+  const _tmpObj = new THREE.Object3D();
+  function localToWorld(parent, x, y, z, out) {
+    _tmpObj.position.set(x, y, z);
+    parent.add(_tmpObj);
+    _tmpObj.updateWorldMatrix(true, false);
+    _tmpObj.getWorldPosition(out);
+    parent.remove(_tmpObj);
+    return out;
+  }
+  /* Inisialisasi kain SEKALI di frame pertama animate: pindahkan clothGroup
+     ke scene (ruang world), tempatkan titik bebas dari posisi dunia anchor,
+     lalu buat stick (panjang constraint diukur dari posisi dunia yang benar,
+     sudah termasuk skala 0.64 & rotasi NPC). */
+  function initCloth(n, L) {
+    const scene = (typeof Game !== 'undefined' && Game.scene) ? Game.scene : null;
+    if (!scene || !n.mesh) return false;
+    n.mesh.updateWorldMatrix(true, true);
+    if (L.clothGroup && L.clothGroup.parent !== scene) scene.add(L.clothGroup);
+    // --- rok ---
+    if (L.skirtPts && L.skirtBody && L.skirtRope && !L.skirtSticked) {
+      L.skirtSticked = true;
+      const SK_COLS = 12, SK_ROWS = 5;
+      for (let r = 0; r < SK_ROWS; r++) for (let c = 0; c < SK_COLS; c++) {
+        const p = L.skirtPts[r][c];
+        if (r === 0) {
+          if (p.anchor) p.anchor.getWorldPosition(p.pos);
+        } else {
+          const a = c / SK_COLS * Math.PI * 2;
+          const rx = 0.32 + r * 0.072, rz = rx * 0.72;
+          localToWorld(L.skirtBody, Math.cos(a) * rx, 0.02 - r * 0.225, Math.sin(a) * rz, p.pos);
+        }
+        p.prev.copy(p.pos);
+      }
+      const R = L.skirtRope;
+      for (let r = 0; r < SK_ROWS - 1; r++) for (let c = 0; c < SK_COLS; c++) {
+        const c2 = (c + 1) % SK_COLS;
+        R.stick(L.skirtPts[r][c], L.skirtPts[r + 1][c], 1);
+        R.stick(L.skirtPts[r][c], L.skirtPts[r + 1][c2], 0.5);
+        R.stick(L.skirtPts[r][c2], L.skirtPts[r + 1][c], 0.5);
+      }
+      for (let r = 0; r < SK_ROWS; r++) for (let c = 0; c < SK_COLS; c++)
+        R.stick(L.skirtPts[r][c], L.skirtPts[r][(c + 1) % SK_COLS], 0.9);
+      for (let r = 0; r < SK_ROWS - 2; r++) for (let c = 0; c < SK_COLS; c++)
+        R.stick(L.skirtPts[r][c], L.skirtPts[r + 2][c], 0.35);
+    }
+    // --- strip kain ---
+    if (L.stripSpec) {
+      for (const sp of L.stripSpec) {
+        sp.p0.pos.copy(sp.bottom.pos); sp.p0.prev.copy(sp.bottom.pos);
+        sp.p1.pos.set(sp.p0.pos.x, sp.p0.pos.y - sp.l1, sp.p0.pos.z); sp.p1.prev.copy(sp.p1.pos);
+        sp.p2.pos.set(sp.p0.pos.x, sp.p0.pos.y - sp.l1 - sp.l2, sp.p0.pos.z); sp.p2.prev.copy(sp.p2.pos);
+        sp.rope.stick(sp.p0, sp.p1); sp.rope.stick(sp.p1, sp.p2);
+      }
+      L.stripSpec = null;
+    }
+    // --- cape ---
+    if (L.capeSpec && !L.capeSticked) {
+      L.capeSticked = true;
+      const spec = L.capeSpec, pts = spec.pts, rows = spec.rows;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < 4; c++) {
+        const p = pts[r][c];
+        if (r === 0) { if (p.anchor) p.anchor.getWorldPosition(p.pos); }
+        else localToWorld(spec.torso, spec.colX[c], 0.60 - r * 0.24, -0.26 - r * 0.045, p.pos);
+        p.prev.copy(p.pos);
+      }
+      const R = spec.rope;
+      for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 4; c++) R.stick(pts[r][c], pts[r + 1][c], 1);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < 3; c++) R.stick(pts[r][c], pts[r][c + 1], 0.9);
+      for (let r = 0; r < rows - 2; r++) for (let c = 0; c < 4; c++) R.stick(pts[r][c], pts[r + 2][c], 0.25);
+    }
+    if (L.clothGroup) L.clothGroup.visible = true;
+    L.clothInit = true;
+    return true;
+  }
   function M(color, emissive) {
     const k = color + '_' + (emissive || 0);
     if (!_mats[k]) _mats[k] = new THREE.MeshLambertMaterial({ color, emissive: emissive || 0x000000 });
@@ -52,7 +223,7 @@ const NPC_Lich = (() => {
   const C = {
     rBlack: 0x161a20, rBlack2: 0x21272f, green: 0x1e5c37, green2: 0x2f8a4e, trim: 0x43b468,
     bone: 0xd8d0b8, bone2: 0xb9b096, dark: 0x0c0e11, metal: 0x9aa3ae, metal2: 0x646c77,
-    wood: 0x3b2c1e, wood2: 0x241a10, dirt: 0x6b4f33
+    wood: 0x3b2c1e, wood2: 0x241a10, dirt: 0x6b4f33, runeMat: 0x0c1210
   };
 
   const ACT = {
@@ -67,26 +238,28 @@ const NPC_Lich = (() => {
       headx: { t: [0, .50, .62, 1.05], v: [0, -.08, .14, 0] }
     },
     summon: {
-      dur: 3.2,
-      shRx: { t: [0, .50, .90, 2.30, 2.80, 3.20], v: [-.18, -2.70, -2.85, -2.50, -1.00, -.18] },
-      shLx: { t: [0, .50, .90, 2.30, 2.80, 3.20], v: [0, -2.40, -2.60, -2.30, -.80, 0] },
-      elRx: { t: [0, .50, 2.70, 3.20], v: [.30, .22, .35, .30] },
-      elLx: { t: [0, .50, 2.70, 3.20], v: [.12, .35, .25, .12] },
-      shLz: { t: [0, .60, 2.60, 3.20], v: [.12, .45, .20, .12] },
-      shRz: { t: [0, .60, 2.60, 3.20], v: [-.12, -.45, -.20, -.12] },
-      torx: { t: [0, .50, .90, 2.50, 3.20], v: [0, -.10, -.14, -.05, .04] },
-      headx: { t: [0, .60, 2.40, 3.20], v: [0, -.28, -.20, -.02] }
+      dur: 3.4,
+      shRx: { t: [0, .50, .90, 2.30, 2.90, 3.40], v: [-.18, -2.70, -2.85, -2.50, -1.00, -.18] },
+      shLx: { t: [0, .50, .90, 2.30, 2.90, 3.40], v: [0, -2.40, -2.60, -2.30, -.80, 0] },
+      elRx: { t: [0, .50, 2.90, 3.40], v: [.30, .22, .35, .30] },
+      elLx: { t: [0, .50, 2.90, 3.40], v: [.12, .35, .25, .12] },
+      shLz: { t: [0, .60, 2.80, 3.40], v: [.12, .45, .20, .12] },
+      shRz: { t: [0, .60, 2.80, 3.40], v: [-.12, -.45, -.20, -.12] },
+      torx: { t: [0, .50, .90, 2.50, 3.40], v: [0, -.10, -.14, -.05, .04] },
+      headx: { t: [0, .60, 2.40, 3.40], v: [0, -.28, -.20, -.02] }
     },
     drain: {
-      dur: 3.5,
-      shRx: { t: [0, .50, .80, 2.90, 3.20, 3.50], v: [-.18, -.90, -1.32, -1.32, -.70, -.18] },
-      elRx: { t: [0, .50, .80, 2.90, 3.50], v: [.30, .15, .08, .08, .30] },
-      shLx: { t: [0, .50, .80, 2.90, 3.50], v: [0, -.35, -.55, -.40, 0] },
-      elLx: { t: [0, .80, 2.90, 3.50], v: [.12, .15, .20, .12] },
-      torx: { t: [0, .50, .80, 2.90, 3.50], v: [.04, .12, .18, .14, .04] },
-      tory: { t: [0, .60, 3.00, 3.50], v: [0, .08, .04, 0] },
-      headx: { t: [0, .60, 3.00, 3.50], v: [0, .14, .08, 0] },
-      bodyy: { t: [0, .60, 3.00, 3.50], v: [0, -.05, -.03, 0] }
+      // Laser merah: channel 10 detik, sedot 5%/detik dari TOTAL HP Lich.
+      // Pose tahan (hold) dari t=0.8 sampai t=9.3, lalu lepas.
+      dur: 10.0,
+      shRx: { t: [0, .50, .80, 9.30, 9.70, 10.0], v: [-.18, -.90, -1.32, -1.32, -.70, -.18] },
+      elRx: { t: [0, .50, .80, 9.40, 10.0], v: [.30, .15, .08, .08, .30] },
+      shLx: { t: [0, .50, .80, 9.40, 10.0], v: [0, -.35, -.55, -.40, 0] },
+      elLx: { t: [0, .80, 9.40, 10.0], v: [.12, .15, .20, .12] },
+      torx: { t: [0, .50, .80, 9.40, 10.0], v: [.04, .12, .18, .14, .04] },
+      tory: { t: [0, .60, 9.40, 10.0], v: [0, .08, .04, 0] },
+      headx: { t: [0, .60, 9.40, 10.0], v: [0, .14, .08, 0] },
+      bodyy: { t: [0, .60, 9.40, 10.0], v: [0, -.05, -.03, 0] }
     }
   };
   const BLEND_KEYS = ['shRx', 'elRx', 'shLx', 'elLx', 'torx', 'tory', 'headx', 'shLz', 'shRz'];
@@ -212,16 +385,64 @@ const NPC_Lich = (() => {
       body.add(torso);
       L.torso = torso;
 
-      // Rok hitam berlipat & trim hijau
-      const skirtGroup = new THREE.Group();
-      body.add(skirtGroup);
-      for (let r = 0; r < 4; r++) {
-        const sy = -0.22 * r;
-        const sw = 0.68 + r * 0.12;
-        const sd = 0.50 + r * 0.10;
-        V(r === 3 ? M(C.green) : M(r % 2 ? C.rBlack : C.rBlack2), sw, 0.24, sd, 0, sy, 0, skirtGroup);
+      // ==== ROK CLOTH PHYSICS PENUH (12 kolom x 5 baris, verlet) ====
+      // Kain di-simulasikan di RUANG WORLD. Posisi awal titik & stick dibuat
+      // LAZY di frame pertama animate (initCloth), saat transform NPC sudah
+      // final — anchor memberi posisi dunia yang benar.
+      const clothGroup = new THREE.Group();
+      clothGroup.visible = false; // tampil setelah initCloth frame pertama
+      outer.add(clothGroup);
+      L.clothGroup = clothGroup;
+      const SK_COLS = 12, SK_ROWS = 5;
+      const ropes = [];
+      const skirtRope = new VRope();
+      const skirtPts = [];
+      for (let r = 0; r < SK_ROWS; r++) {
+        skirtPts[r] = [];
+        for (let c = 0; c < SK_COLS; c++) {
+          const a = c / SK_COLS * Math.PI * 2;
+          const rx = 0.32 + r * 0.072, rz = rx * 0.72;
+          const x = Math.cos(a) * rx, z = Math.sin(a) * rz;
+          if (r === 0) {
+            const anc = new THREE.Object3D(); anc.position.set(x, 0.02, z); body.add(anc);
+            skirtPts[r][c] = skirtRope.point(0, -50, 0, true, anc);
+          } else skirtPts[r][c] = skirtRope.point(0, -50, 0);
+        }
       }
-      L.skirtGroup = skirtGroup;
+      ropes.push({ r: skirtRope, segs: [], wind: 0.7, collide: true });
+      L.skirtPts = skirtPts; L.skirtBody = body; L.skirtRope = skirtRope;
+
+      const skirtPanels = [];
+      for (let r = 0; r < SK_ROWS - 1; r++) for (let c = 0; c < SK_COLS; c++) {
+        let mat;
+        if (r === SK_ROWS - 2) mat = M(C.green);
+        else if (c === 3) mat = M(C.green);
+        else if ((r === 1 && c === 8) || (r === 2 && c === 5)) mat = M(C.green2);
+        else mat = ((r + c) % 2) ? M(C.rBlack) : M(C.rBlack2);
+        const m = new THREE.Mesh(BOX, mat);
+        clothGroup.add(m);
+        skirtPanels.push(m);
+      }
+      L.skirtPanels = skirtPanels;
+      // Pinggang rok padat (menutupi pangkal kain)
+      V(M(C.rBlack2), 0.66, 0.16, 0.48, 0, -0.01, 0, body);
+      V(M(C.rBlack), 0.68, 0.05, 0.50, 0, -0.10, 0, body);
+      // Strip kain menjuntai di bawah rok (12 strip, 2 segmen verlet;
+      // posisi & stick diisi lazy di initCloth mengikuti titik bawah rok)
+      L.stripSpec = [];
+      for (let c = 0; c < SK_COLS; c++) {
+        const bottom = skirtPts[SK_ROWS - 1][c];
+        const rp = new VRope();
+        const l1 = 0.12 + (c % 3) * 0.02, l2 = 0.10 + (c % 2) * 0.07;
+        const p0 = rp.point(0, -50, 0, true, null, bottom);
+        const p1 = rp.point(0, -50, 0);
+        const p2 = rp.point(0, -50, 0);
+        const mat = (c % 3 === 0) ? M(C.trim) : (c % 2 ? M(C.rBlack) : M(C.rBlack2));
+        const m1 = V(mat, 0.16, 1, 0.04); clothGroup.add(m1);
+        const m2 = V(mat, 0.12, 1, 0.035); clothGroup.add(m2);
+        ropes.push({ r: rp, segs: [{ mesh: m1, a: p0, b: p1 }, { mesh: m2, a: p1, b: p2 }], wind: 0.8 });
+        L.stripSpec.push({ rope: rp, p0, p1, p2, bottom, l1, l2 });
+      }
 
       // Torso & tulang rusuk
       V(M(C.rBlack),  0.50, 0.24, 0.32, 0, 0.12, 0, torso);
@@ -229,10 +450,19 @@ const NPC_Lich = (() => {
       V(M(C.dark),    0.30, 0.30, 0.05, 0, 0.46, 0.175, torso);
       for (let i = 0; i < 3; i++) V(M(C.bone), 0.26, 0.045, 0.05, 0, 0.38 + i * 0.08, 0.195, torso);
       V(M(C.bone2), 0.05, 0.26, 0.05, 0, 0.45, 0.205, torso);
+      V(M(C.green), 0.05, 0.44, 0.02, -0.21, 0.44, 0.185, torso);
+      V(M(C.green), 0.05, 0.44, 0.02,  0.21, 0.44, 0.185, torso);
       V(M(0x241a10), 0.56, 0.09, 0.36, 0, 0.16, 0, torso); // sabuk
       V(M(C.bone), 0.10, 0.09, 0.04, 0, 0.16, 0.19, torso); // tengkorak sabuk
-      V(M(C.green), 0.52, 0.34, 0.08, 0, 0.70, -0.19, torso, -0.22); // jubah belakang
+      V(M(C.dark), 0.02, 0.025, 0.02, -0.025, 0.172, 0.213, torso);
+      V(M(C.dark), 0.02, 0.025, 0.02,  0.025, 0.172, 0.213, torso);
+      // (Jubah belakang statis digantikan cape cloth physics di bawah)
 
+      V(M(C.rBlack), 0.12, 0.30, 0.30, -0.24, 0.66, -0.02, torso, 0, 0,  0.22);
+      V(M(C.rBlack), 0.12, 0.30, 0.30,  0.24, 0.66, -0.02, torso, 0, 0, -0.22);
+      V(M(C.rBlack2), 0.62, 0.14, 0.08, 0, 0.62, -0.23, torso);
+      V(M(C.trim), 0.07, 0.07, 0.05, -0.24, 0.62, -0.27, torso);
+      V(M(C.trim), 0.07, 0.07, 0.05,  0.24, 0.62, -0.27, torso);
       // Bahu berduri metal & hijau
       for (const sx of [-1, 1]) {
         V(M(C.rBlack2), 0.26, 0.14, 0.32, sx * 0.34, 0.62, 0, torso, 0, 0, -sx * 0.18);
@@ -247,9 +477,14 @@ const NPC_Lich = (() => {
       L.head = head;
       V(M(C.bone2), 0.16, 0.10, 0.16, 0, 0.02, 0, head);
       V(M(C.bone),  0.40, 0.38, 0.40, 0, 0.28, 0, head);
+      V(M(C.bone2), 0.42, 0.08, 0.08, 0, 0.33, 0.17, head);
       const eyeMat = new THREE.MeshLambertMaterial({ color: 0x0a0c08, emissive: 0x8bff45 });
+      L.eyeMat = eyeMat;
       V(eyeMat, 0.09, 0.07, 0.04, -0.10, 0.245, 0.205, head);
       V(eyeMat, 0.09, 0.07, 0.04,  0.10, 0.245, 0.205, head);
+      V(M(C.dark), 0.06, 0.10, 0.06, -0.165, 0.16, 0.16, head);
+      V(M(C.dark), 0.06, 0.10, 0.06,  0.165, 0.16, 0.16, head);
+      V(M(C.bone2), 0.28, 0.12, 0.30, 0, 0.10, 0.04, head);
       V(M(C.rBlack),  0.56, 0.16, 0.56, 0, 0.50, -0.02, head); // tudung atas
       V(M(C.rBlack2), 0.60, 0.34, 0.14, 0, 0.30, -0.22, head); // tudung belakang
       for (let i = -1; i < 2; i++) {
@@ -305,8 +540,15 @@ const NPC_Lich = (() => {
       L.staff = staff;
 
       V(M(C.wood),  0.09, 2.30, 0.09, 0, 0.85, 0, staff);
+      V(M(C.wood2), 0.10, 0.30, 0.10,  0.01, 0.30, 0.01, staff, 0, 0.5, 0.05);
+      V(M(C.wood2), 0.10, 0.30, 0.10, -0.01, 0.90, -0.01, staff, 0, 1.1, -0.05);
+      V(M(C.wood2), 0.10, 0.26, 0.10,  0.01, 1.45, 0.01, staff, 0, 1.7, 0.04);
+      V(M(C.metal2), 0.11, 0.05, 0.11, 0, 0.05, 0, staff);
+      V(M(C.metal2), 0.11, 0.05, 0.11, 0, 1.62, 0, staff);
       V(M(C.wood2), 0.10, 0.30, 0.10, 0.01, 0.30, 0.01, staff, 0, 0.5, 0.05);
-      V(M(C.bone),  0.16, 0.15, 0.16, 0, 1.74, 0.03, staff); // tengkorak tongkat
+      V(M(C.bone),  0.16, 0.15, 0.16, 0, 1.74, 0.03, staff); // rune hijau di batang tongkat
+      for (let i = 0; i < 5; i++) V(M(C.green), 0.03, 0.07, 0.02, 0, 0.20 + i * 0.32, 0.055, staff);
+      // tengkorak tongkat
 
       const orbMat = new THREE.MeshLambertMaterial({ color: 0x0c1210, emissive: 0x59ff8f });
       const satMat = new THREE.MeshLambertMaterial({ color: 0x101614, emissive: 0x7dffb0 });
@@ -315,6 +557,8 @@ const NPC_Lich = (() => {
       staff.add(orb);
       L.orb = orb;
       V(orbMat, 0.24, 0.24, 0.24, 0, 0, 0, orb);
+      L.orbMat = orbMat; L.satMat = satMat;
+      V(orbMat, 0.18, 0.18, 0.18, 0, 0, 0, orb, 0.6, 0.7, 0.3);
 
       const sats = new THREE.Object3D();
       orb.add(sats);
@@ -329,21 +573,72 @@ const NPC_Lich = (() => {
       orb.add(tipAnchor);
       L.tip = tipAnchor;
 
-      // Lingkaran sihir summon di bawah
+      // ==== JUBAH BELAKANG / CAPE CLOTH PHYSICS (4 kolom x 5 baris) ====
+      // Titik & stick diisi lazy di initCloth (posisi dunia dari anchor).
+      {
+        const colX = [-0.27, -0.09, 0.09, 0.27], rows = 5;
+        const pts = [];
+        const rp = new VRope();
+        for (let r = 0; r < rows; r++) {
+          pts[r] = [];
+          for (let c = 0; c < 4; c++) {
+            if (r === 0) {
+              const anc = new THREE.Object3D(); anc.position.set(colX[c], 0.60, -0.26); torso.add(anc);
+              pts[r][c] = rp.point(0, -50, 0, true, anc);
+            } else pts[r][c] = rp.point(0, -50, 0);
+          }
+        }
+        const segs = [];
+        for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 4; c++) {
+          const mat = (r === rows - 2) ? M(C.green) : (r % 2 ? M(C.rBlack) : M(C.rBlack2));
+          const m = V(mat, 0.188, 1, 0.05); clothGroup.add(m);
+          segs.push({ mesh: m, a: pts[r][c], b: pts[r + 1][c] });
+        }
+        ropes.push({ r: rp, segs, wind: 1.0 });
+        L.capeSpec = { rope: rp, pts, rows, colX, torso };
+      }
+      L.ropes = ropes;
+      L.colliders = [
+        { a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.155 },
+        { a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.155 },
+        { a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.16 }
+      ];
       const circle = new THREE.Group();
       circle.visible = false;
-      const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x3ddc72, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false });
-      const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.15, 36), ringMat1);
+      const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x3ddc72, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+      const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.12, 44), ringMat1);
       ring1.rotation.x = -Math.PI / 2;
+      ring1.position.y = 0.02;
       circle.add(ring1);
+      const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x1f7a42, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+      const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.50, 0.62, 36), ringMat2);
+      ring2.rotation.x = -Math.PI / 2;
+      ring2.position.y = 0.02;
+      circle.add(ring2);
+      const runeG = new THREE.Group();
+      circle.add(runeG);
+      const runeFxMat = new THREE.MeshBasicMaterial({ color: 0x59ff8f, transparent: true, opacity: 0 });
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2;
+        V(runeFxMat, 0.12, 0.02, 0.06, Math.cos(a) * 0.78, 0.025, Math.sin(a) * 0.78, runeG, 0, -a, 0);
+      }
+      L.runeG = runeG; L.ringMat1 = ringMat1; L.ringMat2 = ringMat2; L.runeFxMat = runeFxMat;
       outer.add(circle);
       L.circle = circle;
 
-      // Beam sedot nyawa
+      // Beam sedot nyawa + 2 garis pilin (ala prototipe beamLines)
       const beamCore = V(new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.85, depthWrite: false }), 0.07, 1, 0.07);
       beamCore.visible = false;
       outer.add(beamCore);
       L.beamCore = beamCore;
+      L.beamLines = [];
+      for (let i = 0; i < 2; i++) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(14 * 3), 3));
+        const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: i ? 0xff7788 : 0xcc1133, transparent: true, opacity: 0.85 }));
+        ln.visible = false; ln.frustumCulled = false;
+        outer.add(ln); L.beamLines.push(ln);
+      }
 
       return {
         mesh: outer,
@@ -353,6 +648,30 @@ const NPC_Lich = (() => {
           bodyY: 1.45 * 0.64
         }
       };
+    },
+
+    /* Dipanggil NPCS.despawn: tenggelamkan zombie & buang proyektil/beam
+       supaya tak ada mesh yatim yang beku tertinggal saat Lich mati/hilang. */
+    cleanup(n) {
+      const S = n._lichState;
+      if (S) {
+        for (const z of (S.zombies || [])) {
+          if (z.g && z.g.parent) z.g.parent.remove(z.g);
+        }
+        S.zombies = [];
+        for (const b of (S.bolts || [])) {
+          if (b.mesh && b.mesh.parent) b.mesh.parent.remove(b.mesh);
+        }
+        S.bolts = [];
+      }
+      const L = n.parts && n.parts.L;
+      if (L) {
+        if (L.circle) L.circle.visible = false;
+        if (L.beamCore) L.beamCore.visible = false;
+        if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
+        // Kain sudah dipindah ke scene: buang agar tak tertinggal melayang
+        if (L.clothGroup && L.clothGroup.parent) L.clothGroup.parent.remove(L.clothGroup);
+      }
     },
 
     _st(n) {
@@ -366,6 +685,9 @@ const NPC_Lich = (() => {
           boltCd: 0,
           summonCd: 0,
           drainCd: 0,
+          chargeCd: 0,
+          eyeBoost: 0,
+          beamPCd: 0,
           cast: null,
           zombies: [],
           bolts: []
@@ -446,9 +768,11 @@ const NPC_Lich = (() => {
         drainTickT: 0
       };
       if (action === 'summon') {
+        S.circleT = 0;
         if (n.parts.L && n.parts.L.circle) {
           n.parts.L.circle.visible = true;
           n.parts.L.circle.position.set(0, 0.05, 0);
+          n.parts.L.circle.scale.setScalar(0.4);
         }
         if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(n.pos, 'craft');
       } else if (action === 'drain') {
@@ -464,25 +788,29 @@ const NPC_Lich = (() => {
 
       const tgtPos = target.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
       const boltMesh = new THREE.Group();
-      const bMat = new THREE.MeshBasicMaterial({ color: 0xd47aff });
-      for (let i = 0; i < 4; i++) {
-        const seg = new THREE.Mesh(BOX, bMat);
-        seg.scale.set(0.08, 0.35, 0.08);
-        seg.position.set(rand(-0.15, 0.15), i * 0.28, rand(-0.15, 0.15));
-        boltMesh.add(seg);
+      const bMatA = new THREE.MeshBasicMaterial({ color: 0xa75dff });
+      const bMatB = new THREE.MeshBasicMaterial({ color: 0xdcb8ff });
+      const segs = [];
+      for (let i = 0; i < 8; i++) {
+        const seg = new THREE.Mesh(BOX, i % 2 ? bMatA : bMatB);
+        seg.scale.set(0.07, 0.26, 0.07);
+        seg.position.set(0, 0, i * 0.24);
+        boltMesh.add(seg); segs.push(seg);
       }
       boltMesh.position.copy(tipPos);
+      boltMesh.lookAt(tgtPos);
       if (typeof Game !== 'undefined' && Game.scene) Game.scene.add(boltMesh);
+      if (typeof FX !== 'undefined' && FX.debris) FX.debris(tipPos, 0xb06bff, 8, 2.0);
 
       const baseDmg = (typeof NPCS !== 'undefined' && NPCS.npcDmg) ? NPCS.npcDmg(n) : 36;
       S.bolts.push({
-        mesh: boltMesh,
-        pos: tipPos,
-        target: tgtPos,
-        targetEnt: target,
+        mesh: boltMesh, segs,
+        pos: tipPos.clone(), dir: tgtPos.clone().sub(tipPos).normalize(),
+        target: tgtPos, targetEnt: target,
         dmg: Math.round(baseDmg * 1.75),
-        life: 1.4
+        life: 1.3, t: 0, jt: 0
       });
+      S.recoil = 0.3;
       if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(n.pos, 'hit');
     },
 
@@ -506,10 +834,15 @@ const NPC_Lich = (() => {
         const lx = spots[i][0], lz = spots[i][1];
         const wx = n.pos.x + lx * c - lz * s;
         const wz = n.pos.z + lx * s + lz * c;
-        const wy = (typeof World !== 'undefined' && World.groundAt) ? World.groundAt(wx, wz, n.pos.y + 2) : n.pos.y;
+        let wy = (typeof World !== 'undefined' && World.groundAt) ? World.groundAt(wx, wz, n.pos.y + 2) : n.pos.y;
+        // Fallback: bila tak ada lantai terbaca (void/lubang), pakai tanah
+        // di bawah Lich supaya zombie tidak spawn & tenggelam di kehampaan.
+        if (!wy || wy <= 0) wy = (typeof World !== 'undefined' && World.groundAt)
+          ? (World.groundAt(n.pos.x, n.pos.z, n.pos.y + 2) || n.pos.y) : n.pos.y;
 
         b.g.position.set(wx, wy - 1.8, wz);
         b.g.visible = true;
+        b.g.userData._groundY = wy; // tinggi permukaan tanah final
         if (typeof Game !== 'undefined' && Game.scene) Game.scene.add(b.g);
 
         S.zombies.push({
@@ -520,7 +853,15 @@ const NPC_Lich = (() => {
           maxLife: zDur,
           life: zDur,
           state: 'rising',
+          riseY0: wy - 1.8, // mulai dari dalam tanah
+          groundY: wy,
+          homeX: wx, // titik kubur: zombie berkeliaran di sekitar sini
+          homeZ: wz,
+          wandA: rand(0, 6.28),
+          wandT: rand(1, 3),
           t: 0,
+          sw: 0,
+          hitDone: false,
           burstDone: false,
           atkT: 0.6,
           phase: rand(0, 6),
@@ -544,11 +885,67 @@ const NPC_Lich = (() => {
       S.boltCd = Math.max(0, S.boltCd - dt);
       S.summonCd = Math.max(0, S.summonCd - dt);
       S.drainCd = Math.max(0, S.drainCd - dt);
+      S.recoil = Math.max(0, (S.recoil || 0) * Math.exp(-dt * 6));
 
-      // Rotate Orb & Satellites
+      // Rotate Orb & Satellites + glow shift (ala updateGlow prototipe)
       if (L.sats) L.sats.rotation.y += dt * 3.5;
       if (L.orb) L.orb.rotation.y += dt * 1.2;
+      if (L.staff) {
+        let vibr = 0;
+        if (S.cast && S.cast.action === 'attack' && S.cast.t < 0.55) {
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          vibr = Math.sin(tt * 55) * 0.02 * Math.min(1, Math.max(0, S.cast.t / 0.2));
+        }
+        L.staff.rotation.x = 0.12 - (S.recoil || 0);
+        L.staff.rotation.z = -0.06 + vibr;
+      }
+      {
+        let charge = 0, drainOn = 0;
+        if (S.cast && S.cast.action === 'attack') {
+          const T = S.cast.t;
+          const cl = (v, a, b) => Math.min(b, Math.max(a, v));
+          charge = cl((T - 0.05) / 0.4, 0, 1) * (T < 0.75 ? 1 : cl(1 - (T - 0.75) / 0.3, 0, 1));
+        }
+        if (S.cast && S.cast.action === 'drain' && L.beamCore && L.beamCore.visible) drainOn = 1;
+        S.eyeBoost = Math.max(0, (S.eyeBoost || 0) - dt);
+        if (L.orbMat) {
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          L.orbMat.emissive.setHex(0x59ff8f);
+          if (charge > 0) L.orbMat.emissive.lerp(new THREE.Color(0xb055ff), charge);
+          if (drainOn) L.orbMat.emissive.lerp(new THREE.Color(0xff3344), 0.9);
+          L.orbMat.emissive.multiplyScalar(0.9 + 0.12 * Math.sin(tt * 3) + charge * 0.4 + drainOn * 0.3);
+        }
+        if (L.eyeMat) {
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          const summonW = (S.cast && S.cast.action === 'summon') ? 0.5 : 0;
+          L.eyeMat.emissive.setHex(0x8bff45).multiplyScalar(0.85 + 0.15 * Math.sin(tt * 2.6) + summonW + (S.eyeBoost || 0) * 0.9);
+        }
+        if (L.orb) {
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          L.orb.scale.setScalar(1 + Math.sin(tt * 2.4) * 0.05 + charge * 0.28 + drainOn * 0.12);
+        }
+      }
 
+      // Circle summon: skala + rotasi rune + fade (ala updateCircle prototipe)
+      if (L.circle && L.circle.visible) {
+        S.circleT = (S.circleT || 0) + dt;
+        const easeOutCubic = u => 1 - Math.pow(1 - u, 3);
+        if (S.cast && S.cast.action === 'summon') {
+          const u = Math.min(1, S.circleT / 0.5);
+          L.circle.scale.setScalar(0.4 + 0.6 * easeOutCubic(u));
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          if (L.ringMat1) L.ringMat1.opacity = u * (0.75 + 0.25 * Math.sin(tt * 8));
+          if (L.ringMat2) L.ringMat2.opacity = u * (0.6 + 0.3 * Math.sin(tt * 6 + 2));
+          if (L.runeFxMat) L.runeFxMat.opacity = u * (0.7 + 0.3 * Math.sin(tt * 10));
+          if (L.runeG) L.runeG.rotation.y += dt * 1.6;
+        } else {
+          if (L.ringMat1) L.ringMat1.opacity = Math.max(0, L.ringMat1.opacity - dt * 1.8);
+          if (L.ringMat2) L.ringMat2.opacity = Math.max(0, L.ringMat2.opacity - dt * 1.8);
+          if (L.runeFxMat) L.runeFxMat.opacity = Math.max(0, L.runeFxMat.opacity - dt * 1.8);
+          if (L.runeG) L.runeG.rotation.y += dt * 0.8;
+          if (L.ringMat1 && L.ringMat1.opacity <= 0) L.circle.visible = false;
+        }
+      }
       // Update Action Cast
       if (S.cast) {
         S.cast.t += dt;
@@ -556,7 +953,16 @@ const NPC_Lich = (() => {
         const c = S.cast;
 
         if (c.action === 'attack') {
-          if (!c.fired && c.t >= 0.46) {
+          if (c.t > 0.06 && c.t < 0.5 && L.tip && typeof FX !== 'undefined' && FX.debris) {
+            S.chargeCd -= dt;
+            if (S.chargeCd <= 0) {
+              S.chargeCd = 0.09;
+              const tp = new THREE.Vector3();
+              L.tip.getWorldPosition(tp);
+              FX.debris(tp, 0xb06bff, 2, 1.0);
+            }
+          }
+          if (!c.fired && c.t >= 0.55) {
             c.fired = true;
             this.spawnBolt(n, c.target);
           }
@@ -580,30 +986,76 @@ const NPC_Lich = (() => {
               L.beamCore.position.copy(tipW).addScaledVector(dir, len * 0.5);
               L.beamCore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
               L.beamCore.scale.set(0.08, len, 0.08);
+              // 2 garis pilin sinus di sekeliling beam (ala prototipe)
+              if (L.beamLines) {
+                const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+                const pp = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+                if (pp.lengthSq() < 1e-4) pp.set(1, 0, 0); else pp.normalize();
+                const pp2 = new THREE.Vector3().crossVectors(dir, pp).normalize();
+                for (let li = 0; li < L.beamLines.length; li++) {
+                  const ln = L.beamLines[li];
+                  ln.visible = true;
+                  const arr = ln.geometry.attributes.position.array;
+                  for (let j = 0; j < 14; j++) {
+                    const u = j / 13, env = Math.sin(u * Math.PI);
+                    const bx = tipW.x + dir.x * len * u
+                      + pp.x * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                      + pp2.x * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                    const by = tipW.y + dir.y * len * u
+                      + pp.y * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                      + pp2.y * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                    const bz = tipW.z + dir.z * len * u
+                      + pp.z * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                      + pp2.z * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                    arr[j * 3] = bx; arr[j * 3 + 1] = by; arr[j * 3 + 2] = bz;
+                  }
+                  ln.geometry.attributes.position.needsUpdate = true;
+                }
+                // partikel sedot mengalir korban -> tongkat
+                S.beamPCd -= dt;
+                if (S.beamPCd <= 0 && typeof FX !== 'undefined' && FX.debris) {
+                  S.beamPCd = 0.12;
+                  FX.debris(tgtW, Math.random() < 0.75 ? 0xff3344 : 0x6cff9a, 1, 1.0);
+                }
+              }
 
-              // Tick sedot darah setiap 0.35s
-              if (c.drainTickT >= 0.35) {
+              // Sedot darah: 5% dari TOTAL (max) HP Lich per detik, selama
+              // seluruh channel 10 detik. BUKAN 5% HP lawan — nilai sedotan
+              // dan heal Lich selalu = 5%/detik dari max HP Lich.
+              if (c.drainTickT >= 0.25) {
                 c.drainTickT = 0;
-                const baseDmg = (typeof NPCS !== 'undefined' && NPCS.npcDmg) ? NPCS.npcDmg(n) : 36;
-                const drainDmg = Math.round(baseDmg * 0.55);
+                const lichMax = n.maxHp || 380;
+                const drainDmg = Math.max(1, Math.round(lichMax * 0.05 * 0.25));
                 if (typeof Monsters !== 'undefined' && Monsters.hurt) {
                   Monsters.hurt(c.target, drainDmg, new THREE.Vector3(0, 0.1, 0), 0, n);
                 }
-                // Pulihkan HP Lich
-                n.hp = Math.min(n.maxHp || 380, (n.hp || 380) + drainDmg * 0.85);
+                // Pulihkan HP Lich sebesar yang disedot (5%/detik max HP)
+                n.hp = Math.min(lichMax, (n.hp || lichMax) + drainDmg);
                 if (typeof FX !== 'undefined' && FX.text) {
-                  FX.text(n.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), `+${Math.round(drainDmg * 0.85)} HP`, '#59ff8f');
+                  FX.text(n.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), `+${drainDmg} HP`, '#59ff8f');
                 }
               }
-            } else if (L.beamCore) {
-              L.beamCore.visible = false;
+            } else {
+              if (L.beamCore) L.beamCore.visible = false;
+              if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
             }
           }
         }
 
+        if (c.action === 'drain' && !c.fired && c.t >= c.dur - 0.2) {
+          c.fired = true;
+          S.eyeBoost = 1.2;
+          if (L.tip && typeof FX !== 'undefined' && FX.debris) {
+            const tp = new THREE.Vector3();
+            L.tip.getWorldPosition(tp);
+            FX.debris(tp, 0x6cff9a, 10, 2.4);
+            FX.debris(tp, 0xff3344, 6, 1.8);
+          }
+        }
         if (c.t >= c.dur) {
           if (L.circle) L.circle.visible = false;
           if (L.beamCore) L.beamCore.visible = false;
+          if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
           S.action = null;
           S.cast = null;
         }
@@ -620,7 +1072,9 @@ const NPC_Lich = (() => {
 
         if (z.state === 'rising') {
           const u = Math.min(1, z.t / 0.95);
-          z.g.position.y = (z.g.userData._groundY || z.g.position.y + 1.8 * (1 - u));
+          const y0 = (z.riseY0 != null) ? z.riseY0 : z.g.position.y - 1.8 * (1 - u);
+          const y1 = (z.groundY != null) ? z.groundY : (z.g.userData._groundY || z.g.position.y);
+          z.g.position.y = y0 + (y1 - y0) * (u * u * (3 - 2 * u));
           if (!z.burstDone && u > 0.45) {
             z.burstDone = true;
             if (typeof FX !== 'undefined' && FX.debris) {
@@ -639,9 +1093,9 @@ const NPC_Lich = (() => {
             S.zombies.splice(i, 1);
             continue;
           }
-        } else if (z.state === 'chase' || z.state === 'fight') {
+        } else if (z.state === 'chase' || z.state === 'fight' || z.state === 'swipe') {
           // Cari musuh terdekat untuk diserang zombie
-          let bestFoe = n.target && !n.target.dead ? n.target : null;
+          let bestFoe = (n.target && !n.target.dead && n.target.pos) ? n.target : null;
           if (!bestFoe && typeof Monsters !== 'undefined' && Monsters.list) {
             let bd = 16;
             for (const m of Monsters.list) {
@@ -657,15 +1111,12 @@ const NPC_Lich = (() => {
             const dist = Math.hypot(dx, dz);
             z.g.rotation.y = lerpAngle(z.g.rotation.y, Math.atan2(dx, dz), clamp(dt * 6, 0, 1));
 
-            if (dist > 1.3) {
-              z.g.position.x += (dx / dist) * 2.2 * dt;
-              z.g.position.z += (dz / dist) * 2.2 * dt;
-              z.mv = 1.0;
-            } else {
-              z.mv = 0.2;
-              z.atkT -= dt;
-              if (z.atkT <= 0) {
-                z.atkT = 0.9;
+            if (z.state === 'swipe') {
+              z.sw += dt / 0.55; z.mv = 0.05;
+              const fw = new THREE.Vector3(Math.sin(z.g.rotation.y), 0, Math.cos(z.g.rotation.y));
+              z.g.position.addScaledVector(fw, Math.sin(z.sw * Math.PI) * dt * 0.9);
+              if (z.sw > 0.5 && !z.hitDone) {
+                z.hitDone = true;
                 if (typeof Monsters !== 'undefined' && Monsters.hurt) {
                   Monsters.hurt(bestFoe, z.dmg, new THREE.Vector3(dx * 0.1, 0.2, dz * 0.1), 1.5, n);
                   if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(z.g.position, 'hit');
@@ -674,9 +1125,43 @@ const NPC_Lich = (() => {
                   }
                 }
               }
+              if (z.sw >= 1) { z.state = 'fight'; z.atkT = 1.3 + Math.random() * 0.6; }
+            } else if (dist > 1.3) {
+              z.state = 'chase';
+              z.g.position.x += (dx / dist) * 2.2 * dt;
+              z.g.position.z += (dz / dist) * 2.2 * dt;
+              z.mv = 1.0;
+            } else {
+              z.state = 'fight';
+              z.mv = 0.2;
+              z.atkT -= dt;
+              if (z.atkT <= 0) {
+                z.state = 'swipe'; z.sw = 0; z.hitDone = false;
+              }
             }
           } else {
-            z.mv = 0;
+            // Tak ada target: berkeliaran pelan di sekitar titik kubur
+            // (home) alih-alih diam mematung lalu hilang.
+            z.wandT = (z.wandT || 0) - dt;
+            if (z.wandT <= 0) {
+              z.wandT = 1.5 + Math.random() * 2.5;
+              z.wandA = (z.wandA || 0) + (Math.random() - 0.5) * 2.2;
+            }
+            z.g.rotation.y = lerpAngle(z.g.rotation.y, z.wandA, clamp(dt * 3, 0, 1));
+            z.g.position.x += Math.sin(z.g.rotation.y) * 0.8 * dt;
+            z.g.position.z += Math.cos(z.g.rotation.y) * 0.8 * dt;
+            // Jangan menjauh dari kubur: belok pulang bila > 6 blok
+            const hx = (z.homeX != null) ? z.homeX : z.g.position.x;
+            const hz = (z.homeZ != null) ? z.homeZ : z.g.position.z;
+            if (Math.hypot(z.g.position.x - hx, z.g.position.z - hz) > 6)
+              z.wandA = Math.atan2(hx - z.g.position.x, hz - z.g.position.z);
+            z.mv = 0.45;
+            if (z.state === 'swipe') { z.state = 'fight'; z.atkT = 1.2; }
+          }
+          // Kunci Y zombie ke tanah agar tak tenggelam/hilang saat jalan
+          if (typeof World !== 'undefined' && World.groundAt) {
+            const gy = World.groundAt(z.g.position.x, z.g.position.z, z.g.position.y + 1.5);
+            if (gy > 0) z.g.position.y += (gy - z.g.position.y) * Math.min(1, dt * 10);
           }
 
           // Pose gerak zombie
@@ -685,30 +1170,51 @@ const NPC_Lich = (() => {
           if (z.P.legL) z.P.legL.hip.rotation.x = -sn * 0.5 * z.mv;
           if (z.P.legR) z.P.legR.hip.rotation.x =  sn * 0.5 * z.mv;
           if (z.P.body) z.P.body.position.y = 0.93 + Math.abs(sn) * 0.03 * z.mv;
-          if (z.P.armR) z.P.armR.sh.rotation.x = -1.45 + Math.sin(z.phase * 2) * 0.15;
+          if (z.state === 'swipe') {
+            const ts = [0, 0.3, 0.55, 0.85, 1];
+            const shV = [-1.45, -2.95, -0.3, -1.0, -1.45];
+            const elV = [-0.15, -0.55, -0.05, -0.2, -0.15];
+            if (z.P.armR) {
+              z.P.armR.sh.rotation.x = track(ts, shV, z.sw);
+              if (z.P.armR.el) z.P.armR.el.rotation.x = track(ts, elV, z.sw);
+            }
+            if (z.P.body) z.P.body.rotation.x = 0.08 + 0.06 * z.mv + Math.sin(z.sw * Math.PI) * 0.25;
+          } else {
+            if (z.P.armR) {
+              z.P.armR.sh.rotation.x = -1.45 + Math.sin(z.phase * 2) * 0.15;
+              if (z.P.armR.el) z.P.armR.el.rotation.x = -0.15 + Math.sin(z.phase * 2.3 + z.seed) * 0.05;
+            }
+            if (z.P.body) z.P.body.rotation.x = 0.08 + 0.06 * z.mv;
+          }
           if (z.P.armL) z.P.armL.sh.rotation.x = -1.45 + Math.sin(z.phase * 2 + 1) * 0.15;
         }
       }
 
-      // Update Lightning Bolts
+      // Update Lightning Bolts (ala prototipe: lurus + jitter zigzag + trail)
       for (let i = S.bolts.length - 1; i >= 0; i--) {
         const b = S.bolts[i];
-        b.life -= dt;
-        const dir = new THREE.Vector3().subVectors(b.target, b.pos);
-        const dist = dir.length();
-        if (dist > 0.4 && b.life > 0) {
-          dir.normalize();
-          b.pos.addScaledVector(dir, Math.min(dist, 18 * dt));
-          b.mesh.position.copy(b.pos);
-          b.mesh.rotation.y += dt * 14;
-        } else {
-          // Impact
-          if (b.targetEnt && !b.targetEnt.dead && typeof Monsters !== 'undefined' && Monsters.hurt) {
+        b.t += dt; b.life -= dt;
+        b.mesh.position.addScaledVector(b.dir, 16 * dt);
+        b.pos.copy(b.mesh.position);
+        b.jt -= dt;
+        if (b.jt <= 0) {
+          b.jt = 0.045;
+          if (b.segs) for (const s of b.segs) {
+            s.position.x = (Math.random() - 0.5) * 0.16;
+            s.position.y = (Math.random() - 0.5) * 0.16;
+            s.scale.x = s.scale.y = 0.05 + Math.random() * 0.05;
+          }
+        }
+        if (typeof FX !== 'undefined' && FX.debris && Math.random() < 0.6)
+          FX.debris(b.pos, 0xc68cff, 1, 0.8);
+        const distT = b.mesh.position.distanceTo(b.target);
+        if (distT < 0.55 || b.life <= 0) {
+          if (distT < 1.2 && b.targetEnt && !b.targetEnt.dead && typeof Monsters !== 'undefined' && Monsters.hurt) {
             Monsters.hurt(b.targetEnt, b.dmg, new THREE.Vector3(0, 0.3, 0), 4, n);
           }
           if (typeof FX !== 'undefined') {
-            if (FX.ring) FX.ring(b.pos.x, b.pos.y + 0.1, b.pos.z, 0xd47aff, 0.8, 3.5);
-            if (FX.debris) FX.debris(b.pos, 0xd47aff, 12, 3.0);
+            if (FX.ring) FX.ring(b.pos.x, b.pos.y + 0.1, b.pos.z, 0xb06bff, 0.8, 3.5);
+            if (FX.debris) { FX.debris(b.pos, 0xa75dff, 12, 3.0); FX.debris(b.pos, 0xe6ccff, 6, 1.8); }
           }
           if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(b.pos, 'thunder');
           if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
@@ -768,7 +1274,34 @@ const NPC_Lich = (() => {
       if (L.torso) L.torso.rotation.set(P.torx, P.tory, 0);
       if (L.body) L.body.position.y = 1.45 + P.bodyy;
       if (L.head) L.head.rotation.set(P.headx, 0, 0);
-      if (L.skirtGroup) L.skirtGroup.rotation.z = Math.sin(ph) * 0.04 * act;
+
+      // ==== VERLET CLOTH PHYSICS: rok, strip kain & jubah belakang ====
+      // Dijalankan SETELAH pose di-set agar anchor (body/torso) sudah pada
+      // transform akhir frame ini. Kain di-simulasikan di ruang world.
+      if (L.ropes && L.colliders && n.mesh) {
+        if (!L.clothInit) initCloth(n, L);
+        if (!L.clothInit) { /* scene belum siap: lewati fisika frame ini */ }
+        else {
+        const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+        computeWind(tt, clamp(S.speed / 2.5, 0, 1));
+        if (n.mesh.updateWorldMatrix) n.mesh.updateWorldMatrix(true, true);
+        updateColliders(L, L.colliders);
+        const pdt = Math.min(dt, 0.033);
+        physicsStep(L.ropes, L.colliders, pdt, tt);
+        // Panel rok mengikuti grid verlet
+        if (L.skirtPanels && L.skirtPts) {
+          const SK_COLS = 12, SK_ROWS = 5;
+          let i = 0;
+          for (let r = 0; r < SK_ROWS - 1; r++) for (let c = 0; c < SK_COLS; c++) {
+            const c2 = (c + 1) % SK_COLS;
+            orientPanel(L.skirtPanels[i], L.skirtPts[r][c].pos, L.skirtPts[r][c2].pos, L.skirtPts[r + 1][c].pos, L.skirtPts[r + 1][c2].pos);
+            i++;
+          }
+        }
+        // Strip kain & segmen cape mengikuti titik verlet
+        renderRopes(L.ropes);
+        } // end else: cloth sudah init
+      }
     }
   };
 })();

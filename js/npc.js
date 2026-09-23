@@ -980,6 +980,12 @@ const NPCS={
   },
   despawn(i){
     const n=this.list[i];
+    /* Bersihkan sisa summon/efek milik NPC (mis. zombie Lich) supaya mesh
+       yatim tak beku tertinggal di dunia saat pemiliknya mati/hilang. */
+    try{
+      const ent=n.role&&this.def(n.role.id);
+      if(ent&&ent.cleanup)ent.cleanup(n);
+    }catch(e){}
     Game.scene.remove(n.mesh);
     n.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();
       if(o.material)o.material.dispose();});
