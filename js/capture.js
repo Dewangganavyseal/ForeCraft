@@ -13,23 +13,23 @@
    ============================================================================= */
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
-  scorpion:'🦂',lizard:'🦎',dragon:'🐉',trex:'🦖',mammoth:'🦣',cow:'🐄',horse:'🐎',
+  scorpion:'🦂',lizard:'🦎',iguana:'🐍',dragon:'🐉',trex:'🦖',mammoth:'🦣',cow:'🐄',horse:'🐎',
   kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
-  rabbit:'carrot',scorpion:'meat',lizard:'meat',cow:'wheat',horse:'wheat',
+  rabbit:'carrot',scorpion:'meat',lizard:'meat',iguana:'meat',cow:'wheat',horse:'wheat',
   dragon:'cmeat',trex:'cmeat',mammoth:'cabbage',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard',
   tarantula:'meat'};
 
 /* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
    reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
-  scorpion:180,lizard:220,golem:320,dragon:520,trex:480,mammoth:480,
+  scorpion:180,lizard:220,iguana:230,golem:320,dragon:520,trex:480,mammoth:480,
   kumbang:240,yeti:300,semut:150,reaper:360,tarantula:280};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
-  scorpion:1.35,lizard:1.5,golem:0.85,dragon:2.3,trex:2.1,mammoth:2.0,
+  scorpion:1.35,lizard:1.5,iguana:1.5,golem:0.85,dragon:2.3,trex:2.1,mammoth:2.0,
   kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45,tarantula:1.5};
 
 /* panjang maksimum tali saat tarik-tarikan.
@@ -65,6 +65,7 @@ const Capture={
     wolf:     { baseHp:150,  baseDmg:36 },
     scorpion: { baseHp:180,  baseDmg:39 },
     lizard:   { baseHp:220,  baseDmg:42 },
+    iguana:   { baseHp:240,  baseDmg:45 },
     semut:    { baseHp:200,  baseDmg:39 },
     kumbang:  { baseHp:320,  baseDmg:51 },
     tarantula:{ baseHp:340,  baseDmg:57 },
@@ -90,6 +91,7 @@ const Capture={
     yeti:      { y: 1.95, fwd: -0.10 },
     kumbang:   { y: 1.36, fwd: -0.15 },
     lizard:    { y: 0.82, fwd: -0.10 },
+    iguana:    { y: 0.85, fwd: -0.10 },
     semut:     { y: 0.65, fwd:  0.00 },
     slime:     { y: 0.62, fwd:  0.00 },
     rabbit:    { y: 0.48, fwd: -0.05 },
@@ -292,6 +294,7 @@ const Capture={
     m.windup=0;
     m.foe=null;
     if(m.tAct)m.tAct=null;
+    if(m.iAct)m.iAct=null;
     if(m.kumAtk)m.kumAtk=null;
     if(m.yAct)m.yAct=null;
     if(m.aAct)m.aAct=null;
@@ -889,6 +892,9 @@ const Capture={
       if(m.tAct&&typeof Monsters.tarantulaAct==='function'){
         Monsters.tarantulaAct(m,dt,d,ang,live);return;
       }
+      if(m.iAct&&typeof Monsters.iguanaAct==='function'){
+        Monsters.iguanaAct(m,dt,d,ang,live);return;
+      }
       if(m.bAct&&typeof Monsters.boarAtk==='function'){
         Monsters.boarAtk(m,dt,d,ang,live);return;
       }
@@ -918,6 +924,7 @@ const Capture={
                   (m.type==='semut')?3.2:
                   (m.type==='reaper')?3.4:
                   (m.type==='tarantula')?5.2:
+                  (m.type==='iguana')?3.4:
                   (m.type==='boar')?3.8:
                   (m.type==='mammoth')?3.2:
                   (m.type==='dragon')?3.4:
@@ -1185,7 +1192,7 @@ const Capture={
     /* Batalkan seluruh aksi bertarung pet agar tidak macet di pose serang saat ditunggangi */
     m.mAct=null;m.mActT=0;m.mTarget=null;
     m.kumAtk=null;m.yAct=null;m.aAct=null;m.rAct=null;
-    m.tAct=null;m.bAct=null;
+    m.tAct=null;m.bAct=null;m.iAct=null;
     /* animasi naik: badan dilerp dari posisi berdiri ke atas punggung selama
        durasi ride_mount, lalu masuk pose duduk. */
     this.mounting=true;

@@ -264,7 +264,7 @@ const Chat={
   },
   /* emoji untuk monster (Mob tidak punya ikon sendiri di tabel) */
   MOB_E:{slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',scorpion:'🦂',rabbit:'🐇',
-         cow:'🐄',horse:'🐎',dragon:'🐲',trex:'🦖',mammoth:'🦣',lizard:'🦎',
+          cow:'🐄',horse:'🐎',dragon:'🐲',trex:'🦖',mammoth:'🦣',lizard:'🦎',iguana:'🐍',
          kelabang:'🐛',kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'},
 
   /* dipanggil UI.toggle('term'); isi cukup dibangun sekali */

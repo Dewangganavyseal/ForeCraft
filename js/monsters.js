@@ -3,7 +3,7 @@
 /* nama tampilan untuk notifikasi & teks UI */
 const MOB_NAME={slime:'Slime',boar:'Babi Hutan',golem:'Golem',
   wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',mammoth:'Mammoth',
-  lizard:'Lizard Rawa',cow:'Sapi',horse:'Kuda',
+  lizard:'Lizard Rawa',iguana:'Iguana Hutan',cow:'Sapi',horse:'Kuda',
   kelabang:'Kelabang',kelabang_part:'Ruas Kelabang',kumbang:'Kumbang Tanduk',
   yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper',tarantula:'Tarantula Raksasa'};
 const Monsters={
@@ -39,6 +39,11 @@ const Monsters={
        muncul di tepi sungai/danau (lihat spawnLizard). Radius tabrakan kecil
        (0.55, seukuran babi hutan) mengikuti modelnya yang dikecilkan. */
     lizard:{hp:90,dmg:14,xp:48,speed:3.6,r:0.55,aggro:16},
+    /* IGUANA HUTAN: monster ular voxel dari NEW MODEL/iguana.html (Skeleton IK:
+       spine FABRIK 8+7 ruas, 4 kaki IK 2-tulang). Mob darat biome HUTAN, tangguh
+       setingkat lizard-plus. Tiga aksi: Patuk (melee), Sembur Bisa (proyektil
+       racun DoT), Lompat (sergap AoE saat mendarat). */
+    iguana:{hp:110,dmg:15,xp:52,speed:3.6,r:0.6,aggro:16,bossScale:0.68},
     /* TERNAK PASIF: kategori ANIMAL, bukan monster buruan NPC. Tidak menyerang
        pemain/NPC. Sapi & kuda berkeliaran, merumput, dan kabur dari predator. */
     cow:{hp:60,dmg:0,xp:12,speed:2.6,r:0.65,aggro:0,passive:true,livestock:true,animal:true},
@@ -1181,7 +1186,9 @@ const Monsters={
        m.type==='trex'?[['meat',4],['hard_shell',Math.random()<0.16?1:0]]:
        /* MAMMOTH: daging purba melimpah + kulit tebal + gading 5% (bahan pedang dragon) */
        m.type==='mammoth'?[['meat',4],['leather',2+(Math.random()<0.5?1:0)],['tusk',Math.random()<0.05?1:0]]:
-       m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
+        m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
+        /* iguana hutan: daging + kulit reptil + racun bisa */
+        m.type==='iguana'?[['meat',1+(Math.random()<0.5?1:0)],['venom',1],['green_blood',Math.random()<0.16?1:0],['hard_shell',Math.random()<0.16?1:0]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
     /* ---------- INTI BOSS (boss_core): SATU-SATUNYA dari jalur kill() ----------
        - Mob BIASA (apa pun tipenya): peluang 7% menjatuhkan 1 inti boss.
@@ -1236,7 +1243,7 @@ const Monsters={
     }
     const dustColor=m.type==='slime'?0x67c74f:m.type==='boar'?0x6b4a34:
       m.type==='wolf'?0x6f7480:m.type==='scorpion'?0x8a5a2b:
-      m.type==='lizard'?0x4e8f3a:m.type==='kumbang'?0x7a4f24:
+      m.type==='lizard'?0x4e8f3a:m.type==='iguana'?0x548636:m.type==='kumbang'?0x7a4f24:
       m.type==='yeti'?0xcfe0f2:m.type==='semut'?0x8a3b1f:
       m.type==='tarantula'?0x2e1910:
       m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:m.type==='mammoth'?0x74451f:0x8a8f98;
@@ -1252,6 +1259,7 @@ const Monsters={
       scorpion:[0x8a5a2b,0x6a4320,0xb07a3c],
       rabbit:[0xc9b5a0,0xa08570,0xe0d0bc],
       lizard:[0x4e8f3a,0x69a94b,0x33682a],
+      iguana:[0x548636,0x6ca83c,0x30581e],
       cow:[0xefe8d8,0x2e2a25,0xd9ac92],
       horse:[0x945c33,0x2b2b30,0xe8e4da],
       kelabang:[0x96332c,0x5f1d1a,0xd9a066],
@@ -1595,6 +1603,8 @@ const Monsters={
     if(typeof Mob_Reaper!=='undefined'&&Mob_Reaper.updateSpirits)Mob_Reaper.updateSpirits(dt);
     /* proyektil jaring tarantula (damage + stun 5 detik): update global */
     if(typeof Mob_Tarantula!=='undefined'&&Mob_Tarantula.updateWebs)Mob_Tarantula.updateWebs(dt);
+    /* partikel bisa iguana (damage + racun DoT): update global sekali per frame */
+    if(typeof Mob_Iguana!=='undefined'&&Mob_Iguana.updateVenom)Mob_Iguana.updateVenom(dt);
   },
 
   ai(m,dt,dp){
@@ -1644,6 +1654,13 @@ const Monsters={
        sembur jaring + STUN 5 detik (jauh) ---------- */
     if(m.type==='tarantula'){
       this.aiTarantula(m,dt,dp,angP);
+      return;
+    }
+
+    /* ---------- IGUANA HUTAN: patuk (dekat), sembur bisa (menengah),
+       lompat sergap AoE (jauh) ---------- */
+    if(m.type==='iguana'){
+      this.aiIguana(m,dt,dp,angP);
       return;
     }
 
@@ -3005,6 +3022,154 @@ const Monsters={
   },
 
   /* =========================================================================
+     AI IGUANA HUTAN — 3 aksi otentik (port 1:1 dari NEW MODEL/iguana.html)
+     -------------------------------------------------------------------------
+     'attack' (Patuk) : ancang-ancang menunduk (0.30s) → sentak maju cepat
+              (damage saat k>.85 fase sentak) → pulih. Damage melee + shake.
+     'venom' (Sembur Bisa) : dongak + frill mekar (0.55s) → semprotan partikel
+              racun dari mulut (0.55–1.85s) → pulih. Kena → damage + RACUN DoT.
+     'jump' (Lompat) : keyframe depan-dulu/belakang-menyusul (depan terbang &
+              mendarat duluan) → hantam tanah AoE saat mendarat.
+     Timeline visual dijalankan Mob_Iguana.animate via m.iAct/m.iActT; damage
+     & fisika dijalankan iguanaAct() di sini.
+     ========================================================================= */
+  pickIguanaAtk(d){
+    const r=Math.random();
+    if(d<2.0)return r<0.80?'attack':'venom';
+    if(d<4.5)return r<0.40?'attack':(r<0.70?'venom':'jump');
+    if(d<9.5)return r<0.45?'venom':(r<0.80?'jump':'attack');
+    return r<0.60?'venom':'jump';
+  },
+  startIguanaAtk(m,name,target){
+    const A=(typeof Mob_Iguana!=='undefined')?Mob_Iguana:null;
+    m.iAct=name;m.iActT=0;
+    m.iActDur=(A&&A.DUR[name])||1.2;
+    m.iTarget=(target&&target!==Player)?target:null;
+    m._iHit=false;m._iLaunched=false;m._iVenomFx=false;
+    m._iYaw=m.mesh.rotation.y;
+    if(name==='jump'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'smash',0.5);
+    if(name==='venom'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'cast',0.6);
+  },
+  iguanaAct(m,dt,dp,angP,tgtIn){
+    const A=(typeof Mob_Iguana!=='undefined')?Mob_Iguana:null;
+    m.iActT+=dt;
+    const tA=m.iActT,name=m.iAct;
+    const tgt=(m.iTarget&&!m.iTarget.dead)?m.iTarget:
+              (tgtIn||(m.pet?null:this.aimTarget(m)));
+
+    if(name==='attack'){
+      /* PATUK: bidik saat ancang-ancang, sentak maju, damage saat rahang menutup. */
+      if(tA<0.30){
+        if(dp>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*9);
+        m._iYaw=m.mesh.rotation.y;
+        m.vel.x*=0.8;m.vel.z*=0.8;
+      }else if(tA<0.52){
+        const yaw=m._iYaw!==undefined?m._iYaw:m.mesh.rotation.y;
+        m.vel.x=lerp(m.vel.x,Math.sin(yaw)*7.0,clamp(12*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(yaw)*7.0,clamp(12*dt,0,1));
+      }else{m.vel.x*=0.86;m.vel.z*=0.86;}
+      if(!m._iHit&&tA>=0.30+0.14*0.85){
+        m._iHit=true;
+        if(A)A.addShake(m,0.55);
+        const yaw=m.mesh.rotation.y;
+        const hx=m.pos.x+Math.sin(yaw)*1.9,hz=m.pos.z+Math.cos(yaw)*1.9;
+        this.hitTarget(m,tgt,Math.round(m.dmg*1.3),2.4,hx,hz,5);
+        if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'hit');
+      }
+    }
+
+    else if(name==='venom'){
+      /* SEMBUR BISA: diam mendongak, partikel disemprot Mob_Iguana.animate
+         selama jendela 0.55–1.85s lewat venomBurst(single). */
+      m.vel.x*=0.85;m.vel.z*=0.85;
+      if(tA<1.85&&dp>0.5)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*4);
+      if(!m._iVenomFx&&tA>=0.55){
+        m._iVenomFx=true;
+        if(typeof FX!=='undefined')FX.ring(m.pos.x,m.pos.y+0.1,m.pos.z,0x8fe02a,0.5,1.8);
+      }
+    }
+
+    else{
+      /* LOMPAT SERGAP: bidik → tolak fisika sungguhan → hantam AoE mendarat. */
+      if(tA<0.30){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*8);
+        m._iYaw=m.mesh.rotation.y;
+        m.vel.x*=0.82;m.vel.z*=0.82;
+      }else if(!m._iLaunched){
+        m._iLaunched=true;
+        const reach=clamp(dp,2.0,7.5);
+        m.vel.y=Math.max(m.vel.y,8.2);
+        m.vel.x=Math.sin(m._iYaw)*reach*1.45;
+        m.vel.z=Math.cos(m._iYaw)*reach*1.45;
+        if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'swing',0.7);
+      }else if(tA<0.90){
+        m.mesh.rotation.y=m._iYaw;
+        const hold=10*(1-Math.abs(tA-0.59)/0.6);
+        m.vel.x=Math.sin(m._iYaw)*Math.max(4,hold);
+        m.vel.z=Math.cos(m._iYaw)*Math.max(4,hold);
+      }
+      const landed=(m._iLaunched&&m.onGround&&tA>0.55)||tA>=1.17;
+      if(m._iLaunched&&!m._iHit&&landed){
+        m._iHit=true;
+        if(A)A.addShake(m,0.75);
+        if(typeof FX!=='undefined'){
+          FX.debris(m.pos.clone().add(new THREE.Vector3(0,0.3,0)),0xb8a68e,16,3.0);
+          FX.ring(m.pos.x,m.pos.y+0.08,m.pos.z,0x8fe02a,0.6,3.2);
+          FX.addShake(0.5);
+        }
+        if(typeof Sfx!=='undefined'&&Sfx.smash)Sfx.smash();
+        this.areaHit(m,m.pos.x,m.pos.z,3.0,Math.round(m.dmg*1.5),9);
+      }
+      if(m._iHit){m.vel.x*=0.86;m.vel.z*=0.86;}
+    }
+
+    if(m.iActT>=m.iActDur){
+      m.iAct=null;m.iTarget=null;
+      m.atkCd=(name==='venom')?rand(0.8,1.2):(name==='jump'?rand(1.8,2.8):rand(1.2,2.0));
+    }
+  },
+  aiIguana(m,dt,dp,angP){
+    this.pickFoe(m,dt);
+    const tgt=this.aimTarget(m);
+    const tpos=tgt?tgt.pos:Player.pos;
+    const dT=tgt?Math.hypot(tpos.x-m.pos.x,tpos.z-m.pos.z):999;
+    const angT=Math.atan2(tpos.x-m.pos.x,tpos.z-m.pos.z);
+
+    if(m.iAct){this.iguanaAct(m,dt,dT,angT,tgt);return;}
+
+    const MB=CFG.MOB;
+    const sight=Math.min(this.TYPES.iguana.aggro,MB.SIGHT);
+    m.seeT=Math.max(0,(m.seeT||0)-dt);
+    m.alert=Math.max(0,(m.alert||0)-dt);
+    if(tgt&&dT<sight)m.seeT=MB.MEM;
+    const active=!!tgt&&(m.seeT>0||m.alert>0);
+    m.state=active?'chase':'wander';
+
+    if(active){
+      if(dT>0.45)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*6);
+      let sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
+      if(dT>3.4&&!m.inWater)sp*=1.4;   // lari mengejar mangsa jauh
+      if(dT>1.9){
+        m.vel.x=lerp(m.vel.x,Math.sin(angT)*sp,clamp(7*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(angT)*sp,clamp(7*dt,0,1));
+      }else{
+        const damp=Math.exp(-8*dt);
+        m.vel.x*=damp;m.vel.z*=damp;
+      }
+      if(m.atkCd<=0&&dT<=14)this.startIguanaAtk(m,this.pickIguanaAtk(dT),tgt);
+    }else{
+      m.t-=dt;
+      if(m.t<=0){m.t=rand(1.5,4);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
+      if(m.walking){
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*3);
+        const sp=m.speed*0.4;
+        m.vel.x=lerp(m.vel.x,Math.sin(m.dir)*sp,clamp(4*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(m.dir)*sp,clamp(4*dt,0,1));
+      }else{m.vel.x*=0.85;m.vel.z*=0.85;}
+    }
+  },
+
+  /* =========================================================================
      AI BABI HUTAN — 2 serangan anatomis (port dari Babi Hutan.html)
      -------------------------------------------------------------------------
      'punch' (Pukulan Gading ke Atas / Uppercut Tusk Slash) :
@@ -3469,6 +3634,12 @@ const Monsters={
         }
         return false;
 
+      case 'iguana':
+        /* tiga aksi otentik: patuk (dekat), sembur bisa (menengah), lompat (jauh) */
+        if(m.atkCd>0||m.iAct)return false;
+        this.startIguanaAtk(m,this.pickIguanaAtk(d),tgt);
+        return true;
+
       case 'lizard':
         /* tiga serangan: gigit (dekat), sapuan ekor (AoE), semburan asam (jauh) */
         if(d<1.8){
@@ -3619,7 +3790,7 @@ const Monsters={
     }
   },
 
-  PREDATORS:['wolf','boar','scorpion','lizard','dragon','trex','mammoth'],
+  PREDATORS:['wolf','boar','scorpion','lizard','iguana','dragon','trex','mammoth'],
 
   /* kategori animal: sapi/kuda. NPC tidak boleh memburu/menyerang animal. */
   isAnimal(m){
@@ -3810,6 +3981,10 @@ const Monsters={
       /* ---------- TARANTULA PET: gigitan, lompat sergap & sembur jaring ---------- */
       else if(m.type==='tarantula'){
         if(!m.tAct)this.startTarantulaAtk(m,this.pickTarantulaAtk(d),target);
+      }
+      /* ---------- IGUANA PET: patuk, sembur bisa & lompat sergap ---------- */
+      else if(m.type==='iguana'){
+        if(!m.iAct)this.startIguanaAtk(m,this.pickIguanaAtk(d),target);
       }
       /* ---------- BABI HUTAN PET: pukulan atas gading & seruduk lari kencang ---------- */
       else if(m.type==='boar'){
@@ -4176,7 +4351,7 @@ const Monsters={
 /* tinggi kira-kira model, dipakai untuk posisi teks damage & aura boss */
 function meshHeight(type){
   return type==='golem'?3:type==='dragon'?4.2:type==='mammoth'?4.2:type==='trex'?3.8:type==='cow'?1.8:type==='horse'?2.1:
-    type==='lizard'?1.2:type==='boar'?1.1:
+    type==='lizard'?1.2:type==='iguana'?1.6:type==='boar'?1.1:
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:
     type==='yeti'?2.6:type==='semut'?1.5:
