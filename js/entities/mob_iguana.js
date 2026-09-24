@@ -426,11 +426,49 @@ const Mob_Iguana=(()=>{
       const br=Math.sin(R.breathPhase);
       const bobV=Math.sin(R.gaitPhase*2*TAU)*(.02+speedNorm*.07)*moveK;
 
-      /* ---------- pelvis ---------- */
+      /* ---------- pelvis + ADAPTASI BADAN ala tarantula ----------
+         Pinggul menyesuaikan tinggi telapak kaki dunia (rata-rata kaki yang
+         menapak): bila kaki depan di blok lebih tinggi, badan depan ikut naik
+         (pitch), begitu pula sebaliknya — badan jadi lentur mengikuti kontur. */
+      const mobX=m.pos.x, mobY=m.pos.y, mobZ=m.pos.z;
+      const yawW=m.mesh?m.mesh.rotation.y:0;
+      const cosY=Math.cos(yawW), sinY=Math.sin(yawW);
+      const sc=(m.mesh&&m.mesh.scale&&m.mesh.scale.x)?m.mesh.scale.x:SCALE;
+      const isMoving=speed>0.12;
+      if(!m._gaitT)m._gaitT=0;
+      if(isMoving&&act!=='jump'){
+        const strideWorld=Math.max(0.4,1.8*sc);
+        const cadence=Math.max(1.4,Math.min(4.2,speed/strideWorld*1.3));
+        m._gaitT+=dt*cadence;
+      }
+      const gaitCycle=m._gaitT%1.0;
+      const activeGrp=(gaitCycle<0.5)?0:1;
+      /* rata-rata tinggi kaki depan vs belakang (dunia, relatif ke mobY) */
+      let fH=null,bH=null;
+      if(R.legs){
+        let fS=0,fN=0,bS=0,bN=0;
+        for(const RL of R.legs){
+          if(!RL.worldFoot)continue;
+          const h=(RL.worldFoot.y-mobY)/sc;
+          if(RL.front){fS+=h;fN++;}else{bS+=h;bN++;}
+        }
+        if(fN)fH=fS/fN;if(bN)bH=bS/bN;
+      }
+      let adaptPitch=0,adaptH=0;
+      if(fH!==null&&bH!==null){
+        /* depan lebih tinggi → badan miring ke atas (pitch negatif = dongak) */
+        adaptPitch=Math.max(-0.35,Math.min(0.35,(bH-fH)*0.28));
+        adaptH=(fH+bH)/2;
+        /* tanah miring curam → pinggul ikut naik supaya perut tidak nyangkut */
+        adaptH=Math.max(-0.4,Math.min(1.2,adaptH));
+      }
+      R.adaptPitch=((R.adaptPitch===undefined)?0:R.adaptPitch)+(adaptPitch-(R.adaptPitch||0))*Math.min(1,6*dt);
+      R.adaptH=((R.adaptH===undefined)?0:R.adaptH)+(adaptH-(R.adaptH||0))*Math.min(1,6*dt);
       const hipBase=speed<.05?HIP_BASE:(1.27+(1.20-1.27)*Math.max(0,Math.min(1,(speed-2)/3.2)));
-      R.hipH+=(hipBase+hipExtra+br*.02-R.hipH)*Math.min(1,(act?10:6)*dt);
+      R.hipH+=(hipBase+hipExtra+br*.02+R.adaptH-R.hipH)*Math.min(1,(act?10:6)*dt);
       const idleSway=Math.sin(T*.4)*.045*(1-moveK);
       const Px=idleSway,Py=R.hipH+bobV,Pz=rootOffF;
+      const bodyAdaptPitch=R.adaptPitch||0;
 
       /* ---------- look-around (salinan file asli) ---------- */
       if(!act){
@@ -483,18 +521,22 @@ const Mob_Iguana=(()=>{
       bJ[0].set(Px,Py,Pz);
       this._fabrik(bJ,B_LEN,base,tailTgt,bwdOff,UP);
 
-      /* ---------- orientasi ruas tubuh ---------- */
+      /* ---------- orientasi ruas tubuh (ikut pitch adaptif tanah) ---------- */
       const microRoll=Math.sin(T*.6)*.02*(1-moveK);
       const _a=new THREE.Vector3(),_b=new THREE.Vector3();
       for(let k=0;k<8;k++){
         const roll=R.bank*(.5+k*.08)+Math.cos(R.wavePhase-k*.7)*.05*speedNorm+microRoll;
         this._orient(P.fSeg[k],fJ[k],fJ[k+1],roll);
         P.fSeg[k].position.copy(fJ[k]).add(fJ[k+1]).multiplyScalar(.5);
+        /* lentur depan: ruas depan ikut menengadah/menunduk mengikuti kaki */
+        P.fSeg[k].rotation.x+=bodyAdaptPitch*(0.4+0.6*(k/7));
       }
       for(let k=0;k<7;k++){
         const roll=R.bank*.4-Math.cos(R.tailPhase-k*.85)*.10*speedNorm+microRoll;
         this._orient(P.bSeg[k],bJ[k+1],bJ[k],roll);
         P.bSeg[k].position.copy(bJ[k]).add(bJ[k+1]).multiplyScalar(.5);
+        /* lentur belakang: ruas ekor melawan sedikit supaya punggung melengkung */
+        P.bSeg[k].rotation.x-=bodyAdaptPitch*(0.3+0.5*(1-k/7));
       }
       for(let k=0;k<7;k++){P.jF[k].position.copy(fJ[k+1]);P.jF[k].quaternion.copy(P.fSeg[k].quaternion);}
       for(let k=0;k<6;k++){P.jB[k].position.copy(bJ[k+1]);P.jB[k].quaternion.copy(P.bSeg[k].quaternion);}
@@ -510,8 +552,8 @@ const Mob_Iguana=(()=>{
       if(_a.lengthSq()<1e-6)_a.set(ftx,fty,ftz);
       _a.normalize();
       /* yaw + pitch pandangan */
-      const cosY=Math.cos(R.lookYaw),sinY=Math.sin(R.lookYaw);
-      let dx=_a.x*cosY+_a.z*sinY,dz=-_a.x*sinY+_a.z*cosY,dy=_a.y;
+      const cosL=Math.cos(R.lookYaw),sinL=Math.sin(R.lookYaw);
+      let dx=_a.x*cosL+_a.z*sinL,dz=-_a.x*sinL+_a.z*cosL,dy=_a.y;
       const pitchTot=-R.lookPitch+pitchAdd;
       const cp=Math.cos(pitchTot),sp2=Math.sin(pitchTot);
       const dy2=dy*cp-Math.hypot(dx,dz)*sp2;
@@ -541,11 +583,26 @@ const Mob_Iguana=(()=>{
       HR.tongue.visible=tgK>.02;HR.tongue.scale.z=Math.max(tgK,.001);
       HR.tongue.rotation.y=Math.sin(T*35)*.25*tgK;
 
-      /* ---------- KAKI: footstep + airborne(lompat) + IK ---------- */
+      /* =====================================================================
+         KAKI ala TARANTULA: telapak menapak di permukaan blok DUNIA nyata.
+         Tiap kaki menyimpan worldFoot (koordinat dunia): saat stance ia diam
+         menempel di tanah (anti-sliding); saat drift melewati ambang ia swing
+         parabola dan mendarat di ketinggian blok tanah berikutnya — jadi bila
+         satu kaki di blok lebih tinggi, kaki itu menapak di atas blok itu.
+         ===================================================================== */
       const jumping=act==='jump';
-      const canMove=speed>.1||Math.abs(yawRate)>.2;
+      const isRunning=speed/Math.max(0.6,m.speed||3.5)>0.62;
+      const stepThreshold=(isRunning?0.45:0.36)*sc;
+      const maxDrift=0.95*sc;
       const _hip=new THREE.Vector3(),_v=new THREE.Vector3(),_pole=new THREE.Vector3(),
             _knee=new THREE.Vector3(),_ank=new THREE.Vector3(),_at=new THREE.Vector3();
+      const groundAt=(x,z,refY)=>{
+        if(typeof World!=='undefined'&&World.groundAt){
+          const g2=World.groundAt(x,z,refY);
+          if(g2!==undefined&&isFinite(g2)&&g2>0)return g2;
+        }
+        return mobY;
+      };
       for(let i=0;i<4;i++){
         const RL=R.legs[i],L=P.legs[i];
         const jIdx=RL.front?3:0;
@@ -558,59 +615,117 @@ const Mob_Iguana=(()=>{
         _hip.copy(fJ[jIdx]).addScaledVector(_v,RL.side*(RL.front?.55:.60));
         _hip.y-=RL.front?.32:.30;
         _hip.z+=RL.front?.08:-.10;
-        const idealX=_hip.x+(RL.front?.30:-.25)*FX+RL.side*.80*_v.x;
-        const idealZ=_hip.z+(RL.front?.30:-.25)*FZ+RL.side*.80*_v.z;
+        /* offset rest lokal (maju +Z, kanan +X) → titik ideal DUNIA */
+        const restLX=RL.side*.80, restLZ=RL.front?.30:-.25;
+        const idealWorldX=mobX+(restLX*cosY+restLZ*sinY)*sc;
+        const idealWorldZ=mobZ+(-restLX*sinY+restLZ*cosY)*sc;
+        const idealGroundY=groundAt(idealWorldX,idealWorldZ,mobY+2.5);
 
+        /* inisialisasi awal saat mob baru spawn */
+        if(!RL.worldFoot){
+          RL.worldFoot=new THREE.Vector3(idealWorldX,idealGroundY,idealWorldZ);
+          RL.targetFoot=new THREE.Vector3(idealWorldX,idealGroundY,idealWorldZ);
+          RL.stepStartFoot=new THREE.Vector3(idealWorldX,idealGroundY,idealWorldZ);
+          RL.isStepping=false;RL.stepProgress=1.0;
+          RL.stepDuration=0.2;RL.stepHeight=0.7;
+        }
+
+        /* LOMPAT: lipat kaki rapat ke tubuh selama di udara */
         if(jumping){
           const u=tA/JUMP_DUR;
           const airU=RL.front?.20:.33, landU=RL.front?.76:.87;
-          if(!RL.airborne&&!RL.stepping&&u>=airU){RL.airborne=true;RL.grounded=false;}
-          if(RL.airborne&&!RL.stepping){
-            if(u>=landU){
-              RL.from.copy(RL.pos);
-              RL.to.set(_hip.x+ .55*FX+RL.side*.62*_v.x,0,_hip.z+.55*FZ+RL.side*.62*_v.z);
-              RL.stepT=0;RL.stepDur=.13;RL.lift=.15;RL.stepping=true;
-            }else{
-              /* lipat kaki rapat ke tubuh (salinan file asli) */
-              const foldX=_hip.x+_v.x*RL.side*.45+(RL.front?-.30:.15)*FX;
-              const foldZ=_hip.z+_v.z*RL.side*.45+(RL.front?-.30:.15)*FZ;
-              const foldY=_hip.y-.52;
-              RL.pos.x+=(foldX-RL.pos.x)*Math.min(1,9*dt);
-              RL.pos.y+=(foldY-RL.pos.y)*Math.min(1,9*dt);
-              RL.pos.z+=(foldZ-RL.pos.z)*Math.min(1,9*dt);
+          if(u>=airU&&u<landU){
+            RL.isStepping=false;
+            const foldX=_hip.x+_v.x*RL.side*.45+(RL.front?-.30:.15)*FX;
+            const foldZ=_hip.z+_v.z*RL.side*.45+(RL.front?-.30:.15)*FZ;
+            const foldY=_hip.y-.52;
+            RL.airborne=true;RL.grounded=false;
+            _at.set(foldX,foldY,foldZ);
+            _pole.copy(_hip).addScaledVector(_v,RL.side*1.5);
+            _pole.z+=RL.front?-.5:.5;_pole.y+=.3;
+            this._solveLegIK(_hip,_at,_pole,_knee,_ank);
+            RL._airKnee={x:_knee.x,y:_knee.y,z:_knee.z};
+            RL._airAnk={x:_ank.x,y:_ank.y,z:_ank.z};
+            RL.needsLandSnap=true;
+          }else if(u>=landU&&RL.needsLandSnap){
+            RL.needsLandSnap=false;
+            RL.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            RL.targetFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            RL.isStepping=false;RL.airborne=false;RL.grounded=true;
+          }
+          if(RL.airborne&&RL._airKnee){
+            _knee.set(RL._airKnee.x,RL._airKnee.y,RL._airKnee.z);
+            _ank.set(RL._airAnk.x,RL._airAnk.y,RL._airAnk.z);
+            L.upper.position.copy(_hip).add(_knee).multiplyScalar(.5);
+            this._orient(L.upper,_hip,_knee,0);
+            L.lower.position.copy(_knee).add(_ank).multiplyScalar(.5);
+            this._orient(L.lower,_knee,_ank,0);
+            L.knee.position.copy(_knee);
+            L.ankleB.position.copy(_ank);
+            L.pad.position.copy(_hip);L.pad.position.x+=_v.x*RL.side*.12;L.pad.position.z+=_v.z*RL.side*.12;
+            L.pad.rotation.set(0,0,0);
+            L.foot.position.copy(_ank);
+            L.foot.rotation.set(.55,RL.side*.18,0);
+            continue;
+          }
+        }
+        if(RL.needsLandSnap&&(!jumping||tA/JUMP_DUR>=0.90)){
+          RL.needsLandSnap=false;
+          RL.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+          RL.targetFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+          RL.isStepping=false;RL.airborne=false;
+        }
+
+        /* drift telapak vs titik ideal */
+        const drift=Math.hypot(RL.worldFoot.x-idealWorldX,RL.worldFoot.z-idealWorldZ);
+        if(drift>2.8*sc){
+          RL.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+          RL.isStepping=false;
+        }
+
+        if(RL.isStepping){
+          RL.stepProgress+=dt/RL.stepDuration;
+          const prog=Math.min(1.0,RL.stepProgress);
+          const e=sstep(prog);
+          const stepLift=(RL.stepHeight||0.7)*sc*(isRunning?1.25:1.0);
+          const arc=Math.sin(prog*Math.PI)*stepLift;
+          RL.worldFoot.x=RL.stepStartFoot.x+(RL.targetFoot.x-RL.stepStartFoot.x)*e;
+          RL.worldFoot.z=RL.stepStartFoot.z+(RL.targetFoot.z-RL.stepStartFoot.z)*e;
+          RL.worldFoot.y=RL.stepStartFoot.y+(RL.targetFoot.y-RL.stepStartFoot.y)*e+arc;
+          if(prog>=1.0){
+            RL.isStepping=false;
+            RL.worldFoot.copy(RL.targetFoot);
+            RL.grounded=true;
+            if(typeof FX!=='undefined'&&FX.debris&&Math.random()<0.3){
+              FX.debris(RL.worldFoot.clone().add(new THREE.Vector3(0,0.05,0)),0xb8a68e,2,0.8);
             }
           }
-        }else if(RL.grounded&&!act&&canMove){
-          RL.err=Math.hypot(idealX-RL.pos.x,idealZ-RL.pos.z);
-          RL.thr=.62+speed*.14;
-          const o=R.legs[RL.partner];
-          if(RL.err>RL.thr&&o.grounded&&!(o.err>o.thr&&o.err>RL.err)){
-            RL.grounded=false;RL.stepping=true;RL.stepT=0;
-            RL.stepDur=Math.max(.22,Math.min(.55,.55-speed*.05))+(RL.front?0:.04);
-            RL.lift=.24+speed*.055;
-            RL.from.copy(RL.pos);
-            RL.to.set(idealX,0,idealZ);
-            /* prediksi gerak: RL.to maju searah gerak nyata */
-            RL.to.x+=m.vel.x*RL.stepDur*.62;RL.to.z+=m.vel.z*RL.stepDur*.62;
-            RL.to.x+=_v.x*RL.side*.04;RL.to.z+=_v.z*RL.side*.04;
+        }else{
+          const grp=(i%2===0)?0:1;   // gait diagonal: (depan-kiri+belakang-kanan) vs sebaliknya
+          const isAllowedGait=(grp===activeGrp)||(drift>maxDrift);
+          const shouldStep=isMoving&&!act;
+          if(isAllowedGait&&drift>stepThreshold&&shouldStep){
+            RL.isStepping=true;RL.grounded=false;
+            RL.stepProgress=0.0;
+            RL.stepStartFoot.copy(RL.worldFoot);
+            RL.stepDuration=isRunning?0.13:0.18;
+            RL.stepHeight=isRunning?1.0:0.7;
+            const lead=RL.stepDuration*1.4;
+            let predX=idealWorldX+m.vel.x*lead;
+            let predZ=idealWorldZ+m.vel.z*lead;
+            const landY=groundAt(predX,predZ,mobY+2.5);
+            RL.targetFoot.set(predX,landY,predZ);
+          }else if(!isMoving){
+            /* diam: telapak menyesuaikan kontur blok di bawahnya */
+            const curY=groundAt(RL.worldFoot.x,RL.worldFoot.z,mobY+2.5);
+            RL.worldFoot.y+=(curY-RL.worldFoot.y)*Math.min(1,12*dt);
           }
         }
-        if(RL.stepping){
-          RL.stepT+=dt/RL.stepDur;
-          if(RL.stepT>=1){
-            RL.pos.copy(RL.to);RL.pos.y=0;
-            RL.grounded=true;RL.stepping=false;RL.airborne=false;
-          }else{
-            const e=sstep(RL.stepT);
-            RL.pos.x=RL.from.x+(RL.to.x-RL.from.x)*e;
-            RL.pos.z=RL.from.z+(RL.to.z-RL.from.z)*e;
-            RL.pos.y=Math.sin(Math.PI*RL.stepT)*RL.lift;
-          }
-        }
-        if(RL.grounded)RL.pos.y+=(0-RL.pos.y)*Math.min(1,15*dt);
 
-        /* IK 2-tulang: ankle = titik telapak */
-        _at.set(RL.pos.x,RL.pos.y+.22,RL.pos.z);
+        /* konversi telapak dunia → lokal mesh (mesh di m.pos, grup diskala
+           sc; lokal: maju +Z, kanan +X), lalu IK 2-tulang */
+        const dx=RL.worldFoot.x-mobX, dy=RL.worldFoot.y-mobY, dz=RL.worldFoot.z-mobZ;
+        _at.set((dx*cosY-dz*sinY)/sc, dy/sc, (dx*sinY+dz*cosY)/sc);
         _pole.copy(_hip).addScaledVector(_v,RL.side*1.5);
         _pole.z+=RL.front?-.5:.5;_pole.y+=.3;
         this._solveLegIK(_hip,_at,_pole,_knee,_ank);
@@ -624,8 +739,7 @@ const Mob_Iguana=(()=>{
         L.pad.rotation.set(0,0,0);
         L.foot.position.copy(_ank);
         let tilt=0;
-        if(RL.stepping)tilt=Math.sin(Math.PI*Math.max(0,Math.min(1,RL.stepT)))*.45;
-        else if(RL.airborne)tilt=.55;
+        if(RL.isStepping)tilt=Math.sin(Math.PI*Math.max(0,Math.min(1,RL.stepProgress)))*.45;
         L.foot.rotation.set(tilt,RL.side*.18,0);
       }
 
