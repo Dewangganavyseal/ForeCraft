@@ -3055,7 +3055,18 @@ const Monsters={
     m.iActT+=dt;
     const tA=m.iActT,name=m.iAct;
     const tgt=(m.iTarget&&!m.iTarget.dead)?m.iTarget:
-              (tgtIn||(m.pet?null:this.aimTarget(m)));
+              (tgtIn&&!tgtIn.dead?tgtIn:(m.pet?null:this.aimTarget(m)));
+
+    /* TARGET MATI DI TENGAH SERANGAN (PET MAUPUN MOB LIAR):
+       Segera selesaikan aksi agar pet tidak macet mematung di tempat! */
+    if(!tgt||tgt.dead){
+      if(!m._iLaunched||m.onGround||tA>=0.9){
+        m.iAct=null;m.iTarget=null;
+        m.iActT=0;m._iLaunched=false;m._iHit=false;
+        m.atkCd=0.25;
+        return;
+      }
+    }
 
     if(name==='attack'){
       /* PATUK: bidik saat ancang-ancang, sentak maju, damage saat rahang menutup. */
@@ -4301,7 +4312,7 @@ const Monsters={
     const isSnake=(m.type==='ular'||m.type==='iguana');
     const mrefY=Math.max(py0,m.pos.y)+(isTarantula||isSnake?3.2:1.8);
     let g=World.groundAt(m.pos.x,m.pos.z,mrefY);
-    const isJumping=(m.vel&&m.vel.y>1.5)||(isTarantula&&m._tJumping)||(isSnake&&m._iLaunched&&!m._iHit);
+    const isJumping=(m.vel&&m.vel.y>1.5)||(isTarantula&&m._tJumping)||(isSnake&&(!m.onGround||(m._iLaunched&&!m._iHit)));
     const waterBase = (typeof CFG !== 'undefined' && CFG.WATER_Y) ? CFG.WATER_Y : 4.82;
     const refBaseY = m.inWater ? Math.max(py0, waterBase) : py0;
     const maxG = isJumping ? (Math.max(m.pos.y, refBaseY) + (isTarantula||isSnake ? 3.6 : 1.6)) : (refBaseY + (isTarantula||isSnake ? 2.3 : 1.35));

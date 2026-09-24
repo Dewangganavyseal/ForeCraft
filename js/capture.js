@@ -775,7 +775,7 @@ const Capture={
        tidak bertarung dan jaraknya 8-34 blok (belum sampai ambang teleport),
        ia langsung menyusul ke belakang pemain supaya selalu ikut masuk. */
     if(dp>8&&dp<=34&&!m.dead&&!this.riding){
-      const foe=m.target||m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget;
+      const foe=m.target||m.kumTarget||m.yTarget||m.aTarget||m.rTarget||m.tTarget||m.bTarget||m.mTarget||m.iTarget;
       if(!foe||foe.dead){
         m._followStuckT=(m._followStuckT||0)+dt;
         if(m._followStuckT>2.5){

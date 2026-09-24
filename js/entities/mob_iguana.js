@@ -413,8 +413,16 @@ const Mob_Iguana=(()=>{
 
       const groundHead=groundAt(mobX,mobZ,mobY+2.5);
       const headWorldY=mobY+P.head.position.y*SCALE;
-      const headLift=Math.max(0,headWorldY-(groundHead+0.35*SCALE));
+      const headLift=Math.max(0,headWorldY-(groundHead+0.15*SCALE));
       const uJump=(act==='jump')?Math.max(0,Math.min(1.0,tA/JUMP_DUR)):0;
+
+      /* Posisi kepala di dunia untuk tautan tulang leher */
+      const headFwdOffset=0.15+headOffF*0.75;
+      const headWorldPos={
+        x:mobX+(sinH*headFwdOffset*SCALE),
+        y:headWorldY,
+        z:mobZ+(cosH*headFwdOffset*SCALE)
+      };
 
       /* hitung posisi dunia tiap ruas */
       const segWorldPos=[];
@@ -436,15 +444,22 @@ const Mob_Iguana=(()=>{
         const waveAmp=isMoving?(0.24+Math.min(0.20,speed*0.06)):0.06;
         const latOffset=Math.sin(R.slitherPhase-(i+1)*0.44)*waveAmp*bodyEnv*SCALE;
 
-        const wx=sp.x+normX*latOffset;
-        const wz=sp.z+normZ*latOffset;
+        let wx=sp.x+normX*latOffset;
+        let wz=sp.z+normZ*latOffset;
 
         /* menempel di atas tanah blok medan */
         const spec=SEGS_SPEC[i];
         let gy=groundAt(wx,wz,sp.y+2.5);
         let wy=gy+(spec.h*0.5-0.02)*SCALE;
 
-        /* GELOMBANG LOMPAT BERURUTAN (dari depan menjalar ke belakang) */
+        /* 1. LIFT KEPALA DI UDARA (baik saat ditunggangi melompat, skill lompat, maupun jatuh):
+              Rantai ruas menyambung leher & kepala, merambat ke belakang */
+        if(headLift>0.02){
+          const chainRatio=Math.max(0,1-(i/NUM_SEGS)*0.78);
+          wy+=headLift*chainRatio;
+        }
+
+        /* 2. GELOMBANG LOMPAT SKILL BERURUTAN (dari depan menjalar ke belakang) */
         if(act==='jump'&&uJump>0.08){
           const waveDelay=(i/NUM_SEGS)*0.32; // ruas depan naik duluan, ekor menyusul
           const segU=Math.max(0,Math.min(1.0,(uJump-(0.08+waveDelay))/0.54));
@@ -453,10 +468,24 @@ const Mob_Iguana=(()=>{
           wy+=segWave*peakHeight;
         }
 
-        /* saat mendongak sembur bisa / patuk: ruas leher (0-4) ikut terangkat proporsional */
+        /* 3. saat mendongak sembur bisa / patuk: ruas leher (0-4) ikut terangkat proporsional */
         if(headOffU>0&&i<6){
           wy+=headOffU*(1-i/6)*SCALE*0.9;
         }
+
+        /* 4. TAUTAN KINEMATIKA FISIK (RIGID DISTANCE CONSTRAINT):
+              Setiap ruas i DIKUNCI menyambung rapat dengan ruas i-1 (atau kepala untuk ruas 0).
+              Badan di belakang kepala TIDAK AKAN PERNAH terputus / terlepas saat loncat! */
+        const fwdPt=(i===0)?headWorldPos:segWorldPos[i-1];
+        let cdx=wx-fwdPt.x, cdy=wy-fwdPt.y, cdz=wz-fwdPt.z;
+        const curDist=Math.hypot(cdx,cdy,cdz)||1e-4;
+        const linkRatio=SEG_WORLD_DIST/curDist;
+        wx=fwdPt.x+cdx*linkRatio;
+        wy=fwdPt.y+cdy*linkRatio;
+        wz=fwdPt.z+cdz*linkRatio;
+
+        const minGroundY=groundAt(wx,wz,wy+2.5)+(spec.h*0.5-0.02)*SCALE;
+        if(wy<minGroundY)wy=minGroundY;
 
         segWorldPos.push({x:wx,y:wy,z:wz});
       }
@@ -464,8 +493,8 @@ const Mob_Iguana=(()=>{
       /* terapkan posisi & rotasi ke mesh lokal */
       for(let i=0;i<NUM_SEGS;i++){
         const cur=segWorldPos[i];
-        /* titik pemandu di depan (ruas i-1 atau kepala m.pos) */
-        const fwdPt=(i===0)?{x:mobX,y:mobY+P.head.position.y*SCALE,z:mobZ}:segWorldPos[i-1];
+        /* titik pemandu di depan (ruas i-1 atau kepala headWorldPos) */
+        const fwdPt=(i===0)?headWorldPos:segWorldPos[i-1];
 
         const fdx=fwdPt.x-cur.x, fdz=fwdPt.z-cur.z, fdy=fwdPt.y-cur.y;
         const segYaw=Math.atan2(fdx,fdz);
@@ -498,7 +527,7 @@ const Mob_Iguana=(()=>{
             jwy/SCALE,
             (jwx*sinH+jwz*cosH)/SCALE
           );
-          P.jCubes[i].quaternion.copy(P.segs[i].quaternion);
+          P.jCubes[i].rotation.set(segPitch,segYaw-h,segRoll);
         }
       }
 
@@ -506,7 +535,7 @@ const Mob_Iguana=(()=>{
       if(P.tailTip){
         const lastSeg=P.segs[NUM_SEGS-1];
         P.tailTip.position.copy(lastSeg.position);
-        P.tailTip.quaternion.copy(lastSeg.quaternion);
+        P.tailTip.rotation.set(lastSeg.rotation.x,lastSeg.rotation.y,lastSeg.rotation.z);
       }
 
       /* semprotan partikel bisa saat jendela sembur */
