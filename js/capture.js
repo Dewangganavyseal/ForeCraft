@@ -91,7 +91,7 @@ const Capture={
     yeti:      { y: 1.95, fwd: -0.10 },
     kumbang:   { y: 1.36, fwd: -0.15 },
     lizard:    { y: 0.82, fwd: -0.10 },
-    iguana:    { y: 0.85, fwd: -0.10 },
+    iguana:    { y: 0.82, fwd: -0.65 },
     semut:     { y: 0.65, fwd:  0.00 },
     slime:     { y: 0.62, fwd:  0.00 },
     rabbit:    { y: 0.48, fwd: -0.05 },
