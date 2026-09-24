@@ -860,6 +860,26 @@ const ArmorManager = (function() {
         g.add(M.pl(0.04, 0.22, 0.12, C.membrane, 0.54, -0.20, 0.16));
         g.add(M.pl(0.04, 0.22, 0.12, C.membrane, 0.54, -0.20, -0.16));
         for (const y of [0.64, 0.50, 0.36, 0.22]) g.add(M.pl(0.05, 0.12, 0.10, C.bone, y, -0.20));
+
+        // ==== ORNAMEN & ANCHOR JUBAH EMAS DRAGONSCALE ====
+        const CGold = {
+          main: 0xF1C40F,     // Emas murni berkilau
+          deep: 0xD4AF37,     // Emas imperial pekat
+          bright: 0xFFE066,   // Highlight emas
+          ruby: 0xC8352A      // Permata naga merah
+        };
+        // Peniti & gesper emas di pundak penahan jubah
+        g.add(M.pl(0.52, 0.08, 0.09, CGold.bright, 0.71, -0.21));
+        g.add(M.pl(0.12, 0.10, 0.12, CGold.deep,   0.72, -0.18,  0.22));
+        g.add(M.pl(0.12, 0.10, 0.12, CGold.deep,   0.72, -0.18, -0.22));
+        g.add(M.pl(0.08, 0.08, 0.06, CGold.ruby,   0.71, -0.23,  0)); // Bros permata naga merah
+
+        // Anchor untuk simulasi kain jubah emas (cloth simulation verlet ala Lich)
+        const capeAnchor = new THREE.Object3D();
+        capeAnchor.name = 'DragonCapeAnchor';
+        capeAnchor.position.set(0, 0.71, -0.21);
+        g.add(capeAnchor);
+
         return g;
       },
       buildPants() {

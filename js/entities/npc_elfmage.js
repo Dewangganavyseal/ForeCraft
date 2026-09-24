@@ -143,7 +143,7 @@ const NPC_Elfmage={
       n.vel.x*=0.8;n.vel.z*=0.8;          // berdiri diam merapal
       const c=n.cast;
       if(c.type==='ice'){
-        if(c.t>=3.2){n.cast=null;}
+        if(c.t>=3.2){if(c.magicCircle)c.magicCircle.fade();n.cast=null;}
         else if(c.t>0.35&&c.t<2.4){
           c.acc+=dt;
           while(c.acc>0.1){c.acc-=0.1;PortFX.shard(c.x,c.z,c.y);}
@@ -151,7 +151,7 @@ const NPC_Elfmage={
           if(c.dmgT>=0.4){c.dmgT=0;this.aoe(n,c.x,c.z,3.6,npcDmgSafe(n)*0.9,2);}
         }
       }else{ /* meteor */
-        if(c.t>=3.9){n.cast=null;}
+        if(c.t>=3.9){if(c.magicCircle)c.magicCircle.fade();n.cast=null;}
         else if(c.t>0.5&&c.t<2.7){
           c.acc+=dt;
           if(c.acc>=0.36){c.acc=0;PortFX.meteor(c.x,c.z,n.mesh.rotation.y,c.y);}
@@ -199,11 +199,19 @@ const NPC_Elfmage={
   startElfCast(n,type,tgt){
     const fwd=new THREE.Vector3().subVectors(tgt.pos,n.pos).setY(0).normalize();
     const p=n.pos.clone().addScaledVector(fwd,4.5);
-    n.cast={type,t:0,acc:0,dmgT:0,x:p.x,z:p.z,
-      y:Math.max(CFG.SEA,World.topY(Math.floor(p.x),Math.floor(p.z)))};
+    const gy=Math.max(CFG.SEA,World.topY(Math.floor(p.x),Math.floor(p.z)));
+    n.cast={type,t:0,acc:0,dmgT:0,x:p.x,z:p.z,y:gy,owner:n};
     if(type==='ice')n.elfIceCd=this.ELF.iceCd;else n.elfMetCd=this.ELF.meteorCd;
     NPCS.say(n,type==='ice'?'Es dari langit!':'Meteor, jatuhlah!',2.5);
     Sfx.at(n.pos,'craft');
+
+    // Lingkaran sihir elemen port 1:1 Magic circle.html (ES untuk ice, METEOR untuk meteor)
+    if(typeof MagicCircle!=='undefined'&&MagicCircle.spawn){
+      const dur=(type==='ice')?3.2:3.9;
+      const elem=(type==='ice')?'ice':'meteor';
+      const r=(type==='ice')?3.6:4.0;
+      n.cast.magicCircle=MagicCircle.spawn(elem,p.x,gy+0.04,p.z,dur,r);
+    }
   },
   /* event dari PortFX saat pecahan es/meteor mendarat */
   onShardLand(x,y,z){
@@ -246,7 +254,10 @@ const NPC_Elfmage={
        di-clear saat tidak ada target, sehingga pose selalu kembali normal. */
     if(n.cast&&(!n.target||n.target.dead)){
       n.cast.t+=dt;
-      if(n.cast.t>=(n.cast.type==='ice'?3.2:3.9))n.cast=null;
+      if(n.cast.t>=(n.cast.type==='ice'?3.2:3.9)){
+        if(n.cast.magicCircle)n.cast.magicCircle.fade();
+        n.cast=null;
+      }
     }
     const R=n.parts,rr=R.rare,t=performance.now()*0.001;
     const P=n._pose||(n._pose={rootY:0,lean:0,twist:0,headX:0,headY:0,

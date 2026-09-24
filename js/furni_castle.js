@@ -967,15 +967,9 @@ const FurniCastle = (() => {
 
         const dx = gx - pos.x, dz = gz - pos.z;
         const d = Math.hypot(dx, dz);
-        const limitD = isCastle ? 5.2 : maxD;
+        const limitD = isCastle ? 5.0 : Math.min(maxD, 5.0);
         if (d > limitD) continue;
-
-        if (facing !== undefined) {
-          let diff = Math.abs(Math.atan2(dx, dz) - facing);
-          if (diff > Math.PI) diff = Math.PI * 2 - diff;
-          // Bila pemain dekat dengan bukaan gerbang (<2.5m), izinkan tombol interaksi baik dari luar maupun dalam
-          if (d > 2.5 && diff > 1.45) continue;
-        }
+        if (Math.abs(pos.y - gy) > 2.8) continue; // Di area pintu gerbang
 
         if (d < bd) {
           bd = d;
@@ -1181,6 +1175,20 @@ const FurniCastle = (() => {
         // Tempat Duduk Tahta Raja
         if (Math.abs(lx) <= 0.6 && Math.abs(lz - (daisZ - 0.3)) <= 0.45) {
           yLantai = Math.max(yLantai, f.y + 1.25);
+        }
+
+        // Permukaan Meja Jamuan Makan Panjang & Bangku
+        const colXDist = (half - wallThick) * 0.55;
+        for (const side of [-1, 1]) {
+          const tx = side * (colXDist + 1.4), tz = 0.2;
+          // Meja jamuan makan (tinggi permukaan f.y + 1.27)
+          if (Math.abs(lx - tx) <= 0.65 && Math.abs(lz - tz) <= 1.9) {
+            yLantai = Math.max(yLantai, f.y + 1.27);
+          }
+          // Bangku panjang (tinggi permukaan f.y + 0.90)
+          else if (Math.abs(lx - (tx + side * 0.8)) <= 0.30 && Math.abs(lz - tz) <= 1.9) {
+            yLantai = Math.max(yLantai, f.y + 0.90);
+          }
         }
 
         if (fromY === undefined || yLantai <= fromY + 0.6) {
@@ -1407,6 +1415,17 @@ const FurniCastle = (() => {
           }
         }
 
+        // Bangunan Menara Keep / Kubah Tengah di Atas Atap (Dinding batu abu-abu di bagian tengah atas)
+        const keepW = tier === 1 ? 5.8 : (tier === 2 ? 7.0 : 8.6);
+        const keepBaseY = wallH;
+        const roofBaseY = wallH + 0.3;
+        const keepTopY = tier === 1 ? (roofBaseY + 5.2) : (tier === 2 ? (roofBaseY + 7.2) : (roofBaseY + 10.2));
+        if (ly >= keepBaseY && ly <= keepTopY) {
+          if (Math.abs(lx) <= keepW / 2 + 0.15 && Math.abs(lz) <= keepW / 2 + 0.15) {
+            return true;
+          }
+        }
+
         // Tahta dan perabot interior
         const daisZ = -wallOffset + 2.0;
         // Sandaran Belakang Tahta Raja (Backrest) & Mahkota Emas — TIDAK BISA DITEMBUS
@@ -1431,7 +1450,8 @@ const FurniCastle = (() => {
         for (const side of [-1, 1]) {
           const tx = side * (colXDist + 1.4), tz = 0.2;
           if (Math.abs(lx - tx) <= 0.65 && Math.abs(lz - tz) <= 1.9) {
-            if (ly >= 0.45 && ly <= 1.2) return true;
+            // Solid hanya di bawah permukaan meja (0.45 .. 1.20) agar karakter yang berdiri di atas meja bebas bergerak
+            if (ly >= 0.45 && ly <= 1.20) return true;
           }
         }
 

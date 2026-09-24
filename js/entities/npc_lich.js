@@ -108,10 +108,12 @@ const NPC_Lich = (() => {
     }
   }
   function orientBox(mesh, a, b) {
-    _d.subVectors(b.pos, a.pos);
+    const pA = a.pos || a;
+    const pB = b.pos || b;
+    _d.subVectors(pB, pA);
     const len = _d.length(); if (len < 1e-5) return;
     _d.multiplyScalar(1 / len);
-    mesh.position.copy(a.pos).addScaledVector(_d, len * 0.5);
+    mesh.position.copy(pA).addScaledVector(_d, len * 0.5);
     _q.setFromUnitVectors(_up, _d);
     mesh.quaternion.copy(_q); mesh.scale.y = len;
   }
@@ -187,7 +189,7 @@ const NPC_Lich = (() => {
       }
       L.stripSpec = null;
     }
-    // --- cape ---
+    // --- cape cloth physics (simulasi kain jubah 12 panel) ---
     if (L.capeSpec && !L.capeSticked) {
       L.capeSticked = true;
       const spec = L.capeSpec, pts = spec.pts, rows = spec.rows;
@@ -198,8 +200,16 @@ const NPC_Lich = (() => {
         p.prev.copy(p.pos);
       }
       const R = spec.rope;
-      for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 4; c++) R.stick(pts[r][c], pts[r + 1][c], 1);
+      // Stick vertikal (menjaga panjang jubah)
+      for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 4; c++) R.stick(pts[r][c], pts[r + 1][c], 1.0);
+      // Stick horizontal (menjaga lebar jubah melintang)
       for (let r = 0; r < rows; r++) for (let c = 0; c < 3; c++) R.stick(pts[r][c], pts[r][c + 1], 0.9);
+      // Stick silang / shear diagonal (mencegah kain melipat / terpelintir)
+      for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 3; c++) {
+        R.stick(pts[r][c], pts[r + 1][c + 1], 0.45);
+        R.stick(pts[r][c + 1], pts[r + 1][c], 0.45);
+      }
+      // Stick resistensi lentur (loncat 1 baris)
       for (let r = 0; r < rows - 2; r++) for (let c = 0; c < 4; c++) R.stick(pts[r][c], pts[r + 2][c], 0.25);
     }
     if (L.clothGroup) L.clothGroup.visible = true;
@@ -218,6 +228,61 @@ const NPC_Lich = (() => {
     if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
     if (parent) parent.add(m);
     return m;
+  }
+
+  let glowTexW = null;
+  function getGlowTex() {
+    if (!glowTexW && typeof document !== 'undefined') {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+      gr.addColorStop(0, 'rgba(255,255,255,0.75)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      glowTexW = new THREE.CanvasTexture(c);
+    }
+    return glowTexW;
+  }
+
+  /* Partikel aliran sedot nyawa (darah & jiwa) mengalir dari korban ke tongkat (1:1 prototipe) */
+  const _beamParts = [];
+  const _BP_MAX = 36;
+  let _bpIdx = 0;
+  function spawnBeamParticle(pos, vel, size, color, life) {
+    if (_beamParts.length < _BP_MAX) {
+      const m = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, depthWrite: false }));
+      m.visible = false;
+      m.frustumCulled = false;
+      m.renderOrder = 1001;
+      _beamParts.push({ m, vel: new THREE.Vector3(), life: 0, max: 1, size: 0.1 });
+    }
+    const sc = (typeof Game !== 'undefined' && Game.scene) ? Game.scene : null;
+    const p = _beamParts[_bpIdx];
+    _bpIdx = (_bpIdx + 1) % _beamParts.length;
+    if (sc && p.m.parent !== sc) sc.add(p.m);
+    p.m.visible = true;
+    p.m.position.copy(pos);
+    p.vel.copy(vel);
+    p.size = size;
+    p.life = p.max = life;
+    p.m.scale.setScalar(size);
+    p.m.material.color.set(color);
+    p.m.material.opacity = 1.0;
+  }
+  function updateBeamParticles(dt) {
+    for (let i = 0; i < _beamParts.length; i++) {
+      const p = _beamParts[i];
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      if (p.life <= 0) {
+        p.m.visible = false;
+        continue;
+      }
+      p.m.position.addScaledVector(p.vel, dt);
+      const f = p.life / p.max;
+      p.m.scale.setScalar(Math.max(0.001, p.size * f));
+      p.m.material.opacity = f;
+    }
   }
 
   const C = {
@@ -568,13 +633,22 @@ const NPC_Lich = (() => {
         V(satMat, 0.06, 0.06, 0.06, Math.cos(a) * 0.27, Math.sin(a * 2) * 0.06, Math.sin(a) * 0.27, sats);
       }
 
+      const gt = getGlowTex();
+      if (gt) {
+        const orbGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: gt, color: 0x59ff8f, transparent: true, depthWrite: false }));
+        orbGlow.scale.set(1.15, 1.15, 1);
+        orb.add(orbGlow);
+        L.orbGlow = orbGlow;
+      }
+
       const tipAnchor = new THREE.Object3D();
       tipAnchor.position.y = 0.08;
       orb.add(tipAnchor);
       L.tip = tipAnchor;
 
-      // ==== JUBAH BELAKANG / CAPE CLOTH PHYSICS (4 kolom x 5 baris) ====
-      // Titik & stick diisi lazy di initCloth (posisi dunia dari anchor).
+      // ==== JUBAH BELAKANG / CAPE CLOTH SIMULATION (4 kolom x 5 baris = 20 titik, 12 panel) ====
+      // Simulasi kain ringan: 20 partikel verlet, 12 panel quad bersambung (tanpa celah),
+      // gravitasi, angin kibaran gerak, dan collision tubuh.
       {
         const colX = [-0.27, -0.09, 0.09, 0.27], rows = 5;
         const pts = [];
@@ -588,13 +662,18 @@ const NPC_Lich = (() => {
             } else pts[r][c] = rp.point(0, -50, 0);
           }
         }
-        const segs = [];
-        for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 4; c++) {
-          const mat = (r === rows - 2) ? M(C.green) : (r % 2 ? M(C.rBlack) : M(C.rBlack2));
-          const m = V(mat, 0.188, 1, 0.05); clothGroup.add(m);
-          segs.push({ mesh: m, a: pts[r][c], b: pts[r + 1][c] });
+        const capePanels = [];
+        for (let r = 0; r < rows - 1; r++) for (let c = 0; c < 3; c++) {
+          let mat;
+          if (r === rows - 2) mat = M(C.green);
+          else if (r === rows - 3 && c === 1) mat = M(C.green2);
+          else mat = ((r + c) % 2) ? M(C.rBlack) : M(C.rBlack2);
+          const m = new THREE.Mesh(BOX, mat);
+          clothGroup.add(m);
+          capePanels.push(m);
         }
-        ropes.push({ r: rp, segs, wind: 1.0 });
+        L.capePanels = capePanels;
+        ropes.push({ r: rp, segs: [], wind: 1.0, collide: true });
         L.capeSpec = { rope: rp, pts, rows, colX, torso };
       }
       L.ropes = ropes;
@@ -603,41 +682,49 @@ const NPC_Lich = (() => {
         { a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.155 },
         { a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.16 }
       ];
-      const circle = new THREE.Group();
-      circle.visible = false;
-      const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x3ddc72, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
-      const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.12, 44), ringMat1);
-      ring1.rotation.x = -Math.PI / 2;
-      ring1.position.y = 0.02;
-      circle.add(ring1);
-      const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x1f7a42, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
-      const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.50, 0.62, 36), ringMat2);
-      ring2.rotation.x = -Math.PI / 2;
-      ring2.position.y = 0.02;
-      circle.add(ring2);
-      const runeG = new THREE.Group();
-      circle.add(runeG);
-      const runeFxMat = new THREE.MeshBasicMaterial({ color: 0x59ff8f, transparent: true, opacity: 0 });
-      for (let i = 0; i < 8; i++) {
-        const a = i / 8 * Math.PI * 2;
-        V(runeFxMat, 0.12, 0.02, 0.06, Math.cos(a) * 0.78, 0.025, Math.sin(a) * 0.78, runeG, 0, -a, 0);
+
+      // Lingkaran sihir elemen KEGELAPAN (port 1:1 Magic circle.html) tepat di bawah model Lich
+      let darkCircle = null;
+      let circle = null;
+      if (typeof MagicCircle !== 'undefined' && MagicCircle.createInstance) {
+        darkCircle = MagicCircle.createInstance('dark', 2.3, { dur: 0 });
+        circle = darkCircle.group;
+        circle.position.set(0, 0.02, 0);
+      } else {
+        circle = new THREE.Group();
       }
-      L.runeG = runeG; L.ringMat1 = ringMat1; L.ringMat2 = ringMat2; L.runeFxMat = runeFxMat;
+      circle.visible = false;
       outer.add(circle);
       L.circle = circle;
+      L.darkCircle = darkCircle;
 
-      // Beam sedot nyawa + 2 garis pilin (ala prototipe beamLines)
-      const beamCore = V(new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.85, depthWrite: false }), 0.07, 1, 0.07);
+      // Beam sedot nyawa + 2 garis pilin (ala prototipe beamLines 1:1)
+      // Diletakkan di ruang scene dunia (bukan lokal outer rig) agar koordinat world tidak bergeser
+      const beamCore = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({
+        color: 0xff2244,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false
+      }));
       beamCore.visible = false;
-      outer.add(beamCore);
+      beamCore.frustumCulled = false;
+      beamCore.renderOrder = 999;
       L.beamCore = beamCore;
+
       L.beamLines = [];
       for (let i = 0; i < 2; i++) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(14 * 3), 3));
-        const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: i ? 0xff7788 : 0xcc1133, transparent: true, opacity: 0.85 }));
-        ln.visible = false; ln.frustumCulled = false;
-        outer.add(ln); L.beamLines.push(ln);
+        const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({
+          color: i ? 0xff7788 : 0xcc1133,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false
+        }));
+        ln.visible = false;
+        ln.frustumCulled = false;
+        ln.renderOrder = 1000;
+        L.beamLines.push(ln);
       }
 
       return {
@@ -667,10 +754,24 @@ const NPC_Lich = (() => {
       const L = n.parts && n.parts.L;
       if (L) {
         if (L.circle) L.circle.visible = false;
-        if (L.beamCore) L.beamCore.visible = false;
-        if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
+        if (L.darkCircle) { L.darkCircle.fading = false; L.darkCircle.dead = false; }
+        if (L.beamCore) {
+          L.beamCore.visible = false;
+          if (L.beamCore.parent) L.beamCore.parent.remove(L.beamCore);
+        }
+        if (L.beamLines) {
+          for (const ln of L.beamLines) {
+            ln.visible = false;
+            if (ln.parent) ln.parent.remove(ln);
+          }
+        }
         // Kain sudah dipindah ke scene: buang agar tak tertinggal melayang
         if (L.clothGroup && L.clothGroup.parent) L.clothGroup.parent.remove(L.clothGroup);
+      }
+      for (const p of _beamParts) {
+        p.life = 0;
+        p.m.visible = false;
+        if (p.m.parent) p.m.parent.remove(p.m);
       }
     },
 
@@ -722,7 +823,19 @@ const NPC_Lich = (() => {
 
       if (S.cast) return true; // Sedang mengeksekusi animasi aksi
 
-      // 1. Skill Summon 3 Zombie (CD 24s) - diprioritaskan saat musuh mendekat
+      // 1. Skill Sedot Nyawa (Life Drain Beam) (CD 16s) - PRIORITAS UTAMA saat HP Lich dibawah 50%
+      const lichMax = (typeof NPCS !== 'undefined' && NPCS.npcMaxHp) ? NPCS.npcMaxHp(n) : (n.maxhp || n.maxHp || 600);
+      const hpRatio = (n.hp || lichMax) / lichMax;
+      const drCost = (typeof NPCS !== 'undefined' && NPCS.skillStamCost) ? NPCS.skillStamCost(n, 32) : 32;
+      if (S.drainCd <= 0 && hpRatio < 0.50 && d < 12 && (n.stamina || 0) >= drCost) {
+        n.stamina = (n.stamina || 0) - drCost;
+        n.stamRegenT = 1.8;
+        S.drainCd = 16.0;
+        this.startCast(n, 'drain', tgt);
+        return true;
+      }
+
+      // 2. Skill Summon 3 Zombie (CD 24s) - dipanggil saat musuh mendekat
       const sumCost = (typeof NPCS !== 'undefined' && NPCS.skillStamCost) ? NPCS.skillStamCost(n, 40) : 40;
       if (S.summonCd <= 0 && S.zombies.length < 3 && (n.stamina || 0) >= sumCost && d < 18) {
         n.stamina = (n.stamina || 0) - sumCost;
@@ -732,30 +845,27 @@ const NPC_Lich = (() => {
         return true;
       }
 
-      // 2. Skill Sedot Nyawa (Life Drain Beam) (CD 16s) - saat HP berkurang atau musuh dalam 10 blok
-      const drCost = (typeof NPCS !== 'undefined' && NPCS.skillStamCost) ? NPCS.skillStamCost(n, 32) : 32;
-      if (S.drainCd <= 0 && d < 12 && (n.stamina || 0) >= drCost) {
-        n.stamina = (n.stamina || 0) - drCost;
-        n.stamRegenT = 1.8;
-        S.drainCd = 16.0;
-        this.startCast(n, 'drain', tgt);
-        return true;
+      // 3. SERANGAN DASAR: Tembakan Proyektil Arcane Bolt Petir Ungu (seperti elfmage & magesupport)
+      if (n.atkCd <= 0 && d < 18) {
+        n.atkCd = 0.95;
+        n.swing = 0.28;
+        this.spawnBolt(n, tgt);
       }
 
-      // 3. Skill Sambaran Petir Ungu (CD 3.2s) - serangan ofensif rutin
-      const atkCost = (typeof NPCS !== 'undefined' && NPCS.skillStamCost) ? NPCS.skillStamCost(n, 22) : 22;
-      if (S.boltCd <= 0 && d < 18 && (n.stamina || 0) >= atkCost) {
-        n.stamina = (n.stamina || 0) - atkCost;
-        n.stamRegenT = 1.2;
-        S.boltCd = 3.2;
-        this.startCast(n, 'attack', tgt);
-        return true;
+      // Bila musuh sempat merapat ke jarak melee (<2.1 blok), musuh tetap bisa membalas memukul
+      const m = tgt;
+      if (m.atkCd !== undefined && m.atkCd <= 0 && d < 2.1) {
+        m.atkCd = 1.1;
+        if (typeof NPCS !== 'undefined' && NPCS.hurt) NPCS.hurt(n, m.dmg || 15);
       }
 
-      return false;
+      return true; // SELALU return true: Lich bertarung proyektil jarak jauh penuh tanpa fallback ke melee biasa!
     },
 
     startCast(n, action, target) {
+      if (!target || target.dead) return;
+      // Jangan cast pada hewan ternak/innocent atau mob pet
+      if (target.pet || (typeof Monsters !== 'undefined' && Monsters.isAnimal && Monsters.isAnimal(target))) return;
       const S = this._st(n);
       S.action = action;
       S.actionT = 0;
@@ -769,10 +879,24 @@ const NPC_Lich = (() => {
       };
       if (action === 'summon') {
         S.circleT = 0;
-        if (n.parts.L && n.parts.L.circle) {
-          n.parts.L.circle.visible = true;
-          n.parts.L.circle.position.set(0, 0.05, 0);
-          n.parts.L.circle.scale.setScalar(0.4);
+        const L = n.parts && n.parts.L;
+        if (L) {
+          if (!L.darkCircle && typeof MagicCircle !== 'undefined' && MagicCircle.createInstance) {
+            L.darkCircle = MagicCircle.createInstance('dark', 2.3, { dur: 0 });
+            if (L.circle && L.circle.parent) L.circle.parent.remove(L.circle);
+            L.circle = L.darkCircle.group;
+            L.circle.position.set(0, 0.02, 0);
+            if (n.mesh) n.mesh.add(L.circle);
+          }
+          if (L.darkCircle) {
+            L.darkCircle.age = 0;
+            L.darkCircle.fading = false;
+            L.darkCircle.fadeT = 0;
+            L.darkCircle.dead = false;
+          }
+          if (L.circle) {
+            L.circle.visible = true;
+          }
         }
         if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(n.pos, 'craft');
       } else if (action === 'drain') {
@@ -781,12 +905,13 @@ const NPC_Lich = (() => {
     },
 
     spawnBolt(n, target) {
+      if (!target || target.dead || !target.pos) return;
       const S = this._st(n);
       const tipPos = new THREE.Vector3();
       if (n.parts.L && n.parts.L.tip) n.parts.L.tip.getWorldPosition(tipPos);
       else tipPos.copy(n.pos).add(new THREE.Vector3(0, 1.8, 0));
 
-      const tgtPos = target.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
+      const tgtPos = target.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
       const boltMesh = new THREE.Group();
       const bMatA = new THREE.MeshBasicMaterial({ color: 0xa75dff });
       const bMatB = new THREE.MeshBasicMaterial({ color: 0xdcb8ff });
@@ -807,11 +932,11 @@ const NPC_Lich = (() => {
         mesh: boltMesh, segs,
         pos: tipPos.clone(), dir: tgtPos.clone().sub(tipPos).normalize(),
         target: tgtPos, targetEnt: target,
-        dmg: Math.round(baseDmg * 1.75),
-        life: 1.3, t: 0, jt: 0
+        dmg: Math.round(baseDmg * 1.25),
+        life: 1.4, t: 0, jt: 0
       });
-      S.recoil = 0.3;
-      if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(n.pos, 'hit');
+      S.recoil = 0.35;
+      if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(n.pos, 'magic');
     },
 
     summonZombies(n) {
@@ -821,9 +946,12 @@ const NPC_Lich = (() => {
         if (z.state !== 'sink') { z.state = 'sink'; z.t = 0; z.sinkY0 = z.g.position.y; }
       }
       const lvl = n.level || 1;
-      const zHp = Math.round(85 * (1 + 0.14 * (lvl - 1)));
-      const zDmg = Math.round(15 * (1 + 0.12 * (lvl - 1)));
-      const zDur = 15.0 + Math.min(25.0, (lvl - 1) * 0.4);
+      const lichMax = (typeof NPCS !== 'undefined' && NPCS.npcMaxHp) ? NPCS.npcMaxHp(n) : (n.maxhp || n.maxHp || 600);
+      const lichDmg = (typeof NPCS !== 'undefined' && NPCS.npcDmg) ? NPCS.npcDmg(n) : (n.dmg || 36);
+      // Masing-masing zombie memiliki 30% dari HP Lich dan damage 40% dari Lich
+      const zHp = Math.max(10, Math.round(lichMax * 0.30));
+      const zDmg = Math.max(5, Math.round(lichDmg * 0.40));
+      const zDur = 20.0 + Math.min(20.0, (lvl - 1) * 0.4);
 
       const spots = [[-1.6, 1.8], [0.0, 2.7], [1.6, 1.8]];
       const yaw = n.mesh.rotation.y;
@@ -892,58 +1020,82 @@ const NPC_Lich = (() => {
       if (L.orb) L.orb.rotation.y += dt * 1.2;
       if (L.staff) {
         let vibr = 0;
-        if (S.cast && S.cast.action === 'attack' && S.cast.t < 0.55) {
+        if (n.swing > 0 || (S.cast && S.cast.action === 'attack' && S.cast.t < 0.55)) {
           const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
-          vibr = Math.sin(tt * 55) * 0.02 * Math.min(1, Math.max(0, S.cast.t / 0.2));
+          vibr = Math.sin(tt * 55) * 0.02;
         }
-        L.staff.rotation.x = 0.12 - (S.recoil || 0);
-        L.staff.rotation.z = -0.06 + vibr;
+        let staffRx = 0.12 - (S.recoil || 0) + (n.swing > 0 ? (n.swing / 0.28) * 0.40 : 0);
+        let staffRy = 0;
+        let staffRz = -0.06 + vibr;
+
+        // Saat laser lifesteal (drain): arahkan tongkat ke depan dan sedikit serong ke atas
+        if (S.cast && S.cast.action === 'drain') {
+          const c = S.cast;
+          const drainW = Math.min(ss(clamp(c.t / 0.6, 0, 1)), ss(clamp((c.dur - c.t) / 0.6, 0, 1)));
+          if (drainW > 0) {
+            staffRx = lerp(0.12 - (S.recoil || 0), 2.40, drainW);
+            staffRz = lerp(-0.06 + vibr, -0.12, drainW);
+            staffRy = 0;
+          }
+        }
+        L.staff.rotation.set(staffRx, staffRy, staffRz);
       }
       {
         let charge = 0, drainOn = 0;
-        if (S.cast && S.cast.action === 'attack') {
+        if (n.swing > 0) {
+          charge = Math.min(1, n.swing / 0.28);
+        } else if (S.cast && S.cast.action === 'attack') {
           const T = S.cast.t;
           const cl = (v, a, b) => Math.min(b, Math.max(a, v));
           charge = cl((T - 0.05) / 0.4, 0, 1) * (T < 0.75 ? 1 : cl(1 - (T - 0.75) / 0.3, 0, 1));
         }
         if (S.cast && S.cast.action === 'drain' && L.beamCore && L.beamCore.visible) drainOn = 1;
         S.eyeBoost = Math.max(0, (S.eyeBoost || 0) - dt);
+        const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+        const tmpC = new THREE.Color(0x59ff8f);
+        if (charge > 0) tmpC.lerp(new THREE.Color(0xb055ff), charge);
+        if (drainOn) tmpC.lerp(new THREE.Color(0xff3344), 0.9);
         if (L.orbMat) {
-          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
-          L.orbMat.emissive.setHex(0x59ff8f);
-          if (charge > 0) L.orbMat.emissive.lerp(new THREE.Color(0xb055ff), charge);
-          if (drainOn) L.orbMat.emissive.lerp(new THREE.Color(0xff3344), 0.9);
-          L.orbMat.emissive.multiplyScalar(0.9 + 0.12 * Math.sin(tt * 3) + charge * 0.4 + drainOn * 0.3);
+          L.orbMat.emissive.copy(tmpC).multiplyScalar(0.9 + 0.12 * Math.sin(tt * 3) + charge * 0.4 + drainOn * 0.3);
+        }
+        if (L.satMat) {
+          L.satMat.emissive.copy(L.orbMat.emissive);
+        }
+        if (L.orbGlow) {
+          L.orbGlow.material.color.copy(tmpC);
+          L.orbGlow.scale.setScalar(1.15 + Math.sin(tt * 3) * 0.1 + charge * 0.6 + drainOn * 0.35);
         }
         if (L.eyeMat) {
-          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
           const summonW = (S.cast && S.cast.action === 'summon') ? 0.5 : 0;
           L.eyeMat.emissive.setHex(0x8bff45).multiplyScalar(0.85 + 0.15 * Math.sin(tt * 2.6) + summonW + (S.eyeBoost || 0) * 0.9);
         }
         if (L.orb) {
-          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
           L.orb.scale.setScalar(1 + Math.sin(tt * 2.4) * 0.05 + charge * 0.28 + drainOn * 0.12);
         }
       }
 
-      // Circle summon: skala + rotasi rune + fade (ala updateCircle prototipe)
+      // Circle summon KEGELAPAN (port 1:1 Magic circle.html):
       if (L.circle && L.circle.visible) {
-        S.circleT = (S.circleT || 0) + dt;
-        const easeOutCubic = u => 1 - Math.pow(1 - u, 3);
-        if (S.cast && S.cast.action === 'summon') {
-          const u = Math.min(1, S.circleT / 0.5);
-          L.circle.scale.setScalar(0.4 + 0.6 * easeOutCubic(u));
+        if (!L.darkCircle && typeof MagicCircle !== 'undefined' && MagicCircle.createInstance) {
+          L.darkCircle = MagicCircle.createInstance('dark', 2.3, { dur: 0 });
+          if (L.circle.parent) L.circle.parent.remove(L.circle);
+          L.circle = L.darkCircle.group;
+          L.circle.position.set(0, 0.02, 0);
+          if (n.mesh) n.mesh.add(L.circle);
+        }
+        if (L.darkCircle) {
           const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
-          if (L.ringMat1) L.ringMat1.opacity = u * (0.75 + 0.25 * Math.sin(tt * 8));
-          if (L.ringMat2) L.ringMat2.opacity = u * (0.6 + 0.3 * Math.sin(tt * 6 + 2));
-          if (L.runeFxMat) L.runeFxMat.opacity = u * (0.7 + 0.3 * Math.sin(tt * 10));
-          if (L.runeG) L.runeG.rotation.y += dt * 1.6;
-        } else {
-          if (L.ringMat1) L.ringMat1.opacity = Math.max(0, L.ringMat1.opacity - dt * 1.8);
-          if (L.ringMat2) L.ringMat2.opacity = Math.max(0, L.ringMat2.opacity - dt * 1.8);
-          if (L.runeFxMat) L.runeFxMat.opacity = Math.max(0, L.runeFxMat.opacity - dt * 1.8);
-          if (L.runeG) L.runeG.rotation.y += dt * 0.8;
-          if (L.ringMat1 && L.ringMat1.opacity <= 0) L.circle.visible = false;
+          if (S.cast && S.cast.action === 'summon') {
+            L.darkCircle.update(dt, tt);
+          } else {
+            L.darkCircle.fading = true;
+            L.darkCircle.update(dt, tt);
+            if (L.darkCircle.dead || L.darkCircle.fadeT >= 0.8) {
+              L.circle.visible = false;
+              L.darkCircle.dead = false;
+              L.darkCircle.fading = false;
+            }
+          }
         }
       }
       // Update Action Cast
@@ -973,71 +1125,124 @@ const NPC_Lich = (() => {
           }
         } else if (c.action === 'drain') {
           c.drainTickT += dt;
-          if (c.target && !c.target.dead && c.target.pos) {
-            const d = c.target.pos.distanceTo(n.pos);
-            if (d < 15 && L.beamCore) {
-              L.beamCore.visible = true;
-              const tipW = new THREE.Vector3();
-              L.tip.getWorldPosition(tipW);
-              const tgtW = c.target.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
-              const dir = new THREE.Vector3().subVectors(tgtW, tipW);
-              const len = dir.length();
-              dir.normalize();
-              L.beamCore.position.copy(tipW).addScaledVector(dir, len * 0.5);
-              L.beamCore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-              L.beamCore.scale.set(0.08, len, 0.08);
-              // 2 garis pilin sinus di sekeliling beam (ala prototipe)
-              if (L.beamLines) {
-                const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
-                const pp = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
-                if (pp.lengthSq() < 1e-4) pp.set(1, 0, 0); else pp.normalize();
-                const pp2 = new THREE.Vector3().crossVectors(dir, pp).normalize();
-                for (let li = 0; li < L.beamLines.length; li++) {
-                  const ln = L.beamLines[li];
-                  ln.visible = true;
-                  const arr = ln.geometry.attributes.position.array;
-                  for (let j = 0; j < 14; j++) {
-                    const u = j / 13, env = Math.sin(u * Math.PI);
-                    const bx = tipW.x + dir.x * len * u
-                      + pp.x * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
-                      + pp2.x * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
-                    const by = tipW.y + dir.y * len * u
-                      + pp.y * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
-                      + pp2.y * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
-                    const bz = tipW.z + dir.z * len * u
-                      + pp.z * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
-                      + pp2.z * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
-                    arr[j * 3] = bx; arr[j * 3 + 1] = by; arr[j * 3 + 2] = bz;
-                  }
-                  ln.geometry.attributes.position.needsUpdate = true;
-                }
-                // partikel sedot mengalir korban -> tongkat
-                S.beamPCd -= dt;
-                if (S.beamPCd <= 0 && typeof FX !== 'undefined' && FX.debris) {
-                  S.beamPCd = 0.12;
-                  FX.debris(tgtW, Math.random() < 0.75 ? 0xff3344 : 0x6cff9a, 1, 1.0);
-                }
-              }
 
-              // Sedot darah: 5% dari TOTAL (max) HP Lich per detik, selama
-              // seluruh channel 10 detik. BUKAN 5% HP lawan — nilai sedotan
-              // dan heal Lich selalu = 5%/detik dari max HP Lich.
-              if (c.drainTickT >= 0.25) {
-                c.drainTickT = 0;
-                const lichMax = n.maxHp || 380;
-                const drainDmg = Math.max(1, Math.round(lichMax * 0.05 * 0.25));
-                if (typeof Monsters !== 'undefined' && Monsters.hurt) {
-                  Monsters.hurt(c.target, drainDmg, new THREE.Vector3(0, 0.1, 0), 0, n);
-                }
-                // Pulihkan HP Lich sebesar yang disedot (5%/detik max HP)
-                n.hp = Math.min(lichMax, (n.hp || lichMax) + drainDmg);
-                if (typeof FX !== 'undefined' && FX.text) {
-                  FX.text(n.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), `+${drainDmg} HP`, '#59ff8f');
-                }
+          // Target tidak boleh mati/tewas, tidak boleh kosong, tidak boleh hewan ternak/innocent, dan tidak boleh pet
+          const isInvalid = !c.target || c.target.dead || (c.target.hp !== undefined && c.target.hp <= 0) || !c.target.pos ||
+            c.target.pet || (typeof Monsters !== 'undefined' && Monsters.isAnimal && Monsters.isAnimal(c.target));
+
+          if (isInvalid) {
+            // Target mati / tidak sah: HENTIKAN lifesteal & animasi SEKETIKA
+            if (L.beamCore) L.beamCore.visible = false;
+            if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
+            S.action = null;
+            S.cast = null;
+            return;
+          }
+
+          const d = c.target.pos.distanceTo(n.pos);
+          if (d > 16) {
+            // Target keluar jangkauan: hentikan lifesteal & animasi
+            if (L.beamCore) L.beamCore.visible = false;
+            if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
+            S.action = null;
+            S.cast = null;
+            return;
+          }
+
+          const scene = (typeof Game !== 'undefined' && Game.scene) ? Game.scene : null;
+          if (scene) {
+            if (L.beamCore && L.beamCore.parent !== scene) scene.add(L.beamCore);
+            if (L.beamLines) {
+              for (const ln of L.beamLines) {
+                if (ln.parent !== scene) scene.add(ln);
               }
-            } else {
+            }
+          }
+
+          const tipW = new THREE.Vector3();
+          if (L.tip) L.tip.getWorldPosition(tipW);
+          else tipW.copy(n.pos).add(new THREE.Vector3(0, 1.8, 0));
+
+          const tgtW = c.target.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
+          const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+          tgtW.x += Math.sin(tt * 11) * 0.06;
+          tgtW.y += Math.cos(tt * 9) * 0.05;
+
+          // Orient beamCore box: midpoint, arah, dan panjang (persis prototipe Lich.html)
+          orientBox(L.beamCore, tipW, tgtW);
+          L.beamCore.visible = true;
+          L.beamCore.scale.x = L.beamCore.scale.z = 0.055 + Math.sin(tt * 35) * 0.02 + 0.02;
+
+          // 2 garis pilin sinus merah persis Lich.html
+          if (L.beamLines) {
+            const bDir = new THREE.Vector3().subVectors(tgtW, tipW);
+            const bLen = bDir.length();
+            if (bLen > 1e-4) {
+              bDir.normalize();
+              const pp = new THREE.Vector3().crossVectors(bDir, _up);
+              if (pp.lengthSq() < 1e-5) pp.set(1, 0, 0); else pp.normalize();
+              const pp2 = new THREE.Vector3().crossVectors(bDir, pp).normalize();
+              for (let li = 0; li < L.beamLines.length; li++) {
+                const ln = L.beamLines[li];
+                ln.visible = true;
+                const arr = ln.geometry.attributes.position.array;
+                for (let j = 0; j < 14; j++) {
+                  const u = j / 13, env = Math.sin(u * Math.PI);
+                  const bx = tipW.x + bDir.x * bLen * u
+                    + pp.x * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                    + pp2.x * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                  const by = tipW.y + bDir.y * bLen * u
+                    + pp.y * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                    + pp2.y * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                  const bz = tipW.z + bDir.z * bLen * u
+                    + pp.z * Math.sin(u * 14 - tt * 22 + li * 3) * 0.14 * env
+                    + pp2.z * Math.cos(u * 11 - tt * 18 + li * 2) * 0.10 * env;
+                  arr[j * 3] = bx; arr[j * 3 + 1] = by; arr[j * 3 + 2] = bz;
+                }
+                ln.geometry.attributes.position.needsUpdate = true;
+              }
+            }
+          }
+
+          // Partikel sedot darah & jiwa mengalir dari korban ke tongkat (1:1 Lich.html)
+          S.beamPCd = (S.beamPCd || 0) - dt;
+          if (S.beamPCd <= 0) {
+            S.beamPCd = 0.045;
+            const p = tgtW.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.25));
+            const v = tipW.clone().sub(p).multiplyScalar(2.2).add(new THREE.Vector3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8));
+            spawnBeamParticle(p, v, 0.07, Math.random() < 0.75 ? 0xff3344 : 0x6cff9a, 0.55);
+          }
+
+          // Sedot darah: 10% dari TOTAL (max) HP Lich per detik, disedot tiap 0.25 detik (2.5% per tick)
+          if (c.drainTickT >= 0.25) {
+            c.drainTickT = 0;
+            const lichMax = (typeof NPCS !== 'undefined' && NPCS.npcMaxHp) ? NPCS.npcMaxHp(n) : (n.maxhp || n.maxHp || 600);
+            const drainDmg = Math.max(1, Math.round(lichMax * 0.10 * 0.25));
+
+            // Pastikan HP target benar-benar berkurang
+            const prevTargetHp = (c.target.hp !== undefined) ? c.target.hp : drainDmg;
+            if (typeof Monsters !== 'undefined' && Monsters.hurt) {
+              Monsters.hurt(c.target, drainDmg, new THREE.Vector3(0, 0.1, 0), 0, n);
+            }
+            const actualDrained = Math.max(1, Math.min(drainDmg, prevTargetHp));
+
+            // Pulihkan HP Lich sebesar yang benar-benar diserap dari musuh
+            n.hp = Math.min(lichMax, (n.hp || 0) + actualDrained);
+            n.hpT = 6;
+            if (typeof FX !== 'undefined' && FX.text) {
+              FX.text(n.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), `+${actualDrained} HP`, '#59ff8f');
+            }
+
+            // Jika musuh mati akibat sedotan ini: segera akhiri lifesteal & animasi
+            if (c.target.dead || (c.target.hp !== undefined && c.target.hp <= 0)) {
               if (L.beamCore) L.beamCore.visible = false;
               if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
+              if (typeof FX !== 'undefined' && FX.debris) {
+                FX.debris(tgtW, 0xff3344, 12, 2.0);
+              }
+              S.action = null;
+              S.cast = null;
+              return;
             }
           }
         }
@@ -1062,7 +1267,9 @@ const NPC_Lich = (() => {
       } else {
         if (L.circle) L.circle.visible = false;
         if (L.beamCore) L.beamCore.visible = false;
+        if (L.beamLines) for (const ln of L.beamLines) ln.visible = false;
       }
+      updateBeamParticles(dt);
 
       // Update Zombies
       for (let i = S.zombies.length - 1; i >= 0; i--) {
@@ -1093,83 +1300,140 @@ const NPC_Lich = (() => {
             S.zombies.splice(i, 1);
             continue;
           }
-        } else if (z.state === 'chase' || z.state === 'fight' || z.state === 'swipe') {
-          // Cari musuh terdekat untuk diserang zombie
-          let bestFoe = (n.target && !n.target.dead && n.target.pos) ? n.target : null;
+        } else if (z.state === 'chase' || z.state === 'fight' || z.state === 'swipe' || z.state === 'wander') {
+          // Radius kendali zombie agar tidak menjauh dari Lich (maksimal 10 blok)
+          const ZOMBIE_LEASH_RADIUS = 10.0;
+          const distToLich = Math.hypot(z.g.position.x - n.pos.x, z.g.position.z - n.pos.z);
+
+          // Jika Lich berpindah sangat jauh (> 22 blok), teleport zombie mendekat ke Lich
+          if (distToLich > 22.0) {
+            z.g.position.set(n.pos.x + (Math.random() - 0.5) * 2, n.pos.y, n.pos.z + (Math.random() - 0.5) * 2);
+          }
+
+          // Helper: entitas tidak sah (innocent seperti sapi/kuda/kelinci, pet, ruas kelabang, atau target mati)
+          const isInvalidZombieTarget = (m) => {
+            if (!m || m.dead || m.pet || !m.pos) return true;
+            if (m.hp !== undefined && m.hp <= 0) return true;
+            if (m.catchActive || m.type === 'kelabang_part') return true;
+            if (typeof Monsters !== 'undefined' && Monsters.isAnimal && Monsters.isAnimal(m)) return true;
+            return false;
+          };
+
+          // Cari musuh terdekat dalam radius kendali Lich (TIDAK BOLEH MENYERANG INNOCENT SEPERTI KUDA, SAPI, DLL)
+          let bestFoe = (n.target && !isInvalidZombieTarget(n.target)) ? n.target : null;
+          if (bestFoe && bestFoe.pos.distanceTo(n.pos) > ZOMBIE_LEASH_RADIUS + 3.0) {
+            bestFoe = null;
+          }
           if (!bestFoe && typeof Monsters !== 'undefined' && Monsters.list) {
-            let bd = 16;
+            let bd = ZOMBIE_LEASH_RADIUS;
             for (const m of Monsters.list) {
-              if (m.dead || m.pet) continue;
-              const d = m.pos.distanceTo(z.g.position);
-              if (d < bd) { bd = d; bestFoe = m; }
+              if (isInvalidZombieTarget(m)) continue;
+              const dL = m.pos.distanceTo(n.pos);
+              if (dL > ZOMBIE_LEASH_RADIUS) continue; // Hanya serang musuh di dekat Lich
+              const dZ = m.pos.distanceTo(z.g.position);
+              if (dZ < bd) { bd = dZ; bestFoe = m; }
             }
           }
 
-          if (bestFoe) {
+          // Jika zombie sudah berada di luar radius leash Lich (> 10 blok),
+          // paksa zombie kembali ke Lich agar selalu menjaga tuannya
+          if (distToLich > ZOMBIE_LEASH_RADIUS) {
+            const toLx = n.pos.x - z.g.position.x;
+            const toLz = n.pos.z - z.g.position.z;
+            const dL = Math.hypot(toLx, toLz);
+            z.g.rotation.y = lerpAngle(z.g.rotation.y, Math.atan2(toLx, toLz), clamp(dt * 6, 0, 1));
+            z.g.position.x += (toLx / dL) * 2.4 * dt;
+            z.g.position.z += (toLz / dL) * 2.4 * dt;
+            z.state = 'chase';
+          } else if (bestFoe) {
             const dx = bestFoe.pos.x - z.g.position.x;
             const dz = bestFoe.pos.z - z.g.position.z;
             const dist = Math.hypot(dx, dz);
             z.g.rotation.y = lerpAngle(z.g.rotation.y, Math.atan2(dx, dz), clamp(dt * 6, 0, 1));
 
             if (z.state === 'swipe') {
-              z.sw += dt / 0.55; z.mv = 0.05;
+              z.sw += dt / 0.55;
               const fw = new THREE.Vector3(Math.sin(z.g.rotation.y), 0, Math.cos(z.g.rotation.y));
               z.g.position.addScaledVector(fw, Math.sin(z.sw * Math.PI) * dt * 0.9);
               if (z.sw > 0.5 && !z.hitDone) {
                 z.hitDone = true;
-                if (typeof Monsters !== 'undefined' && Monsters.hurt) {
-                  Monsters.hurt(bestFoe, z.dmg, new THREE.Vector3(dx * 0.1, 0.2, dz * 0.1), 1.5, n);
-                  if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(z.g.position, 'hit');
-                  if (typeof FX !== 'undefined' && FX.debris) {
-                    FX.debris(bestFoe.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4422, 6, 1.8);
+                if (bestFoe && !isInvalidZombieTarget(bestFoe)) {
+                  if (typeof Monsters !== 'undefined' && Monsters.hurt) {
+                    Monsters.hurt(bestFoe, z.dmg, new THREE.Vector3(dx * 0.1, 0.2, dz * 0.1), 1.5, n);
+                    if (typeof Sfx !== 'undefined' && Sfx.at) Sfx.at(z.g.position, 'hit');
+                    if (typeof FX !== 'undefined' && FX.debris) {
+                      FX.debris(bestFoe.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4422, 6, 1.8);
+                    }
                   }
                 }
               }
               if (z.sw >= 1) { z.state = 'fight'; z.atkT = 1.3 + Math.random() * 0.6; }
             } else if (dist > 1.3) {
               z.state = 'chase';
-              z.g.position.x += (dx / dist) * 2.2 * dt;
-              z.g.position.z += (dz / dist) * 2.2 * dt;
-              z.mv = 1.0;
+              z.g.position.x += (dx / dist) * 2.4 * dt;
+              z.g.position.z += (dz / dist) * 2.4 * dt;
             } else {
               z.state = 'fight';
-              z.mv = 0.2;
               z.atkT -= dt;
               if (z.atkT <= 0) {
                 z.state = 'swipe'; z.sw = 0; z.hitDone = false;
               }
             }
           } else {
-            // Tak ada target: berkeliaran pelan di sekitar titik kubur
-            // (home) alih-alih diam mematung lalu hilang.
+            // Tak ada musuh: berkeliaran di dekat Lich (radius 3-5.5 blok)
+            z.state = 'wander';
             z.wandT = (z.wandT || 0) - dt;
             if (z.wandT <= 0) {
-              z.wandT = 1.5 + Math.random() * 2.5;
-              z.wandA = (z.wandA || 0) + (Math.random() - 0.5) * 2.2;
+              z.wandT = 1.5 + Math.random() * 2.0;
+              if (distToLich > 5.0) {
+                z.wandA = Math.atan2(n.pos.x - z.g.position.x, n.pos.z - z.g.position.z) + (Math.random() - 0.5) * 0.5;
+              } else {
+                z.wandA = (z.wandA || 0) + (Math.random() - 0.5) * 2.2;
+              }
+            }
+            if (distToLich > 5.5) {
+              z.wandA = Math.atan2(n.pos.x - z.g.position.x, n.pos.z - z.g.position.z);
             }
             z.g.rotation.y = lerpAngle(z.g.rotation.y, z.wandA, clamp(dt * 3, 0, 1));
-            z.g.position.x += Math.sin(z.g.rotation.y) * 0.8 * dt;
-            z.g.position.z += Math.cos(z.g.rotation.y) * 0.8 * dt;
-            // Jangan menjauh dari kubur: belok pulang bila > 6 blok
-            const hx = (z.homeX != null) ? z.homeX : z.g.position.x;
-            const hz = (z.homeZ != null) ? z.homeZ : z.g.position.z;
-            if (Math.hypot(z.g.position.x - hx, z.g.position.z - hz) > 6)
-              z.wandA = Math.atan2(hx - z.g.position.x, hz - z.g.position.z);
-            z.mv = 0.45;
-            if (z.state === 'swipe') { z.state = 'fight'; z.atkT = 1.2; }
+            z.g.position.x += Math.sin(z.g.rotation.y) * 1.2 * dt;
+            z.g.position.z += Math.cos(z.g.rotation.y) * 1.2 * dt;
+            z.atkT = 1.2;
           }
-          // Kunci Y zombie ke tanah agar tak tenggelam/hilang saat jalan
+          // Kunci Y zombie ke tanah agar tak tenggelam/melayang saat jalan
           if (typeof World !== 'undefined' && World.groundAt) {
             const gy = World.groundAt(z.g.position.x, z.g.position.z, z.g.position.y + 1.5);
-            if (gy > 0) z.g.position.y += (gy - z.g.position.y) * Math.min(1, dt * 10);
+            if (gy && gy > 0) z.g.position.y += (gy - z.g.position.y) * Math.min(1, dt * 10);
           }
 
-          // Pose gerak zombie
-          z.phase += dt * (2 + z.mv * 5.5);
-          const sn = Math.sin(z.phase);
-          if (z.P.legL) z.P.legL.hip.rotation.x = -sn * 0.5 * z.mv;
-          if (z.P.legR) z.P.legR.hip.rotation.x =  sn * 0.5 * z.mv;
-          if (z.P.body) z.P.body.position.y = 0.93 + Math.abs(sn) * 0.03 * z.mv;
+          // Pose gerak langkah zombie — LOGIC SAMA DENGAN PLAYER ANIMATOR (berbasis jarak, anti-sliding & anti-freeze)
+          const zSpeed = (z.state === 'chase') ? 2.4 : (z.state === 'wander' ? 1.2 : 0);
+          const targetMv = (zSpeed > 0) ? 1.0 : 0.0;
+          z.mv = (z.mv !== undefined) ? lerp(z.mv, targetMv, clamp(dt * 8, 0, 1)) : targetMv;
+          if (z.mv > 0.01) {
+            z.gait = (z.gait || 0) + (zSpeed > 0 ? zSpeed : 1.2) * dt * 2.8 * z.mv;
+          }
+          const g = z.gait || 0;
+          const s = Math.sin(g);
+          const c = Math.cos(g);
+          const isMoving = z.mv > 0.05;
+          const legAmp = (z.state === 'chase' ? 0.60 : 0.45) * z.mv;
+          const kneeAmp = (z.state === 'chase' ? 0.68 : 0.52) * z.mv;
+
+          if (z.P.legL) {
+            z.P.legL.hip.rotation.x = s * legAmp;
+            if (z.P.legL.knee) z.P.legL.knee.rotation.x = Math.max(0, -c) * kneeAmp;
+            if (z.P.legL.foot) z.P.legL.foot.rotation.x = clamp(-s * legAmp * 0.4, -0.35, 0.35);
+          }
+          if (z.P.legR) {
+            z.P.legR.hip.rotation.x = -s * legAmp;
+            if (z.P.legR.knee) z.P.legR.knee.rotation.x = Math.max(0, c) * kneeAmp;
+            if (z.P.legR.foot) z.P.legR.foot.rotation.x = clamp(s * legAmp * 0.4, -0.35, 0.35);
+          }
+          if (z.P.body) {
+            z.P.body.position.y = 0.93 + Math.abs(s) * 0.04 * (isMoving ? 1 : 0);
+            z.P.body.rotation.z = Math.sin(g) * 0.03 * (isMoving ? 1 : 0);
+          }
+
           if (z.state === 'swipe') {
             const ts = [0, 0.3, 0.55, 0.85, 1];
             const shV = [-1.45, -2.95, -0.3, -1.0, -1.45];
@@ -1178,15 +1442,18 @@ const NPC_Lich = (() => {
               z.P.armR.sh.rotation.x = track(ts, shV, z.sw);
               if (z.P.armR.el) z.P.armR.el.rotation.x = track(ts, elV, z.sw);
             }
-            if (z.P.body) z.P.body.rotation.x = 0.08 + 0.06 * z.mv + Math.sin(z.sw * Math.PI) * 0.25;
+            if (z.P.body) z.P.body.rotation.x = 0.08 + Math.sin(z.sw * Math.PI) * 0.25;
           } else {
             if (z.P.armR) {
-              z.P.armR.sh.rotation.x = -1.45 + Math.sin(z.phase * 2) * 0.15;
-              if (z.P.armR.el) z.P.armR.el.rotation.x = -0.15 + Math.sin(z.phase * 2.3 + z.seed) * 0.05;
+              z.P.armR.sh.rotation.x = -1.45 + s * 0.15 * (isMoving ? 1 : 0);
+              if (z.P.armR.el) z.P.armR.el.rotation.x = -0.15 + Math.sin(g * 0.5) * 0.05;
             }
-            if (z.P.body) z.P.body.rotation.x = 0.08 + 0.06 * z.mv;
+            if (z.P.armL) {
+              z.P.armL.sh.rotation.x = -1.45 - s * 0.15 * (isMoving ? 1 : 0);
+              if (z.P.armL.el) z.P.armL.el.rotation.x = -0.15 - Math.sin(g * 0.5) * 0.05;
+            }
+            if (z.P.body) z.P.body.rotation.x = 0.08 + (isMoving ? 0.06 : 0);
           }
-          if (z.P.armL) z.P.armL.sh.rotation.x = -1.45 + Math.sin(z.phase * 2 + 1) * 0.15;
         }
       }
 
@@ -1194,7 +1461,19 @@ const NPC_Lich = (() => {
       for (let i = S.bolts.length - 1; i >= 0; i--) {
         const b = S.bolts[i];
         b.t += dt; b.life -= dt;
-        b.mesh.position.addScaledVector(b.dir, 16 * dt);
+
+        // Peluru mengikuti pergerakan target (homing halus)
+        if (b.targetEnt && !b.targetEnt.dead && b.targetEnt.pos) {
+          const tgtPoint = b.targetEnt.pos.clone().add(new THREE.Vector3(0, 1.0, 0));
+          const toTgt = tgtPoint.clone().sub(b.pos);
+          if (toTgt.lengthSq() > 1e-4) {
+            b.dir.lerp(toTgt.normalize(), clamp(dt * 7, 0, 1)).normalize();
+            b.mesh.lookAt(b.pos.clone().add(b.dir));
+          }
+          b.target.copy(tgtPoint);
+        }
+
+        b.mesh.position.addScaledVector(b.dir, 18 * dt);
         b.pos.copy(b.mesh.position);
         b.jt -= dt;
         if (b.jt <= 0) {
@@ -1208,9 +1487,18 @@ const NPC_Lich = (() => {
         if (typeof FX !== 'undefined' && FX.debris && Math.random() < 0.6)
           FX.debris(b.pos, 0xc68cff, 1, 0.8);
         const distT = b.mesh.position.distanceTo(b.target);
-        if (distT < 0.55 || b.life <= 0) {
-          if (distT < 1.2 && b.targetEnt && !b.targetEnt.dead && typeof Monsters !== 'undefined' && Monsters.hurt) {
-            Monsters.hurt(b.targetEnt, b.dmg, new THREE.Vector3(0, 0.3, 0), 4, n);
+        if (distT < 0.95 || b.life <= 0) {
+          if (b.targetEnt && !b.targetEnt.dead) {
+            const hitDir = b.dir ? b.dir.clone().setY(0.25) : new THREE.Vector3(0, 0.3, 0);
+            if (typeof Monsters !== 'undefined' && Monsters.list && Monsters.list.includes(b.targetEnt)) {
+              Monsters.hurt(b.targetEnt, b.dmg, hitDir, 4, n);
+            } else if (typeof NPCS !== 'undefined' && NPCS.list && NPCS.list.includes(b.targetEnt)) {
+              NPCS.hurt(b.targetEnt, b.dmg, n);
+            } else if (typeof Player !== 'undefined' && b.targetEnt === Player) {
+              Player.hurt(b.dmg, 'Lich Arcane Bolt');
+            } else if (typeof Monsters !== 'undefined' && Monsters.hurt) {
+              Monsters.hurt(b.targetEnt, b.dmg, hitDir, 4, n);
+            }
           }
           if (typeof FX !== 'undefined') {
             if (FX.ring) FX.ring(b.pos.x, b.pos.y + 0.1, b.pos.z, 0xb06bff, 0.8, 3.5);
@@ -1223,7 +1511,7 @@ const NPC_Lich = (() => {
       }
 
       // Pose Karakter Lich
-      const spd = Math.hypot(n.vel.x, n.vel.z);
+      const spd = (n.vel && typeof n.vel.x === 'number') ? Math.hypot(n.vel.x, n.vel.z) : 0;
       const isMoving = spd > 0.2;
       const s = isMoving ? (spd > 3.0 ? 2.5 : 1.2) : 0;
       S.speed += (s - S.speed) * Math.min(1, dt * 5.0);
@@ -1298,7 +1586,18 @@ const NPC_Lich = (() => {
             i++;
           }
         }
-        // Strip kain & segmen cape mengikuti titik verlet
+        // Panel cape jubah belakang mengikuti grid verlet 4 kolom x 5 baris (12 panel kain bersambung)
+        if (L.capePanels && L.capeSpec && L.capeSpec.pts) {
+          const pts = L.capeSpec.pts, rows = L.capeSpec.rows;
+          let idx = 0;
+          for (let r = 0; r < rows - 1; r++) {
+            for (let c = 0; c < 3; c++) {
+              orientPanel(L.capePanels[idx], pts[r][c].pos, pts[r][c + 1].pos, pts[r + 1][c].pos, pts[r + 1][c + 1].pos);
+              idx++;
+            }
+          }
+        }
+        // Strip kain menjuntai bawah rok mengikuti titik verlet
         renderRopes(L.ropes);
         } // end else: cloth sudah init
       }

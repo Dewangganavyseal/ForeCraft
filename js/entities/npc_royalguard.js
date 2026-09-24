@@ -228,20 +228,48 @@ const NPC_RoyalGuard={
     const shieldSlot=new THREE.Group();shieldPivot.add(shieldSlot);
     shieldSlot.rotation.x=-0.01;                   // pitch editor SHIELD_BASE
 
-    /* cape belakang (versi game: selendang kaku sederhana â€” cape verlet 35
-       partikel prototipe terlalu mahal di mobile; siluetnya tetap sama) */
-    B(body,1.40,0.12,0.14,C.gold,0,0.94,-0.44);
-    const cape=B(body,1.15,1.55,0.10,C.cape,0,0.10,-0.50);
-    B(body,1.15,0.10,0.11,C.capeD,0,-0.66,-0.50);
+    /* cape belakang (simulasi kain verlet ringan: 4 kolom x 5 baris = 20 titik, 12 panel) */
+    B(body,1.44,0.12,0.14,C.gold,0,0.94,-0.44); // palang emas penahan jubah di pundak
+    B(body,0.52,0.20,0.16,C.redD,0,0.90,-0.42); // ornamen punggung
+
+    const capeAnchor = new THREE.Object3D();
+    capeAnchor.position.set(0, 0.94, -0.44);
+    body.add(capeAnchor);
+
+    const clothGroup = new THREE.Group();
+    clothGroup.visible = false;
+    // Lebar lebih lapang menutupi pundak (local width 1.36)
+    const colX = [-0.68, -0.23, 0.23, 0.68], rows = 5;
+    const pts = [];
+    for (let r = 0; r < rows; r++) {
+      pts[r] = [];
+      for (let c = 0; c < 4; c++) {
+        if (r === 0) {
+          const anc = new THREE.Object3D(); anc.position.set(colX[c], 0, 0); capeAnchor.add(anc);
+          pts[r][c] = { pos: new THREE.Vector3(), prev: new THREE.Vector3(), pinned: true, anchor: anc };
+        } else {
+          pts[r][c] = { pos: new THREE.Vector3(), prev: new THREE.Vector3(), pinned: false };
+        }
+      }
+    }
+    const capePanels = [];
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < 3; c++) {
+        // Kuning dengan tepian merah (sisi kiri c=0, sisi kanan c=2, dan baris bawah r=rows-2 berbingkai merah)
+        const isBorder = (c === 0 || c === 2 || r === rows - 2);
+        const color = isBorder ? 0xb02a26 : 0xf1c40f;
+        const m = new THREE.Mesh(boxGeo, Furni.M('rg_c_' + color, color));
+        clothGroup.add(m);
+        capePanels.push(m);
+      }
+    }
+    const capeSpec = { pts, rows, colX, capeAnchor, clothGroup, capePanels, inited: false };
 
     /* label pembaca SkillsPort */
     const parts={body,head,armL,armR,legs:[legL,legR],
       shinL:legL.userData.shin,shinR:legR.userData.shin,skirt,plume,
-      /* foreL/foreR WAJIB diekspor: animate() menerapkan rotasi siku lewat
-         parts.foreL/foreR — tanpa ini siku tidak pernah ditekuk (guard
-         `if(R.foreL)` melompati diam-diam) dan pose tidak seperti file asli */
       foreL,foreR,
-      bodyY:1.5,swordSlot,shieldSlot,shieldPivot,
+      bodyY:1.5,swordSlot,shieldSlot,shieldPivot,capeSpec,
       rare:{kind:'royalguard'}};
     return {mesh:g,parts};
   },
@@ -445,6 +473,150 @@ const NPC_RoyalGuard={
       if(st.aura)st.aura.visible=false;
       if(P.shieldPlate&&P.shieldPlate.material&&P.shieldPlate.material.emissive)
         P.shieldPlate.material.emissiveIntensity=0;
+    }
+
+    /* ---------- CAPE CLOTH SIMULATION (kain jubah 12 panel) ---------- */
+    if(R.capeSpec&&n.mesh){
+      if(!R.capeSpec.inited)this._initCapeCloth(n,R);
+      if(R.capeSpec.inited){
+        R.capeSpec.clothGroup.visible=n.mesh.visible;
+        this._stepCapeCloth(n,R,dt,sp);
+      }
+    }
+  },
+
+  cleanup(n){
+    if(n&&n.parts&&n.parts.capeSpec&&n.parts.capeSpec.clothGroup){
+      const cg=n.parts.capeSpec.clothGroup;
+      if(cg.parent)cg.parent.remove(cg);
+    }
+  },
+
+  _initCapeCloth(n,R){
+    const scene=(typeof Game!=='undefined'&&Game.scene)?Game.scene:null;
+    if(!scene||!n.mesh)return false;
+    const spec=R.capeSpec;
+    if(!spec)return false;
+    if(spec.clothGroup&&spec.clothGroup.parent!==scene)scene.add(spec.clothGroup);
+
+    if(!spec.inited){
+      spec.inited=true;
+      const pts=spec.pts,rows=spec.rows;
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<4;c++){
+          const p=pts[r][c];
+          if(r===0){
+            if(p.anchor)p.anchor.getWorldPosition(p.pos);
+          }else{
+            _tmpARG.set(spec.colX[c],-r*0.42,0);
+            spec.capeAnchor.localToWorld(_tmpARG);
+            p.pos.copy(_tmpARG);
+          }
+          p.prev.copy(p.pos);
+        }
+      }
+      const sticks=spec.sticks=[];
+      const addStick=(a,b,stiff=1.0)=>{
+        sticks.push({a,b,len:a.pos.distanceTo(b.pos),stiff});
+      };
+      // Vertikal (panjang kain)
+      for(let r=0;r<rows-1;r++)for(let c=0;c<4;c++)addStick(pts[r][c],pts[r+1][c],1.0);
+      // Horizontal (lebar kain)
+      for(let r=0;r<rows;r++)for(let c=0;c<3;c++)addStick(pts[r][c],pts[r][c+1],0.9);
+      // Shear diagonal silang (mencegah kusut / terpelintir)
+      for(let r=0;r<rows-1;r++)for(let c=0;c<3;c++){
+        addStick(pts[r][c],pts[r+1][c+1],0.45);
+        addStick(pts[r][c+1],pts[r+1][c],0.45);
+      }
+      // Bending resistance (loncat 1 baris)
+      for(let r=0;r<rows-2;r++)for(let c=0;c<4;c++)addStick(pts[r][c],pts[r+2][c],0.25);
+    }
+    return true;
+  },
+
+  _stepCapeCloth(n,R,dt,sp){
+    const spec=R.capeSpec;
+    if(!spec||!spec.inited)return;
+    const pts=spec.pts,rows=spec.rows;
+    const time=(typeof performance!=='undefined'?performance.now():Date.now())*0.001;
+    const pdt=Math.min(dt,0.033);
+    const pdt2=pdt*pdt;
+    const run=sp>3.4;
+    const windAmp=(sp>0.3?(run?2.5:1.4):0.4);
+
+    // 1. Baris atas pin ke anchor bahu
+    for(let c=0;c<4;c++){
+      const p=pts[0][c];
+      if(p.anchor)p.anchor.getWorldPosition(p.pos);
+      p.prev.copy(p.pos);
+    }
+
+    const yaw=n.mesh.rotation.y;
+    const fwdX=Math.sin(yaw);
+    const fwdZ=Math.cos(yaw);
+    const backX=-fwdX;
+    const backZ=-fwdZ;
+
+    const bodyW=_tmpBRG;
+    R.body.getWorldPosition(bodyW);
+    // Kedalaman punggung zirah dari pusat badan (dalam koordinat world)
+    const backDepth=0.28;
+
+    // 2. Integrasi verlet partikel bebas
+    for(let r=1;r<rows;r++){
+      for(let c=0;c<4;c++){
+        const p=pts[r][c];
+        _tmpARG.copy(p.pos);
+        _vaRG.subVectors(p.pos,p.prev).multiplyScalar(0.968);
+        _vaRG.y-=19.0*pdt2; // gravitasi
+        const wWave=Math.sin(time*3.5+r*0.7+c*0.5);
+        _vaRG.x+=(backX*windAmp*4.0+Math.cos(time*2.8+c)*0.6)*pdt2;
+        _vaRG.z+=(backZ*windAmp*4.0+Math.sin(time*2.5+r)*0.6)*pdt2;
+        _vaRG.y+=wWave*0.35*windAmp*pdt2;
+        p.pos.add(_vaRG);
+        p.prev.copy(_tmpARG);
+
+        if(p.pos.y<n.pos.y+0.04)p.pos.y=n.pos.y+0.04;
+      }
+    }
+
+    // 3. Jaga jarak stick & bidang collision punggung (rata, tanpa menggelembung)
+    const sticks=spec.sticks||[];
+    for(let it=0;it<3;it++){
+      for(let i=0;i<sticks.length;i++){
+        const s=sticks[i];
+        _vaRG.subVectors(s.b.pos,s.a.pos);
+        const d=_vaRG.length()||1e-5;
+        const diff=(d-s.len)/d*0.5*s.stiff;
+        _vaRG.multiplyScalar(diff);
+        if(!s.a.pinned)s.a.pos.add(_vaRG);
+        if(!s.b.pinned)s.b.pos.sub(_vaRG);
+      }
+      // Batas bidang punggung: dorong jubah ke belakang jika masuk ke badan,
+      // menjaga semua kolom tetap lurus rata tanpa terhimpit atau menggelembung
+      for(let r=1;r<rows;r++){
+        for(let c=0;c<4;c++){
+          const p=pts[r][c];
+          const fwdDist=(p.pos.x-bodyW.x)*fwdX+(p.pos.z-bodyW.z)*fwdZ;
+          const pen=fwdDist-(-backDepth);
+          if(pen>0){
+            p.pos.x-=fwdX*pen;
+            p.pos.z-=fwdZ*pen;
+          }
+        }
+      }
+    }
+
+    // 4. Update 12 panel jubah
+    const panels=spec.capePanels;
+    if(panels){
+      let idx=0;
+      for(let r=0;r<rows-1;r++){
+        for(let c=0;c<3;c++){
+          orientPanelRG(panels[idx],pts[r][c].pos,pts[r][c+1].pos,pts[r+1][c].pos,pts[r+1][c+1].pos);
+          idx++;
+        }
+      }
     }
   },
 
@@ -705,4 +877,24 @@ const RG_QA=new THREE.Quaternion(),RG_QB=new THREE.Quaternion(),
       RG_E=new THREE.Euler(),
       RG_QPITCH=new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(1,0,0),-0.01);   // pitch editor file asli (SHIELD_BASE.rot)
+
+/* Helper matematika & orientasi panel kain jubah Royal Guard */
+const _upRG=new THREE.Vector3(0,1,0),_m4RG=new THREE.Matrix4(),_rightRG=new THREE.Vector3(),
+      _upvRG=new THREE.Vector3(),_fwdRG=new THREE.Vector3(),
+      _tmpARG=new THREE.Vector3(),_tmpBRG=new THREE.Vector3(),_vaRG=new THREE.Vector3();
+function orientPanelRG(mesh,tl,tr,bl,br){
+  mesh.position.set(
+    (tl.x+tr.x+bl.x+br.x)*0.25,
+    (tl.y+tr.y+bl.y+br.y)*0.25,
+    (tl.z+tr.z+bl.z+br.z)*0.25);
+  _upvRG.set((bl.x+br.x-tl.x-tr.x)*0.5,(bl.y+br.y-tl.y-tr.y)*0.5,(bl.z+br.z-tl.z-tr.z)*0.5);
+  _rightRG.set((tr.x+br.x-tl.x-bl.x)*0.5,(tr.y+br.y-tl.y-bl.y)*0.5,(tr.z+br.z-tl.z-bl.z)*0.5);
+  const h=Math.max(1e-4,_upvRG.length()),w=Math.max(1e-4,_rightRG.length());
+  _upvRG.multiplyScalar(1/h);_rightRG.multiplyScalar(1/w);
+  _fwdRG.crossVectors(_rightRG,_upvRG).normalize();
+  _m4RG.makeBasis(_rightRG,_upvRG,_fwdRG);
+  mesh.quaternion.setFromRotationMatrix(_m4RG);
+  mesh.scale.set(w*1.14,h*1.14,0.05);
+}
+
 window.NPC_Royalguard=NPC_RoyalGuard;

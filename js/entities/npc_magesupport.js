@@ -236,7 +236,7 @@ const NPC_Magesupport={
     starTrail:0.05,           /* jeda percikan jejak (mobile: ×2.4)         */
     starShake:0.18,           /* getar kamera saat mendarat (semantik max)  */
     starSfxEvery:3,           /* suara tumbukan tiap N bola (12 bola/hujan) */
-    areaFade:0.6,             /* lama penanda area memudar di akhir hujan   */
+    areaFade:0.8,             /* lama penanda area memudar di akhir hujan   */
     /* AURA PERISAI (shieldG prototipe): 3 torus + 4 orb oktahedron.
        auraSeg = segmen torus PC (persis prototipe: 8×40); auraSegM dipakai
        di mobile agar torus tidak boros draw (siluetnya sama). */
@@ -433,8 +433,10 @@ const NPC_Magesupport={
   _endCast(S){
     const c=S.cast;
     S.cast=null;
-    if(c&&c.areaFx)
-      c.areaFx.life=Math.min(c.areaFx.life,this.SUP.areaFade);
+    if(c&&c.areaFx){
+      if(c.areaFx.fade)c.areaFx.fade();
+      c.areaFx.life=Math.min(c.areaFx.life||1,this.SUP.areaFade);
+    }
   },
   /* tinggi tanah di bawah sebuah titik (tempat bola bintang mendarat) */
   groundY(p){
@@ -725,8 +727,15 @@ const NPC_Magesupport={
         PortFX.spark(m.pos.x,m.pos.y+0.8,m.pos.z,4,0xfff8dc,4);
     }
   },
-  /* cincin & cahaya area di tanah selama hujan berlangsung (areaRing+areaGlow) */
+  /* cincin & cahaya area di tanah selama hujan berlangsung (elemen CAHAYA port 1:1 Magic circle.html) */
   spawnStarArea(x,gy,z,dur){
+    if (typeof MagicCircle !== 'undefined' && MagicCircle.spawn) {
+      const circle = MagicCircle.spawn('light', x, gy + 0.04, z, dur, 4.2);
+      if (circle) {
+        circle.life = dur;
+        return circle;
+      }
+    }
     const SUP=this.SUP,S=SUP.S,L=SUP.fxLite;
     const g=new THREE.Group();
     g.position.set(x,gy,z);

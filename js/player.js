@@ -1140,6 +1140,9 @@ const Player={
       const mv=(typeof Input!=='undefined')?Input.moveVec():{x:0,z:0};
       const moving=Math.hypot(mv.x,mv.z)>0.12;
       this.animate(dt,moving,0,false);
+      const petSpd=(Capture.pet&&Capture.pet.vel)?Math.hypot(Capture.pet.vel.x,Capture.pet.vel.z):(moving?4.5:0);
+      const petSprint=(typeof Input!=='undefined'&&Input.sprintHeld)?Input.sprintHeld():false;
+      this.updateDragonCape(dt,moving,petSpd,petSprint);
       return;
     }
     /* DUDUK DI SINGGASANA TAHTA KASTIL: pemain diam bertumpu di tahta, kamera tinjau wilayah aktif */
@@ -1147,6 +1150,7 @@ const Player={
       this.vel.set(0,0,0);
       this.onGround=true;
       this.animate(dt,false,0,false);
+      this.updateDragonCape(dt,false,0,false);
       return;
     }
     /* lompatan Hantam Bumi terarah: terbang ke target, hantam saat mendarat */
@@ -1411,11 +1415,15 @@ const Player={
     if(!A.active||A.recover){
       if(moving)this.facing=angLerp(this.facing,Math.atan2(mv.x,mv.z),clamp(14*dt,0,1));
     }
-    this.animate(dt,moving,hspd,sprint);
-    this.updateSwordGlow(dt);
+    // Sinkronkan posisi & rotasi mesh pemain sebelum dan sesudah animasi
     this.mesh.position.copy(this.pos);
-    /* extraYaw menambahkan putaran 360° combo 3 di atas arah hadap */
     this.mesh.rotation.y=this.facing+(this.extraYaw||0);
+    this.animate(dt,moving,hspd,sprint);
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y=this.facing+(this.extraYaw||0);
+    // updateDragonCape dijalankan di sini setelah posisi mesh & pose animator 100% final untuk frame ini
+    this.updateDragonCape(dt,moving,hspd,sprint);
+    this.updateSwordGlow(dt);
 
     /* Mode TPP: karakter selalu tampak penuh di depan kamera */
     if(this.mesh){
@@ -1636,6 +1644,203 @@ const Player={
     }
     this.skillAnim={id,t:dur,max:dur};
   },
+  /* ---------- simulasi kain jubah emas zirah dragonscale (ala Lich) ---------- */
+  updateDragonCape(dt,moving,hspd,sprint){
+    const anchor=this.parts&&this.parts.torso&&this.parts.torso.getObjectByName('DragonCapeAnchor');
+    if(!anchor){
+      if(this.dragonCapeCloth){
+        if(this.dragonCapeCloth.clothGroup&&this.dragonCapeCloth.clothGroup.parent){
+          this.dragonCapeCloth.clothGroup.parent.remove(this.dragonCapeCloth.clothGroup);
+        }
+        this.dragonCapeCloth=null;
+      }
+      return;
+    }
+
+    const scene=(typeof Game!=='undefined'&&Game.scene)?Game.scene:null;
+    if(!scene)return;
+
+    if(!this.dragonCapeCloth){
+      const clothGroup=new THREE.Group();
+      clothGroup.name='PlayerDragonClothGroup';
+      scene.add(clothGroup);
+
+      // Pastikan world matrix mesh up to date sebelum membaca koordinat anchor
+      if (this.mesh && this.mesh.updateWorldMatrix) this.mesh.updateWorldMatrix(true, true);
+
+      const colX=[-0.27,-0.09,0.09,0.27],rows=5;
+      const pts=[];
+      const subAncs=[];
+      for(let c=0;c<4;c++){
+        const sa=new THREE.Object3D();
+        sa.position.set(colX[c],0,0);
+        anchor.add(sa);
+        subAncs.push(sa);
+      }
+      if (anchor.updateWorldMatrix) anchor.updateWorldMatrix(true, true);
+      const tmpV=new THREE.Vector3();
+      for(let r=0;r<rows;r++){
+        pts[r]=[];
+        for(let c=0;c<4;c++){
+          if(r===0){
+            pts[r][c]={pos:new THREE.Vector3(),prev:new THREE.Vector3(),pinned:true,anchor:subAncs[c]};
+            subAncs[c].getWorldPosition(pts[r][c].pos);
+          }else{
+            tmpV.set(colX[c],-r*0.24,0);
+            anchor.localToWorld(tmpV);
+            pts[r][c]={pos:tmpV.clone(),prev:tmpV.clone(),pinned:false};
+          }
+          pts[r][c].prev.copy(pts[r][c].pos);
+        }
+      }
+
+      const BOX=(typeof Furni!=='undefined'&&Furni.BOX)?Furni.BOX:new THREE.BoxGeometry(1,1,1);
+      const capePanels=[];
+      for(let r=0;r<rows-1;r++){
+        for(let c=0;c<3;c++){
+          let color;
+          if(r===rows-2)color=0x997A15; // trim emas tua di ujung bawah
+          else if(c===1)color=0xFFE066;   // punggung naga emas cerah
+          else color=((r+c)%2)?0xF1C40F:0xD4AF37;
+          const mat=new THREE.MeshLambertMaterial({color});
+          const m=new THREE.Mesh(BOX,mat);
+          clothGroup.add(m);
+          capePanels.push(m);
+        }
+      }
+
+      const sticks=[];
+      const addStick=(a,b,stiff=1.0)=>sticks.push({a,b,len:a.pos.distanceTo(b.pos),stiff});
+      for(let r=0;r<rows-1;r++)for(let c=0;c<4;c++)addStick(pts[r][c],pts[r+1][c],1.0);
+      for(let r=0;r<rows;r++)for(let c=0;c<3;c++)addStick(pts[r][c],pts[r][c+1],0.9);
+      for(let r=0;r<rows-1;r++)for(let c=0;c<3;c++){
+        addStick(pts[r][c],pts[r+1][c+1],0.45);
+        addStick(pts[r][c+1],pts[r+1][c],0.45);
+      }
+      for(let r=0;r<rows-2;r++)for(let c=0;c<4;c++)addStick(pts[r][c],pts[r+2][c],0.25);
+
+      this.dragonCapeCloth={clothGroup,pts,rows,colX,capePanels,sticks,anchor};
+    }
+
+    const cloth=this.dragonCapeCloth;
+    if(cloth.clothGroup.parent!==scene)scene.add(cloth.clothGroup);
+
+    const isVisible=this.mesh&&this.mesh.visible;
+    cloth.clothGroup.visible=isVisible;
+    if(!isVisible)return;
+
+    // Deteksi jika pemain baru saja berteleportasi jauh
+    const topPos=new THREE.Vector3();
+    cloth.pts[0][0].anchor.getWorldPosition(topPos);
+    if(topPos.distanceTo(cloth.pts[0][0].pos)>2.0){
+      const tmpV=new THREE.Vector3();
+      for(let r=0;r<cloth.rows;r++){
+        for(let c=0;c<4;c++){
+          tmpV.set(cloth.colX[c],-r*0.24,0);
+          anchor.localToWorld(tmpV);
+          cloth.pts[r][c].pos.copy(tmpV);
+          cloth.pts[r][c].prev.copy(tmpV);
+        }
+      }
+    }
+
+    const time=(typeof performance!=='undefined'?performance.now():Date.now())*0.001;
+    const pdt=Math.min(dt,0.033);
+    const pdt2=pdt*pdt;
+
+    // Arah hadap badan pemain dari torso di dunia (TIDAK terpengaruh rotasi kamera Cam.yaw)
+    const _fwdVec=new THREE.Vector3();
+    this.parts.torso.getWorldDirection(_fwdVec);
+    _fwdVec.y=0;
+    if(_fwdVec.lengthSq()<1e-4)_fwdVec.set(0,0,1); else _fwdVec.normalize();
+    const fwdX=_fwdVec.x,fwdZ=_fwdVec.z;
+    const backX=-fwdX,backZ=-fwdZ;
+
+    const isMoving=moving&&((hspd||0)>0.1);
+    const speedK=Math.min(1.5,(hspd||0)/2.5);
+    const windSpeed=isMoving?((sprint?3.2:1.8)+speedK):0;
+    const vy=(this.vel&&this.vel.y)?this.vel.y:0;
+    const lift=isMoving?Math.max(-0.25,Math.min(0.65,-vy*0.05)):0;
+    const wFlutter=isMoving?0.6:0.06;
+
+    // 1. Pin baris atas ke anchor (pastikan world matrix up to date mengikuti lean/bob langkah)
+    if (this.mesh && this.mesh.updateWorldMatrix) this.mesh.updateWorldMatrix(true, true);
+    for(let c=0;c<4;c++){
+      const p=cloth.pts[0][c];
+      p.anchor.getWorldPosition(p.pos);
+      p.prev.copy(p.pos);
+    }
+
+    // 2. Integrasi verlet
+    const _va=new THREE.Vector3(),_tmp=new THREE.Vector3();
+    for(let r=1;r<cloth.rows;r++){
+      for(let c=0;c<4;c++){
+        const p=cloth.pts[r][c];
+        _tmp.copy(p.pos);
+        _va.subVectors(p.pos,p.prev).multiplyScalar(0.968);
+        _va.y-=18.0*pdt2;
+        const wWave=Math.sin(time*3.6+r*0.8+c*0.6);
+        _va.x+=(backX*windSpeed*4.8+Math.cos(time*2.8+c)*wFlutter)*pdt2;
+        _va.z+=(backZ*windSpeed*4.8+Math.sin(time*2.5+r)*wFlutter)*pdt2;
+        _va.y+=(lift*12.0+wWave*0.35*windSpeed)*pdt2;
+        p.pos.add(_va);
+        p.prev.copy(_tmp);
+
+        const floorY=(typeof Capture!=='undefined'&&Capture.riding&&Capture.pet)?Capture.pet.pos.y:this.pos.y;
+        if(p.pos.y<floorY+0.04)p.pos.y=floorY+0.04;
+      }
+    }
+
+    // 3. Jaga jarak stick & planar back collision
+    const torsoW=new THREE.Vector3();
+    this.parts.torso.getWorldPosition(torsoW);
+    const backDepth=0.20;
+
+    for(let it=0;it<3;it++){
+      for(let i=0;i<cloth.sticks.length;i++){
+        const s=cloth.sticks[i];
+        _va.subVectors(s.b.pos,s.a.pos);
+        const d=_va.length()||1e-5;
+        const diff=(d-s.len)/d*0.5*s.stiff;
+        _va.multiplyScalar(diff);
+        if(!s.a.pinned)s.a.pos.add(_va);
+        if(!s.b.pinned)s.b.pos.sub(_va);
+      }
+      for(let r=1;r<cloth.rows;r++){
+        for(let c=0;c<4;c++){
+          const p=cloth.pts[r][c];
+          const fwdDist=(p.pos.x-torsoW.x)*fwdX+(p.pos.z-torsoW.z)*fwdZ;
+          const pen=fwdDist-(-backDepth);
+          if(pen>0){
+            p.pos.x-=fwdX*pen;
+            p.pos.z-=fwdZ*pen;
+          }
+        }
+      }
+    }
+
+    // 4. Update 12 panel jubah menggunakan orientPanel
+    const _upP=new THREE.Vector3(0,1,0),_m4P=new THREE.Matrix4(),_rightP=new THREE.Vector3(),_upvP=new THREE.Vector3(),_fwdP=new THREE.Vector3();
+    let idx=0;
+    for(let r=0;r<cloth.rows-1;r++){
+      for(let c=0;c<3;c++){
+        const mesh=cloth.capePanels[idx];
+        const tl=cloth.pts[r][c].pos,tr=cloth.pts[r][c+1].pos;
+        const bl=cloth.pts[r+1][c].pos,br=cloth.pts[r+1][c+1].pos;
+
+        mesh.position.set((tl.x+tr.x+bl.x+br.x)*0.25,(tl.y+tr.y+bl.y+br.y)*0.25,(tl.z+tr.z+bl.z+br.z)*0.25);
+        _upvP.set((bl.x+br.x-tl.x-tr.x)*0.5,(bl.y+br.y-tl.y-tr.y)*0.5,(bl.z+br.z-tl.z-tr.z)*0.5);
+        _rightP.set((tr.x+br.x-tl.x-bl.x)*0.5,(tr.y+br.y-tl.y-bl.y)*0.5,(tr.z+br.z-tl.z-bl.z)*0.5);
+        const h=Math.max(1e-4,_upvP.length()),w=Math.max(1e-4,_rightP.length());
+        _upvP.multiplyScalar(1/h);_rightP.multiplyScalar(1/w);
+        _fwdP.crossVectors(_rightP,_upvP).normalize();
+        _m4P.makeBasis(_rightP,_upvP,_fwdP);
+        mesh.quaternion.setFromRotationMatrix(_m4P);
+        mesh.scale.set(w*1.14,h*1.14,0.04);
+        idx++;
+      }
+    }
+  },
 };
 
 /* =====================================================================
@@ -1846,4 +2051,5 @@ const SlamAim={
     this.indicator.position.set(this.aim.x,gy+0.08,this.aim.z);
   },
 };
+window.Player=Player;
 window.SlamAim=SlamAim;

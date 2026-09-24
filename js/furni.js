@@ -980,7 +980,7 @@ const Furni={
     this.list.push(f);
     if(defId.startsWith('fence')&&typeof FurniCastle!=='undefined')FurniCastle.rebuildFences();
 
-    if(!auto)this.save();
+    if(!auto&&!fromLoad)this.save();
     return f;
 
   },
@@ -1424,6 +1424,7 @@ const Furni={
     for(const f of this.list){
       const def=this.DEFS[f.def];
       if(!def||def.decor)continue;
+      if(f.def && f.def.startsWith('castle')) continue; // Kastil ditangani khusus oleh nearestGate (daun pintu) & throneSeat (tahta)
       const r=def.r;
       const dx = f.x - pos.x, dz = f.z - pos.z;
       const d=Math.hypot(dx, dz);
@@ -2767,12 +2768,9 @@ const Furni={
       if(Array.isArray(raw)){this.applyFurniList(raw);return;}
       if(raw.dead)this.dead=raw.dead;
       if(raw.vaults)this.vaults=raw.vaults;
-      this.applyFurniList(raw.f);
-      /* RUMAH modular: tulis ulang blok ke dunia dari record tersimpan.
-         setBlock akan memaksa generate data chunk yang belum termuat.
-         Tiap record dibungkus try sendiri supaya satu record bermasalah
-         tidak menggagalkan record lain (dulu: exception di tengah loop
-         membiarkan sebagian kolom dinding tidak tertulis). */
+      /* RUMAH modular: muat dan simpan ke this.houses DULU sebelum applyFurniList,
+         agar saat ada perabot dimuat tidak ada risiko tertimpa houses kosong */
+      this.houses=[];
       if(Array.isArray(raw.houses)){
         const S=this.LEGACY_SIZE;
         let resized=0;
@@ -2825,11 +2823,25 @@ const Furni={
            pintu hasil migrasi tidak dihitung lagi setiap kali game dibuka */
         if(resized)this.save();
       }
+      this.applyFurniList(raw.f);
     }catch(e){}
   },
   applyFurniList(data){
     if(!Array.isArray(data))return;
+    let hadDup=false;
     for(const f of data){
+      // Jaring pengaman: lewati jika perabot yang sama sudah ada di titik ini
+      const dup=this.list.find(e=>!e.auto&&e.def===f.d&&Math.hypot(e.x-f.x,e.z-f.z)<0.5&&Math.abs(e.y-f.y)<1.0);
+      if(dup){
+        hadDup=true;
+        if(f.doorOpen!==undefined){
+          dup.doorOpen=dup.doorOpen||!!f.doorOpen;
+          if(typeof FurniCastle!=='undefined'&&FurniCastle.applyDoorState){
+            FurniCastle.applyDoorState(dup, dup.doorOpen?1.0:0.0);
+          }
+        }
+        continue;
+      }
       const o=this.place(f.d,f.x,f.y,f.z,f.r,false,true);
       if(o&&f.doorOpen!==undefined){
         o.doorOpen=f.doorOpen;
@@ -2850,15 +2862,43 @@ const Furni={
           o.inv[i]=slot;
         }
     }
+    this.deduplicate();
+    if(hadDup)this.save();
   },
-  /* Pulihkan mesh kastil ke scene bila scene dibersihkan saat relog */
+  /* Bersihkan perabot/kastil duplikat yang menempati koordinat yang sama */
+  deduplicate(){
+    if(!this.list||!this.list.length)return;
+    let changed=false;
+    for(let i=this.list.length-1;i>=0;i--){
+      const a=this.list[i];
+      if(!a||a.auto)continue;
+      for(let j=i-1;j>=0;j--){
+        const b=this.list[j];
+        if(!b||b.auto)continue;
+        if(a.def===b.def&&Math.hypot(a.x-b.x,a.z-b.z)<0.5&&Math.abs(a.y-b.y)<1.0){
+          if(a.doorOpen!==undefined)b.doorOpen=a.doorOpen;
+          if(this.scene&&a.mesh){
+            this.scene.remove(a.mesh);
+            a.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});
+          }
+          this.list.splice(i,1);
+          changed=true;
+          break;
+        }
+      }
+    }
+    if(changed)this.save();
+  },
+  /* Pulihkan mesh furnitur & kastil ke scene bila scene dibersihkan saat relog */
   restoreCastles(){
+    this.deduplicate();
     if(!this.list||!this.list.length||!this.scene)return;
     for(const f of this.list){
-      if(f.def&&f.def.startsWith('castle')){
-        if(f.mesh&&!this.scene.children.includes(f.mesh)){
-          this.scene.add(f.mesh);
-        }
+      if(f.mesh&&!this.scene.children.includes(f.mesh)){
+        this.scene.add(f.mesh);
+      }
+      if(f.def&&f.def.startsWith('castle')&&typeof FurniCastle!=='undefined'&&FurniCastle.applyDoorState){
+        FurniCastle.applyDoorState(f, f.doorOpen?1.0:0.0);
       }
     }
   },
@@ -2895,6 +2935,18 @@ const Furni={
       if(!this.list[i].auto)this.remove(this.list[i],false);
   },
 };
+if (typeof window !== 'undefined') window.Furni = Furni;
+
+/* Sinkronkan Furni.save() otomatis setiap kali RPG.save() dipanggil (interval 8 detik, beforeunload, dll) */
+if (typeof RPG !== 'undefined' && typeof RPG.save === 'function') {
+  const _origRpgSave = RPG.save;
+  RPG.save = function() {
+    _origRpgSave.apply(this, arguments);
+    try {
+      if (typeof Furni !== 'undefined' && Furni.save) Furni.save();
+    } catch (e) {}
+  };
+}
 
 /* =============================================================================
    AKSI KONTEKSTUAL  (tombol G / tombol layar)
@@ -2955,7 +3007,7 @@ const Action={
 
     /* ---------- GERBANG KASTIL & PAGAR: buka/tutup (prioritas tinggi) ---------- */
     if(typeof FurniCastle!=="undefined"){
-      const g=FurniCastle.nearestGate(pPos,pFacing,3.6);
+      const g=FurniCastle.nearestGate(pPos,pFacing,5.0);
       if(g){
         candidates.push({
           score:g.d-0.45,

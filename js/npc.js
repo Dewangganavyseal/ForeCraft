@@ -867,7 +867,7 @@ const NPCS={
         const dd=n.pos.distanceTo(Player.pos);
         if(dd>CFG.NPC.TELEPORT_R*1.5)this.forcedRecall(n);
         else if(dd>CFG.NPC.TELEPORT_R)this.recall(n);
-      }else if(!n.wander&&!n.settleCastle&&n.pos.distanceTo(Player.pos)>70){this.despawn(i);continue;}
+      }else if(!n.wander&&!n.settleCastle&&!n.settleHouseKey&&n.pos.distanceTo(Player.pos)>70){this.despawn(i);continue;}
 
 
       n.flash=Math.max(0,n.flash-dt);

@@ -94,9 +94,9 @@ const CastleVillage = (() => {
       if (!f || !f.def) continue;
       let kind = null;
       if (f.def === 'bed') kind = 'bed';
-      else if (f.def === 'table') kind = 'table';
-      else if (f.def === 'chair') kind = 'chair';
-      else if (f.def === 'chest') kind = 'chest';
+      else if (f.def === 'table' || f.def === 'workbench' || f.def === 'stove' || f.def === 'smelter' || f.def === 'anvil') kind = 'table';
+      else if (f.def === 'chair' || f.def === 'stool' || f.def === 'bench') kind = 'chair';
+      else if (f.def === 'chest' || f.def === 'bchest' || f.def === 'dchest' || f.def === 'wreck_chest' || f.def === 'barrel') kind = 'chest';
       else if (f.def === 'board') kind = 'board';
       if (!kind) continue;
       if (Furni.recHasBlock(h, Math.floor(f.x), Math.floor(f.z))) out[kind]++;
@@ -104,9 +104,9 @@ const CastleVillage = (() => {
     return out;
   }
 
-  /* rumah lengkap: kasur + meja + kursi (masing-masing >= 1, chest opsional) */
+  /* rumah lengkap: kasur + meja (atau meja kerja/tungku) + kursi (masing-masing >= 1, chest opsional) */
   function isCompleteHouse(counts) {
-    return counts.bed >= 1 && counts.table >= 1 && counts.chair >= 1;
+    return counts.bed >= 1 && (counts.table >= 1 || counts.chest >= 1) && counts.chair >= 1;
   }
 
   /* syarat aula desa: gugus >= 4 modul + 4 meja + 8 kursi + 1 chest + 1 board */
@@ -268,6 +268,54 @@ const CastleVillage = (() => {
     }
   }
 
+  /* proses rumah mandiri pemain di luar radius kastil atau saat belum ada kastil */
+  function processStandaloneHouses(castles) {
+    const houses = (typeof Furni !== 'undefined' && Furni.houses) ? Furni.houses : [];
+    if (!houses.length) return;
+    if (!S.standalone) S.standalone = {};
+
+    // Bersihkan klaim rumah yang sudah dihapus/dihancurkan
+    const validHouseKeys = new Set(houses.map(h => houseKey(h)));
+    for (const hk in S.standalone) {
+      if (!validHouseKeys.has(hk)) delete S.standalone[hk];
+    }
+
+    const claimedIds = Object.values(S.standalone);
+    for (const h of houses) {
+      const hk = houseKey(h);
+      const c = houseCenter(h);
+      if (!c) continue;
+
+      // Jika sudah berada di dalam radius kastil aktif mana pun, biarkan dikelola oleh kastil itu
+      const nearCastle = castles.some(f => dist2(c.x, c.z, f.x, f.z) <= castleRadius(f));
+      if (nearCastle) continue;
+
+      const counts = furnInHouse(h);
+      if (!isCompleteHouse(counts)) continue;
+
+      // Cek apakah NPC untuk rumah ini sudah hidup dan hadir di dunia
+      const existingNpc = (typeof NPCS !== 'undefined' && NPCS.list)
+        ? NPCS.list.find(n => !n.dead && !NPCS.isTeam(n) && (n.settleHouseKey === hk || (n.home && n.home.x === Math.round(c.x) && n.home.z === Math.round(c.z))))
+        : null;
+
+      if (existingNpc) continue;
+
+      // Belum ada NPC di dunia (baru memenuhi syarat atau baru load/relog): spawn sekarang!
+      const roleId = S.standalone[hk] || nextBasicRole(claimedIds);
+      const npc = spawnSettler(roleId, c, null, hk, null);
+      if (npc) {
+        const wasNew = !S.standalone[hk];
+        S.standalone[hk] = roleId;
+        if (wasNew) claimedIds.push(roleId);
+        save();
+        if (wasNew && typeof UI !== 'undefined' && UI.toast) {
+          const role = (typeof NPC_ROLES !== 'undefined') ? NPC_ROLES.find(r => r.id === roleId) : null;
+          UI.toast((role ? role.e + ' ' + role.name : roleId) + ' datang dan menetap di rumahmu!');
+        }
+      }
+    }
+  }
+
   return {
     /* radius teritori kastil (T1=40, T2=60, T3=80) */
     radiusOf(f) { return castleRadius(f); },
@@ -282,7 +330,6 @@ const CastleVillage = (() => {
       this._tick = 2.0;
       load();
       const castles = playerCastles();
-      if (!castles.length) return;
       /* bersihkan state kastil yang sudah tidak ada (dibongkar pemain) */
       const alive = {};
       for (const f of castles) alive[castleKey(f)] = 1;
@@ -290,6 +337,8 @@ const CastleVillage = (() => {
       for (const f of castles) {
         try { processCastle(f); } catch (e) { console.error('[CastleVillage error]', e); }
       }
+      /* Proses rumah mandiri yang di luar radius kastil atau belum punya kastil */
+      try { processStandaloneHouses(castles); } catch (e) { console.error('[StandaloneHouse error]', e); }
     },
   };
 })();
