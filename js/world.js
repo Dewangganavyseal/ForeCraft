@@ -1,7 +1,7 @@
 'use strict';
 /* Manajemen chunk: streaming, edit blok, reruntuhan, banjir air */
 const World={
-  chunks:new Map(),dirty:new Set(),pending:[],flood:[],blockHP:new Map(),
+  chunks:new Map(),dirty:new Set(),pending:[],flood:[],floodKeys:new Set(),blockHP:new Map(),
   /* regrow: tanah (DIRT) yang terbuka setelah blok grass hancur; setelah
      REGROW_T detik kembali menjadi GRASS dan ditumbuhi rumput dunia kecil. */
   regrow:[],REGROW_T:15,
@@ -45,6 +45,9 @@ const World={
     if(lz===0)this.markDirty(cx,cz-1);if(lz===15)this.markDirty(cx,cz+1);
     if(id===B.AIR){
       c.plants=c.plants.filter(p=>!(p.x===lx&&p.z===lz&&p.y>=wy));
+      this.checkFlood(wx,wy,wz);
+    }else if(id!==B.WATER&&this.floodKeys){
+      this.floodKeys.delete(wx+','+wy+','+wz);
     }
   },
   markDirty(cx,cz){
@@ -874,10 +877,36 @@ const World={
       const f=this.flood[i];f.t-=dt;
       if(f.t<=0){
         this.flood.splice(i,1);
+        const k=f.x+','+f.y+','+f.z;
+        if(this.floodKeys)this.floodKeys.delete(k);
+
+        // Hanya isi jika posisi ini masih AIR (tidak ditambal oleh pemain)
         if(this.getBlock(f.x,f.y,f.z)===B.AIR){
           this.setBlock(f.x,f.y,f.z,B.WATER);
-          FX.ripple(f.x+0.5,CFG.WATER_Y,f.z+0.5,0xbfe6f5,1.2);
-          Sfx.splash(false);
+
+          // Audio & partikel riak air lembut (dithrottle agar tidak bising)
+          const now=performance.now()*0.001;
+          if(!this._lastWaterSfx||now-this._lastWaterSfx>0.15){
+            this._lastWaterSfx=now;
+            if(typeof FX!=='undefined'&&FX.ripple)
+              FX.ripple(f.x+0.5,f.y+0.82,f.z+0.5,0xbfe6f5,1.2);
+            if(typeof Sfx!=='undefined'&&Sfx.splash)
+              Sfx.splash(false);
+          }
+
+          // DINAMIS: Air mengalir mengisi lubang/cekungan di samping dan di bawahnya!
+          // 1. Air jatuh ke bawah (gravitasi mengalir ke dasar lubang)
+          if(f.y>1&&this.getBlock(f.x,f.y-1,f.z)===B.AIR){
+            this.checkFlood(f.x,f.y-1,f.z,0);
+          }
+          // 2. Air merembes ke 4 sisi samping mengisi lubang sampai penuh
+          const nb=[[1,0],[-1,0],[0,1],[0,-1]];
+          for(const[dx,dz]of nb){
+            const nx=f.x+dx,nz=f.z+dz;
+            if(this.getBlock(nx,f.y,nz)===B.AIR){
+              this.checkFlood(nx,f.y,nz,(f.srcDist||0)+1);
+            }
+          }
         }
       }
     }
@@ -896,14 +925,55 @@ const World={
       FX.debris(new THREE.Vector3(g.x+0.5,g.y+1.05,g.z+0.5),0x5d9e3f,5,1.4);
     }
   },
-  checkFlood(x,y,z){
-    if(y>3)return;
-    const nb=[[1,0],[-1,0],[0,1],[0,-1],[0,0]];
-    for(const[dx,dz]of nb){
-      if(this.getBlock(x+dx,y,z+dz)===B.WATER){
-        this.flood.push({x,y,z,t:1.2+Math.random()*0.6});return;
+  /* ---------- DINAMIKA AIR: menggenangi lubang/cekungan di samping air (laut/sungai) ----------
+     Bila dataran di samping air laut/sungai dihancurkan, air secara dinamis mengalir
+     mengisi lubang tersebut sampai terisi penuh! */
+  checkFlood(x,y,z,srcDist=0){
+    if(y<1||y>=(CFG.WORLD_H||16))return;
+    if(this.getBlock(x,y,z)!==B.AIR)return;
+    if(this.flood.length>=600)return;
+
+    const k=x+','+y+','+z;
+    if(!this.floodKeys)this.floodKeys=new Set();
+    if(this.floodKeys.has(k))return;
+
+    const seaLevel=(typeof CFG!=='undefined'&&CFG.SEA!==undefined)?CFG.SEA:5;
+
+    // Cek apakah ada sumber air yang menyentuh blok ini:
+    // 1. Air tepat di atasnya (y + 1) -> air jatuh ke bawah
+    let hasSource=false;
+    let isDownflow=false;
+
+    if(this.getBlock(x,y+1,z)===B.WATER){
+      hasSource=true;
+      isDownflow=true;
+    }
+
+    // 2. Air di 4 sisi samping horizontal pada level y atau level y + 1 (air terjun tepi)
+    if(!hasSource){
+      const nb=[[1,0],[-1,0],[0,1],[0,-1]];
+      for(const[dx,dz]of nb){
+        const sideB=this.getBlock(x+dx,y,z+dz);
+        const topSideB=this.getBlock(x+dx,y+1,z+dz);
+        if(sideB===B.WATER||topSideB===B.WATER){
+          hasSource=true;
+          break;
+        }
       }
     }
+
+    if(!hasSource)return;
+
+    // Rumah pemain terlindungi dari genangan
+    if(typeof Furni!=='undefined'&&Furni.houses&&Furni.houses.length&&Furni.houseNear({x,z}))return;
+
+    // Bila di atas sea level (kolam/sungai bukit), batasi aliran mendatar agar tidak meluber ke daratan tak terbatas
+    if(y>=seaLevel&&!isDownflow&&srcDist>6)return;
+
+    this.floodKeys.add(k);
+    // Waktu alir: jatuh ke bawah sangat cepat (0.05s), mengalir mendatar (0.08 - 0.14s)
+    const delay=isDownflow?0.05:(0.08+Math.random()*0.05);
+    this.flood.push({x,y,z,t:delay,srcDist:isDownflow?0:srcDist});
   },
   /* Anti-eksploit: perlindungan blok yang memuat ore di atasnya atau dirinya sendiri */
   hasOreAboveOrSelf(wx, wy, wz){

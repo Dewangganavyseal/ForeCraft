@@ -363,11 +363,12 @@ const Mob_Iguana=(()=>{
       }
 
       /* =====================================================================
-         3. KEPALA ULAR: TERFOKUS LURUS KE DEPAN (TIDAK MENOLEH-NOLEH)
-         Kepala menghadap ke arah hadap tubuh (tangent gerak), diam stabil.
+         3. KEPALA ULAR: MENAPAK DI PERMUKAAN BLOK & TERFOKUS LURUS KE DEPAN
+         Kepala bertengger di atas balok (elevasi Y +0.48 lokal agar dagu/rahang
+         bawah tidak mendelep/tertanam ke dalam blok), diam stabil menghadap lurus.
          ===================================================================== */
       const HR=P.HR;
-      P.head.position.set(0,(headOffU+jumpFly)*0.8,0.15+headOffF*0.75);
+      P.head.position.set(0,0.48+(headOffU+jumpFly)*0.8,0.15+headOffF*0.75);
       P.head.rotation.set(pitchAdd,0,0); // yaw = 0 (tetap lurus ke depan, tidak menoleh)
 
       R.jawOpen+=(jawT*0.95-R.jawOpen)*Math.min(1,(act?14:8)*dt);
@@ -413,7 +414,7 @@ const Mob_Iguana=(()=>{
 
       const groundHead=groundAt(mobX,mobZ,mobY+2.5);
       const headWorldY=mobY+P.head.position.y*SCALE;
-      const headLift=Math.max(0,headWorldY-(groundHead+0.15*SCALE));
+      const headLift=Math.max(0,headWorldY-(groundHead+0.48*SCALE));
       const uJump=(act==='jump')?Math.max(0,Math.min(1.0,tA/JUMP_DUR)):0;
 
       /* Posisi kepala di dunia untuk tautan tulang leher */
