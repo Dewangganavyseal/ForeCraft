@@ -372,8 +372,8 @@ const BIOME_INFO={
      pun bobot mob lain & apa pun waktu (siang/malam). Dipakai untuk mob yang
      peluangnya sudah ditentukan pasti, mis. Yeti 30% di tundra. */
   [BIOME.FOREST]:{name:'Hutan Rimba',e:'🌳',surface:B.GRASS,sub:B.DIRT,
-    fog:0x9fc8e8,tree:1.0,ore:B.ORE_IRON,mobs:['slime','boar','iguana','golem','wolf','rabbit'],
-    mobW:{rabbit:4.0,slime:2.8,boar:2.2,iguana:2.0,golem:1.2,wolf:1.2}},
+    fog:0x9fc8e8,tree:1.0,ore:B.ORE_IRON,mobs:['slime','boar','ular','golem','wolf','rabbit'],
+    mobW:{rabbit:4.0,slime:2.8,boar:2.2,ular:2.0,golem:1.2,wolf:1.2}},
   [BIOME.DESERT]:{name:'Gurun Pasir',e:'🏜️',surface:B.SAND,sub:B.SAND,
     fog:0xe4d7a8,tree:0.12,ore:B.ORE_GOLD,mobs:['scorpion','boar','golem','rabbit'],
     mobW:{scorpion:3.5,boar:2.0,golem:1.5,rabbit:1.2}},

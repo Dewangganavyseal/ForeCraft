@@ -395,9 +395,9 @@ const Mob_Iguana=(()=>{
       HR.tongue.rotation.y=Math.sin(T*35)*0.25*tgK;
 
       /* =====================================================================
-         4. GELOMBANG LATERAL (S-CURVE SERPENTINE UNDULATION) & KONTUR MEDAN
-         Setiap ruas ditempatkan sepanjang jejak breadcrumb. Saat berbelok,
-         ruas depan membelok terlebih dahulu, disusul ruas belakang secara berurutan!
+         4. GELOMBANG LATERAL (S-CURVE) & GELOMBANG LOMPAT BERURUTAN
+         Saat melompat, gelombang terangkat secara dinamis dan berurutan dari
+         atas (kepala) lalu menjalar seperti gelombang ke arah belakang!
          ===================================================================== */
       R.slitherPhase+=dt*(1.4+speed*2.6);
       R.breathPhase+=dt*1.8;
@@ -410,6 +410,11 @@ const Mob_Iguana=(()=>{
         }
         return mobY;
       };
+
+      const groundHead=groundAt(mobX,mobZ,mobY+2.5);
+      const headWorldY=mobY+P.head.position.y*SCALE;
+      const headLift=Math.max(0,headWorldY-(groundHead+0.35*SCALE));
+      const uJump=(act==='jump')?Math.max(0,Math.min(1.0,tA/JUMP_DUR)):0;
 
       /* hitung posisi dunia tiap ruas */
       const segWorldPos=[];
@@ -437,17 +442,20 @@ const Mob_Iguana=(()=>{
         /* menempel di atas tanah blok medan */
         const spec=SEGS_SPEC[i];
         let gy=groundAt(wx,wz,sp.y+2.5);
-        /* elevasi: dasar badan tepat menyentuh permukaan tanah */
         let wy=gy+(spec.h*0.5-0.02)*SCALE;
 
-        /* saat lompat di udara: gelombang lompat menjalar dari depan ke belakang */
-        if(jumpFly>0){
-          const jumpWaveDelay=0.10+i*0.028;
-          wy+=jumpFly*bump((tA/JUMP_DUR)-jumpWaveDelay,0.34)*SCALE*2.2;
+        /* GELOMBANG LOMPAT BERURUTAN (dari depan menjalar ke belakang) */
+        if(act==='jump'&&uJump>0.08){
+          const waveDelay=(i/NUM_SEGS)*0.32; // ruas depan naik duluan, ekor menyusul
+          const segU=Math.max(0,Math.min(1.0,(uJump-(0.08+waveDelay))/0.54));
+          const segWave=Math.sin(segU*Math.PI); // parabola halus
+          const peakHeight=Math.max(headLift,1.8*SCALE)*Math.max(0.40,1-(i/NUM_SEGS)*0.55);
+          wy+=segWave*peakHeight;
         }
-        /* saat mendongak sembur bisa / patuk: ruas leher (0-3) ikut terangkat proporsional */
-        if(headOffU>0&&i<5){
-          wy+=headOffU*(1-i/5)*SCALE*1.1;
+
+        /* saat mendongak sembur bisa / patuk: ruas leher (0-4) ikut terangkat proporsional */
+        if(headOffU>0&&i<6){
+          wy+=headOffU*(1-i/6)*SCALE*0.9;
         }
 
         segWorldPos.push({x:wx,y:wy,z:wz});
@@ -545,8 +553,8 @@ const Mob_Iguana=(()=>{
       if(!tgt)return;
       const toT=new THREE.Vector3().subVectors(
         tgt.pos.clone().add(new THREE.Vector3(0,0.9,0)),mouth);
-      const dist=toT.length();toT.normalize();
-      if(tgt.vel){toT.x+=tgt.vel.x*0.03*dist;toT.z+=tgt.vel.z*0.03*dist;toT.normalize();}
+      const dist=toT.length()||1e-4;toT.multiplyScalar(1/dist);
+      if(tgt.vel){toT.x+=tgt.vel.x*0.03*dist;toT.z+=tgt.vel.z*0.03*dist;const d2=toT.length()||1e-4;toT.multiplyScalar(1/d2);}
       const n=single?1:10;
       let spawned=0;
       for(let i=0;i<VENOM_MAX&&spawned<n;i++){
@@ -605,6 +613,7 @@ const Mob_Iguana=(()=>{
     },
   };
 
+  window.Mob_Ular=Mob_Iguana;
   window.Mob_Iguana=Mob_Iguana;
   return Mob_Iguana;
 })();
