@@ -13,23 +13,23 @@
    ============================================================================= */
 
 const PET_EMOJI={slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',rabbit:'🐰',
-  scorpion:'🦂',lizard:'🦎',ular:'🐍',iguana:'🐍',dragon:'🐉',trex:'🦖',mammoth:'🦣',cow:'🐄',horse:'🐎',
+  scorpion:'🦂',lizard:'🦎',snake:'🐍',dragon:'🐉',trex:'🦖',mammoth:'🦣',cow:'🐄',horse:'🐎',
   kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'};
 
 const PET_FOOD={slime:'berry',boar:'carrot',golem:'stone',wolf:'meat',
-  rabbit:'carrot',scorpion:'meat',lizard:'meat',ular:'meat',iguana:'meat',cow:'wheat',horse:'wheat',
+  rabbit:'carrot',scorpion:'meat',lizard:'meat',snake:'meat',cow:'wheat',horse:'wheat',
   dragon:'cmeat',trex:'cmeat',mammoth:'cabbage',kumbang:'fiber',yeti:'cmeat',semut:'meat',reaper:'soul_shard',
   tarantula:'meat'};
 
 /* kesulitan tangkap: yeti sekuat golem, semut selincah serigala.
    reaper (penjaga dungeon) paling sulit setelah naga. */
 const CATCH_DIFF={slime:65,rabbit:50,boar:125,cow:50,horse:70,wolf:160,
-  scorpion:180,lizard:220,ular:230,iguana:230,golem:320,dragon:520,trex:480,mammoth:480,
+  scorpion:180,lizard:220,snake:230,golem:320,dragon:520,trex:480,mammoth:480,
   kumbang:240,yeti:300,semut:150,reaper:360,tarantula:280};
 
 /* kecepatan kabur per tipe saat minigame; naga & kuda jauh lebih sulit */
 const CATCH_FLEE={slime:0.8,rabbit:1.4,boar:1.25,cow:1.0,horse:1.7,wolf:1.65,
-  scorpion:1.35,lizard:1.5,ular:1.5,iguana:1.5,golem:0.85,dragon:2.3,trex:2.1,mammoth:2.0,
+  scorpion:1.35,lizard:1.5,snake:1.5,golem:0.85,dragon:2.3,trex:2.1,mammoth:2.0,
   kumbang:1.2,yeti:1.0,semut:1.8,reaper:1.45,tarantula:1.5};
 
 /* panjang maksimum tali saat tarik-tarikan.
@@ -65,8 +65,7 @@ const Capture={
     wolf:     { baseHp:150,  baseDmg:36 },
     scorpion: { baseHp:180,  baseDmg:39 },
     lizard:   { baseHp:220,  baseDmg:42 },
-    ular:     { baseHp:240,  baseDmg:45 },
-    iguana:   { baseHp:240,  baseDmg:45 },
+    snake:    { baseHp:240,  baseDmg:45 },
     semut:    { baseHp:200,  baseDmg:39 },
     kumbang:  { baseHp:320,  baseDmg:51 },
     tarantula:{ baseHp:340,  baseDmg:57 },
@@ -92,8 +91,7 @@ const Capture={
     yeti:      { y: 1.95, fwd: -0.10 },
     kumbang:   { y: 1.36, fwd: -0.15 },
     lizard:    { y: 0.82, fwd: -0.10 },
-    ular:      { y: 0.82, fwd: -0.65 },
-    iguana:    { y: 0.82, fwd: -0.65 },
+    snake:     { y: 0.82, fwd: -0.65 },
     semut:     { y: 0.65, fwd:  0.00 },
     slime:     { y: 0.62, fwd:  0.00 },
     rabbit:    { y: 0.48, fwd: -0.05 },
@@ -186,6 +184,14 @@ const Capture={
       @media (max-width:560px){
         .pc-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
       }
+      @media (max-width:400px){
+        .pc-actions button{font-size:10px;padding:6px 3px;min-height:32px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .pc-chip{font-size:9.5px;padding:2px 5px;}
+        .pc-head{gap:6px;}
+        .pc-ico{width:38px;height:38px;font-size:22px;}
+        .pc-title b{font-size:12.5px;}
+        .pc-lv{font-size:10px;padding:3px 6px;}
+      }
     `;
     document.head.appendChild(style);
 
@@ -244,7 +250,12 @@ const Capture={
   },
   calmMult(){return Math.max(0.4,1-0.075*this.sk('catch_calm'));},
 
-  mobName(type){return (typeof MOB_NAME!=='undefined'&&MOB_NAME[type])?MOB_NAME[type]:type;},
+  mobName(type){
+    if(type==='ular'||type==='iguana')type='snake';
+    const nm = (typeof MOB_NAME!=='undefined'&&MOB_NAME[type])?MOB_NAME[type]:type;
+    if(/iguana|ular/i.test(nm||'')) return 'Snake';
+    return nm;
+  },
   petFood(type){return PET_FOOD[type]||'bread';},
 
   /* ---------- Cari mob yang bisa ditangkap ---------- */
@@ -579,7 +590,13 @@ const Capture={
     while(RPG.mobSlots.length<4)RPG.mobSlots.push(null);
     /* migrasi pet lama: tambahkan bintang, level, exp, damage bila belum ada */
     for(let i=0;i<RPG.mobSlots.length;i++){
-      if(RPG.mobSlots[i])RPG.mobSlots[i]=this.migratePet(RPG.mobSlots[i]);
+      if(RPG.mobSlots[i]){
+        RPG.mobSlots[i]=this.migratePet(RPG.mobSlots[i]);
+        if(RPG.mobSlots[i].type==='snake'||RPG.mobSlots[i].type==='ular'||RPG.mobSlots[i].type==='iguana'||/iguana|ular/i.test(RPG.mobSlots[i].name||'')){
+          RPG.mobSlots[i].type='snake';
+          RPG.mobSlots[i].name='Snake';
+        }
+      }
     }
     this.deployedSlot=-1;
     RPG.deployedPet=-1;
@@ -590,6 +607,11 @@ const Capture={
   /* pet lama dari save lama tetap bisa dipakai; diseimbangkan dengan kurva stat baru */
   migratePet(p){
     if(!p)return p;
+    /* rename lama: ular/iguana -> snake (save & pet lama tetap jalan) */
+    if(p.type==='ular'||p.type==='iguana'||/iguana|ular/i.test(p.name||'')){
+      p.type='snake';
+      p.name='Snake';
+    }
     if(!p.stars){
       p.stars=this.rollStars(!!p.boss);
     }
@@ -602,7 +624,7 @@ const Capture={
     p.maxhp = Math.round(statDef.baseHp * starMult + statDef.baseHp * 0.08 * starMult * (curLvl - 1));
     p.hp = Math.min(p.hp || p.maxhp, p.maxhp);
     p.dmg = Math.round(statDef.baseDmg * starMult + statDef.baseDmg * 0.05 * starMult * (curLvl - 1));
-    if(!p.name)p.name=this.mobName(p.type);
+    if(!p.name||/iguana|ular/i.test(p.name))p.name=this.mobName(p.type);
     return p;
   },
 
@@ -638,6 +660,10 @@ const Capture={
   deploy(i){
     const pet=RPG.mobSlots[i];
     if(!pet)return;
+    if(pet.type==='ular'||pet.type==='iguana'||/iguana|ular/i.test(pet.name||'')){
+      pet.type='snake';
+      pet.name='Snake';
+    }
     if(this.riding)this.stopRide(true);
     if(this.pet)this.storeActive(true);
 
@@ -917,8 +943,8 @@ const Capture={
       if(m.tAct&&typeof Monsters.tarantulaAct==='function'){
         Monsters.tarantulaAct(m,dt,d,ang,live);return;
       }
-      if(m.iAct&&(typeof Monsters.iguanaAct==='function'||typeof Monsters.ularAct==='function')){
-        const actFn=Monsters.ularAct||Monsters.iguanaAct;
+      if(m.iAct&&(typeof Monsters.snakeAct==='function'||typeof Monsters.snakeAct==='function')){
+        const actFn=Monsters.snakeAct||Monsters.snakeAct;
         actFn.call(Monsters,m,dt,d,ang,live);return;
       }
       if(m.bAct&&typeof Monsters.boarAtk==='function'){
@@ -950,7 +976,7 @@ const Capture={
                   (m.type==='semut')?3.2:
                   (m.type==='reaper')?3.4:
                   (m.type==='tarantula')?5.2:
-                  (m.type==='ular'||m.type==='iguana')?3.4:
+                  m.type==='snake'?3.4:
                   (m.type==='boar')?3.8:
                   (m.type==='mammoth')?3.2:
                   (m.type==='dragon')?3.4:
@@ -1790,10 +1816,16 @@ const Capture={
     }
     wrap.innerHTML='';
 
-    /* safety: pet lama yang belum dimigrasi mendapat field baru */
+    /* safety: pet lama yang belum dimigrasi mendapat field baru & normalisasi snake */
     for(let i=0;i<RPG.mobSlots.length;i++){
-      if(RPG.mobSlots[i]&&RPG.mobSlots[i].stars===undefined)
-        RPG.mobSlots[i]=this.migratePet(RPG.mobSlots[i]);
+      if(RPG.mobSlots[i]){
+        if(RPG.mobSlots[i].stars===undefined)
+          RPG.mobSlots[i]=this.migratePet(RPG.mobSlots[i]);
+        if(RPG.mobSlots[i].type==='snake'||RPG.mobSlots[i].type==='ular'||RPG.mobSlots[i].type==='iguana'||/iguana|ular/i.test(RPG.mobSlots[i].name||'')){
+          RPG.mobSlots[i].type='snake';
+          RPG.mobSlots[i].name='Snake';
+        }
+      }
     }
 
     RPG.mobSlots.forEach((pet,i)=>{

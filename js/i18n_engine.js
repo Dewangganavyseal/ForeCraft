@@ -169,7 +169,13 @@ const I18N={
     /* nama pet tersimpan mengikuti nama mob bahasa aktif */
     if(typeof RPG!=='undefined'&&Array.isArray(RPG.mobSlots)&&typeof MOB_NAME!=='undefined'){
       for(const p of RPG.mobSlots){
-        if(p&&p.type&&MOB_NAME[p.type])p.name=MOB_NAME[p.type];
+        if(!p)continue;
+        if(p.type==='ular'||p.type==='iguana'||/iguana|ular/i.test(p.name||'')){
+          p.type='snake';
+          p.name=MOB_NAME['snake']||'Snake';
+        } else if(p.type&&MOB_NAME[p.type]){
+          p.name=MOB_NAME[p.type];
+        }
       }
     }
 
@@ -341,8 +347,15 @@ const I18N={
     this.localizeDOM(this.lang);
     if(typeof Quest!=='undefined'&&Quest.refresh)Quest.refresh();
   },
+
+  /* penerjemah teks langsung (id -> bahasa aktif) */
+  t(txt, lang){
+    const l=lang||this.lang||'id';
+    return this.translateText(txt, l);
+  },
 };
 window.I18N=I18N;
+window.t=function(txt, lang){ return I18N.t(txt, lang); };
 
 /* terapkan bahasa tersimpan saat halaman siap */
 (function(){

@@ -638,7 +638,7 @@ const Quest={
   renderTracker(){
     const el=document.getElementById('questtrack');
     if(!el)return;
-    if(!this.active.length||(typeof Game!=='undefined'&&!Game.started)){
+    if(!this.active.length||(typeof Game!=='undefined'&&(!Game.started||Game.menuMode))){
       el.style.display='none';el.innerHTML='';return;
     }
     el.style.display='';
@@ -661,24 +661,40 @@ const Quest={
   /* ---------------------------------------------------------------------------
      PENYIMPANAN
      --------------------------------------------------------------------------- */
+  getSaveKey(){
+    const slot = (typeof RPG !== 'undefined' && RPG.slot) ? RPG.slot : 1;
+    return `forest_survival_quest_slot_${slot}`;
+  },
   save(){
     try{
-      localStorage.setItem(this.SAVE_KEY,JSON.stringify({
+      localStorage.setItem(this.getSaveKey(),JSON.stringify({
         a:this.active.map(a=>({i:a.id,h:a.have||0})),d:this.done}));
     }catch(e){}
   },
   load(){
     try{
-      const o=JSON.parse(localStorage.getItem(this.SAVE_KEY));
-      if(!o)return;
+      const raw = localStorage.getItem(this.getSaveKey());
+      if(!raw){
+        this.active=[];this.done={};
+        this.renderTracker();
+        return;
+      }
+      const o=JSON.parse(raw);
+      if(!o){ this.active=[];this.done={}; return; }
       if(Array.isArray(o.a))
         this.active=o.a.filter(x=>this.def(x.i)).map(x=>({id:x.i,have:x.h||0}));
+      else this.active=[];
       if(o.d&&typeof o.d==='object')this.done=o.d;
-    }catch(e){}
+      else this.done={};
+    }catch(e){
+      this.active=[];this.done={};
+    }
+    this.renderTracker();
   },
   clearSave(){
-    try{localStorage.removeItem(this.SAVE_KEY);}catch(e){}
+    try{localStorage.removeItem(this.getSaveKey());}catch(e){}
     this.active=[];this.done={};this.refresh();
+    this.renderTracker();
   },
 };
 
@@ -803,7 +819,7 @@ Furni.DEFS.board={
   panel.className='panel hidden';panel.id='panel-quest';
   panel.innerHTML=
     '<h2><span id="quest-title"><img class="ph-ico" src="buttons/ui_scroll.png" alt="" onerror="this.outerHTML=\'📜\'"> Papan Quest</span> '+
-    '<button class="x" data-close="quest">✕</button></h2>'+
+    '<button class="x" data-close="quest" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>'+
     '<p class="tip" id="quest-tip">Ambil quest dari papan di desa, penuhi tujuannya, lalu '+
     'kembali ke papan mana pun untuk mengambil hadiah.</p>'+
     '<div id="quest-body"></div>';
@@ -873,6 +889,4 @@ Furni.DEFS.board={
     Quest.board=null;
     UI.toggle('quest');
   });
-
-  Quest.load();
 })();

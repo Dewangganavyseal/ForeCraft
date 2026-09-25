@@ -14,7 +14,7 @@ const UI={
       body.className='panel-body';
       const keep=[];                       // node yang tetap di luar (header/tab)
       Array.from(p.childNodes).forEach(n=>{
-        const isHead=n.nodeType===1&&(n.tagName==='H2'||n.id==='craft-tabs'||n.id==='sp-info');
+        const isHead=n.nodeType===1&&(n.tagName==='H2'||n.id==='craft-tabs'||n.id==='sp-info'||n.id==='bag-float-menu'||n.id==='char-tabs');
         if(isHead)keep.push(n);else body.appendChild(n);
       });
       p.appendChild(body);                 // body di bawah header/tab
@@ -1137,7 +1137,7 @@ const UI={
        mengubahnya di renderDungeonShop) */
     const panel=document.getElementById('panel-shop');
     const h2=panel?panel.querySelector('h2'):null;
-    if(h2)h2.innerHTML='<img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML=\'🏪\'"> Pedagang Desa <button class="x" data-close="shop">✕</button>';
+    if(h2)h2.innerHTML='<img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML=\'🏪\'"> Pedagang Desa <button class="x" data-close="shop" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>';
     const xh=h2?h2.querySelector('[data-close]'):null;
     if(xh)xh.addEventListener('click',()=>this.toggle('shop'));
     if(panel){
@@ -1208,7 +1208,7 @@ const UI={
     /* judul panel diganti (h2 pertama) supaya jelas ini bukan pedagang biasa */
     const panel=document.getElementById('panel-shop');
     const h2=panel?panel.querySelector('h2'):null;
-    if(h2)h2.innerHTML=`<img class="ph-ico" src="buttons/npc_dungeonmaster.png" alt="" onerror="this.outerHTML='${n.role.e}'"> Dungeon Master — Dungeon Changer <button class="x" data-close="shop">✕</button>`;
+    if(h2)h2.innerHTML=`<img class="ph-ico" src="buttons/npc_dungeonmaster.png" alt="" onerror="this.outerHTML='${n.role.e}'"> Dungeon Master — Dungeon Changer <button class="x" data-close="shop" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>`;
     const x=h2?h2.querySelector('[data-close]'):null;
     if(x)x.addEventListener('click',()=>this.toggle('shop'));
     const buyEl=document.getElementById('shop-buy');
@@ -2328,7 +2328,7 @@ const UI={
     if(this.open==='bag')this.positionBagMenu();
   },
 
-  /* letakkan tombol Bag/Pet tepat di samping kiri panel Tas, bukan di tepi layar */
+  /* letakkan tombol Bag/Blok/Furnitur/Pet: desktop dempet kiri panel, mobile bar horizontal di atas panel */
   positionBagMenu(){
     const menu=document.getElementById('bag-float-menu');
     const panel=document.getElementById('panel-bag');
@@ -2336,11 +2336,22 @@ const UI={
     requestAnimationFrame(()=>{
       if(this.open!=='bag')return;
       const r=panel.getBoundingClientRect();
-      const mw=menu.offsetWidth||58;
-      const mh=menu.offsetHeight||190;
+      const mw=menu.offsetWidth||50;
+      const mh=menu.offsetHeight||50;
+      if(window.innerWidth<=768||window.innerHeight<=520){
+        /* mobile: bar horizontal rata tengah tepat di atas panel */
+        let left=r.left+r.width/2-mw/2;
+        left=clamp(left,4,Math.max(4,window.innerWidth-mw-4));
+        let top=r.top-mh-8;
+        if(top<56)top=Math.max(56,r.top-mh-8);
+        if(top+mh>r.top-2)top=Math.max(56,r.top-mh-6);
+        menu.style.left=left+'px';
+        menu.style.top=top+'px';
+        return;
+      }
       let left=r.left-mw-10;
-      /* layar sempit: tetap tempel sedekat mungkin ke panel */
-      if(left<4)left=Math.max(4,r.left-mw*0.55);
+      if(left<4)left=r.right+10;
+      if(left+mw>window.innerWidth-4)left=Math.max(4,window.innerWidth-mw-4);
       let top=r.top+r.height/2-mh/2;
       top=clamp(top,64,Math.max(64,window.innerHeight-mh-64));
       menu.style.left=left+'px';

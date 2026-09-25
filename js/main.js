@@ -160,6 +160,41 @@ const Game={
     return{x:sx,z:sz,y:WGEN.height(sx,sz)};
   },
 
+  /* Titik spawn terpadu di biome hutan untuk seluruh pemain multiplayer */
+  findForestSpawn(seed){
+    if(typeof WGEN!=='undefined'&&WGEN.init)WGEN.init(seed||this.seed||1);
+    for(let r=0;r<=140;r+=2){
+      const steps=Math.max(8,Math.floor(r*1.8));
+      for(let a=0;a<steps;a++){
+        const ang=(a/steps)*Math.PI*2;
+        const x=Math.round(Math.cos(ang)*r);
+        const z=Math.round(Math.sin(ang)*r);
+        if(!WGEN.isLand(x,z))continue;
+        if(WGEN.biomeAt(x,z)!==BIOME.FOREST)continue;
+        const h=WGEN.height(x,z);
+        if(h>=CFG.SEA&&!WGEN.treeAt(x,z,h)){
+          return {x,y:h,z};
+        }
+      }
+    }
+    return {x:0,y:CFG.SEA+2,z:0};
+  },
+
+  findMultiplayerPlayerSpawn(base){
+    for(let i=0;i<80;i++){
+      const ang=Math.random()*Math.PI*2;
+      const r=2+Math.random()*18; // radius 2 - 20 blok agar pemain berada di area sama tanpa saling menumpuk
+      const x=Math.round(base.x+Math.cos(ang)*r);
+      const z=Math.round(base.z+Math.sin(ang)*r);
+      if(!WGEN.isLand(x,z))continue;
+      const h=WGEN.height(x,z);
+      if(h>=CFG.SEA&&!WGEN.treeAt(x,z,h)){
+        return {x:x+0.5,y:h+0.5,z:z+0.5};
+      }
+    }
+    return {x:base.x+0.5,y:base.y+0.5,z:base.z+0.5};
+  },
+
   /* ---------- main menu background ----------
      Panorama yang BERJALAN antar desa: kamera mengorbit pelan (otomatis, tanpa
      input pengguna) di atas sebuah desa, lalu setelah beberapa detik memudar
@@ -188,6 +223,8 @@ const Game={
     Weather.time=0.35;Weather.day=1;
     Cam.targetZoom=8.2;Cam.zoom=8.2;Cam.applyZoom();
     this.setMenuFade(0);
+    if(typeof UI!=='undefined')UI.closeAll();
+    if(typeof Quest!=='undefined')Quest.renderTracker();
     this.menuLoadChunks();
     /* musik main menu (mulai pada gestur pengguna pertama bila autoplay ditolak) */
     if(typeof Music!=='undefined'&&Music.playMenu)Music.playMenu();
@@ -294,6 +331,11 @@ const Game={
     if(typeof SaveGame!=='undefined'&&SaveGame.now)SaveGame.now();
     else if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
 
+    if(this.isMultiplayer && typeof Network!=='undefined'){
+      Network.leave();
+      this.isMultiplayer=false;
+    }
+
     /* tutup UI / chat / panel aktif */
     if(typeof UI!=='undefined'&&UI.open)UI.toggle(UI.open);
     if(typeof Chat!=='undefined'&&Chat.close)Chat.close();
@@ -332,6 +374,130 @@ const Game={
 
     if(typeof MainMenu!=='undefined'&&MainMenu.showMain)MainMenu.showMain();
     this.startMenuBackground();
+  },
+
+  /* ---------- mulai game MULTIPLAYER (MMORPG) ---------- */
+  beginMultiplayer(joinData){
+    this.isMultiplayer=true;
+    this.menuMode=false;
+    document.body.classList.remove('in-menu');
+    this.setMenuFade(0);
+    if(Player.mesh)Player.mesh.visible=true;
+
+    document.getElementById('start').classList.add('hidden');
+    const loadEl=document.getElementById('loading');
+    if(loadEl){
+      loadEl.querySelector('p').textContent='Memasuki dunia multiplayer...';
+      loadEl.style.display='flex';
+    }
+    this.loadingDone=false;
+    this._loadingStartT=(typeof performance!=='undefined')?performance.now():Date.now();
+
+    this.seed=joinData.seed;
+    WGEN.init(this.seed);
+    this.clearWorldMeshes();
+
+    /* terapkan blok yang sudah diubah di room ini dari server */
+    World.networkOverrides=Object.assign({},joinData.worldDiffs||{});
+
+    const prof=joinData.profile||{};
+    Player.name=prof.name||'Ranger';
+    Player.hairStyle=(prof.hairStyle!==undefined)?prof.hairStyle:4;
+    Player.hairColor=(prof.hairColor!==undefined)?prof.hairColor:0x2c1f14;
+    Player.level=prof.level||1;
+    Player.hp=prof.hp!==undefined?prof.hp:Player.maxHp();
+    Player.hunger=100;
+    Player.stamina=Player.maxStamina();
+    Player.dead=false;
+    Player.xp=prof.xp||0;
+    Player.kills=prof.kills||0;
+
+    RPG.sp=prof.sp||0;
+    RPG.skills=prof.skills||{};
+    RPG.coin=(prof.coin!==undefined)?prof.coin:50;
+    RPG.bagTier=1;
+    RPG.hotbar=Array.isArray(prof.hotbar)?prof.hotbar:new Array(7).fill(null);
+    RPG.bag=Array.isArray(prof.bag)?prof.bag:new Array(RPG.BAG_BASE).fill(null);
+    while(RPG.bag.length<RPG.bagMax())RPG.bag.push(null);
+    RPG.blockBag=Array.isArray(prof.blockBag)?prof.blockBag:new Array(21).fill(null);
+    while(RPG.blockBag.length<21)RPG.blockBag.push(null);
+    RPG.selectedBlockSlot=-1;
+    RPG.furniBag=Array.isArray(prof.furniBag)?prof.furniBag:new Array(21).fill(null);
+    while(RPG.furniBag.length<21)RPG.furniBag.push(null);
+    RPG.selectedFurniSlot=-1;
+
+    /* starter items jika pemain baru */
+    if(!prof.lastUpdated){
+      RPG.addItem('bread',5);
+      RPG.addItem('sword_wood',1);
+      RPG.addItem('wood',20);
+    }
+
+    const savedEq=prof.equip||{};
+    RPG.equip={helm:savedEq.helm||null,chest:savedEq.chest||null,
+      boots:savedEq.boots||null,shield:savedEq.shield||null};
+    if(savedEq.weapon)RPG.addItem(savedEq.weapon,1);
+
+    // Penentuan spawn bersama di Biome Hutan
+    const forestBase = this.findForestSpawn(this.seed);
+    if(prof.pos&&Array.isArray(prof.pos)&&prof.pos.length===3&&(prof.pos[0]!==0||prof.pos[1]!==20||prof.pos[2]!==0)){
+      Player.pos.set(prof.pos[0],prof.pos[1],prof.pos[2]);
+      Player.spawnP.copy(Player.pos);
+    }else{
+      // Pemain masuk di 1 area yang sama dalam radius 20 blok agar tidak bertumpuk
+      const sp=this.findMultiplayerPlayerSpawn(forestBase);
+      Player.spawnP.set(sp.x,sp.y,sp.z);
+      Player.pos.copy(Player.spawnP);
+    }
+
+    // Bersihkan quest singleplayer agar tidak mencemari sesi multiplayer
+    if(typeof Quest!=='undefined'){
+      Quest.clearSave();
+    }
+
+    if(typeof Prof!=='undefined')Prof.load(prof.prof||null);
+
+    Player.setHair(Player.hairStyle,Player.hairColor);
+    Player.refreshArmor();
+
+    /* reset kamera ke posisi pemain */
+    this.camTarget.set(Player.pos.x,Player.pos.y+1.3,Player.pos.z);
+    Cam.targetZoom=9.5;
+    Cam.zoom=9.5;
+    Cam.applyZoom();
+    Cam.update(0.016,this.camTarget);
+
+    Weather.time=0.32;Weather.day=1;
+
+    /* generate chunk awal & bangun mesh sekitar spawn langsung */
+    const pcx=Math.floor(Player.pos.x/16),pcz=Math.floor(Player.pos.z/16);
+    for(let dz=-CFG.VIEW_R;dz<=CFG.VIEW_R;dz++)
+      for(let dx=-CFG.VIEW_R;dx<=CFG.VIEW_R;dx++)
+        World.getChunk(pcx+dx,pcz+dz);
+
+    for(let dz=-1;dz<=1;dz++)
+      for(let dx=-1;dx<=1;dx++){
+        const c=World.chunks.get(World.key(pcx+dx,pcz+dz));
+        if(c&&!c.group)World.buildMesh(c);
+      }
+
+    UI.renderHotbar();
+    RPG.renderCoin();
+    if(typeof BuildSys!=='undefined')BuildSys.init();
+
+    this.started=true;
+    if(typeof Network!=='undefined'){
+      Network.active=true;
+      Network.sendMove(Player.pos.x,Player.pos.y,Player.pos.z,Player.yaw,Player.pitch,false);
+      Network.sendPlayerSync();
+    }
+
+    Sfx.init();
+    Music.start();
+
+    if(typeof UI!=='undefined'&&UI.toast){
+      UI.toast(`🌐 Selamat datang di [Room ${joinData.roomId}] ${joinData.roomName}!`);
+    }
   },
 
   /* ---------- mulai game ---------- */
@@ -458,6 +624,9 @@ const Game={
     }
     if(typeof Capture!=='undefined')Capture.load(save?save.mobSlots:null,save?save.deployedPet:-1);
     if(typeof BuildSys!=='undefined')BuildSys.init();
+    if(typeof Quest!=='undefined'){
+      if(save)Quest.load();else Quest.clearSave();
+    }
 
     this.started=true;
 
@@ -526,6 +695,7 @@ const Game={
         else SlamAim.cancel();
       }
       Player.update(dt);
+      if(typeof Network!=='undefined'&&Network.active){try{Network.update(dt);}catch(e){console.error('[Network error]',e);}}
       try{Monsters.update(dt);}catch(e){console.error('[Monsters error]',e);}
       try{NPCS.update(dt);}catch(e){console.error('[NPCS error]',e);}
       if(typeof RareNPC!=='undefined'){try{RareNPC.update(dt);}catch(e){console.error('[RareNPC error]',e);}}
@@ -638,13 +808,149 @@ const MainMenu={
         <div class="menu-btns">
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>
+          <button id="mm-multi" class="big mm-multi">🌐 Multiplayer</button>
           <button id="mm-music" class="big mm-music">🎵 Musik</button>
         </div>
       </div>`;
     if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('#mm-load').addEventListener('click',()=>this.showLoad());
     this.el.querySelector('#mm-new').addEventListener('click',()=>this.showNew());
+    this.el.querySelector('#mm-multi').addEventListener('click',()=>this.showMultiplayer());
     this.el.querySelector('#mm-music').addEventListener('click',()=>this.showMusic());
+  },
+
+  /* ---------- menu MULTIPLAYER (10 Rooms, maks 50 player) ---------- */
+  showMultiplayer(){
+    const defaultName = localStorage.getItem('forecraft_mp_name') || (typeof Player !== 'undefined' && Player.name) || 'Ranger';
+    const defaultHost = (typeof Network !== 'undefined') ? Network.getServerHost() : '10.247.243.121:3000';
+    this.el.innerHTML = `
+      <div class="mp-wrap">
+        <div class="mp-header">
+          <h2 class="mp-title">🌐 FORECRAFT ONLINE</h2>
+          <div class="mp-sub">Pilih Room Server · Maksimal 50 Pemain per Room · Cross-Platform (PC & Mobile)</div>
+        </div>
+        <div class="mp-name-bar">
+          <span class="mp-name-label">Karakter:</span>
+          <input type="text" id="mp-name-input" class="mp-name-input" maxlength="16" value="${defaultName}" placeholder="Nama...">
+          <span class="mp-name-label" style="margin-left:8px;">Server IP:</span>
+          <input type="text" id="mp-host-input" class="mp-name-input" style="width:170px;" value="${defaultHost}" placeholder="IP:Port">
+        </div>
+        <div id="mp-room-list" class="mp-room-grid">
+          <div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #a0b4cc;">
+            <div class="loader" style="margin: 0 auto 12px;"></div>
+            Memuat daftar 10 room dari server...
+          </div>
+        </div>
+        <div class="mp-footer">
+          <button class="big mm-back">← Kembali</button>
+          <button id="mp-btn-refresh" class="big" style="background: #2e435e; border-color: #4a678f;">🔄 Segarkan</button>
+        </div>
+      </div>`;
+
+    this.el.querySelector('.mm-back').addEventListener('click', () => this.showMain());
+    const refreshBtn = this.el.querySelector('#mp-btn-refresh');
+    refreshBtn.addEventListener('click', () => {
+      const hostInput = this.el.querySelector('#mp-host-input');
+      if (hostInput && typeof Network !== 'undefined') {
+        Network.setServerHost(hostInput.value);
+      }
+      this.loadRooms();
+    });
+
+    const hostInput = this.el.querySelector('#mp-host-input');
+    if (hostInput) {
+      hostInput.addEventListener('change', () => {
+        if (typeof Network !== 'undefined') Network.setServerHost(hostInput.value);
+        this.loadRooms();
+      });
+    }
+
+    this.loadRooms();
+  },
+
+  async loadRooms(){
+    const listEl = this.el.querySelector('#mp-room-list');
+    if (!listEl) return;
+    listEl.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #a0b4cc;">
+        <div class="loader" style="margin: 0 auto 12px;"></div>
+        Menghubungi server Forecraft Online...
+      </div>`;
+
+    try {
+      const rooms = await Network.fetchRooms();
+      const hostInput = this.el.querySelector('#mp-host-input');
+      if (hostInput && typeof Network !== 'undefined') {
+        const curHost = Network.getServerHost();
+        if (curHost && hostInput.value !== curHost) {
+          hostInput.value = curHost;
+        }
+      }
+
+      if (!rooms || !rooms.length) {
+        listEl.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 25px; color: #ff8a80; background: rgba(30,10,10,0.6); border-radius: 8px; border: 1px solid rgba(255,100,100,0.3);">
+            ⚠️ Tidak dapat terhubung ke Server Forecraft Online.<br>
+            <span style="font-size: 12px; color: #b0bec5; display: block; margin-top: 8px; line-height: 1.5;">
+              1. Pastikan <b>Start_Server.bat</b> sudah berjalan di laptop.<br>
+              2. Atau masukkan domain / IP server di kotak <b>Server IP</b> di atas lalu tekan <b>🔄 Segarkan</b>.
+            </span>
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = rooms.map(r => {
+        const isFull = r.players >= r.maxPlayers;
+        return `
+          <div class="mp-room-card ${isFull ? 'is-full' : ''}">
+            <div class="mp-room-top">
+              <span class="mp-room-name">Room ${r.id}: ${r.name}</span>
+              <span class="mp-room-badge ${isFull ? 'mp-badge-full' : 'mp-badge-online'}">
+                ${isFull ? '🔴 Penuh' : '🟢'} ${r.players}/${r.maxPlayers}
+              </span>
+            </div>
+            <div class="mp-room-desc">${r.desc || ''}</div>
+            <div class="mp-room-foot">
+              <span class="mp-room-seed">Seed: ${r.seed}</span>
+              <button class="mp-btn-join" data-room="${r.id}" ${isFull ? 'disabled' : ''}>
+                ${isFull ? 'Penuh' : 'Masuk World'}
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('.mp-btn-join').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const roomId = Number(btn.dataset.room);
+          const nameInput = this.el.querySelector('#mp-name-input');
+          const rawName = (nameInput ? nameInput.value : '').trim();
+          const cleanName = rawName.substring(0, 16) || 'Ranger';
+          localStorage.setItem('forecraft_mp_name', cleanName);
+
+          const loadEl = document.getElementById('loading');
+          if (loadEl) {
+            loadEl.querySelector('p').textContent = `Menghubungkan ke Room ${roomId}...`;
+            loadEl.style.display = 'flex';
+          }
+          this.el.classList.add('hidden');
+
+          Network.connectAndJoin(
+            roomId,
+            cleanName,
+            (joinData) => {
+              Game.beginMultiplayer(joinData);
+            },
+            (errMsg) => {
+              if (loadEl) loadEl.style.display = 'none';
+              this.el.classList.remove('hidden');
+              alert(errMsg);
+            }
+          );
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #ff8a80;">Error: ${err.message}</div>`;
+    }
   },
 
   /* ---------- pengaturan musik (di main menu) ---------- */
@@ -1084,4 +1390,8 @@ const CutsceneIntro={
   },
 };
 
-window.addEventListener('load',()=>Game.init());
+if(document.readyState==='complete'||document.readyState==='interactive'){
+  Game.init();
+}else{
+  window.addEventListener('load',()=>Game.init());
+}

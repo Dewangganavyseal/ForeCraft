@@ -31,6 +31,15 @@ const Chat={
   maxNotifLog:18,
   MIN_NOTIF_RARITY:2,        // minimal tier rare (2: rare, epic, legendary, mythic) agar item sampah tidak membanjiri chat
   _unreadNotif:false,
+  teleportEnabled:(typeof localStorage!=='undefined'&&localStorage.getItem('forecraft_teleport_enabled')==='1'),
+
+  setTeleport(enable){
+    this.teleportEnabled=!!enable;
+    if(typeof localStorage!=='undefined'){
+      localStorage.setItem('forecraft_teleport_enabled',this.teleportEnabled?'1':'0');
+    }
+    if(this._updateTpBtn)this._updateTpBtn();
+  },
 
   /* ------------------------------ inisialisasi --------------------------- */
   init(){
@@ -189,12 +198,18 @@ const Chat={
     this.input.value='';
     if(!text)return;
 
-    /* ---- KODE RAHASIA: buka terminal spawn / toggle mode TPP ---- */
+    /* ---- KODE RAHASIA: buka terminal spawn / toggle mode TPP / Teleport ---- */
     if(text.startsWith(this.SECRET) || text === '/tpp' || text === '/fpp'){
       const arg = text.slice(this.SECRET.length).trim().toLowerCase();
       if(arg === 'tpp' || arg === 'fpp' || arg === 'toggle' || text === '/tpp' || text === '/fpp'){
         if(typeof Cam !== 'undefined') Cam.setTPP(!Cam.tppEnabled);
         this.pushLog('>> Mode TPP: ' + (Cam.tppEnabled ? 'AKTIF (zoom dekat untuk kamera belakang karakter)' : 'NONAKTIF'), 'sys');
+        this.close();
+        return;
+      }
+      if(arg === 'tp' || arg === 'teleport'){
+        this.setTeleport(!this.teleportEnabled);
+        this.pushLog('>> Mode Teleport: ' + (this.teleportEnabled ? 'AKTIF [ON]' : 'NONAKTIF [OFF]'), 'sys');
         this.close();
         return;
       }
@@ -204,7 +219,21 @@ const Chat={
       return;
     }
 
+    /* ---- PERINTAH TELEPORT: /teleport <target> atau /tp <target> ---- */
+    if(text.startsWith('/teleport') || text.startsWith('/tp ') || text === '/tp'){
+      let targetName = '';
+      if(text.startsWith('/teleport')) targetName = text.slice(9).trim();
+      else if(text.startsWith('/tp')) targetName = text.slice(3).trim();
+      this.executeTeleport(targetName);
+      this.close();
+      return;
+    }
+
     /* ---- pesan biasa: log + gelembung teks di atas kepala pemain ---- */
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendChat(text);
+      return;
+    }
     const pName = (typeof Player!=='undefined'&&Player.name) ||
                   (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
                   'Kamu';
@@ -229,6 +258,166 @@ const Chat={
     while(this.logEl.childElementCount>this.MAX_LOG)
       this.logEl.firstElementChild.remove();
     this.logEl.scrollTop=this.logEl.scrollHeight;
+  },
+
+  /* ------------------------------ sistem teleportasi --------------------- */
+  executeTeleport(targetName){
+    const raw=(targetName||'').trim();
+    const query=raw.toLowerCase();
+
+    // Teleport hanya bisa diaktifkan melalui /280195
+    if(query==='on'||query==='enable'||query==='1'||query==='off'||query==='disable'||query==='0'){
+      this.pushLog('⚠️ <b>Mode Teleport hanya bisa diaktifkan/dinonaktifkan melalui menu rahasia /280195!</b>','sys');
+      return false;
+    }
+
+    if(!this.teleportEnabled){
+      this.pushLog('⚠️ <b>Mode Teleport sedang NONAKTIF!</b> Fitur ini hanya dapat diaktifkan melalui menu rahasia <code>/280195</code>.','sys');
+      return false;
+    }
+
+    if(!raw){
+      this.pushLog('❓ Gunakan: <code>/teleport &lt;nama pemain / NPC / monster / koordinat x y z / spawn / desa&gt;</code>','sys');
+      return false;
+    }
+
+    // 1. Cek jika koordinat angka: "/teleport 100 25 -50" atau "/tp 100, 25, -50"
+    const coords=raw.split(/[\s,]+/).map(Number);
+    if(coords.length===3&&!coords.some(isNaN)){
+      return this._doTeleport(coords[0],coords[1],coords[2],`Koordinat (${Math.round(coords[0])}, ${Math.round(coords[1])}, ${Math.round(coords[2])})`);
+    }
+
+    // 2. Keyword khusus: spawn & desa
+    if(query==='spawn'){
+      if(typeof Player!=='undefined'&&Player.spawnP){
+        return this._doTeleport(Player.spawnP.x,Player.spawnP.y,Player.spawnP.z,'Titik Spawn');
+      }
+    }
+    if(query==='desa'||query==='village'||query==='kampung'){
+      const nearest=(typeof WGEN!=='undefined'&&WGEN.nearestVillage)?WGEN.nearestVillage(Player.pos.x,Player.pos.z):null;
+      if(nearest){
+        const seaH=(typeof CFG!=='undefined'?CFG.SEA:22)+1.2;
+        return this._doTeleport(nearest.x,seaH,nearest.z,'Desa Terdekat');
+      }
+    }
+
+    // 3. Cari pemain lain di Multiplayer (Network.remotePlayers)
+    if(typeof Network!=='undefined'&&Network.remotePlayers&&Network.remotePlayers.size>0){
+      let matchedPlayer=null;
+      for(const rp of Network.remotePlayers.values()){
+        const rpName=(rp.name||'').toLowerCase();
+        if(rpName===query){
+          matchedPlayer=rp;
+          break;
+        }
+        if(rpName.includes(query)&&!matchedPlayer){
+          matchedPlayer=rp;
+        }
+      }
+      if(matchedPlayer){
+        const pos=matchedPlayer.currentPos||(matchedPlayer.mesh?matchedPlayer.mesh.position:null);
+        if(pos){
+          return this._doTeleport(pos.x,pos.y,pos.z,`Pemain "${matchedPlayer.name}"`);
+        }
+      }
+    }
+
+    // 4. Cari NPC di sekitar (NPCS.list atau NPCS.team)
+    if(typeof NPCS!=='undefined'){
+      const allNpcs=[...(NPCS.list||[]),...(NPCS.team||[])];
+      let matchedNpc=null;
+      for(const n of allNpcs){
+        const nName=(n.name||'').toLowerCase();
+        const nRole=(n.role||'').toLowerCase();
+        if(nName===query||nRole===query){
+          matchedNpc=n;
+          break;
+        }
+        if((nName.includes(query)||nRole.includes(query))&&!matchedNpc){
+          matchedNpc=n;
+        }
+      }
+      if(matchedNpc){
+        const p=matchedNpc.pos||(matchedNpc.mesh?matchedNpc.mesh.position:null);
+        if(p){
+          return this._doTeleport(p.x,p.y,p.z,`NPC "${matchedNpc.name||matchedNpc.role}"`);
+        }
+      }
+    }
+
+    // 5. Cari Monster / Boss (Monsters.list)
+    if(typeof Monsters!=='undefined'&&Monsters.list&&Monsters.list.length>0){
+      let matchedMob=null;
+      for(const m of Monsters.list){
+        if(m.dead)continue;
+        const mType=(m.type||'').toLowerCase();
+        const mName=(m.name||'').toLowerCase();
+        if(mType===query||mName===query){
+          matchedMob=m;
+          break;
+        }
+        if((mType.includes(query)||mName.includes(query))&&!matchedMob){
+          matchedMob=m;
+        }
+      }
+      if(matchedMob){
+        const p=matchedMob.pos||(matchedMob.mesh?matchedMob.mesh.position:null);
+        if(p){
+          return this._doTeleport(p.x,p.y,p.z,`Monster "${matchedMob.name||matchedMob.type}"`);
+        }
+      }
+    }
+
+    // 6. Tidak ditemukan
+    this.pushLog(`❌ Target "<b>${raw}</b>" tidak ditemukan. Pastikan target ada di room / dunia ini (Pemain, NPC, Monster, atau koordinat x y z).`,'sys');
+    return false;
+  },
+
+  _doTeleport(x,y,z,label){
+    if(typeof Player==='undefined'||!Player.pos)return false;
+
+    // Pastikan ketinggian aman di atas daratan/blok
+    let safeY=y;
+    if(typeof WGEN!=='undefined'&&WGEN.height){
+      const groundH=WGEN.height(Math.round(x),Math.round(z));
+      safeY=Math.max(y,groundH+0.5);
+    }
+
+    // Efek kepulan asap sebelum teleport
+    if(typeof FX!=='undefined'&&FX.puff){
+      FX.puff(Player.pos.clone());
+    }
+
+    Player.pos.set(x,safeY,z);
+    if(Player.vel)Player.vel.set(0,0,0);
+
+    if(typeof Game!=='undefined'){
+      Game.camTarget.set(x,safeY+1.3,z);
+      if(typeof Cam!=='undefined'){
+        Cam.update(0.016,Game.camTarget);
+      }
+    }
+
+    // Efek partikel & suara di posisi baru
+    if(typeof FX!=='undefined'){
+      if(FX.puff)FX.puff(new THREE.Vector3(x,safeY,z));
+      if(FX.sparks)FX.sparks(new THREE.Vector3(x,safeY,z));
+    }
+    if(typeof Sfx!=='undefined'&&Sfx.pop){
+      Sfx.pop();
+    }
+
+    // Beritahukan ke server multiplayer
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendTeleport(x,safeY,z);
+    }
+
+    const info=`⚡ Teleportasi berhasil ke <b>${label}</b> [${Math.round(x)}, ${Math.round(safeY)}, ${Math.round(z)}]`;
+    this.pushLog(info,'sys');
+    if(typeof UI!=='undefined'&&UI.toast){
+      UI.toast(`⚡ Teleport ke ${label}`);
+    }
+    return true;
   },
 
   /* =======================================================================
@@ -264,7 +453,7 @@ const Chat={
   },
   /* emoji untuk monster (Mob tidak punya ikon sendiri di tabel) */
   MOB_E:{slime:'🟢',boar:'🐗',golem:'🗿',wolf:'🐺',scorpion:'🦂',rabbit:'🐇',
-          cow:'🐄',horse:'🐎',dragon:'🐲',trex:'🦖',mammoth:'🦣',lizard:'🦎',ular:'🐍',iguana:'🐍',
+          cow:'🐄',horse:'🐎',dragon:'🐲',trex:'🦖',mammoth:'🦣',lizard:'🦎',snake:'🐍',
          kelabang:'🐛',kumbang:'🪲',yeti:'❄️',semut:'🐜',reaper:'⚰️',tarantula:'🕷️'},
 
   /* dipanggil UI.toggle('term'); isi cukup dibangun sekali */
@@ -273,6 +462,7 @@ const Chat={
     if(!body)return;
     if(this._termBuilt){
       if(this._updateFppBtn)this._updateFppBtn();
+      if(this._updateTpBtn)this._updateTpBtn();
       return;
     }
     this._termBuilt=true;
@@ -305,6 +495,25 @@ const Chat={
       updateTppBtn();
     });
     ctl.appendChild(tppBtn);
+
+    /* Tombol Toggle Mode Teleport */
+    const tpBtn=document.createElement('button');
+    tpBtn.className='tbtn';
+    tpBtn.style.cssText='width:100%;margin:4px 0 6px;padding:9px 12px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;transition:.15s;text-align:left;';
+    const updateTpBtn=()=>{
+      const on=!!Chat.teleportEnabled;
+      tpBtn.style.borderColor=on?'#38bdf8':'#64748b';
+      tpBtn.style.background=on?'rgba(56,189,248,0.22)':'rgba(0,0,0,0.40)';
+      tpBtn.style.color=on?'#7dd3fc':'#cbd5e1';
+      tpBtn.innerHTML='⚡ Mode Teleport (/teleport &lt;nama target&gt;): <b>'+(on?'AKTIF [ON]':'NONAKTIF [OFF]')+'</b>';
+    };
+    this._updateTpBtn=updateTpBtn;
+    updateTpBtn();
+    tpBtn.addEventListener('click',()=>{
+      Chat.setTeleport(!Chat.teleportEnabled);
+      updateTpBtn();
+    });
+    ctl.appendChild(tpBtn);
 
     body.appendChild(ctl);
 

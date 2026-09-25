@@ -69,7 +69,7 @@
 
 <!-- ================= PANEL TAS ================= -->
 <div class="panel" id="panel-bag">
-  <h2><img class="ph-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"> Tas <button class="x" data-close="bag">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"> Tas <button class="x" data-close="bag" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
 
   <div id="bag-layout">
     <div id="bag-pages">
@@ -123,17 +123,17 @@
   </div>
 </div>
 
-<!-- tombol melayang Bag / Block / Furnitur / Pet di sisi kiri panel tas -->
+<!-- tombol tab Bag / Block / Furnitur / Pet (hanya icon, tanpa teks) -->
 <div id="bag-float-menu">
-  <button type="button" class="bag-menu-btn active" data-bagpage="bag"><span><img class="menu-ico" src="buttons/bag.png" alt="" onerror="this.outerHTML='🎒'"></span>Bag</button>
-  <button type="button" class="bag-menu-btn" data-bagpage="blocks"><span><img class="menu-ico" src="buttons/build.png" alt="" onerror="this.outerHTML='🧱'"></span>Block</button>
-  <button type="button" class="bag-menu-btn" data-bagpage="furniture"><span><img class="menu-ico" src="buttons/f_chair.png" alt="" onerror="this.outerHTML='🪑'"></span>Furnitur</button>
-  <button type="button" class="bag-menu-btn" data-bagpage="pet"><span><img class="menu-ico" src="buttons/pet_slime.png" alt="" onerror="this.outerHTML='🐾'"></span>Pet</button>
+  <button type="button" class="bag-menu-btn active" data-bagpage="bag" title="Bag"><img class="menu-ico" src="buttons/bag.png" alt="Bag" onerror="this.outerHTML='🎒'"></button>
+  <button type="button" class="bag-menu-btn" data-bagpage="blocks" title="Block"><img class="menu-ico" src="buttons/build.png" alt="Block" onerror="this.outerHTML='🧱'"></button>
+  <button type="button" class="bag-menu-btn" data-bagpage="furniture" title="Furniture"><img class="menu-ico" src="buttons/f_chair.png" alt="Furniture" onerror="this.outerHTML='🪑'"></button>
+  <button type="button" class="bag-menu-btn" data-bagpage="pet" title="Pet"><img class="menu-ico" src="buttons/pet_slime.png" alt="Pet" onerror="this.outerHTML='🐾'"></button>
 </div>
 
 <!-- ================= PANEL SKILL ================= -->
 <div class="panel" id="panel-skills">
-  <h2><img class="ph-ico" src="buttons/skills.png" alt="" onerror="this.outerHTML='🌟'"> Skill Tree <button class="x" data-close="skills">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/skills.png" alt="" onerror="this.outerHTML='🌟'"> Skill Tree <button class="x" data-close="skills" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div id="sp-info">Skill Points: <b id="sp-num">0</b></div>
   <!-- Pohon skill digambar dinamis oleh UI.renderSkills(): node per skill
        yang saling terhubung garis akar sesuai prasyarat (req). -->
@@ -148,14 +148,14 @@
 
 <!-- ================= PANEL CRAFTING ================= -->
 <div class="panel" id="panel-craft">
-  <h2><img class="ph-ico" src="buttons/craft.png" alt="" onerror="this.outerHTML='🔨'"> Crafting <button class="x" data-close="craft">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/craft.png" alt="" onerror="this.outerHTML='🔨'"> Crafting <button class="x" data-close="craft" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div id="craft-tabs"></div>
   <div id="recipes"></div>
 </div>
 
 <!-- ================= PANEL PETI PENYIMPANAN ================= -->
 <div class="panel" id="panel-chest">
-  <h2><img class="ph-ico" src="buttons/f_chest.png" alt="" onerror="this.outerHTML='🧰'"> <span id="chest-title">Peti Penyimpanan</span> <button class="x" data-close="chest">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/f_chest.png" alt="" onerror="this.outerHTML='🧰'"> <span id="chest-title">Peti Penyimpanan</span> <button class="x" data-close="chest" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="sub">Isi Peti <span id="chest-num">0/0</span>
     <button id="chest-all" class="mini btn-img-mini" title="Titip Semua Resource">Titip Semua Resource</button></div>
   <div class="grid" id="chest-grid"></div>
@@ -167,7 +167,7 @@
 <!-- ================= PANEL REKAN ================= -->
 
 <div class="panel" id="panel-npc">
-  <h2><img class="ph-ico" src="buttons/ui_team.png" alt="" onerror="this.outerHTML='🤝'"> Rekan Tim <button class="x" data-close="npc">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_team.png" alt="" onerror="this.outerHTML='🤝'"> Rekan Tim <button class="x" data-close="npc" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div id="npc-body"></div>
 </div>
 
@@ -175,7 +175,7 @@
      Dibuka dengan tombol G. Menampilkan seluruh rekan + pet; klik satu rekan
      untuk membuka panel kontrol detailnya. -->
 <div class="panel hidden" id="panel-party">
-  <h2><img class="ph-ico" src="buttons/ui_party.png" alt="" onerror="this.outerHTML='👥'"> Party <button class="x" data-close="party">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_party.png" alt="" onerror="this.outerHTML='👥'"> Party <button class="x" data-close="party" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="sub">Anggota tim & peliharaanmu — ketuk untuk mengatur.</div>
   <div id="party-body"></div>
 </div>
@@ -183,7 +183,7 @@
 <!-- ================= PANEL PEDAGANG / TOKO =================
      Beli item dengan koin, atau jual item dari tas untuk dapat koin. -->
 <div class="panel hidden" id="panel-shop">
-  <h2><img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML='🏪'"> Pedagang Desa <button class="x" data-close="shop">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_shop.png" alt="" onerror="this.outerHTML='🏪'"> Pedagang Desa <button class="x" data-close="shop" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="shop-coin"><img class="hud-ico" src="buttons/ui_coin.png" alt="" onerror="this.outerHTML='🪙'"> Koinmu: <b id="shop-coin">0</b></div>
   <div class="sub">Beli</div>
   <div id="shop-buy"></div>
@@ -196,7 +196,7 @@
      Enchant equipment: menaikkan level pedang/armor/tameng dengan koin
      dan bahan yang relevan. Dibuka lewat interaksi furnitur Landasan Tempa. -->
 <div class="panel hidden" id="panel-anvil">
-  <h2><img class="ph-ico" src="buttons/f_anvil.png" alt="" onerror="this.outerHTML='⚒️'"> Landasan Tempa <button class="x" data-close="anvil">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/f_anvil.png" alt="" onerror="this.outerHTML='⚒️'"> Landasan Tempa <button class="x" data-close="anvil" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="sub">Tempa equipment untuk menaikkan Levelnya — bayar dengan 🪙 koin dan bahan yang relevan dengan equipment-nya.</div>
   <div id="anvil-body"></div>
 </div>
@@ -205,7 +205,7 @@
      Peleburan Ore menjadi Ingot dengan bahan bakar Batu Bara (Coal).
      1 Ingot = 2 Ore (5 detik). 1 Coal = 60 detik. -->
 <div class="panel hidden" id="panel-smelter">
-  <h2><img class="ph-ico" src="buttons/f_smelter.png" alt="" onerror="this.outerHTML='🏭'"> Smelter Industri <button class="x" data-close="smelter">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/f_smelter.png" alt="" onerror="this.outerHTML='🏭'"> Smelter Industri <button class="x" data-close="smelter" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="sub">Lebur 2 Bijih Ore menjadi 1 Batang Ingot (durasi 5s). Gunakan 🖤 Batu Bara sebagai bahan bakar (bertahan 60s).</div>
   <div id="smelter-body"></div>
 </div>
@@ -214,7 +214,7 @@
      Isi ingredient lalu mulai ritual untuk memanggil boss. Dibuka lewat
      interaksi bagian tengah altar di dunia. -->
 <div class="panel hidden" id="panel-altar">
-  <h2><img class="ph-ico" src="buttons/ui_altar.png" alt="" onerror="this.outerHTML='🔮'"> Altar Ritual <button class="x" data-close="altar">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_altar.png" alt="" onerror="this.outerHTML='🔮'"> Altar Ritual <button class="x" data-close="altar" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="sub">Isi seluruh ingredient untuk memulai ritual pemanggilan boss.</div>
   <div id="altar-body"></div>
 </div>
@@ -223,13 +223,13 @@
      Konsol dev tersembunyi: hanya bisa dibuka lewat kode khusus yang
      diketik di chat. Dipakai untuk men-spawn apa pun yang ada di game. -->
 <div class="panel hidden" id="panel-term">
-  <h2><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='🖥️'"> TERMINAL <button class="x" data-close="term">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='🖥️'"> TERMINAL <button class="x" data-close="term" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div id="term-body"></div>
 </div>
 
 <!-- ================= PANEL HELP ================= -->
-<div class="panel" id="panel-help">
-  <h2><img class="ph-ico" src="buttons/ui_scroll.png" alt="" onerror="this.outerHTML='ℹ️'"> Bantuan <button class="x" data-close="help">✕</button></h2>
+<div class="panel hidden" id="panel-help">
+  <h2><img class="ph-ico" src="buttons/ui_scroll.png" alt="" onerror="this.outerHTML='ℹ️'"> Bantuan <button class="x" data-close="help" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <table class="help-t">
     <tr><td>WASD / Panah</td><td>Gerak (panah ←→ juga putar kamera)</td></tr>
     <tr><td>SHIFT</td><td>Lari &nbsp;·&nbsp; tekan 2× = roll/dodge</td></tr>
@@ -252,7 +252,7 @@
      Dibuka dari bingkai potret di kiri atas. Kiri = daftar stat detail / lencana,
      kanan = render full-body karakter beserta equipment yang dipakai. -->
 <div class="panel hidden" id="panel-char">
-  <h2><img class="ph-ico" src="buttons/ui_char.png" alt="" onerror="this.outerHTML='🧍'"> Karakter <button class="x" data-close="char">✕</button></h2>
+  <h2><img class="ph-ico" src="buttons/ui_char.png" alt="" onerror="this.outerHTML='🧍'"> Karakter <button class="x" data-close="char" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div class="char-tabs" id="char-tabs">
     <button type="button" class="char-tab-btn active" id="char-tab-stats" data-tab="stats">📊 Statistik</button>
     <button type="button" class="char-tab-btn" id="char-tab-badges" data-tab="badges">🎖️ Gelar & Lencana (20)</button>
@@ -271,7 +271,7 @@
      Berisi pengaturan musik, custom UI, save manual, & pilihan bahasa.
      Dibuka dari tombol gear di sisi HP bar. -->
 <div class="panel hidden" id="panel-settings">
-  <h2 id="settings-title"><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='⚙️'"> Pengaturan <button class="x" data-close="settings">✕</button></h2>
+  <h2 id="settings-title"><img class="ph-ico" src="buttons/gear.png" alt="" onerror="this.outerHTML='⚙️'"> Pengaturan <button class="x" data-close="settings" title="Tutup"><svg class="x-ico" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></h2>
   <div id="settings-content"></div>
   <p class="tip" id="settings-tip">Setelan tersimpan otomatis.</p>
 </div>
@@ -388,8 +388,8 @@
 <script src="js/entities/mob_trex.js"></script>
 <script src="js/entities/mob_mammoth.js"></script>
 <script src="js/entities/mob_lizard.js"></script>
-<!-- IGUANA HUTAN: monster ular voxel Skeleton IK (NEW MODEL/iguana.html) -->
-<script src="js/entities/mob_iguana.js"></script>
+<!-- SNAKE HUTAN: monster ular voxel Skeleton IK (NEW MODEL/snake.html) -->
+<script src="js/entities/mob_snake.js"></script>
 <script src="js/entities/mob_cow.js"></script>
 <script src="js/entities/mob_horse.js"></script>
 <script src="js/entities/mob_kelabang.js"></script>
@@ -489,6 +489,8 @@
 <script src="js/bomb.js"></script>
 <!-- engine i18n dimuat paling akhir: butuh semua data game sudah terdaftar -->
 <script src="js/i18n_engine.js"></script>
+<!-- Multiplayer Online MMORPG Network Module -->
+<script src="js/network.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

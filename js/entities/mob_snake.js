@@ -1,6 +1,6 @@
 'use strict';
 /* =============================================================================
-   ENTITAS MOB: IGUANA HUTAN / ULAR VOXEL (🐍)
+   ENTITAS MOB: SNAKE HUTAN / ULAR VOXEL (🐍)
    -----------------------------------------------------------------------------
    Model ular voxel panjang tanpa kaki dengan tulang belakang dinamis (spine trail IK).
    Pergerakan sangat lentur & organik:
@@ -15,7 +15,7 @@
        Lompat (coiled strike leap AoE).
    ============================================================================= */
 
-const Mob_Iguana=(()=>{
+const Mob_Snake=(()=>{
 
   const SCALE=0.42;                  // skala model di dunia voxel
   const NUM_SEGS=22;                 // jumlah ruas badan ular dari leher ke ekor
@@ -115,7 +115,7 @@ const Mob_Iguana=(()=>{
     SEGS_SPEC.push({w,h,len:SEG_DIST,dorsal,side,belly});
   }
 
-  const Mob_Iguana={
+  const Mob_Snake={
     SCALE, DUR, NUM_SEGS, SEG_WORLD_DIST,
 
     /* ================= MODEL 3D: ULAR PANJANG TANPA KAKI ================= */
@@ -643,7 +643,8 @@ const Mob_Iguana=(()=>{
     },
   };
 
-  window.Mob_Ular=Mob_Iguana;
-  window.Mob_Iguana=Mob_Iguana;
-  return Mob_Iguana;
+  window.Mob_Snake=Mob_Snake;
+  window.Mob_Ular=Mob_Snake;
+  window.Mob_Iguana=Mob_Snake;
+  return Mob_Snake;
 })();

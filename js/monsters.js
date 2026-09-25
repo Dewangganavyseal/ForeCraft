@@ -3,7 +3,7 @@
 /* nama tampilan untuk notifikasi & teks UI */
 const MOB_NAME={slime:'Slime',boar:'Babi Hutan',golem:'Golem',
   wolf:'Serigala',scorpion:'Kalajengking',rabbit:'Kelinci',dragon:'Naga',trex:'T-Rex',mammoth:'Mammoth',
-  lizard:'Lizard Rawa',ular:'Ular',iguana:'Ular',cow:'Sapi',horse:'Kuda',
+  lizard:'Lizard Rawa',snake:'Snake',ular:'Snake',iguana:'Snake',cow:'Sapi',horse:'Kuda',
   kelabang:'Kelabang',kelabang_part:'Ruas Kelabang',kumbang:'Kumbang Tanduk',
   yeti:'Yeti',semut:'Semut Raksasa',reaper:'Reaper',tarantula:'Tarantula Raksasa'};
 const Monsters={
@@ -39,11 +39,10 @@ const Monsters={
        muncul di tepi sungai/danau (lihat spawnLizard). Radius tabrakan kecil
        (0.55, seukuran babi hutan) mengikuti modelnya yang dikecilkan. */
     lizard:{hp:90,dmg:14,xp:48,speed:3.6,r:0.55,aggro:16},
-    /* ULAR HUTAN: monster ular voxel panjang tanpa kaki (Spine Trail IK 22 ruas).
+    /* SNAKE HUTAN: monster ular voxel panjang tanpa kaki (Spine Trail IK 22 ruas).
        Mob darat biome HUTAN. Tiga aksi: Patuk (melee), Sembur Bisa (proyektil
        racun DoT), Lompat (sergap gelombang melayang AoE). */
-    ular:{hp:110,dmg:15,xp:52,speed:3.8,r:0.65,aggro:16,bossScale:0.68},
-    iguana:{hp:110,dmg:15,xp:52,speed:3.8,r:0.65,aggro:16,bossScale:0.68},
+    snake:{hp:110,dmg:15,xp:52,speed:3.8,r:0.65,aggro:16,bossScale:0.68},
     /* TERNAK PASIF: kategori ANIMAL, bukan monster buruan NPC. Tidak menyerang
        pemain/NPC. Sapi & kuda berkeliaran, merumput, dan kabur dari predator. */
     cow:{hp:60,dmg:0,xp:12,speed:2.6,r:0.65,aggro:0,passive:true,livestock:true,animal:true},
@@ -650,6 +649,8 @@ const Monsters={
   /* `opts.mark`=false → tanpa penanda boss (dipakai boss ritual Altar)
      `opts.scaleMul` → skala boss RELATIF terhadap ukuran alami model */
   make(type,pos,boss=false,opts){
+    /* alias tipe lama (save/dunia lama): ular & iguana -> snake */
+    if(type==='ular'||type==='iguana')type='snake';
     const T=this.TYPES[type];
     opts=opts||{};
 
@@ -1187,8 +1188,8 @@ const Monsters={
        /* MAMMOTH: daging purba melimpah + kulit tebal + gading 5% (bahan pedang dragon) */
        m.type==='mammoth'?[['meat',4],['leather',2+(Math.random()<0.5?1:0)],['tusk',Math.random()<0.05?1:0]]:
         m.type==='lizard'?[['meat',1],['stone',2],['hard_shell',Math.random()<0.16?1:0],['green_blood',Math.random()<0.16?1:0]]:
-        /* ular / iguana hutan: daging + kulit reptil + racun bisa */
-        (m.type==='ular'||m.type==='iguana')?[['meat',1+(Math.random()<0.5?1:0)],['venom',1],['green_blood',Math.random()<0.16?1:0],['hard_shell',Math.random()<0.16?1:0]]:
+        /* snake hutan: daging + kulit reptil + racun bisa */
+        m.type==='snake'?[['meat',1+(Math.random()<0.5?1:0)],['venom',1],['green_blood',Math.random()<0.16?1:0],['hard_shell',Math.random()<0.16?1:0]]:
        [['stone',2+(Math.random()<0.5?1:0)],['meat',1]];
     /* ---------- INTI BOSS (boss_core): SATU-SATUNYA dari jalur kill() ----------
        - Mob BIASA (apa pun tipenya): peluang 7% menjatuhkan 1 inti boss.
@@ -1243,7 +1244,7 @@ const Monsters={
     }
     const dustColor=m.type==='slime'?0x67c74f:m.type==='boar'?0x6b4a34:
       m.type==='wolf'?0x6f7480:m.type==='scorpion'?0x8a5a2b:
-      m.type==='lizard'?0x4e8f3a:(m.type==='ular'||m.type==='iguana')?0x548636:m.type==='kumbang'?0x7a4f24:
+      m.type==='lizard'?0x4e8f3a:m.type==='snake'?0x548636:m.type==='kumbang'?0x7a4f24:
       m.type==='yeti'?0xcfe0f2:m.type==='semut'?0x8a3b1f:
       m.type==='tarantula'?0x2e1910:
       m.type==='reaper'?0x2a2140:m.type==='trex'?0x5f7f4c:m.type==='mammoth'?0x74451f:0x8a8f98;
@@ -1259,8 +1260,7 @@ const Monsters={
       scorpion:[0x8a5a2b,0x6a4320,0xb07a3c],
       rabbit:[0xc9b5a0,0xa08570,0xe0d0bc],
       lizard:[0x4e8f3a,0x69a94b,0x33682a],
-      ular:[0x548636,0x6ca83c,0x30581e],
-      iguana:[0x548636,0x6ca83c,0x30581e],
+      snake:[0x548636,0x6ca83c,0x30581e],
       cow:[0xefe8d8,0x2e2a25,0xd9ac92],
       horse:[0x945c33,0x2b2b30,0xe8e4da],
       kelabang:[0x96332c,0x5f1d1a,0xd9a066],
@@ -1604,9 +1604,9 @@ const Monsters={
     if(typeof Mob_Reaper!=='undefined'&&Mob_Reaper.updateSpirits)Mob_Reaper.updateSpirits(dt);
     /* proyektil jaring tarantula (damage + stun 5 detik): update global */
     if(typeof Mob_Tarantula!=='undefined'&&Mob_Tarantula.updateWebs)Mob_Tarantula.updateWebs(dt);
-    /* partikel bisa ular / iguana (damage + racun DoT): update global sekali per frame */
-    if(typeof Mob_Ular!=='undefined'&&Mob_Ular.updateVenom)Mob_Ular.updateVenom(dt);
-    else if(typeof Mob_Iguana!=='undefined'&&Mob_Iguana.updateVenom)Mob_Iguana.updateVenom(dt);
+    /* partikel bisa snake (damage + racun DoT): update global sekali per frame */
+    if(typeof Mob_Snake!=='undefined'&&Mob_Snake.updateVenom)Mob_Snake.updateVenom(dt);
+    else if(typeof Mob_Snake!=='undefined'&&Mob_Snake.updateVenom)Mob_Snake.updateVenom(dt);
   },
 
   ai(m,dt,dp){
@@ -1659,10 +1659,10 @@ const Monsters={
       return;
     }
 
-    /* ---------- ULAR HUTAN: patuk (dekat), sembur bisa (menengah),
+    /* ---------- SNAKE HUTAN: patuk (dekat), sembur bisa (menengah),
        lompat sergap AoE (jauh) ---------- */
-    if(m.type==='ular'||m.type==='iguana'){
-      this.aiIguana(m,dt,dp,angP);
+    if(m.type==='snake'){
+      this.aiSnake(m,dt,dp,angP);
       return;
     }
 
@@ -3075,7 +3075,7 @@ const Monsters={
   },
 
   /* =========================================================================
-     AI ULAR HUTAN — 3 aksi otentik (port dari NEW MODEL/iguana.html)
+     AI SNAKE HUTAN — 3 aksi otentik (port dari NEW MODEL/snake.html)
      -------------------------------------------------------------------------
      'attack' (Patuk) : ancang-ancang menunduk (0.30s) → sentak maju cepat
               (damage saat rahang menutup) → pulih. Damage melee + shake.
@@ -3084,15 +3084,15 @@ const Monsters={
      'jump' (Lompat) : lompatan melayang dengan gelombang badan berurutan
               dari atas ke belakang → hantam tanah AoE saat mendarat.
      ========================================================================= */
-  pickIguanaAtk(d){
+  pickSnakeAtk(d){
     const r=Math.random();
     if(d<2.0)return r<0.80?'attack':'venom';
     if(d<4.5)return r<0.40?'attack':(r<0.70?'venom':'jump');
     if(d<9.5)return r<0.45?'venom':(r<0.80?'jump':'attack');
     return r<0.60?'venom':'jump';
   },
-  startIguanaAtk(m,name,target){
-    const A=(typeof Mob_Ular!=='undefined')?Mob_Ular:((typeof Mob_Iguana!=='undefined')?Mob_Iguana:null);
+  startSnakeAtk(m,name,target){
+    const A=(typeof Mob_Snake!=='undefined')?Mob_Snake:null;
     m.iAct=name;m.iActT=0;
     m.iActDur=(A&&A.DUR&&A.DUR[name])||1.2;
     m.iTarget=(target&&target!==Player)?target:null;
@@ -3101,8 +3101,8 @@ const Monsters={
     if(name==='jump'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'smash',0.5);
     if(name==='venom'&&typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'cast',0.6);
   },
-  iguanaAct(m,dt,dp,angP,tgtIn){
-    const A=(typeof Mob_Ular!=='undefined')?Mob_Ular:((typeof Mob_Iguana!=='undefined')?Mob_Iguana:null);
+  snakeAct(m,dt,dp,angP,tgtIn){
+    const A=(typeof Mob_Snake!=='undefined')?Mob_Snake:null;
     m.iActT+=dt;
     const tA=m.iActT,name=m.iAct;
     const tgt=(m.iTarget&&!m.iTarget.dead)?m.iTarget:
@@ -3141,7 +3141,7 @@ const Monsters={
     }
 
     else if(name==='venom'){
-      /* SEMBUR BISA: diam mendongak, partikel disemprot Mob_Ular/Mob_Iguana.animate
+      /* SEMBUR BISA: diam mendongak, partikel disemprot Mob_Snake.animate
          selama jendela 0.55–1.85s lewat venomBurst(single). */
       m.vel.x*=0.85;m.vel.z*=0.85;
       if(tA<1.85&&dp>0.5&&angP!==undefined)m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angP,dt*4);
@@ -3194,17 +3194,17 @@ const Monsters={
       m.atkCd=(name==='venom')?rand(0.8,1.2):(name==='jump'?rand(1.8,2.8):rand(1.2,2.0));
     }
   },
-  aiIguana(m,dt,dp,angP){
+  aiSnake(m,dt,dp,angP){
     this.pickFoe(m,dt);
     const tgt=this.aimTarget(m);
     const tpos=tgt?tgt.pos:Player.pos;
     const dT=tgt?Math.hypot(tpos.x-m.pos.x,tpos.z-m.pos.z):999;
     const angT=Math.atan2(tpos.x-m.pos.x,tpos.z-m.pos.z);
 
-    if(m.iAct){this.iguanaAct(m,dt,dT,angT,tgt);return;}
+    if(m.iAct){this.snakeAct(m,dt,dT,angT,tgt);return;}
 
     const MB=CFG.MOB;
-    const sight=Math.min((this.TYPES.ular||this.TYPES.iguana).aggro,MB.SIGHT);
+    const sight=Math.min(this.TYPES.snake.aggro,MB.SIGHT);
     m.seeT=Math.max(0,(m.seeT||0)-dt);
     m.alert=Math.max(0,(m.alert||0)-dt);
     if(tgt&&dT<sight)m.seeT=MB.MEM;
@@ -3222,7 +3222,7 @@ const Monsters={
         const damp=Math.exp(-8*dt);
         m.vel.x*=damp;m.vel.z*=damp;
       }
-      if(m.atkCd<=0&&dT<=14)this.startIguanaAtk(m,this.pickIguanaAtk(dT),tgt);
+      if(m.atkCd<=0&&dT<=14)this.startSnakeAtk(m,this.pickSnakeAtk(dT),tgt);
     }else{
       m.t-=dt;
       if(m.t<=0){m.t=rand(1.5,4);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
@@ -3700,11 +3700,10 @@ const Monsters={
         }
         return false;
 
-      case 'ular':
-      case 'iguana':
+      case 'snake':
         /* tiga aksi otentik: patuk (dekat), sembur bisa (menengah), lompat (jauh) */
         if(m.atkCd>0||m.iAct)return false;
-        this.startIguanaAtk(m,this.pickIguanaAtk(d),tgt);
+        this.startSnakeAtk(m,this.pickSnakeAtk(d),tgt);
         return true;
 
       case 'lizard':
@@ -3857,7 +3856,7 @@ const Monsters={
     }
   },
 
-  PREDATORS:['wolf','boar','scorpion','lizard','ular','iguana','dragon','trex','mammoth'],
+  PREDATORS:['wolf','boar','scorpion','lizard','snake','dragon','trex','mammoth'],
 
   /* kategori animal: sapi/kuda. NPC tidak boleh memburu/menyerang animal. */
   isAnimal(m){
@@ -4049,9 +4048,9 @@ const Monsters={
       else if(m.type==='tarantula'){
         if(!m.tAct)this.startTarantulaAtk(m,this.pickTarantulaAtk(d),target);
       }
-      /* ---------- ULAR PET: patuk, sembur bisa & lompat sergap ---------- */
-      else if(m.type==='ular'||m.type==='iguana'){
-        if(!m.iAct)this.startIguanaAtk(m,this.pickIguanaAtk(d),target);
+      /* ---------- SNAKE PET: patuk, sembur bisa & lompat sergap ---------- */
+      else if(m.type==='snake'){
+        if(!m.iAct)this.startSnakeAtk(m,this.pickSnakeAtk(d),target);
       }
       /* ---------- BABI HUTAN PET: pukulan atas gading & seruduk lari kencang ---------- */
       else if(m.type==='boar'){
@@ -4201,7 +4200,7 @@ const Monsters={
     if((m._stepCd||0)>0)return false;
     if(!m.onGround&&!m.inWater)return false;
     const isTarantula=(m.type==='tarantula');
-    const isSnake=(m.type==='ular'||m.type==='iguana');
+    const isSnake=m.type==='snake';
     let spd=Math.hypot(m.vel.x,m.vel.z);
     let want;
     if(spd<0.15){
@@ -4360,7 +4359,7 @@ const Monsters={
        tidak terpotong saat mob sedang turun; pass unburyY menjamin mob tidak
        pernah tersisa DI DALAM blok padat. */
     const isTarantula=(m.type==='tarantula');
-    const isSnake=(m.type==='ular'||m.type==='iguana');
+    const isSnake=m.type==='snake';
     const mrefY=Math.max(py0,m.pos.y)+(isTarantula||isSnake?3.2:1.8);
     let g=World.groundAt(m.pos.x,m.pos.z,mrefY);
     const isJumping=(m.vel&&m.vel.y>1.5)||(isTarantula&&m._tJumping)||(isSnake&&(!m.onGround||(m._iLaunched&&!m._iHit)));
@@ -4420,7 +4419,7 @@ const Monsters={
 /* tinggi kira-kira model, dipakai untuk posisi teks damage & aura boss */
 function meshHeight(type){
   return type==='golem'?3:type==='dragon'?4.2:type==='mammoth'?4.2:type==='trex'?3.8:type==='cow'?1.8:type==='horse'?2.1:
-    type==='lizard'?1.2:(type==='ular'||type==='iguana')?1.4:type==='boar'?1.1:
+    type==='lizard'?1.2:type==='snake'?1.4:type==='boar'?1.1:
     type==='kelabang'?3.9:type==='kelabang_part'?1.4:
     type==='kumbang'?1.8:
     type==='yeti'?2.6:type==='semut'?1.5:

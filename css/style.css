@@ -135,7 +135,28 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 /* ==== Panels ==== */
 .panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,94vw);max-height:86vh;overflow-y:auto;background:rgba(20,16,12,.95);border:2px solid #7c2d12;border-radius:14px;padding:18px 22px;z-index:30;box-shadow:0 12px 50px rgba(0,0,0,.75);backdrop-filter:blur(6px)}
 .panel h2{font-family:'Press Start 2P',monospace;font-size:14px;color:#ea580c;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
-.panel .x{background:none;border:none;color:#ea580c;font-size:16px;cursor:pointer}
+.panel .x{
+  position:relative;z-index:4;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;padding:0;
+  border-radius:8px;
+  background-color:#ea580c;
+  border:1.5px solid #7c2d12;
+  color:#ffffff;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif !important;
+  font-size:16px;font-weight:900;line-height:1;
+  cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,0.3);
+  transition:transform .12s,background .15s,border-color .15s;
+  margin-left:auto;
+}
+.panel .x:hover{
+  background-color:#f97316;border-color:#9a3412;transform:scale(1.08);
+}
+.panel .x:active{
+  transform:scale(.92);background-color:#c2410c;
+}
+.panel .x .x-ico{width:14px;height:14px;display:block;pointer-events:none}
 .sub{font-size:11px;opacity:.7;margin:10px 0 6px;text-transform:uppercase;letter-spacing:1px}
 .grid{display:grid;grid-template-columns:repeat(7,56px);gap:6px;justify-content:center}
 .slot{width:56px;height:56px;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.14);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;cursor:pointer}
@@ -1109,34 +1130,51 @@ img.block-3d-ico,img.furni-3d-ico{
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;-ms-overflow-style:none}
 .panel>.panel-body::-webkit-scrollbar{width:0;height:0;display:none}
-.panel .x{position:relative;z-index:4;padding:2px 8px;line-height:1;
-  border-radius:8px}
-.panel .x:active{background:rgba(255,255,255,.12)}
-
-/* ====== MENU MELAYANG BAG / PET DI SAMPING PANEL TAS ====================
-   Posisi final dihitung JS (UI.positionBagMenu) agar selalu dempet di sisi
-   kiri panel Tas, bukan di sisi layar. */
+/* ====== MENU BAG / BLOK / FURNITUR / PET (ICON ONLY) ====================
+   Elemen ini saudara #panel-bag (BUKAN anaknya) supaya tidak terpotong oleh
+   overflow:hidden panel. Posisi final dihitung JS (UI.positionBagMenu):
+   - Desktop: vertikal melayang dempet di sisi kiri panel Tas (icon kotak 50px).
+   - Mobile / layar pendek: bar horizontal tepat di ATAS panel Tas. */
 #bag-float-menu{position:fixed;left:0;top:0;
-  display:none;flex-direction:column;gap:10px;z-index:35}
+  display:none;flex-direction:column;gap:8px;z-index:35}
 #bag-float-menu.show{display:flex}
-#bag-float-menu .bag-menu-btn{width:58px;height:58px;border-radius:16px;
+#bag-float-menu .bag-menu-btn{width:50px;height:50px;border-radius:14px;
   border:2px solid #7c2d12;background-color:#ea580c;
-  color:#ffffff;font-size:11px;font-weight:700;line-height:1.25;
+  color:#ffffff;line-height:1;
   cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,0.35);backdrop-filter:blur(4px);
-  transition:transform .12s, border-color .15s, box-shadow .15s}
+  transition:transform .12s, border-color .15s, box-shadow .15s;
+  display:flex;align-items:center;justify-content:center;padding:0}
 #bag-float-menu .bag-menu-btn:hover{
-  border-color:#9a3412;
+  border-color:#ffd24d;
   box-shadow:0 8px 20px rgba(0,0,0,.6), 0 0 12px rgba(234,88,12,0.45);
   transform:translateY(-2px);
 }
-#bag-float-menu .bag-menu-btn span{display:block;font-size:20px}
-#bag-float-menu .menu-ico{width:24px;height:24px;object-fit:contain}
-#bag-float-menu .bag-menu-btn.active{border-color:#7c2d12;color:#ffffff;
+#bag-float-menu .menu-ico{width:28px;height:28px;object-fit:contain;display:block}
+#bag-float-menu .bag-menu-btn.active{border-color:#ffd24d;color:#ffffff;
   background-color:#c2410c;
   box-shadow:0 6px 20px rgba(194,65,12,0.5), inset 0 2px 4px rgba(0,0,0,0.4)}
-@media (max-width:640px){
-  #bag-float-menu .bag-menu-btn{width:48px;height:48px;font-size:9px}
-  #bag-float-menu .bag-menu-btn span{font-size:17px}
+
+/* Mobile & layar sempit: bar tab horizontal di atas panel Tas */
+@media (max-width:768px), (max-height:520px){
+  #bag-float-menu{
+    flex-direction:row;gap:8px;
+    padding:6px 10px;background:rgba(20,16,12,.97);
+    border:1.5px solid #7c2d12;border-radius:12px;
+    box-shadow:0 6px 18px rgba(0,0,0,.5);
+    box-sizing:border-box;max-width:96vw;
+    justify-content:center;
+  }
+  #bag-float-menu .bag-menu-btn{
+    width:42px;height:42px;border-radius:10px;flex:0 0 auto;
+    padding:0;transform:none !important;
+  }
+  #bag-float-menu .bag-menu-btn:hover{transform:none !important}
+  #bag-float-menu .menu-ico{width:24px;height:24px}
+}
+@media (max-width:420px){
+  #bag-float-menu{padding:4px 6px;gap:6px}
+  #bag-float-menu .bag-menu-btn{width:36px;height:36px}
+  #bag-float-menu .menu-ico{width:20px;height:20px}
 }
 
 /* ====== TAB KATEGORI CRAFTING (baris tetap di bawah header) ============== */
@@ -1751,9 +1789,10 @@ body.touch #chat-input{font-size:14px}
 
 /* --- panel harus selalu muat di layar & tidak tertutup kontrol mobile --- */
 .panel{max-height:88vh}
-body.touch .panel{max-height:66vh;top:40%;width:min(560px,96vw)}
+body.touch .panel{max-height:82vh;top:50%;width:min(560px,96vw)}
+body.touch .panel>.panel-body{padding:8px 10px 14px}
 @media (max-height:560px){
-  body.touch .panel{max-height:78vh;top:47%}
+  body.touch .panel{max-height:88vh;top:50%}
   .panel{max-height:92vh}
 }
 
@@ -2654,6 +2693,99 @@ body.touch #portrait{width:58px;height:58px}
   color: #ffffff;
 }
 
+.bh-place-btn {
+  background: #15803d;
+  border: 1.5px solid #22c55e;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bh-place-btn:hover {
+  background: #16a34a;
+  border-color: #4ade80;
+  color: #ffffff;
+}
+
+/* Control bar di tab Blok & Furnitur pada panel Tas */
+.bag-ctrl-bar {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid #7c2d12;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bag-ctrl-desc {
+  font-size: 12px;
+  color: #ffd24d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.bag-ctrl-ico {
+  font-size: 20px;
+  flex: 0 0 auto;
+}
+
+.bag-ctrl-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bag-ctrl-btn {
+  background: #ea580c;
+  color: #fff;
+  border: 1.5px solid #7c2d12;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  transition: all 0.15s ease;
+}
+
+.bag-ctrl-btn:hover {
+  background: #f97316;
+  border-color: #9a3412;
+}
+
+@media (max-width: 480px) {
+  .bag-ctrl-bar {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  .bag-ctrl-desc {
+    font-size: 11px;
+  }
+  .bag-ctrl-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .bh-body {
   display: flex;
   align-items: center;
@@ -2736,7 +2868,7 @@ body.touch #portrait{width:58px;height:58px}
 
 @media (max-width: 640px) {
   #build-hud {
-    top: 10px;
+    top: 52px;
     width: 90vw;
     max-width: 320px;
   }
@@ -2754,12 +2886,44 @@ body.touch #portrait{width:58px;height:58px}
     padding: 4px 8px;
     font-size: 10px;
   }
+  .bh-place-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
   .bh-tip {
     font-size: 9px;
   }
   body.touch #block-grid, body.touch #furni-grid {
     grid-template-columns: repeat(auto-fill, 40px);
     gap: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .bh-body {
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .shop-row {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+  .shop-row .s-info {
+    font-size: 11px;
+  }
+  .shop-row .s-buy {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .grid.npc-bag, .grid.npc-give {
+    grid-template-columns: repeat(auto-fill, 34px);
+    gap: 3px;
+  }
+  .grid.npc-bag .slot, .grid.npc-give .slot {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
   }
 }
 
@@ -2896,6 +3060,209 @@ body.touch #portrait{width:58px;height:58px}
   color: #e0ecff;
   opacity: 0.85;
 }
+
+/* =========================================================================
+   FORECRAFT ONLINE - MULTIPLAYER MENU & ROOM BROWSER
+   ========================================================================= */
+.mm-multi {
+  background: linear-gradient(135deg, #1565c0, #0d47a1) !important;
+  border-color: #64b5f6 !important;
+  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.45) !important;
+  color: #fff !important;
+}
+.mm-multi:hover {
+  background: linear-gradient(135deg, #1976d2, #1565c0) !important;
+  border-color: #90caf9 !important;
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6) !important;
+}
+
+.mp-wrap {
+  width: min(850px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 22, 28, 0.94);
+  border: 2px solid #2e435e;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #e0e8f0;
+  box-sizing: border-box;
+}
+
+.mp-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 12px;
+}
+.mp-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 20px;
+  color: #64b5f6;
+  text-shadow: 0 2px 8px rgba(33, 150, 243, 0.5);
+  margin: 0;
+}
+.mp-sub {
+  font-size: 12px;
+  color: #a0b4cc;
+}
+
+.mp-name-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mp-name-label {
+  font-weight: bold;
+  font-size: 13px;
+  color: #ffd24d;
+}
+.mp-name-input {
+  background: #101824;
+  border: 1px solid #3c5478;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  width: 180px;
+  transition: border-color 0.2s;
+}
+.mp-name-input:focus {
+  border-color: #64b5f6;
+  box-shadow: 0 0 8px rgba(100, 181, 246, 0.4);
+}
+
+.mp-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 48vh;
+  padding-right: 6px;
+  margin-bottom: 14px;
+}
+
+.mp-room-card {
+  background: rgba(28, 36, 48, 0.85);
+  border: 1px solid #314663;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: transform 0.15s, border-color 0.2s, background 0.2s;
+}
+.mp-room-card:hover {
+  transform: translateY(-2px);
+  border-color: #64b5f6;
+  background: rgba(36, 48, 64, 0.95);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.mp-room-card.is-full {
+  opacity: 0.6;
+  border-color: #4a2828;
+}
+
+.mp-room-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.mp-room-name {
+  font-weight: bold;
+  font-size: 14px;
+  color: #ffffff;
+}
+.mp-room-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+.mp-badge-online {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+.mp-badge-full {
+  background: rgba(244, 67, 54, 0.2);
+  color: #e57373;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.mp-room-desc {
+  font-size: 11px;
+  color: #a8b8cc;
+  line-height: 1.35;
+}
+.mp-room-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+.mp-room-seed {
+  font-size: 10px;
+  color: #728ca6;
+  font-family: monospace;
+}
+.mp-btn-join {
+  background: linear-gradient(135deg, #2e7d32, #1b5e20);
+  border: 1px solid #81c784;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mp-btn-join:hover {
+  background: linear-gradient(135deg, #388e3c, #2e7d32);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  transform: scale(1.03);
+}
+.mp-btn-join:disabled {
+  background: #333333;
+  border-color: #555555;
+  color: #888888;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mp-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+}
+
+@media (max-width: 600px) {
+  .mp-room-grid {
+    grid-template-columns: 1fr;
+    max-height: 42vh;
+  }
+  .mp-name-bar {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
 
 
 

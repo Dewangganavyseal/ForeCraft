@@ -33,11 +33,10 @@
         }
         localStorage.setItem('forest_survival_slots_meta', JSON.stringify(meta));
 
-        /* Pulihkan data dunia pendukung (furnitur/rumah, peti, quest, shop) bila kosong */
+        /* Pulihkan data dunia pendukung (furnitur/rumah, peti, shop) bila kosong */
         const extras = [
           'forest_survival_furni_v1',
           'forest_survival_chest_v1',
-          'forest_survival_quest_v1',
           'forest_survival_dshop_v1',
           'forecraft_altar_v1',
           'forecraft_farm_v1',

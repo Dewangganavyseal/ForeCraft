@@ -1514,5 +1514,374 @@ const I18N_PHRASE={
   "Tidak ada tawaran baru untuk saat ini — naikkan level atau selesaikan quest yang berjalan.":["No new offers right now — level up or complete current quests.","目前没有新任务——提升等级或完成当前任务。","現在新しい依頼はありません — レベルを上げるか進行中のクエストを完了してください。"],
   "Kembali ke papan quest di tavern untuk mengambil hadiah":["Return to the quest board in the tavern to claim your reward","返回酒馆任务板领取奖励","報酬を受け取るため酒場の掲示板に戻る"],
 
+  /* ================= TAMBAHAN PELOKALAN (BAG, BLOK, FURNITUR, PET, BUILD, DLL) ================= */
+  'Semua': ['All','全部','すべて'],
+  'Blok': ['Block','方块','ブロック'],
+  'Block': ['Block','方块','ブロック'],
+  'Furnitur': ['Furniture','家具','家具'],
+  'Furniture': ['Furniture','家具','家具'],
+  'Penyimpanan Blok': ['Block Storage','方块收纳','ブロック収納'],
+  'Penyimpanan Furnitur': ['Furniture Storage','家具收纳','家具収納'],
+  'Klik blok untuk memilih': ['Click block to select','点击方块进行选择','ブロックをクリックして選択'],
+  'Klik furnitur untuk memilih': ['Click furniture to select','点击家具进行选择','家具をクリックして選択'],
+  'Pilih blok untuk membangun': ['Select a block to build','选择要建造的方块','建築するブロックを選択'],
+  'Pilih furnitur untuk dipasang': ['Select furniture to place','选择要放置的家具','配置する家具を選択'],
+  'Pasang Furnitur': ['Place Furniture','放置家具','家具を配置'],
+  'Ganti Furnitur': ['Change Furniture','更换家具','家具変更'],
+  'Ganti Blok': ['Change Block','更换方块','ブロック変更'],
+  'Blok Aktif:': ['Active Block:','当前方块：','アクティブブロック：'],
+  'Belum ada blok dipilih': ['No block selected','未选择方块','ブロックが選択されていません'],
+  'Mode Bangun': ['Build Mode','建造模式','建築モード'],
+  'MODE BANGUN': ['BUILD MODE','建造模式','建築モード'],
+  'Keluar Mode Bangun': ['Exit Build Mode','退出建造模式','建築モードを終了'],
+  'Putar Arah (Tekan R)': ['Rotate Direction (Press R)','旋转朝向 (按 R)','向きを回転 (Rキー)'],
+  'Putar': ['Rotate','旋转','回転'],
+  '🔄 Putar': ['🔄 Rotate','🔄 旋转','🔄 回転'],
+  '✔ Pasang': ['✔ Place','✔ 放置','✔ 配置'],
+  'Pasang': ['Place','放置','配置'],
+  'Titip Semua Resource': ['Deposit All Resources','存入所有资源','すべての資源を預ける'],
+  'Tasmu — klik untuk menitipkan': ['Your Bag — click to deposit','你的背包 — 点击存入','あなたのバッグ — クリックで預ける'],
+  'Klik item di peti untuk mengambilnya, klik item di tasmu untuk menitipkannya. Isi peti tetap tersimpan walau kamu keluar dari permainan.':
+    ['Click items in the chest to take them, click items in your bag to store them. Chest contents stay saved even when you exit the game.',
+     '点击箱子中的物品取出，点击背包中的物品存入。退出游戏后箱子内的物品依然会保存。',
+     'チェストのアイテムをクリックして取り出し、バッグのアイテムをクリックして預けます。ゲーム終了後も保存されます。'],
+  'Anggota tim & peliharaanmu — ketuk untuk mengatur.':
+    ['Your party members & pets — tap to manage.',
+     '你的队员和宠物 — 点击以管理。',
+     '仲間とペット — タップして管理。'],
+  'Harga beli tetap; harga jual setengah harga beli. Koin didapat dari quest, mengalahkan monster, dan menjual barang.':
+    ['Buying price is fixed; sell price is half the buy price. Coins are earned from quests, defeating monsters, and selling items.',
+     '买入价格固定；出售价格为买入价的一半。金币可通过任务、击败怪物和出售物品获得。',
+     '購入価格は固定、売却価格は半額です。コインはクエスト、モンスター討伐、アイテム売却で入手できます。'],
+  'Tempa equipment untuk menaikkan Levelnya — bayar dengan 🪙 koin dan bahan yang relevan dengan equipment-nya.':
+    ['Forge equipment to raise its Level — pay with 🪙 coins and materials relevant to the equipment.',
+     '锻造装备以提升等级 — 使用 🪙 金币及该装备对应材料。',
+     '装備を鍛錬してレベルアップ — 🪙コインと対応素材が必要です。'],
+  'Lebur 2 Bijih Ore menjadi 1 Batang Ingot (durasi 5s). Gunakan 🖤 Batu Bara sebagai bahan bakar (bertahan 60s).':
+    ['Smelt 2 Ores into 1 Ingot (takes 5s). Use 🖤 Coal as fuel (lasts 60s).',
+     '将 2 块矿石熔炼为 1 块金属锭 (耗时 5秒)。使用 🖤 煤炭作为燃料 (持续 60秒)。',
+     '鉱石2個をインゴット1個に製錬（所要時間5秒）。🖤石炭を燃料として使用（持続時間60秒）。'],
+  'Blok yang dihancurkan di dunia otomatis terkumpul di sini. Aktifkan Mode Bangun untuk menata dan memasang blok di dunia.':
+    ['Blocks broken in the world automatically gather here. Activate Build Mode to organize and place blocks in the world.',
+     '在世界中采集的方块会自动存放在此。启用建造模式以在世界中放置与搭建方块。',
+     '世界で壊したブロックは自動的にここに集まります。建築モードを起動してブロックを配置・整頓してください。'],
+  'Semua furnitur & struktur sekali pasang tersimpan di sini. Pilih furnitur lalu klik Pasang untuk meletakkan di dunia.':
+    ['All furniture & one-time structures are stored here. Select furniture and click Place to put it in the world.',
+     '所有家具与建筑构件均保存在此。选择家具并点击“放置”即可放置于世界中。',
+     'すべての家具と設置物はここに保管されます。家具を選択して「配置」をクリックすると世界に設置できます。'],
+  'Klik item lalu klik slot lain untuk memindahkan. Tekan <b>F</b> untuk makan item hotbar terpilih.':
+    ['Click an item then click another slot to move. Press <b>F</b> to eat selected hotbar item.',
+     '点击物品再点击其他栏位以移动。按 <b>F</b> 食用选中的快捷栏物品。',
+     'アイテムをクリックして別のスロットに移動。<b>F</b>キーで選択中のホットバーアイテムを食べます。'],
+  'Pet tidak bisa di-drop. Pet bisa diberi makan, dipasang Sadel, dijual, atau dilepaskan.':
+    ['Pets cannot be dropped. Pets can be fed, saddled, sold, or released.',
+     '宠物无法丢弃。宠物可以喂食、装备鞍、出售或放生。',
+     'ペットはドロップできません。餌やり、サドル装着、売却、放生が可能です。'],
+  'Klik atau seret (drag) di permukaan dunia untuk menata blok':
+    ['Click or drag on the world surface to place blocks',
+     '点击或拖拽地面以放置方块',
+     '地面をクリックまたはドラッグしてブロックを配置'],
+  'Klik tanah untuk meletakkan furnitur · Putar dengan tombol 🔄 / tekan R':
+    ['Click ground to place furniture · Rotate with 🔄 button / press R',
+     '点击地面放置家具 · 使用 🔄 按钮 / 按 R 旋转',
+     '地面をクリックして家具を配置 · 🔄ボタン / Rキーで回転'],
+  'Arah furnitur diputar 90°':
+    ['Furniture rotated 90°',
+     '家具旋转 90°',
+     '家具の向きを90°回転'],
+  'Pilih furnitur di tab Furnitur terlebih dahulu!':
+    ['Select furniture in the Furniture tab first!',
+     '请先在家具栏选择家具！',
+     'まず家具タブで家具を選択してください！'],
+  'Tidak bisa meletakkan di sini':
+    ['Cannot place here',
+     '无法放置于此处',
+     'ここに配置できません'],
+  'pagar terpasang menyambung rapi':
+    ['fences placed seamlessly',
+     '个栅栏已整齐连接安装',
+     '個の柵を綺麗に接続配置しました'],
+  'Apakah kamu yakin ingin memasang':
+    ['Are you sure you want to place',
+     '确认要放置',
+     '本当に配置しますか：'],
+  'Area seleksi:':
+    ['Selection area:',
+     '选中区域：',
+     '選択エリア：'],
+  'blok (Tersedia di tas:':
+    ['blocks (Available in bag:',
+     '个方块（背包可用：',
+     '個のブロック（バッグ内：'],
+  'Ya, Pasang':
+    ['Yes, Place',
+     '确认放置',
+     'はい、配置する'],
+  '✔ Ya, Pasang':
+    ['✔ Yes, Place',
+     '✔ 确认放置',
+     '✔ はい、配置する'],
+  'Perahu hanya bisa diletakkan di air':
+    ['Boat can only be placed on water',
+     '船只能放置在水面上',
+     'ボートは水上でのみ配置できます'],
+  'Tidak bisa memasang di air':
+    ['Cannot place in water',
+     '无法放置在水中',
+     '水中には配置できません'],
+  'Terlalu dekat dengan kastil lain':
+    ['Too close to another castle',
+     '距离其他城堡太近',
+     '他の城に近すぎます'],
+  'Sudah ada perabot di situ':
+    ['Furniture already occupies this spot',
+     '此处已有家具',
+     'ここには既に家具があります'],
+  'Terlalu jauh (maks':
+    ['Too far (max',
+     '太远了 (最大',
+     '遠すぎます (最大'],
+  'Terlalu tinggi/rendah dari karakter':
+    ['Too high/low from character',
+     '相对于角色过高/过低',
+     '高低差がありすぎます'],
+  'Ketuk sekali lagi atau tekan ✔ Pasang untuk menaruh':
+    ['Tap once more or press ✔ Place to place',
+     '再次点击或按 ✔ 放置以摆放',
+     'もう一度タップするか ✔配置 を押して設置'],
+  'Arahkan atau ketuk tanah terlebih dahulu!':
+    ['Aim or tap on the ground first!',
+     '请先瞄准或点击地面！',
+     'まず地面を狙うかタップしてください！'],
+  'dikeluarkan!': ['deployed!','已派出！','を出撃させました！'],
+  'DIKELUARKAN!': ['DEPLOYED!','已派出！','出撃！'],
+  'Mob disimpan kembali.': ['Mob stored back.','怪物已收回。','モブをしまいました。'],
+  'MOB DISIMPAN!': ['MOB STORED!','怪物已收回！','モブをしまいました！'],
+  'melemah dan kembali ke slot.': ['weakened and returned to slot.','已衰弱并返回栏位。','力尽きてスロットに戻りました。'],
+  'MELEMAH!': ['WEAKENED!','已衰弱！','力尽きた！'],
+  'Sudah memakai Sadel.': ['Already equipped with Saddle.','已装备鞍。','すでにサドルを装備しています。'],
+  'SUDAH PAKAI SADEL!': ['ALREADY SADDLED!','已装备鞍！','サドル装着済み！'],
+  'Butuh Sadel! Buat dari Kulit & Kayu.': ['Requires Saddle! Craft from Leather & Wood.','需要鞍！用皮革和木材制作。','サドルが必要です！革と木材でクラフトしてください。'],
+  'BUTUH SADEL!': ['SADDLE REQUIRED!','需要鞍！','サドルが必要！'],
+  'Sadel dipasang ke': ['Saddle equipped on','鞍已安装至','サドルを装着：'],
+  'Tekan F untuk naik.': ['Press F to ride.','按 F 骑乘。','Fキーで騎乗。'],
+  'SADEL DIPASANG!': ['SADDLE EQUIPPED!','鞍已装备！','サドル装着！'],
+  'MAKAN!': ['FED!','喂食完成！','食べた！'],
+  'makan!': ['ate!','进食！','が食べました！'],
+  'seharga': ['for','售价','価格'],
+  'kembali ke alam liar?': ['back into the wild?','回大自然吗？','自然に放しますか？'],
+  'Pet yang dilepas tidak bisa dikembalikan.': ['Released pets cannot be recovered.','放生的宠物无法找回。','放生したペットは元に戻せません。'],
+  'dijual +': ['sold +','出售获得 +','売却 +'],
+  'DILEPASKAN!': ['RELEASED!','已放生！','放生完了！'],
+  'LEVEL UP GAGAL!': ['LEVEL UP FAILED!','升级失败！','レベルアップ失敗！'],
+  'LEVEL UP BERHASIL!': ['LEVEL UP SUCCESS!','升级成功！','レベルアップ成功！'],
+  'TAS PENUH!': ['BAG FULL!','背包已满！','バッグ満杯！'],
+  'TEAM PENUH!': ['TEAM FULL!','队伍已满！','チーム満員！'],
+  'PET PENUH!': ['PET SLOTS FULL!','宠物栏已满！','ペット枠満杯！'],
+  'KOIN KURANG!': ['NOT ENOUGH COINS!','金币不足！','コイン不足！'],
+  'BAHAN KURANG!': ['NOT ENOUGH MATERIALS!','材料不足！','素材不足！'],
+  'Jimat Pawang menambah +30% peluang': ['Tamer Charm adds +30% chance','驯兽护符增加 +30% 几率','テイマーの護符で確率+30%'],
+  'Butuh Sadel': ['Needs Saddle','需要鞍','サドルが必要'],
+  'Beri Makan': ['Feed','喂食','餌をあげる'],
+  'Pasang Sadel': ['Equip Saddle','安装鞍','サドル装着'],
+  'Naiki': ['Ride','骑乘','乗る'],
+  'Keluarkan': ['Deploy','出战','出す'],
+  'Simpan': ['Store','收回','しまう'],
+  'Jual': ['Sell','出售','売却'],
+  'Lepaskan': ['Release','放生','放す'],
+  'Pet dipanggil ke sisimu lalu langsung dinaiki.':
+    ['Pet is summoned to your side and immediately mounted.',
+     '宠物将召唤至身旁并直接骑乘。',
+     'ペットを呼び寄せてすぐに騎乗します。'],
+  'IKAN TERKAIL!': ['FISH ON THE HOOK!','鱼咬钩了！','ヒット！魚が掛かった！'],
+  'Tahan <b>KLIK / SPASI / 🎣</b> untuk mengendalikan bar hijau!':
+    ['Hold <b>CLICK / SPACE / 🎣</b> to control the green bar!',
+     '按住 <b>点击 / 空格 / 🎣</b> 以控制绿条！',
+     '<b>クリック / スペース / 🎣</b>長押しで緑のバーを操作！'],
+  'Progress Tangkapan': ['Catch Progress','捕获进度','釣り進行度'],
+  'Jaga ikan tetap di dalam bar hijau!':
+    ['Keep the fish inside the green bar!',
+     '保持鱼在绿条范围内！',
+     '魚を緑のバー内にキープせよ！'],
+  '📊 Statistik': ['📊 Stats','📊 属性','📊 ステータス'],
+  'Statistik': ['Stats','属性','ステータス'],
+  '🎖️ Gelar & Lencana (20)': ['🎖️ Titles & Badges (20)','🎖️ 称号与徽章 (20)','🎖️ 称号とバッジ (20)'],
+  '🎖️ Gelar & Lencana': ['🎖️ Titles & Badges','🎖️ 称号与徽章','🎖️ 称号とバッジ'],
+  'Gelar & Lencana': ['Titles & Badges','称号与徽章','称号とバッジ'],
+  'dilepaskan kembali ke alam': ['released back into the wild','已放归大自然','自然に放しました'],
+  'ditetaskan': ['hatched','已孵化','孵化しました'],
+  'Menempa': ['Forging','锻造','鍛錬'],
+  'Tempa': ['Forge','锻造','鍛錬'],
+  'Menaikkan': ['Upgrades','提升','強化'],
+
+  /* Audit pelokalan tambahan */
+  'Belum ada furnitur di tas! Buat furnitur di panel Craft terlebih dahulu.':
+    ['No furniture in bag! Craft furniture in the Craft panel first.',
+     '背包中没有家具！请先在制作面板制作家具。',
+     'バッグに家具がありません！まずクラフト画面で家具を作ってください。'],
+  'Mode TPP: AKTIF! (Zoom sangat dekat untuk kamera belakang karakter)':
+    ['TPP Mode: ACTIVE! (Zoom very close for behind-character camera)',
+     '第三人称模式：开启！（极近缩放以切换至角色背后视角）',
+     '三人称視点: オン！（近距離ズームでキャラクター後方視点）'],
+  'Tidak bisa ditangkap!':
+    ['Cannot be captured!',
+     '无法被捕捉！',
+     '捕獲できません！'],
+  'Tali putus! Monster mengamuk sejenak (coba lagi dengan tali baru).':
+    ['The rope snapped! The monster enrages briefly (try again with a new rope).',
+     '绳子断了！怪物暂时暴怒（换新绳子再试）。',
+     'ロープが切れた！モンスターが一時的に暴走（新しいロープで再挑戦）。'],
+  'Sayap naga masih lelah (cooldown':
+    ['Dragon wings are still tired (cooldown',
+     '巨龙双翼仍在疲劳中 (冷却',
+     'ドラゴンの翼はまだ疲れている (クールダウン'],
+  'Kaki tarantula masih istirahat (cooldown':
+    ['Tarantula legs are still resting (cooldown',
+     '狼蛛长足仍在休息 (冷却',
+     'タランチュラの脚はまだ休んでいる (クールダウン'],
+  'Kaki babi hutan masih memulihkan tenaga (':
+    ['Boar legs are still recovering energy (',
+     '野猪后蹄仍在恢复体力 (',
+     'イノシシの脚はまだ体力を回復中 ('],
+  'Desa kastil berdiri! Penduduk akan berdatangan hari demi hari':
+    ['Castle village established! Residents will arrive day by day',
+     '城堡村落已建立！村民将日复一日陆续到来',
+     '城の村が建ちました！日々住人がやってきます'],
+  'Rekrut langsung ke Tim':
+    ['Recruit directly to Team',
+     '直接招募进队伍',
+     '直接チームに勧誘'],
+  'Terlalu jauh untuk dicangkul — dekati blok':
+    ['Too far to till — move closer to the block',
+     '距离过远无法耕作 — 请靠近方块',
+     '耕すには遠すぎます — ブロックに近づいてください'],
+  'Menarik kembali pancingan.':
+    ['Reeling back the fishing rod.',
+     '收回钓竿。',
+     '釣り竿を引き戻した。'],
+  'Berhasil menangkap':
+    ['Successfully caught',
+     '成功捕获',
+     '釣り上げ成功：'],
+  'Ikan berhasil meloloskan diri!':
+    ['The fish managed to escape!',
+     '鱼成功逃脱了！',
+     '魚に逃げられた！'],
+  'Ketuk dinding luar untuk memindah pintu · atau pakai ◀ ▶':
+    ['Tap the outer wall to move door · or use ◀ ▶',
+     '点击外墙以移动门 · 或使用 ◀ ▶',
+     '外壁をタップして扉を移動 · または ◀ ▶ を使用'],
+  'Tekan F untuk membuka peti harta!':
+    ['Press F to open the treasure chest!',
+     '按 F 打开宝箱！',
+     'Fキーで宝箱を開ける！'],
+  'Lich menolak: Kamu baru membunuh':
+    ['Lich refuses: You recently killed',
+     '巫妖拒绝：你刚刚杀死了',
+     'リッチは拒絶した：最近殺害した'],
+  'Kau terbangun kembali di titik awal petualanganmu.':
+    ['You awaken back at the starting point of your adventure.',
+     '你在冒险起点重新醒来。',
+     '冒険の出発点で再び目を覚ましました。'],
+  'Lencana Terbuka:':
+    ['Badge Unlocked:',
+     '徽章已解锁：',
+     'バッジ獲得：'],
+  'Slot 1 berhasil dipulihkan!':
+    ['Slot 1 successfully restored!',
+     '槽位 1 恢复成功！',
+     'スロット1を復元しました！'],
+  'Save berhasil diimpor!':
+    ['Save successfully imported!',
+     '存档导入成功！',
+     'セーブデータのインポートに成功しました！'],
+  '/ Panah':
+    ['/ Arrow Keys',
+     '/ 方向键',
+     '/ 矢印キー'],
+  'Skill aktif slot 1–4 (Q tahan untuk bidik Hantam Bumi)':
+    ['Active skills slot 1–4 (hold Q to aim Ground Slam)',
+     '快捷技能栏 1–4（长按 Q 瞄准裂地斩）',
+     'アクティブスキル1–4（Q長押しでグラウンドスラム照準）'],
+  'Memilih slot hotbar (tekan lagi untuk lepas tangan)':
+    ['Select hotbar slot (press again to unequip)',
+     '选择快捷栏槽位（再次按下卸下手持）',
+     'ホットバー選択（再押しで手ぶら）'],
+  'Interaksi universal (Bicara, Rekrut, Perabot, Altar, Naik pet)':
+    ['Universal interaction (Talk, Recruit, Furniture, Altar, Mount pet)',
+     '通用交互（交谈、招募、家具、祭坛、骑乘宠物）',
+     'インタラクト（会話、勧誘、家具、祭壇、騎乗）'],
+  'Membuka / menutup Pohon Skill & Profisiensi':
+    ['Open / close Skill Tree & Proficiency',
+     '打开 / 关闭技能树与熟练度',
+     'スキルツリー＆熟練度の開閉'],
+  'Panah ← →':
+    ['Arrow Keys ← →',
+     '方向键 ← →',
+     '矢印キー ← →'],
+  'Panah ↑ ↓':
+    ['Arrow Keys ↑ ↓',
+     '方向键 ↑ ↓',
+     '矢印キー ↑ ↓'],
+  'Menutup panel aktif / Lepas kursor mouse':
+    ['Close active panel / Release mouse cursor',
+     '关闭当前面板 / 释放鼠标光标',
+     'パネルを閉じる / マウスカーソル解除'],
+  'Analog Kiri Bawah':
+    ['Bottom-Left Analog Stick',
+     '左下虚拟摇杆',
+     '左下アナログスティック'],
+  'Geser untuk bergerak (dorong penuh untuk sprint)':
+    ['Drag to move (push fully to sprint)',
+     '拖动移动（推满进入冲刺）',
+     'ドラッグで移動（全倒しでダッシュ）'],
+  'Pakai skill aktif 1–4 (tahan ikon hantam bumi untuk membidik)':
+    ['Use active skills 1–4 (hold ground slam icon to aim)',
+     '使用快捷技能 1–4（长按裂地斩图标瞄准）',
+     'アクティブスキル1–4（グラウンドスラム長押しで照準）'],
+  'Dua Jari (Geser)':
+    ['Two Fingers (Drag)',
+     '双指拖拽',
+     '二本指ドラッグ'],
+  'Memutar kamera 360° dengan mulus':
+    ['Smoothly rotate camera 360°',
+     '平滑 360° 旋转视角',
+     'カメラを360°滑らかに回転'],
+  'Smelter sedang memproses':
+    ['Smelter is processing',
+     '熔炉正在处理中',
+     '製錬機が稼働中'],
+  'Menarik kembali':
+    ['Taking back',
+     '取回',
+     '回収中'],
+  'Berhasil mengambil':
+    ['Successfully collected',
+     '成功取出',
+     '受け取り完了'],
+  'Tasmu kosong — tidak ada yang bisa dijual (item hotbar terlindungi).':
+    ['Your bag is empty — nothing can be sold (hotbar items are protected).',
+     '你的背包是空的 — 没有可出售的物品（快捷栏物品受保护）。',
+     'バッグは空です — 売却可能なアイテムがありません（ホットバーは保護中）。'],
+  'Dungeon Master tidak membeli barang.':
+    ['Dungeon Master does not buy items.',
+     '地下城城主不收购物品。',
+     'ダンジョンマスターはアイテムを買い取りません。'],
+  'Klik = pilih · Seret keluar panel = buang':
+    ['Click = select · Drag out of panel = drop',
+     '点击 = 选择 · 拖出面板 = 丢弃',
+     'クリック = 選択 · パネル外へドラッグ = 破棄'],
+  'Klik = pilih · Klik ganda = pasang · Seret keluar = buang':
+    ['Click = select · Double click = place · Drag out = drop',
+     '点击 = 选择 · 双击 = 放置 · 拖出 = 丢弃',
+     'クリック = 選択 · ダブルクリック = 設置 · パネル外へドラッグ = 破棄'],
+  'Forest Iguana': ['Snake', '蛇', 'ヘビ'],
+  'FOREST IGUANA': ['SNAKE', '蛇', 'ヘビ'],
+  'Iguana Hutan': ['Snake', '蛇', 'ヘビ'],
+  'IGUANA HUTAN': ['SNAKE', '蛇', 'ヘビ'],
+  'Iguana': ['Snake', '蛇', 'ヘビ'],
+  'IGUANA': ['SNAKE', '蛇', 'ヘビ'],
+  'iguana': ['snake', '蛇', 'ヘビ'],
+
 };
 

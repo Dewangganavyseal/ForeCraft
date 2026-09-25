@@ -231,6 +231,7 @@ const I18N_MOBS={
   trex:{en:'T-Rex',zh:'霸王龙',ja:'ティラノサウルス'},
   mammoth:{en:'Mammoth',zh:'猛犸象',ja:'マンモス'},
   lizard:{en:'Swamp Lizard',zh:'沼泽蜥蜴',ja:'沼のトカゲ'},
+  snake:{en:'Snake',zh:'蛇',ja:'ヘビ'},
   ular:{en:'Snake',zh:'蛇',ja:'ヘビ'},
   iguana:{en:'Snake',zh:'蛇',ja:'ヘビ'},
   cow:{en:'Cow',zh:'牛',ja:'牛'},

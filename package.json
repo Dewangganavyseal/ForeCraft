@@ -1,9 +1,11 @@
-﻿{
+{
   "name": "forest-survival-3d",
   "version": "0.2.39",
   "description": "Forest Survival 3D - Voxel survival game",
   "main": "index.js",
   "scripts": {
+    "start": "node server/server.js",
+    "server": "node server/server.js",
     "studio": "node scripts/studio.js",
     "build": "node scripts/build.js",
     "audit:i18n": "node tools/audit-i18n.js",
@@ -28,6 +30,7 @@
   "dependencies": {
     "@capacitor/android": "^7.6.8",
     "@capacitor/cli": "^7.6.8",
-    "@capacitor/core": "^7.6.8"
+    "@capacitor/core": "^7.6.8",
+    "ws": "^8.21.3"
   }
 }

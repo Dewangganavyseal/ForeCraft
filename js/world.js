@@ -15,6 +15,20 @@ const World={
     if(!c){
       const g=genChunk(cx,cz);
       c={cx,cz,data:g.data,plants:g.plants,ores:g.ores,group:null};
+      if(this.networkOverrides){
+        const minX=cx*16, maxX=minX+15, minZ=cz*16, maxZ=minZ+15;
+        for(const [coord, bid] of Object.entries(this.networkOverrides)){
+          const sep1=coord.indexOf(','), sep2=coord.lastIndexOf(',');
+          const wx=+coord.slice(0,sep1), wy=+coord.slice(sep1+1,sep2), wz=+coord.slice(sep2+1);
+          if(wx>=minX && wx<=maxX && wz>=minZ && wz<=maxZ){
+            const lx=wx-minX, lz=wz-minZ;
+            c.data[this.idx(lx,wy,lz)]=bid;
+            if(bid===B.AIR){
+              c.plants=c.plants.filter(p=>!(p.x===lx&&p.z===lz&&p.y>=wy));
+            }
+          }
+        }
+      }
       this.chunks.set(k,c);
     }
     return c;
@@ -35,6 +49,13 @@ const World={
     if(old===B.FARM&&id!==B.FARM&&typeof Farming!=='undefined')
       Farming.removeAt(wx,wy,wz,true);
     c.data[this.idx(lx,wy,lz)]=id;
+    if(typeof Game!=='undefined'&&Game.isMultiplayer){
+      if(!this.networkOverrides)this.networkOverrides={};
+      this.networkOverrides[wx+','+wy+','+wz]=id;
+      if(!this._fromNetwork&&typeof Network!=='undefined'&&Network.active){
+        Network.sendBlockChange(wx,wy,wz,id);
+      }
+    }
     /* daftar blok ladang untuk NPC farmer & sistem farming */
     if(typeof Farming!=='undefined'){
       if(id===B.FARM)Farming.registerFarm(wx,wy,wz);
@@ -319,8 +340,8 @@ const World={
        anggaran dinaikkan & kuota dilebarkan — dunia jadi siap jauh lebih cepat
        tanpa pernah mengganggu gameplay, karena gameplay memang belum berjalan. */
     const t0=performance.now();
-    const warm=(typeof Game!=='undefined')&&(!Game.started||Game.menuMode);
-    const BUDGET=warm?16:(IS_MOBILE?3:5);
+    const warm=(typeof Game!=='undefined')&&(!Game.started||Game.menuMode||!Game.loadingDone);
+    const BUDGET=warm?20:(IS_MOBILE?4:6);
 
     /* TAHAP 1 — generate DATA chunk yang belum ada, terdekat dulu. */
     let gens=0;
@@ -333,27 +354,25 @@ const World={
       gens++;
     }
 
-    /* TAHAP 2 — mesh MAKSIMAL 1 chunk per frame (2 saat persiapan), hanya yang
-       data + 8 tetangganya sudah siap (4 sisi utk wajah perbatasan + 4 diagonal
-       utk AO sudut). Dengan begini mesh tidak memicu generasi chunk apa pun
-       (bebas cascade). Anggaran habis → berhenti, lanjut frame berikut. */
-    if(performance.now()-t0<BUDGET){
-      const R=CFG.VIEW_R;
-      let meshed=0;
-      for(const e of this.loadList){
-        if(e.d>R*R)break;                                  // hanya radius render
-        if(meshed>=(warm?2:1))break;
-        const c=this.chunks.get(this.key(e.cx,e.cz));
-        if(!c||c.group)continue;                           // belum ada data / sudah mesh
-        let ready=true;
-        for(let dz=-1;dz<=1&&ready;dz++)for(let dx=-1;dx<=1;dx++){
-          if(dx===0&&dz===0)continue;
-          if(!this.chunks.has(this.key(e.cx+dx,e.cz+dz))){ready=false;break;}
-        }
-        if(!ready)continue;                                // tetangga belum siap
-        this.buildMesh(c);
-        meshed++;                                          // cukup utk frame ini
+    /* TAHAP 2 — mesh chunk: bangun mesh hanya jika data + tetangganya siap.
+       Pastikan setidaknya 1 chunk di-mesh per frame jika ada yang siap agar tidak starvation. */
+    const R=CFG.VIEW_R;
+    let meshed=0;
+    const meshMax=warm?3:1;
+    for(const e of this.loadList){
+      if(e.d>R*R)break;                                  // hanya radius render
+      if(meshed>=meshMax)break;
+      if(meshed>0 && performance.now()-t0>BUDGET)break;
+      const c=this.chunks.get(this.key(e.cx,e.cz));
+      if(!c||c.group)continue;                           // belum ada data / sudah mesh
+      let ready=true;
+      for(let dz=-1;dz<=1&&ready;dz++)for(let dx=-1;dx<=1;dx++){
+        if(dx===0&&dz===0)continue;
+        if(!this.chunks.has(this.key(e.cx+dx,e.cz+dz))){ready=false;break;}
       }
+      if(!ready)continue;                                // tetangga belum siap
+      this.buildMesh(c);
+      meshed++;                                          // cukup utk frame ini
     }
 
     /* remesh chunk kotor (edit blok) � anggaran kecil, maks 2 */

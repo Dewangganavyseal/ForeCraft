@@ -35,6 +35,17 @@ promopt.txt
 .opencode/
 scripts/studio.js
 
+# ============ Server Data & Ephemeral ============
+server/data/players/
+server/data/worlds/
+server/public_url.txt
+
+# ============ Binaries & Tests ============
+*.exe
+test_*.js
+smoke_*.js
+*.log
+
 # ============ OS / Editor ============
 .DS_Store
 Thumbs.db

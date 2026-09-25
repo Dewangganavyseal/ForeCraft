@@ -621,6 +621,10 @@ const Player={
           : comboC;
       }
 
+      if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+        Network.sendAttack(next+1, (typeof RPG!=='undefined'&&RPG.equip)?RPG.equip.weapon:null);
+      }
+
    },
 
   /* =========================================================================
