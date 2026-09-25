@@ -1,6 +1,6 @@
 ﻿{
   "name": "forest-survival-3d",
-  "version": "0.2.37",
+  "version": "0.2.39",
   "description": "Forest Survival 3D - Voxel survival game",
   "main": "index.js",
   "scripts": {

@@ -614,17 +614,25 @@ const Capture={
       if(i>=0)Monsters.list.splice(i,1);
       if(this.pet.mesh){
         Game.scene.remove(this.pet.mesh);
-        this.pet.mesh.traverse(o=>{
-          if(o.geometry)o.geometry.dispose();
-          if(o.material)o.material.dispose();
-        });
+        try{
+          this.pet.mesh.traverse(o=>{
+            if(o.geometry)o.geometry.dispose();
+            if(o.material){
+              if(Array.isArray(o.material))o.material.forEach(mat=>mat&&mat.dispose&&mat.dispose());
+              else if(o.material.dispose)o.material.dispose();
+            }
+          });
+        }catch(e){}
       }
       this.pet.dead=true;
       this.pet=null;
     }
     this.deployedSlot=-1;
     RPG.deployedPet=-1;
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(!silent&&typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   deploy(i){
@@ -692,7 +700,12 @@ const Capture={
     this.deployedSlot=i;
     RPG.deployedPet=i;
     UI.toast(`🐾 ${pet.name} dikeluarkan!`);
+    if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`🐾 ${pet.name.toUpperCase()} DIKELUARKAN!`);
+    if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   storeActive(silent){
@@ -710,19 +723,29 @@ const Capture={
     if(idx>=0)Monsters.list.splice(idx,1);
     if(m.mesh){
       Game.scene.remove(m.mesh);
-      m.mesh.traverse(o=>{
-        if(o.geometry)o.geometry.dispose();
-        if(o.material)o.material.dispose();
-      });
+      try{
+        m.mesh.traverse(o=>{
+          if(o.geometry)o.geometry.dispose();
+          if(o.material){
+            if(Array.isArray(o.material))o.material.forEach(mat=>mat&&mat.dispose&&mat.dispose());
+            else if(o.material.dispose)o.material.dispose();
+          }
+        });
+      }catch(e){}
     }
     m.dead=true;
     this.pet=null;
     this.deployedSlot=-1;
     RPG.deployedPet=-1;
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(!silent){
       UI.toast('📦 Mob disimpan kembali.');
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('📦 MOB DISIMPAN!');
+      if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
       if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
     }
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   /* ---------- pertarungan pet ----------
@@ -1033,11 +1056,15 @@ const Capture={
 
   petDown(m){
     UI.toast(`💔 ${this.mobName(m.type)} melemah dan kembali ke slot.`);
+    if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`💔 ${this.mobName(m.type).toUpperCase()} MELEMAH!`);
     if(this.deployedSlot>=0&&RPG.mobSlots[this.deployedSlot]){
       RPG.mobSlots[this.deployedSlot].hp=1;
     }
     this.storeActive(true);
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   /* ---------- saddle / ride ---------- */
@@ -1166,13 +1193,27 @@ const Capture={
   addSaddle(i){
     const pet=RPG.mobSlots[i];
     if(!pet)return;
-    if(pet.saddle){UI.toast('🐴 Sudah memakai Sadel.');return;}
-    if(RPG.countItem('saddle')<1){UI.toast('🐴 Butuh Sadel! Buat dari Kulit & Kayu.');return;}
+    if(pet.saddle){
+      UI.toast('🐴 Sudah memakai Sadel.');
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('🐴 SUDAH PAKAI SADEL!');
+      return;
+    }
+    if(RPG.countItem('saddle')<1){
+      UI.toast('🐴 Butuh Sadel! Buat dari Kulit & Kayu.');
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('🐴 BUTUH SADEL!');
+      if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
+      return;
+    }
     RPG.removeItems({saddle:1});
     pet.saddle=true;
     if(this.pet&&this.deployedSlot===i)this.pet.saddle=true;
     UI.toast(`🐴 Sadel dipasang ke ${pet.name}. Tekan F untuk naik.`);
+    if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert('🐴 SADEL DIPASANG!');
+    if(typeof Sfx!=='undefined'&&Sfx.craft)Sfx.craft();
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   /* call=true (dari tombol panel): pet dipanggil ke sisi pemain dulu bila jauh */
@@ -1543,6 +1584,8 @@ const Capture={
     const fIco=(typeof UI!=='undefined'&&UI.itemIcon)?UI.itemIcon(food):ITEMS[food].e;
     if(RPG.countItem(food)<1){
       UI.toast(`${fIco} ${pet.name} butuh ${ITEMS[food].n}!`);
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`⚠️ BUTUH ${ITEMS[food].n.toUpperCase()}!`);
+      if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
       return;
     }
     RPG.removeItems({[food]:1});
@@ -1550,8 +1593,12 @@ const Capture={
     pet.hp=clamp((pet.hp||1)+heal,1,pet.maxhp);
     if(this.pet&&this.deployedSlot===i)this.pet.hp=pet.hp;
     UI.toast(`${fIco} ${pet.name} makan! +${heal} HP`);
+    if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`🍖 ${pet.name.toUpperCase()} MAKAN! (+${heal} HP)`);
     if(typeof Sfx!=='undefined'&&Sfx.eat)Sfx.eat();
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   sellValue(pet){
@@ -1566,21 +1613,63 @@ const Capture={
   sell(i){
     const pet=RPG.mobSlots[i];
     if(!pet)return;
-    if(this.deployedSlot===i&&this.pet)this.storeActive(true);
     const v=this.sellValue(pet);
-    RPG.mobSlots[i]=null;
-    RPG.addCoin(v);
-    UI.toast(`💰 ${pet.name} dijual +${v} koin.`);
-    if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    const doSell=()=>{
+      if(this.deployedSlot===i&&this.pet)this.storeActive(true);
+      RPG.mobSlots[i]=null;
+      RPG.addCoin(v);
+      UI.toast(`💰 ${pet.name} dijual +${v} koin.`);
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`💰 +${v} KOIN (${pet.name.toUpperCase()})`);
+      if(typeof Sfx!=='undefined'&&Sfx.coin)Sfx.coin();
+      if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
+      if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+      this.renderMobBag();
+      if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
+    };
+
+    if(typeof UI!=='undefined'&&UI.modal){
+      const emoji=PET_EMOJI[pet.type]||'🐾';
+      const ico=(typeof UI.petIcon==='function')?UI.petIcon(pet.type,emoji):emoji;
+      UI.modal({
+        icon:ico,
+        text:`Jual <b>${pet.name}</b> (Lv ${pet.lvl||1}) seharga <b style="color:#ffd24d;">${v} koin</b>?`,
+        okLabel:'💰 Jual',
+        cancelLabel:'✖ Batal',
+        onOk:doSell
+      });
+    }else{
+      doSell();
+    }
   },
 
   release(i){
     const pet=RPG.mobSlots[i];
     if(!pet)return;
-    if(this.deployedSlot===i&&this.pet)this.storeActive(true);
-    RPG.mobSlots[i]=null;
-    UI.toast(`🕊️ ${pet.name} dilepaskan kembali ke alam.`);
-    if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    const doRelease=()=>{
+      if(this.deployedSlot===i&&this.pet)this.storeActive(true);
+      RPG.mobSlots[i]=null;
+      UI.toast(`🕊️ ${pet.name} dilepaskan kembali ke alam.`);
+      if(typeof UI!=='undefined'&&UI.centerAlert)UI.centerAlert(`🕊️ ${pet.name.toUpperCase()} DILEPASKAN!`);
+      if(typeof Sfx!=='undefined'&&Sfx.click)Sfx.click();
+      if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
+      if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+      this.renderMobBag();
+      if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
+    };
+
+    if(typeof UI!=='undefined'&&UI.modal){
+      const emoji=PET_EMOJI[pet.type]||'🐾';
+      const ico=(typeof UI.petIcon==='function')?UI.petIcon(pet.type,emoji):emoji;
+      UI.modal({
+        icon:ico,
+        text:`Lepaskan <b>${pet.name}</b> (Lv ${pet.lvl||1}) kembali ke alam liar?<br><span class="m-sub" style="color:#ff8888;">Pet yang dilepas tidak bisa dikembalikan.</span>`,
+        okLabel:'🕊️ Lepaskan',
+        cancelLabel:'✖ Batal',
+        onOk:doRelease
+      });
+    }else{
+      doRelease();
+    }
   },
 
   /* =========================================================================
@@ -1678,7 +1767,10 @@ const Capture={
       if(typeof UI!=='undefined'&&UI.centerAlert) UI.centerAlert('❌ LEVEL UP GAGAL!');
       if(typeof Sfx!=='undefined'&&Sfx.noStamina)Sfx.noStamina();
     }
+    if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
+    this.renderMobBag();
+    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
   },
 
   /* ---------- UI slot mob di panel tas ---------- */
@@ -1723,6 +1815,8 @@ const Capture={
       const xpPct=clamp(xp/Math.max(1,xpMax)*100,0,100);
       const cost=this.levelCost(pet);
       const rate=this.levelRate(pet);
+      const itFood=(typeof ITEMS!=='undefined'&&ITEMS[food])||{e:'🍖',n:food};
+      const itCost=(typeof ITEMS!=='undefined'&&ITEMS[cost.food])||{e:'🍖',n:cost.food};
 
       const d=document.createElement('div');
       d.className='pet-card'+(active?' active':'');
@@ -1741,19 +1835,30 @@ const Capture={
         </div>
         <div class="pc-stats">
           <span class="pc-chip">⚔️ ${pet.dmg||0}</span>
-          <span class="pc-chip">${ITEMS[food].e} ${ITEMS[food].n}</span>
+          <span class="pc-chip">${itFood.e} ${itFood.n}</span>
           <span class="pc-chip">${pet.saddle?'🐴 Sadel':'🚫 Sadel'}</span>
-          <span class="pc-chip">⬆ ${cost.n}${ITEMS[cost.food].e} · ${rate}%</span>
+          <span class="pc-chip">⬆ ${cost.n}${itCost.e} · ${rate}%</span>
         </div>
         <div class="pc-actions"></div>
       `;
        const btns=d.querySelector('.pc-actions');
        const mkBtn=(txt,fn,cls,title)=>{
          const b=document.createElement('button');
+         b.type='button';
          b.textContent=txt;
          if(cls)b.className=cls;
          if(title)b.title=title;
-         b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();fn();});
+         let triggered=false;
+         const trigger=e=>{
+           if(e){e.preventDefault();e.stopPropagation();}
+           if(triggered)return;
+           triggered=true;
+           setTimeout(()=>triggered=false,280);
+           fn();
+         };
+         b.addEventListener('pointerdown',e=>e.stopPropagation());
+         b.addEventListener('click',trigger);
+         b.addEventListener('touchend',trigger,{passive:false});
          btns.appendChild(b);
        };
 
@@ -1763,8 +1868,10 @@ const Capture={
        /* Tombol ride hanya muncul jika saddle terpasang — via panel, pet
           dipanggil ke sisi pemain sehingga tidak perlu tombol melayang
           di atas pet yang mengganggu interaksi lain. */
-       if(pet.saddle&&active)mkBtn('🐎 Naiki',()=>this.startRide(true),null,
-         'Pet dipanggil ke sisimu lalu langsung dinaiki.');
+       if(pet.saddle&&active)mkBtn('🐎 Naiki',()=>{
+         if(typeof UI!=='undefined'&&UI.closeAll)UI.closeAll();
+         this.startRide(true);
+       },null,'Pet dipanggil ke sisimu lalu langsung dinaiki.');
 
        mkBtn('⬆ Naik',()=>this.tryLevelUp(i),null,
          `Butuh ${cost.n} ${ITEMS[cost.food].n}, XP penuh, peluang ${rate}%\nJimat Pawang menambah +30% peluang (dipakai otomatis bila ada).`);

@@ -33,6 +33,13 @@ const Mob_Kelabang=(()=>{
   const SEG=1.55;          // jarak antar ruas (unit lokal) — badan ~1.6 dalam,
                            // jadi ruas saling menyambung rapat tanpa menumpuk
   const SCALE=1.86;        // skala keseluruhan model (3× dari 0.62 sebelumnya)
+  const LEG_L1=0.82;       // panjang segmen femur / paha atas (unit lokal ruas)
+  const LEG_L2=0.94;       // panjang segmen tibia / betis + cakar kitin
+
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const smooth5=x=>{x=clamp(x,0,1);return x*x*x*(x*(x*6-15)+10);};
+  const rand=(a,b)=>a+Math.random()*(b-a);
 
   /* set material baru per pemanggilan build (lihat catatan di atas) */
   function makeMats(){
@@ -92,7 +99,26 @@ const Mob_Kelabang=(()=>{
     return {group:g,jaw,antR,antL,clawR,clawL};
   }
 
-  /* ---------- satu ruas badan + sepasang kaki ---------- */
+  /* ---------- geometri kaki IK: femur (paha) & tibia (betis + cakar) ---------- */
+  function buildFemur(parent, M){
+    box(parent, M.dark,     0, 0, 0.08, 0.28, 0.26, 0.18);
+    box(parent, M.leg,      0, 0, LEG_L1 * 0.46, 0.24, 0.24, LEG_L1 * 0.72);
+    box(parent, M.carapace, 0, 0.11, LEG_L1 * 0.46, 0.28, 0.08, LEG_L1 * 0.68);
+    box(parent, M.legDark,  0, -0.09, LEG_L1 * 0.46, 0.20, 0.08, LEG_L1 * 0.60);
+    box(parent, M.legDark,  0, 0, LEG_L1, 0.28, 0.28, 0.22);
+    box(parent, M.bone,     0, 0.16, LEG_L1 - 0.03, 0.12, 0.20, 0.14);
+  }
+
+  function buildTibia(parent, M){
+    box(parent, M.legDark,   0, 0, 0.08, 0.26, 0.26, 0.16);
+    box(parent, M.leg,       0, 0, LEG_L2 * 0.36, 0.22, 0.22, LEG_L2 * 0.50);
+    box(parent, M.carapace2, 0, 0.08, LEG_L2 * 0.36, 0.24, 0.08, LEG_L2 * 0.46);
+    box(parent, M.legDark,   0, 0, LEG_L2 * 0.72, 0.16, 0.16, LEG_L2 * 0.38);
+    box(parent, M.bone,      0, -0.03, LEG_L2, 0.12, 0.14, 0.22);
+    box(parent, M.dark,      0, -0.07, LEG_L2 + 0.07, 0.08, 0.08, 0.12);
+  }
+
+  /* ---------- satu ruas badan + sepasang kaki IK ---------- */
   function buildSegment(M,idx){
     const g=new THREE.Group();
     const main=idx%2?M.carapace2:M.carapace;
@@ -108,19 +134,43 @@ const Mob_Kelabang=(()=>{
         box(g,M.bone, s*0.40,0.98,-0.10, 0.18,0.20,0.18);
       }
     }
-    /* sepasang kaki bersendi */
+    /* sepasang kaki IK (femur + tibia per kaki, Euler YXZ) */
     const legs=[];
     for(const side of[1,-1]){
-      const hip=new THREE.Group();
-      hip.position.set(side*0.62,-0.26,0);
-      box(hip,M.leg, side*0.36,0,0, 0.78,0.22,0.26);
-      box(hip,M.legDark, side*0.70,-0.10,0, 0.24,0.26,0.26);
-      const knee=new THREE.Group();
-      knee.position.set(side*0.78,-0.26,0);
-      box(knee,M.leg, 0,-0.28,0, 0.20,0.56,0.22);
-      box(knee,M.legDark, 0,-0.54,0.06, 0.18,0.12,0.26);
-      hip.add(knee);g.add(hip);
-      legs.push({hip,knee,side});
+      const femurG=new THREE.Group();
+      buildFemur(femurG,M);
+      g.add(femurG);
+
+      const tibiaG=new THREE.Group();
+      buildTibia(tibiaG,M);
+      g.add(tibiaG);
+
+      femurG.rotation.order='YXZ';
+      tibiaG.rotation.order='YXZ';
+
+      const hipLocal=new THREE.Vector3(side*0.72, 0.08, idx%2 ? 0.10 : -0.10);
+      const splayZ=(idx<=1 ? 0.18 : idx>=5 ? -0.20 : 0);
+      const restLocal=new THREE.Vector3(side*1.82, -0.42, splayZ);
+
+      legs.push({
+        id:`seg${idx}_${side>0?'R':'L'}`,
+        segIdx:idx,
+        side,
+        group:(idx+(side>0?0:1))%2,
+        hipLocal,
+        restLocal,
+        femurGroup:femurG,
+        tibiaGroup:tibiaG,
+        worldFoot:new THREE.Vector3(),
+        targetFoot:new THREE.Vector3(),
+        stepStartFoot:new THREE.Vector3(),
+        isStepping:false,
+        stepProgress:1.0,
+        stepDuration:0.16,
+        stepHeight:0.40,
+        initialized:false,
+        needsLandSnap:false,
+      });
     }
     /* ekor pada ruas terakhir */
     if(idx===MAXSEG-1){
@@ -132,7 +182,39 @@ const Mob_Kelabang=(()=>{
   }
 
   const Mob_Kelabang={
-    MAXSEG, SEG, SCALE,
+    MAXSEG, SEG, SCALE, LEG_L1, LEG_L2,
+
+    /* ---------- solver IK analitis 3D (Euler YXZ seperti Tarantula) ---------- */
+    solveLeg(leg,hipW,footW){
+      let dx=footW.x-hipW.x;
+      let dy=footW.y-hipW.y;
+      let dz=footW.z-hipW.z;
+      const maxReach=(LEG_L1+LEG_L2)*0.996;
+      const minReach=Math.abs(LEG_L1-LEG_L2)+0.05;
+      let dist3D=Math.hypot(dx,dy,dz);
+      if(dist3D>maxReach){
+        const f=maxReach/dist3D;
+        dx*=f;dy*=f;dz*=f;
+        dist3D=maxReach;
+      }
+      const distXZ=Math.hypot(dx,dz)||1e-4;
+      dist3D=Math.max(minReach,Math.min(maxReach,dist3D));
+      const yaw=Math.atan2(dx,dz);
+      const elev=Math.atan2(dy,distXZ);
+      const cosA=(LEG_L1*LEG_L1+dist3D*dist3D-LEG_L2*LEG_L2)/(2*LEG_L1*dist3D);
+      const alpha=Math.acos(clamp(cosA,-1,1));
+      const femurElev=elev+alpha;
+      const kx=hipW.x+Math.sin(yaw)*Math.cos(femurElev)*LEG_L1;
+      const ky=hipW.y+Math.sin(femurElev)*LEG_L1;
+      const kz=hipW.z+Math.cos(yaw)*Math.cos(femurElev)*LEG_L1;
+      leg.femurGroup.position.copy(hipW);
+      leg.femurGroup.rotation.set(-femurElev,yaw,0);
+      const d2x=footW.x-kx,d2y=footW.y-ky,d2z=footW.z-kz;
+      const yaw2=Math.atan2(d2x,d2z);
+      const elev2=Math.atan2(d2y,Math.hypot(d2x,d2z)||1e-4);
+      leg.tibiaGroup.position.set(kx,ky,kz);
+      leg.tibiaGroup.rotation.set(-elev2,yaw2,0);
+    },
 
     /* ---------- MODEL 3D ----------
        Kepala di root; ruas ditambahkan sebagai anak root tapi diposisikan tiap
@@ -175,13 +257,16 @@ const Mob_Kelabang=(()=>{
       return trail[trail.length-1];
     },
 
-    /* ---------- ANIMASI: tubuh melata mengikuti jejak kepala ---------- */
+    /* ---------- ANIMASI: tubuh melata mengikuti jejak kepala + KAKI IK TANAH ---------- */
     animate(m,dt){
-      const t=performance.now()*0.001;
+      const t=(typeof performance!=='undefined'?performance.now():Date.now())*0.001;
       const P=m.parts;
       const head=m.pos;
       const h=m.mesh.rotation.y;
       const cos=Math.cos(h),sin=Math.sin(h);
+      const spd=Math.hypot(m.vel.x,m.vel.z);
+      const isMoving=(spd>0.10);
+      const sc=SCALE;
 
       /* jejak breadcrumb (ruang dunia). Kepala = m.pos.
          Total panjang badan (dunia) = MAXSEG*SEG*SCALE; jejak harus menyimpan
@@ -212,11 +297,18 @@ const Mob_Kelabang=(()=>{
         last.y+=(head.y-last.y)*Math.min(1,dt*8); // tetap ikuti ketinggian saat diam
       }
 
+      /* gait wave metachronal untuk 14 kaki kelabang (bergerak beriak harmonis) */
+      if(!m._gaitT)m._gaitT=0;
+      if(isMoving){
+        const strideWorld=Math.max(0.3,1.1*sc);
+        const cadence=clamp(spd/strideWorld*1.5,2.0,6.5);
+        m._gaitT+=dt*cadence;
+      }
+      const gaitCycle=m._gaitT%1.0;
+      const activeGrp=(gaitCycle<0.5)?0:1;
+
       /* jumlah ruas aktif (berkurang saat tubuh terbelah). Default penuh. */
       const active=(m.segCount!==undefined)?m.segCount:MAXSEG;
-      m.gaitPhase=(m.gaitPhase||0)+(moved*3.2+dt*1.2);
-      const spd=Math.hypot(m.vel.x,m.vel.z);
-      const ampK=Math.min(1,spd/2.2);
 
       /* liftY (lokal) = seberapa tinggi kepala & ruas depan TERANGKAT saat
          serangan SAMBARAN / SEMBURAN / TERJANG BUMI. Diisi oleh Monsters
@@ -240,22 +332,142 @@ const Mob_Kelabang=(()=>{
         seg.position.set(lx,ly+Math.sin(t*1.8+i*0.6)*0.04+rear,lz);
         /* yaw ruas: arah menuju sampel yang lebih dekat kepala */
         const spF=this._sampleTrail(m._trail,i*SEG*SCALE);
+        let worldYaw=h;
         if(spF){
           const ddx=spF.x-sp.x,ddz=spF.z-sp.z;
           if(ddx*ddx+ddz*ddz>1e-5){
-            const worldYaw=Math.atan2(ddx,ddz);
+            worldYaw=Math.atan2(ddx,ddz);
             seg.rotation.y=worldYaw-h;
           }
         }
-        /* kaki melangkah bergelombang */
+
+        /* transformasi dunia ruas saat ini */
+        const segWorldX=sp.x;
+        const segWorldZ=sp.z;
+        const segWorldY=sp.y+(Math.sin(t*1.8+i*0.6)*0.04+rear)*sc;
+        const segYaw=worldYaw;
+        const cosSegY=Math.cos(segYaw),sinSegY=Math.sin(segYaw);
+
+        /* =====================================================================
+           PROCEDURAL 3D TWO-BONE IK LEGS & GROUND ADAPTATION
+           ---------------------------------------------------------------------
+           Kaki menapak di koordinat dunia (blok tanah / kontur Redlands).
+           Saat merayap: telapak kaki diam di tanah (stance), badan meluncur
+           maju di atas kaki. Saat drift melebihi batas gait, kaki mengangkat
+           dalam lengkungan parabola (swing) dan mendarat pada elevasi tanah
+           berikutnya. Saat ruas terangkat tinggi (sambaran/semburan), kaki
+           mengembang & berayun garang di udara.
+           ===================================================================== */
         const legs=P.segLegs[i];
-        if(legs)for(const L of legs){
-          const ph=m.gaitPhase*1.4+i*0.85+(L.side>0?0:Math.PI);
-          const swing=Math.sin(ph)*(0.18+0.34*ampK);
-          const lift=Math.max(0,Math.cos(ph))*(0.2+0.3*ampK);
-          L.hip.rotation.y=-L.side*swing;
-          L.hip.rotation.z=L.side*(0.35+lift*0.5);
-          L.knee.rotation.z=-L.side*(0.5+lift*0.6);
+        if(legs)for(const leg of legs){
+          const rx=leg.restLocal.x;
+          const rz=leg.restLocal.z;
+          const idealWorldX=segWorldX+(rx*cosSegY+rz*sinSegY)*sc;
+          const idealWorldZ=segWorldZ+(-rx*sinSegY+rz*cosSegY)*sc;
+          let idealGroundY=(typeof World!=='undefined'&&World.groundAt)
+            ?World.groundAt(idealWorldX,idealWorldZ,segWorldY+2.5):segWorldY;
+          if(idealGroundY===undefined||!isFinite(idealGroundY)||idealGroundY<=0)idealGroundY=segWorldY;
+
+          // Inisialisasi awal saat baru spawn
+          if(!leg.initialized){
+            leg.initialized=true;
+            leg.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.targetFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.stepStartFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.isStepping=false;
+            leg.stepProgress=1.0;
+          }
+
+          // KASUS 1: RUAS TERANGKAT TINGGI DI UDARA ATAU SEDANG MENYELAM (BURROW)
+          const heightAboveGround=segWorldY-idealGroundY;
+          const isReared=heightAboveGround>(LEG_L1+LEG_L2)*sc*0.72;
+          if(isReared||(m.underground&&m.katk==='burrow')){
+            leg.isStepping=false;
+            const flareZ=(i<=1?0.28:i>=5?-0.22:0);
+            const footPosLocal=leg.restLocal.clone();
+            footPosLocal.x*=1.25;
+            footPosLocal.y=-0.32+Math.sin(t*8+i*1.4+leg.side)*0.12;
+            footPosLocal.z+=flareZ;
+            this.solveLeg(leg,leg.hipLocal,footPosLocal);
+            leg.needsLandSnap=true;
+            continue;
+          }
+          if(leg.needsLandSnap){
+            leg.needsLandSnap=false;
+            leg.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.targetFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.isStepping=false;
+          }
+
+          // Jarak drift telapak kaki di dunia terhadap titik ideal
+          const drift=Math.hypot(leg.worldFoot.x-idealWorldX,leg.worldFoot.z-idealWorldZ);
+          if(drift>2.6*sc){
+            leg.worldFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.targetFoot.set(idealWorldX,idealGroundY,idealWorldZ);
+            leg.isStepping=false;
+          }
+
+          // FASE MELANGKAH (SWING) ATAU MENAPAK (STANCE)
+          const isRunning=(spd>4.0);
+          const stepThreshold=(isRunning?0.32:0.22)*sc;
+          const maxDrift=0.75*sc;
+
+          if(leg.isStepping){
+            leg.stepProgress+=dt/leg.stepDuration;
+            const prog=Math.min(1.0,leg.stepProgress);
+            const u=smooth5(prog);
+            const stepLift=(leg.stepHeight||0.40)*sc*(isRunning?1.3:1.0);
+            const arc=Math.sin(prog*Math.PI)*stepLift;
+
+            leg.worldFoot.x=lerp(leg.stepStartFoot.x,leg.targetFoot.x,u);
+            leg.worldFoot.z=lerp(leg.stepStartFoot.z,leg.targetFoot.z,u);
+            leg.worldFoot.y=lerp(leg.stepStartFoot.y,leg.targetFoot.y,u)+arc;
+
+            if(prog>=1.0){
+              leg.isStepping=false;
+              leg.worldFoot.copy(leg.targetFoot);
+              if(typeof FX!=='undefined'&&FX.debris&&Math.random()<0.22){
+                FX.debris(leg.worldFoot.clone().add(new THREE.Vector3(0,0.05,0)),0x9e3b2c,2,0.6);
+              }
+            }
+          }else{
+            const isAllowedGait=(leg.group===activeGrp)||(drift>maxDrift);
+            if(isAllowedGait&&drift>stepThreshold&&isMoving){
+              leg.isStepping=true;
+              leg.stepProgress=0.0;
+              leg.stepStartFoot.copy(leg.worldFoot);
+
+              leg.stepDuration=isRunning?0.11:0.16;
+              leg.stepHeight=isRunning?0.50:0.35;
+
+              const lead=leg.stepDuration*1.3;
+              let predX=idealWorldX+m.vel.x*lead;
+              let predZ=idealWorldZ+m.vel.z*lead;
+              let landY=(typeof World!=='undefined'&&World.groundAt)
+                ?World.groundAt(predX,predZ,segWorldY+2.5):idealGroundY;
+              if(landY===undefined||!isFinite(landY)||landY<=0)landY=idealGroundY;
+              leg.targetFoot.set(predX,landY,predZ);
+            }else if(!isMoving){
+              // Menyesuaikan kontur blok tanah di bawahnya secara halus saat diam
+              let curGroundY=(typeof World!=='undefined'&&World.groundAt)
+                ?World.groundAt(leg.worldFoot.x,leg.worldFoot.z,segWorldY+2.5):segWorldY;
+              if(curGroundY!==undefined&&isFinite(curGroundY)&&curGroundY>0){
+                leg.worldFoot.y=lerp(leg.worldFoot.y,curGroundY,clamp(12*dt,0,1));
+              }
+            }
+          }
+
+          // Konversi worldFoot ke koordinat lokal ruas
+          const fdx=leg.worldFoot.x-segWorldX;
+          const fdy=leg.worldFoot.y-segWorldY;
+          const fdz=leg.worldFoot.z-segWorldZ;
+          const footLocalX=(fdx*cosSegY-fdz*sinSegY)/sc;
+          const footLocalY=fdy/sc;
+          const footLocalZ=(fdx*sinSegY+fdz*cosSegY)/sc;
+          const footPosLocal=new THREE.Vector3(footLocalX,footLocalY,footLocalZ);
+
+          // Selesaikan 3D Two-Bone IK dari hipLocal ke footPosLocal
+          this.solveLeg(leg,leg.hipLocal,footPosLocal);
         }
       }
 
@@ -291,8 +503,13 @@ const Mob_Kelabang=(()=>{
       const M=makeMats();
       const idx=(Math.random()*2)|0;
       const S=buildSegment(M,idx);
-      /* kaki dilipat rapat (sudah mati) */
-      for(const L of S.legs){L.hip.rotation.z=L.side*0.9;L.knee.rotation.z=-L.side*1.1;}
+      /* kaki IK dilipat melengkung ke bawah (pose mati serangga) */
+      for(const L of S.legs){
+        L.femurGroup.position.copy(L.hipLocal);
+        L.femurGroup.rotation.set(0, L.side * 1.5, L.side * 0.6);
+        L.tibiaGroup.position.set(L.hipLocal.x + L.side * 0.35, L.hipLocal.y + 0.30, L.hipLocal.z);
+        L.tibiaGroup.rotation.set(0, L.side * 1.5, -L.side * 1.4);
+      }
       S.group.position.y=0.5;
       g.add(S.group);
       g.scale.setScalar(SCALE);

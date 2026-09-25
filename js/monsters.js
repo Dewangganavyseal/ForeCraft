@@ -1892,10 +1892,58 @@ const Monsters={
     m.state=active?'chase':'wander';
 
     if(active){
-      m.mesh.rotation.y=angLerp(m.mesh.rotation.y,angT,dt*4);
+      const curYaw=m.mesh.rotation.y;
+      /* selisih sudut hadap kelabang dengan arah sasaran [-PI, PI] */
+      const dAngle=Math.atan2(Math.sin(angT-curYaw),Math.cos(angT-curYaw));
+
+      /* =========================================================================
+         1. MANUVER SLITHER & PASSTHROUGH (Terjang Lewat, Bukan Menempel di Kaki)
+         -------------------------------------------------------------------------
+         Bila pemain bertarung sangat dekat (< 4.0 blok) dan sudut ke pemain mulai
+         tajam (pemain berada di samping atau sudah terlewat di belakang):
+         Jangan paksa memutar kepala 180° di tempat karena akan membuat tubuh 20 blok
+         terpelintir melipat menembus dirinya sendiri. Kelabang meluncur maju meneruskan
+         jalurnya, mengambil busur melingkar lebar (wide sweep) mengitari arena.
+         ========================================================================= */
+      m._slitherPass=Math.max(0,(m._slitherPass||0)-dt);
+      if(dT<4.0&&Math.abs(dAngle)>0.85&&m._slitherPass<=0){
+        m._slitherPass=rand(1.2,1.6);
+        m._slitherSide=(dAngle>=0)?1:-1;
+      }
+
+      /* target kemudi: jika sedang passthrough, belok landai membentuk kurva luas */
+      let steerTarget=angT;
+      if(m._slitherPass>0){
+        const side=m._slitherSide||((dAngle>=0)?1:-1);
+        steerTarget=curYaw+side*0.85;
+      }
+
+      /* =========================================================================
+         2. PEMBATASAN RADIUS PUTAR MINIMUM (Min Turning Radius ~4.2 Blok)
+         -------------------------------------------------------------------------
+         Kecepatan putar sudut (rad/detik) dibatasi ketat: maxTurnRate = sp / minTurnR.
+         Dengan cara ini, dalam kecepatan gerak apa pun, radius belok kelabang dijamin
+         tidak akan pernah lebih tajam dari 4.0–4.2 blok (diameter lingkaran ≥ 8.4 blok).
+         Ruas tubuh belakang (~2.8 blok) selalu memiliki ruang kosong 5+ blok di tengah
+         sehingga bebas dari tabrakan atau menembus badan sendiri.
+         ========================================================================= */
       const sp=m.speed*(m.inWater?0.5:1)*(m.slowMul||1);
-      m.vel.x=lerp(m.vel.x,Math.sin(angT)*sp,clamp(5*dt,0,1));
-      m.vel.z=lerp(m.vel.z,Math.cos(angT)*sp,clamp(5*dt,0,1));
+      const minTurnR=clamp(Math.min(dT, 4.2), 3.8, 5.0);
+      const maxTurnRate=Math.max(0.6, (sp / minTurnR) * (dT > 8 ? 1.8 : 1.0));
+      const maxAngleStep=maxTurnRate*dt;
+
+      const dSteer=Math.atan2(Math.sin(steerTarget-curYaw),Math.cos(steerTarget-curYaw));
+      const steerStep=clamp(dSteer, -maxAngleStep, maxAngleStep);
+      m.mesh.rotation.y=curYaw+steerStep;
+
+      /* KELABANG MELUNCUR SEARAH HADAP BADAN (Heading-aligned locomotion):
+         Kecepatan (vel) wajib searah dengan hadap kepala & badan, BUKAN ditarik
+         menyamping langsung ke arah pemain (strafe/crab-walk). Ini menjaga jejak
+         ruas (breadcrumb trail) tetap berupa kurva melata yang mulus & aerodinamis. */
+      const heading=m.mesh.rotation.y;
+      m.vel.x=lerp(m.vel.x,Math.sin(heading)*sp,clamp(5*dt,0,1));
+      m.vel.z=lerp(m.vel.z,Math.cos(heading)*sp,clamp(5*dt,0,1));
+
       /* timer khusus TERJANG BUMI: menghitung waktu sejak terakhir menyelam.
          Tanpa ini, kelabang hampir selalu berada <3 blok dari sasaran (karena
          terus mengejar) sehingga selalu memilih SAMBARAN dan nyaris tak pernah
@@ -1909,8 +1957,8 @@ const Monsters={
         if(m.burrowCd<=0){
           choice='burrow';
           m.burrowCd=rand(8,12);
-        }else if(dT<3.2){
-          /* dekat: kebanyakan sambaran, sesekali semburan */
+        }else if(dT<3.8&&Math.abs(dAngle)<0.80){
+          /* dekat & menghadap sasaran: lakukan sambaran atau semburan */
           choice=Math.random()<0.75?'strike':'spit';
         }else{
           const r=Math.random();
@@ -1927,10 +1975,11 @@ const Monsters={
       m.t-=dt;
       if(m.t<=0){m.t=rand(1.6,3.8);m.dir=Math.random()*Math.PI*2;m.walking=Math.random()<0.6;}
       if(m.walking){
-        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*3);
+        m.mesh.rotation.y=angLerp(m.mesh.rotation.y,m.dir,dt*2);
+        const heading=m.mesh.rotation.y;
         const sp=m.speed*0.4;
-        m.vel.x=lerp(m.vel.x,Math.sin(m.dir)*sp,clamp(4*dt,0,1));
-        m.vel.z=lerp(m.vel.z,Math.cos(m.dir)*sp,clamp(4*dt,0,1));
+        m.vel.x=lerp(m.vel.x,Math.sin(heading)*sp,clamp(4*dt,0,1));
+        m.vel.z=lerp(m.vel.z,Math.cos(heading)*sp,clamp(4*dt,0,1));
       }else{m.vel.x*=0.85;m.vel.z*=0.85;}
     }
   },
@@ -1938,6 +1987,7 @@ const Monsters={
   /* mulai jurus kelabang: set durasi & reset flag internal */
   startKelabangAtk(m,name){
     m.katk=name;m.katkT=0;
+    m._slitherPass=0;
     m._kFlag=false;m._kFlag2=false;
     m.dur=name==='strike'?1.5:name==='charge'?2.2:name==='spit'?1.6:name==='burrow'?4.4:1.5;
     /* cooldown berikutnya diset saat jurus selesai */
@@ -2137,6 +2187,7 @@ const Monsters={
       m.mesh.visible=true;m.underground=false;
       m.liftY=0;m.headPitch=0;
       m.atkCd=rand(2.4,4.0);
+      m._slitherPass=0;
     }
   },
 

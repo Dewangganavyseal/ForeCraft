@@ -2463,6 +2463,7 @@ const UI={
         this.renderBag();
         if(this.bagPage==='blocks')this.renderBlockBag();
         if(this.bagPage==='furniture')this.renderFurniBag();
+        if(this.bagPage==='pet'&&typeof Capture!=='undefined'&&Capture.renderMobBag)Capture.renderMobBag();
       }
       if(this.open==='chest')this.renderChest();
       if(this.open==='shop')this.renderShop&&this.renderShop();
