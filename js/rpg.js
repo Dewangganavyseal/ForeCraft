@@ -1160,8 +1160,8 @@ const RPG={
     UI.renderSkills();UI.renderActiveSkills(true);
   },
   save(){
-    if(typeof Game!=='undefined'&&Game.isMultiplayer){
-      if(typeof Network!=='undefined'&&Network.sendPlayerSync)Network.sendPlayerSync();
+    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)){
+      if(Game.isMultiplayer && typeof Network!=='undefined' && Network.sendPlayerSync)Network.sendPlayerSync();
       return;
     }
     try{

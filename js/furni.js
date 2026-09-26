@@ -2730,6 +2730,7 @@ const Furni={
   },
 
   save(){
+    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)) return;
     try{
       const data=this.list.filter(f=>!f.auto)
         .map(f=>{

@@ -327,13 +327,15 @@ const Game={
   /* ---------- kembali ke main menu dari in-game ---------- */
   returnToMenu(){
     if(this.menuMode)return;
-    /* simpan data permainan saat ini agar progres pemain aman */
-    if(typeof SaveGame!=='undefined'&&SaveGame.now)SaveGame.now();
-    else if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
 
-    if(this.isMultiplayer && typeof Network!=='undefined'){
-      Network.leave();
+    if(this.isMultiplayer){
+      if(typeof Network!=='undefined')Network.leave();
       this.isMultiplayer=false;
+      if(typeof Capture!=='undefined')Capture.clearActive(true);
+    }else{
+      /* simpan data permainan saat ini HANYA jika dalam mode Single Player */
+      if(typeof SaveGame!=='undefined'&&SaveGame.now)SaveGame.now();
+      else if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
     }
 
     /* tutup UI / chat / panel aktif */
@@ -480,6 +482,10 @@ const Game={
     }
 
     if(typeof Prof!=='undefined')Prof.load(prof.prof||null);
+    if(typeof Capture!=='undefined'){
+      Capture.clearActive(true);
+      Capture.load(prof.mobSlots||null, prof.deployedPet!==undefined?prof.deployedPet:-1);
+    }
 
     Player.setHair(Player.hairStyle,Player.hairColor);
     Player.refreshArmor();
@@ -665,11 +671,19 @@ const Game={
     if(!save&&typeof Tutorial!=='undefined')Tutorial.show();
 
     if(!this._saveInterval){
-      this._saveInterval=setInterval(()=>{if(!Player.dead)RPG.save();},8000);
+      this._saveInterval=setInterval(()=>{
+        if(typeof Game!=='undefined'&&Game.started&&!Game.menuMode&&!Game.isMultiplayer&&!Player.dead){
+          RPG.save();
+        }
+      },8000);
     }
     if(!this._beforeUnload){
       this._beforeUnload=true;
-      window.addEventListener('beforeunload',()=>RPG.save());
+      window.addEventListener('beforeunload',()=>{
+        if(typeof Game!=='undefined'&&Game.started&&!Game.menuMode&&!Game.isMultiplayer&&!Player.dead){
+          RPG.save();
+        }
+      });
     }
     Sfx.init();
     /* musik latar: mulai pelan-pelan sesudah gestur pengguna (klik mulai) */
@@ -1031,10 +1045,21 @@ const MainMenu={
       <div class="menu-wrap">
         <h2 class="menu-head">📂 Load Game</h2>
         <div class="slot-list">${slots}</div>
-        <button class="big mm-back">← Kembali</button>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="big mm-back">← Kembali</button>
+          <button id="mm-restore-s1" class="big" style="background:#2a4365;border-color:#4299e1;" title="Pulihkan save utama Slot 1 (Lv 86) jika sempat tertimpa">🔄 Pulihkan Slot 1 (Lv 86)</button>
+        </div>
       </div>`;
     if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
+    const restoreBtn=this.el.querySelector('#mm-restore-s1');
+    if(restoreBtn){
+      restoreBtn.addEventListener('click',()=>{
+        if(typeof ForecraftSave!=='undefined'&&ForecraftSave.restoreSlot1){
+          ForecraftSave.restoreSlot1();
+        }
+      });
+    }
     this.el.querySelectorAll('.slot-btn').forEach(b=>{
       b.addEventListener('click',()=>{
         const i=+b.dataset.slot;
