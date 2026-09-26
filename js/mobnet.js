@@ -31,6 +31,67 @@ const MobNet = {
     try { Network.ws.send(JSON.stringify(msg)); } catch (e) {}
   },
 
+  sendEntityFx(fx, data) {
+    this.send({ type: 'entity_fx', fx, data: data || {} });
+  },
+
+  onEntityFx(fx, data) {
+    if (!fx || !data) return;
+    try {
+      if (fx === 'golem_smash') {
+        if (typeof FX !== 'undefined') {
+          FX.ring(data.x, data.y + 0.05, data.z, 0xff5a35, 0.55, 5.5);
+          FX.ring(data.x, data.y + 0.05, data.z, 0xdddddd, 0.4, 3.5);
+          if (typeof FX.groundWave === 'function') FX.groundWave(data.x, data.y, data.z, { mode: 'radial', radius: 3.4, color: 0xff5a35 });
+          FX.debris(new THREE.Vector3(data.x, data.y + 0.4, data.z), 0x8a8a8a, 22, 4);
+          if (FX.addShake) FX.addShake(0.75);
+        }
+        if (typeof Sfx !== 'undefined' && Sfx.smash) Sfx.smash();
+      } else if (fx === 'dragon_fire') {
+        if (typeof FX !== 'undefined') {
+          FX.ring(data.x, data.y + 0.05, data.z, 0xff5a2a, 0.5, 1.8);
+          FX.debris(new THREE.Vector3(data.x, data.y, data.z), 0xff6a30, 8, 2.4);
+          if (FX.text) FX.text(new THREE.Vector3(data.x, data.y + 2.2, data.z), '🔥', '#ff7a2e');
+        }
+      } else if (fx === 'trex_charge') {
+        if (typeof FX !== 'undefined' && FX.groundWave) {
+          FX.groundWave(data.leftX, data.groundY, data.leftZ, { mode: 'line', dir: data.yaw, radius: 3.4, amp: 0.85, width: 1.2, speed: 7.0, smooth: true });
+          FX.groundWave(data.rightSideX, data.groundY, data.rightSideZ, { mode: 'line', dir: data.yaw, radius: 3.4, amp: 0.85, width: 1.2, speed: 7.0, smooth: true });
+        }
+      } else if (fx === 'kelabang_split') {
+        if (typeof FX !== 'undefined') {
+          FX.ring(data.x, data.y + 0.1, data.z, 0x8dff3a, 1.2, 5);
+          FX.debris(new THREE.Vector3(data.x, data.y + 1, data.z), 0x96332c, 18, 3.5);
+        }
+        if (typeof Sfx !== 'undefined' && Sfx.hit) Sfx.hit();
+      } else if (fx === 'npc_quake') {
+        if (typeof FX !== 'undefined') {
+          if (typeof FX.groundWave === 'function') FX.groundWave(data.x, data.y, data.z, { mode: 'radial', radius: 3.8, color: 0xb08a5a });
+          FX.debris(new THREE.Vector3(data.x, data.y + 0.4, data.z), 0x8a8a8a, 16, 3.2);
+        }
+        if (typeof Sfx !== 'undefined' && Sfx.smash) Sfx.smash();
+      } else if (fx === 'npc_roar') {
+        if (typeof FX !== 'undefined') {
+          if (FX.shockwave) FX.shockwave(data.x, data.y + 1.45, data.z, 0xffd08a, 6);
+          FX.ring(data.x, data.y + 0.05, data.z, 0xffa23c, 0.8, 6);
+        }
+        if (typeof Sfx !== 'undefined' && Sfx.shout) Sfx.shout();
+      } else if (fx === 'npc_spell') {
+        if (typeof PortFX !== 'undefined') {
+          if (data.type === 'meteor' && PortFX.meteor) PortFX.meteor(data.x, data.y, data.z);
+          else if (PortFX.shard) PortFX.shard(data.x, data.y, data.z);
+        }
+      } else if (fx === 'npc_lich') {
+        if (typeof FX !== 'undefined') {
+          FX.ring(data.x, data.y + 0.1, data.z, 0xa855f7, 1.2, 4.5);
+          FX.debris(new THREE.Vector3(data.x, data.y + 0.5, data.z), 0x7c3aed, 14, 2.5);
+        }
+      }
+    } catch (e) {
+      console.warn('[MobNet] onEntityFx error:', e);
+    }
+  },
+
   /* Bungkus spawner & handler damage saat sesi MP aktif */
   wrap() {
     if (this._wrapped) return;

@@ -1058,6 +1058,8 @@ const Monsters={
     this.list.push(child);
     FX.ring(parent.pos.x,parent.pos.y+0.1,parent.pos.z,0x8dff3a,1.2,5);
     FX.debris(parent.pos.clone().add(new THREE.Vector3(0,1,0)),0x96332c,18,3.5);
+    if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+      MobNet.sendEntityFx('kelabang_split',{x:parent.pos.x,y:parent.pos.y,z:parent.pos.z});
     Sfx.hit();
     UI.toast('🐛 Tubuh kelabang terbelah menjadi dua!');
   },
@@ -1550,6 +1552,8 @@ const Monsters={
             if(!m.pet)World.destroyArea(ix,iz,1.6);
             FX.ring(ix,World.topY(Math.floor(ix),Math.floor(iz))+0.05,iz,0xff5a2a,0.5,1.8);
             FX.debris(new THREE.Vector3(ix,World.topY(Math.floor(ix),Math.floor(iz)),iz),0xff6a30,6,2.2);
+            if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+              MobNet.sendEntityFx('dragon_fire',{x:ix,y:World.topY(Math.floor(ix),Math.floor(iz)),z:iz});
             /* kerucut ~60° di depan naga: siapa pun di dalamnya terbakar */
             const fdmg=Math.max(3,Math.round(m.dmg*0.7));
             for(const t of this.areaTargets(m,m.pos.x,m.pos.z,6)){
@@ -1604,6 +1608,8 @@ const Monsters={
                 ?World.getBlock(Math.floor(rightSideX),Math.floor(groundY)-1,Math.floor(rightSideZ)):null;
               const cR=(typeof BLOCK_INFO!=='undefined'&&BLOCK_INFO[bR])?BLOCK_INFO[bR].color:0x5a422e;
               FX.debris(new THREE.Vector3(rightSideX,groundY+0.3,rightSideZ),cR,6,2.2);
+              if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+                MobNet.sendEntityFx('trex_charge',{leftX,leftZ,rightSideX,rightSideZ,groundY,yaw});
 
               FX.addShake(0.25);
               if(typeof Sfx!=='undefined'&&Sfx.at)Sfx.at(m.pos,'rock');
@@ -4044,6 +4050,8 @@ const Monsters={
     if(typeof PortFX!=='undefined')
       PortFX.crescent(c.x,c.y+1.1,c.z,m.mesh.rotation.y,-1.35,0,2.4,1.9,0.3,0xff5a2a);
     FX.debris(new THREE.Vector3(c.x,c.y+0.4,c.z),0x8a8a8a,22,4);
+    if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+      MobNet.sendEntityFx('golem_smash',{x:c.x,y:c.y,z:c.z,yaw:m.mesh.rotation.y});
     /* HANCURKAN TANAH: hanya golem liar. Golem pet tidak boleh merusak dunia
        milik pemain saat bertarung dengan monster. */
     if(!m.pet)World.destroyArea(c.x,c.z,2.4);

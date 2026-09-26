@@ -338,6 +338,9 @@ const RPG={
       this.activeCD.slam=this.activeCDMax('slam');
     }
     this._slamAoE(x,y,z);
+    if(typeof Network!=='undefined'&&Network.active){
+      Network.sendSkill('slam',x,y,z,typeof Player!=='undefined'?(Player.facing||0):0);
+    }
     UI.renderActiveSkills();
     return true;
   },
@@ -450,6 +453,9 @@ const RPG={
     /* animasi tubuh khas per skill aktif (slam lewat mesin fase slamQuick) */
     if(id!=='slam'&&typeof Player!=='undefined'&&Player.playSkillAnim)
       Player.playSkillAnim(id);
+    if(id!=='slam'&&typeof Network!=='undefined'&&Network.active){
+      Network.sendSkill(id,P.x,P.y,P.z,typeof Player!=='undefined'?(Player.facing||0):0);
+    }
     this.activeCD[id]=this.activeCDMax(id);
     UI.toast(msg);
     UI.renderActiveSkills();

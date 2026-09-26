@@ -232,6 +232,8 @@ const NPC_Lionknight={
       FX.debris(n.pos.clone().add(new THREE.Vector3(0,1.5,0)),0xE3B45A,14,4.5);
       FX.text(n.pos.clone().add(new THREE.Vector3(0,2.6,0)),'AUM!!','#ffd24d');
       FX.addShake(0.6);
+      if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+        MobNet.sendEntityFx('npc_roar',{x:n.pos.x,y:n.pos.y,z:n.pos.z});
       Sfx.at(n.pos,'roar');
     }else{
       FX.ring(n.pos.x,n.pos.y+0.15,n.pos.z,0xE3B45A,1.8,5);

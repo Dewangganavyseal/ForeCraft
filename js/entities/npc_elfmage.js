@@ -146,7 +146,12 @@ const NPC_Elfmage={
         if(c.t>=3.2){if(c.magicCircle)c.magicCircle.fade();n.cast=null;}
         else if(c.t>0.35&&c.t<2.4){
           c.acc+=dt;
-          while(c.acc>0.1){c.acc-=0.1;PortFX.shard(c.x,c.z,c.y);}
+          while(c.acc>0.1){
+            c.acc-=0.1;
+            PortFX.shard(c.x,c.z,c.y);
+            if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+              MobNet.sendEntityFx('npc_spell',{type:'shard',x:c.x,y:c.y,z:c.z});
+          }
           c.dmgT=(c.dmgT||0)+dt;
           if(c.dmgT>=0.4){c.dmgT=0;this.aoe(n,c.x,c.z,3.6,npcDmgSafe(n)*0.9,2);}
         }
@@ -154,7 +159,12 @@ const NPC_Elfmage={
         if(c.t>=3.9){if(c.magicCircle)c.magicCircle.fade();n.cast=null;}
         else if(c.t>0.5&&c.t<2.7){
           c.acc+=dt;
-          if(c.acc>=0.36){c.acc=0;PortFX.meteor(c.x,c.z,n.mesh.rotation.y,c.y);}
+          if(c.acc>=0.36){
+            c.acc=0;
+            PortFX.meteor(c.x,c.z,n.mesh.rotation.y,c.y);
+            if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+              MobNet.sendEntityFx('npc_spell',{type:'meteor',x:c.x,y:c.y,z:c.z});
+          }
         }
       }
       return true;

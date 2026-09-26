@@ -325,6 +325,9 @@ const Player={
       Sfx.jump();
       FX.debris(this.pos.clone().add(new THREE.Vector3(0,0.3,0)),0xbfe4ff,6,1.6);
       FX.ring(this.pos.x,this.pos.y+0.2,this.pos.z,0x8fe0ff,0.5,2.2);
+      if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+        Network.sendSkill('djump',this.pos.x,this.pos.y,this.pos.z,this.facing);
+      }
     }
   },
 
@@ -455,6 +458,9 @@ const Player={
     if(typeof Prof!=='undefined')Prof.gain('agility',5,1);
     Sfx.dash();
     if(this.inWater){FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2.6);Sfx.splash(false);}
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendSkill('dodge',this.pos.x,this.pos.y,this.pos.z,Math.atan2(dir.x,dir.z));
+    }
   },
    /* ---------- durasi serangan ----------
       comboAnimDur : panjang ANIMASI combo ke-ci (sumber: PlayerAnimator).

@@ -1286,6 +1286,8 @@ const NPC_Lich = (() => {
             z.burstDone = true;
             if (typeof FX !== 'undefined' && FX.debris) {
               FX.debris(new THREE.Vector3(z.g.position.x, z.g.position.y + 0.1, z.g.position.z), 0x6b4f33, 14, 2.5);
+              if (typeof MobNet !== 'undefined' && MobNet.isMp() && MobNet.isHost())
+                MobNet.sendEntityFx('npc_lich', { x: z.g.position.x, y: z.g.position.y, z: z.g.position.z });
             }
           }
           if (u >= 1) {

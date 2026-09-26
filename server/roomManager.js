@@ -292,23 +292,25 @@ class RoomManager {
     if (!client) return;
 
     const now = Date.now();
-    // Anti-Cheat: Rate limit perubahan blok (maksimal 20 blok/detik)
+    const isHost = (room.clients.keys().next().value === meta.netId);
+    const maxBlocksPerSec = isHost ? 200 : 35;
+    // Anti-Cheat: Rate limit perubahan blok
     if (now - client.lastBlockTime < 1000) {
       client.blockActionCount++;
-      if (client.blockActionCount > 20) return;
+      if (client.blockActionCount > maxBlocksPerSec) return;
     } else {
       client.lastBlockTime = now;
       client.blockActionCount = 1;
     }
 
-    const { x, y, z, id } = msg;
+    const { x, y, z, id, oldId } = msg;
     if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return;
     if (y < 0 || y >= 128) return;
 
-    // Anti-Cheat: Jarak maksimal jangkauan pukul/taruh blok (Reach Hack Check: maks 12 blok)
-    if (client.pos) {
+    // Anti-Cheat: Jarak jangkauan pukul/taruh blok (dilewati untuk host respawn pohon/batu)
+    if (client.pos && !isHost) {
       const distSq = (x - client.pos[0]) ** 2 + (y - client.pos[1]) ** 2 + (z - client.pos[2]) ** 2;
-      if (distSq > 144) return; // Lebih dari 12 blok
+      if (distSq > 256) return; // Maks 16 blok
     }
 
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
@@ -322,8 +324,48 @@ class RoomManager {
       x: Math.round(x),
       y: Math.round(y),
       z: Math.round(z),
-      id: id | 0
+      id: id | 0,
+      oldId: oldId !== undefined ? (oldId | 0) : null
     });
+  }
+
+  handleBlockHit(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    this.broadcastToRoom(meta.roomId, {
+      type: 'block_hit',
+      netId: meta.netId,
+      x: msg.x,
+      y: msg.y,
+      z: msg.z,
+      id: msg.id,
+      stage: msg.stage || 0,
+      prog: msg.prog || 0
+    }, meta.netId);
+  }
+
+  handlePlayerSkill(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    this.broadcastToRoom(meta.roomId, {
+      type: 'player_skill',
+      netId: meta.netId,
+      skillId: msg.skillId,
+      x: msg.x,
+      y: msg.y,
+      z: msg.z,
+      facing: msg.facing || 0
+    }, meta.netId);
+  }
+
+  handleEntityFx(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    this.broadcastToRoom(meta.roomId, {
+      type: 'entity_fx',
+      fx: msg.fx,
+      data: msg.data || {}
+    }, meta.netId);
   }
 
   handleAttack(ws, msg) {

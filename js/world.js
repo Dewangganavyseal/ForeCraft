@@ -53,7 +53,7 @@ const World={
       if(!this.networkOverrides)this.networkOverrides={};
       this.networkOverrides[wx+','+wy+','+wz]=id;
       if(!this._fromNetwork&&typeof Network!=='undefined'&&Network.active){
-        Network.sendBlockChange(wx,wy,wz,id);
+        Network.sendBlockChange(wx,wy,wz,id,old);
       }
     }
     /* daftar blok ladang untuk NPC farmer & sistem farming */
@@ -309,6 +309,7 @@ const World={
     this.processTimers(dt);
     if(typeof Farming!=='undefined')Farming.update(dt,pp);
     if(typeof Env_Ore!=='undefined'&&Env_Ore.update)Env_Ore.update(dt);
+    if(typeof Game!=='undefined'&&Game.isMultiplayer)this.checkBiomeResourceRespawn(dt);
     /* waktu angin tumbuhan voxel: satu uniform untuk seluruh dunia, jadi
        semua semak/tebu/tulip bergoyang tanpa biaya per-tanaman */
     if(Mesher.floraTime)Mesher.floraTime.value+=dt;
@@ -858,7 +859,9 @@ const World={
         const id=this.getBlock(p.x,p.y,p.z);
         if(id===B.AIR||id===B.WATER)continue;
         if(this.hasOreAboveOrSelf(p.x,p.y,p.z))continue; // Kebal bila di atasnya ada ore!
+        if(p.noNet)this._fromNetwork=true;
         this.setBlock(p.x,p.y,p.z,B.AIR);
+        if(p.noNet)this._fromNetwork=false;
         let col=(BLOCK_INFO[id]||{}).color||0x888888;
         if(typeof WGEN!=='undefined'&&WGEN.biomeAt){
           const bio=WGEN.biomeAt(p.x,p.z);
@@ -1147,6 +1150,9 @@ const World={
         OreFX.burst(wx+0.5,wy,wz+0.5,id,newStage===1?4:5,1.0);
       if(newStage===1)FX.addShake(0.12);
       else if(newStage===2)FX.addShake(0.18);
+      if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+        Network.sendBlockHit(wx,wy,wz,id,newStage,st.prog);
+      }
       if(st.prog>=1){
         delete this.oreStg[k];
         FX.clearBlockShake(wx,wy,wz);
@@ -1164,6 +1170,9 @@ const World={
     FX.blockShake(wx,wy,wz,BLOCK_INFO[id].color,
       1+0.8*(1-clamp(hp/maxHp,0,1)));
     if(id===B.STONE)Sfx.rock();else Sfx.chop();
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendBlockHit(wx,wy,wz,id,0,1-clamp(hp/maxHp,0,1));
+    }
     if(hp<=0){
       this.blockHP.delete(k);
       FX.clearBlockShake(wx,wy,wz);
@@ -1263,7 +1272,7 @@ const World={
     this.checkFlood(wx,wy,wz);
   },
   /* pohon tumbang: batang di atas titik potong runtuh berurutan */
-  fellTree(wx,wy,wz){
+  fellTree(wx,wy,wz,noNet=false){
     const trunk=[];
     for(let y=wy+1;y<CFG.WORLD_H;y++){
       if(this.getBlock(wx,y,wz)!==B.WOOD)break;
@@ -1280,12 +1289,13 @@ const World={
         dx:wx+0.5+d[0]*(0.35+i*0.42),
         dz:wz+0.5+d[1]*(0.35+i*0.42),
         last:i===trunk.length-1,
+        noNet:!!noNet
       });
     });
-    UI.toast('?? Pohon tumbang!');
+    if(!noNet)UI.toast('?? Pohon tumbang!');
   },
 
-  leafDecay(wx,wy,wz){
+  leafDecay(wx,wy,wz,noNet=false){
     if(typeof Env_Pigeon!=="undefined"&&Env_Pigeon.flushTree)Env_Pigeon.flushTree(wx,wz);
     for(let dy=-2;dy<=2;dy++)for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++){
       const x=wx+dx,y=wy+dy,z=wz+dz;
@@ -1295,7 +1305,7 @@ const World={
         if(this.getBlock(x+bx,y+by,z+bz)===B.WOOD)wood=true;
       if(!wood){
         const d=Math.abs(dx)+Math.abs(dy)+Math.abs(dz);
-        this.pending.push({x,y,z,t:0.15+d*0.09+Math.random()*0.1,leaf:true});
+        this.pending.push({x,y,z,t:0.15+d*0.09+Math.random()*0.1,leaf:true,noNet:!!noNet});
       }
     }
   },
@@ -1344,4 +1354,203 @@ const World={
     }
     if(hit){c.plants=keep;this.markDirty(cx,cz);Player.addXP(1);Prof.gain('harvesting',4,1);}
   },
+  /* ---------- MULTIPLAYER REMOTE BLOCK HIT & BREAK EFFECTS ---------- */
+  onRemoteBlockHit(x, y, z, id, stage, prog){
+    const col = (BLOCK_INFO[id] && BLOCK_INFO[id].color) || 0x8a8f98;
+    FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), col, 3, 1.8);
+    FX.blockShake(x, y, z, col, 1.2 + (prog || 0) * 0.8);
+
+    if (id === B.WOOD) {
+      if (typeof Sfx !== 'undefined' && Sfx.chop) Sfx.chop();
+    } else {
+      if (typeof Sfx !== 'undefined' && Sfx.rock) Sfx.rock();
+      if (typeof ORE_INFO !== 'undefined' && ORE_INFO[id]) {
+        if (typeof Env_Ore !== 'undefined' && Env_Ore.onHit) {
+          Env_Ore.onHit(x, y, z, id, stage);
+        } else if (stage > 0 && typeof OreFX !== 'undefined' && OreFX.burst) {
+          OreFX.burst(x + 0.5, y, z + 0.5, id, stage === 1 ? 4 : 5, 1.0);
+        }
+      }
+      if (stage === 1) FX.addShake(0.12);
+      else if (stage === 2) FX.addShake(0.18);
+    }
+  },
+
+  playBlockBreakFx(x, y, z, prevId){
+    if (!prevId || prevId === B.AIR || prevId === B.WATER) return;
+
+    if (prevId === B.WOOD) {
+      FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), 0x6e4f2f, 14, 3.2);
+      if (typeof Sfx !== 'undefined' && Sfx.chop) Sfx.chop();
+      this.fellTree(x, y, z, true);
+      this.leafDecay(x, y, z, true);
+      return;
+    }
+
+    if (prevId === B.STONE) {
+      FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), 0x8a8f98, 14, 3.5);
+      if (typeof OreFX !== 'undefined' && OreFX.burst) {
+        OreFX.burst(x + 0.5, y + 0.5, z + 0.5, B.STONE, 10, 1.5);
+      }
+      if (typeof Sfx !== 'undefined' && Sfx.rock) Sfx.rock();
+      FX.addShake(0.20);
+      return;
+    }
+
+    if (typeof ORE_INFO !== 'undefined' && ORE_INFO[prevId]) {
+      const col = (BLOCK_INFO[prevId] && BLOCK_INFO[prevId].color) || 0x8a8f98;
+      FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), col, 14, 3.5);
+      if (typeof Env_Ore !== 'undefined' && Env_Ore.onDestroy) {
+        Env_Ore.onDestroy(x, y, z, prevId);
+      } else if (typeof OreFX !== 'undefined' && OreFX.burst) {
+        OreFX.burst(x + 0.5, y + 0.5, z + 0.5, prevId, 10, 1.5);
+      }
+      if (typeof Sfx !== 'undefined' && Sfx.rock) Sfx.rock();
+      FX.addShake(0.22);
+      return;
+    }
+
+    if (prevId === B.LEAF) {
+      FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), 0x4a7c36, 5, 1.8);
+      return;
+    }
+
+    const col = (BLOCK_INFO[prevId] && BLOCK_INFO[prevId].color) || 0x8a8f98;
+    FX.debris(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5), col, 8, 2.5);
+  },
+
+  /* ---------- MULTIPLAYER RESOURCE RESPAWNER (TREES & ROCKS) ---------- */
+  spawnTreeAt(wx, wz){
+    const groundY = this.topY(wx, wz);
+    if (groundY < CFG.SEA || groundY >= CFG.WORLD_H - 8) return false;
+    const baseBlk = this.getBlock(wx, groundY - 1, wz);
+    if (!this.isFloor(baseBlk) || baseBlk === B.WOOD || baseBlk === B.LEAF) return false;
+    for (let y = groundY; y < groundY + 7; y++) {
+      if (this.getBlock(wx, y, wz) !== B.AIR) return false;
+    }
+
+    const th = 6;
+    for (let t = 0; t < th; t++) {
+      this.setBlock(wx, groundY + t, wz, B.WOOD);
+    }
+    const topY = groundY + th;
+    for (let dy = -2; dy <= 1; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx === 0 && dz === 0 && dy < 0) continue;
+          const dist = Math.abs(dx) + Math.abs(dz);
+          const rad = (dy <= -1) ? 3 : (dy === 0 ? 4 : 2);
+          if (dist <= rad) {
+            const bx = wx + dx, by = topY + dy, bz = wz + dz;
+            if (this.getBlock(bx, by, bz) === B.AIR) {
+              this.setBlock(bx, by, bz, B.LEAF);
+            }
+          }
+        }
+      }
+    }
+    if (typeof FX !== 'undefined' && FX.debris) {
+      FX.debris(new THREE.Vector3(wx + 0.5, groundY + 1.0, wz + 0.5), 0x4a7c36, 12, 2.5);
+    }
+    return true;
+  },
+
+  spawnRockAt(wx, wz){
+    const groundY = this.topY(wx, wz);
+    if (groundY < CFG.SEA || groundY >= CFG.WORLD_H - 4) return false;
+    const baseBlk = this.getBlock(wx, groundY - 1, wz);
+    if (!this.isFloor(baseBlk) || baseBlk === B.WOOD || baseBlk === B.LEAF || baseBlk === B.STONE) return false;
+    if (this.getBlock(wx, groundY, wz) !== B.AIR) return false;
+
+    this.setBlock(wx, groundY, wz, B.STONE);
+    this.setBlock(wx, groundY + 1, wz, B.STONE);
+
+    const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dz] of neighbors) {
+      if (Math.random() < 0.6) {
+        const nx = wx + dx, nz = wz + dz;
+        const ny = this.topY(nx, nz);
+        if (ny >= CFG.SEA && this.getBlock(nx, ny, nz) === B.AIR) {
+          this.setBlock(nx, ny, nz, B.STONE);
+        }
+      }
+    }
+    if (typeof FX !== 'undefined' && FX.debris) {
+      FX.debris(new THREE.Vector3(wx + 0.5, groundY + 0.5, wz + 0.5), 0x8a8f98, 10, 2.2);
+    }
+    if (typeof Sfx !== 'undefined' && Sfx.rock) Sfx.rock();
+    return true;
+  },
+
+  checkBiomeResourceRespawn(dt){
+    if (typeof Game === 'undefined' || !Game.isMultiplayer) return;
+    if (typeof Network === 'undefined' || !Network.active || !Network.isHost) return;
+
+    this._resTimer = (this._resTimer || 0) - dt;
+    if (this._resTimer > 0) return;
+    this._resTimer = 10; // Cek setiap 10 detik
+
+    const centers = [];
+    if (typeof Player !== 'undefined' && Player.pos) centers.push(Player.pos);
+    if (typeof Network !== 'undefined' && Network.remotePlayers) {
+      for (const rp of Network.remotePlayers.values()) {
+        if (rp && rp.pos) centers.push(rp.pos);
+      }
+    }
+    if (centers.length === 0) return;
+
+    const center = centers[Math.floor(Math.random() * centers.length)];
+    const R = 42;
+    const R_SQ = R * R;
+    const cx = Math.round(center.x);
+    const cz = Math.round(center.z);
+
+    let treeCount = 0;
+    let rockCount = 0;
+
+    for (let x = cx - R; x <= cx + R; x += 3) {
+      for (let z = cz - R; z <= cz + R; z += 3) {
+        const d2 = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+        if (d2 > R_SQ) continue;
+        const ty = this.topY(x, z);
+        if (ty <= CFG.SEA) continue;
+        const b = this.getBlock(x, ty - 1, z);
+        if (b === B.WOOD) {
+          treeCount++;
+        } else if (b === B.STONE || (typeof ORE_INFO !== 'undefined' && ORE_INFO[b])) {
+          rockCount++;
+        }
+      }
+    }
+
+    const MIN_TREES = 5;
+    const MAX_TREES = 16;
+    const MIN_ROCKS = 5;
+    const MAX_ROCKS = 14;
+
+    if (treeCount <= MIN_TREES) {
+      let needed = MAX_TREES - treeCount;
+      let spawned = 0;
+      for (let attempt = 0; attempt < 35 && spawned < needed; attempt++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 12 + Math.random() * (R - 14);
+        const tx = Math.round(cx + Math.cos(ang) * dist);
+        const tz = Math.round(cz + Math.sin(ang) * dist);
+        if (this.spawnTreeAt(tx, tz)) spawned++;
+      }
+    }
+
+    if (rockCount <= MIN_ROCKS) {
+      let needed = MAX_ROCKS - rockCount;
+      let spawned = 0;
+      for (let attempt = 0; attempt < 35 && spawned < needed; attempt++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 12 + Math.random() * (R - 14);
+        const rx = Math.round(cx + Math.cos(ang) * dist);
+        const rz = Math.round(cz + Math.sin(ang) * dist);
+        if (this.spawnRockAt(rx, rz)) spawned++;
+      }
+    }
+  },
 };
+window.World = World;

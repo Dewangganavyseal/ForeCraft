@@ -172,8 +172,20 @@ wss.on('connection', (ws) => {
         roomManager.handleBlockChange(ws, msg);
         break;
 
+      case 'block_hit':
+        roomManager.handleBlockHit(ws, msg);
+        break;
+
       case 'attack':
         roomManager.handleAttack(ws, msg);
+        break;
+
+      case 'player_skill':
+        roomManager.handlePlayerSkill(ws, msg);
+        break;
+
+      case 'entity_fx':
+        roomManager.handleEntityFx(ws, msg);
         break;
 
       case 'chat':

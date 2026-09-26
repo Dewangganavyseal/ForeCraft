@@ -241,6 +241,8 @@ const NPC_Stonegiant={
     FX.debris(new THREE.Vector3(p.x,y+.3,p.z),0x7a7f87,13,4);
     PortFX.spark(p.x,y+.5,p.z,10,0xffd9a0,9);
     FX.addShake(.5);
+    if(typeof MobNet!=='undefined'&&MobNet.isMp()&&MobNet.isHost())
+      MobNet.sendEntityFx('npc_quake',{x:p.x,y:y,z:p.z});
     Sfx.at(n.pos,'smash');
   },
   /* visual tiap pukulan biasa raksasa: slash arc bergilir ala combo 5-hit */

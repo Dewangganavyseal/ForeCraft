@@ -285,6 +285,82 @@ class RemotePlayer {
     } catch (e) {}
   }
 
+  playSkill(skillId, x, y, z, facing) {
+    const f = (facing !== undefined) ? facing : this.yaw;
+    this.yaw = f;
+    if (this.mesh) this.mesh.rotation.y = f;
+    const P = new THREE.Vector3(x !== undefined ? x : this.pos.x, y !== undefined ? y : this.pos.y, z !== undefined ? z : this.pos.z);
+
+    if (skillId === 'slam') {
+      if (this.animator) this.animator.playOnce('slam_land', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined') {
+        if (FX.shockwave) FX.shockwave(P.x, P.y + 0.1, P.z, 0xffd24d, 7);
+        if (FX.ring) FX.ring(P.x, P.y + 0.05, P.z, 0xffa23c, 0.8, 6);
+        if (FX.debris) FX.debris(new THREE.Vector3(P.x, P.y + 0.5, P.z), 0x8a6a4a, 14, 3.5);
+        if (typeof FX.groundWave === 'function') FX.groundWave(P.x, P.y, P.z, { mode: 'radial', radius: 4.5, color: 0xffd24d });
+        if (FX.addShake) FX.addShake(0.6);
+      }
+      if (typeof Sfx !== 'undefined') {
+        if (Sfx.smash) Sfx.smash(); else if (Sfx.jump) Sfx.jump();
+      }
+    } else if (skillId === 'whirl') {
+      if (this.animator) this.animator.playOnce('skill_whirlwind', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined') {
+        const up = P.clone().add(new THREE.Vector3(0, 1.0, 0));
+        if (FX.trail) {
+          FX.trail(up, f, false, 2);
+          FX.trail(up, f + Math.PI, false, 3);
+        }
+        if (FX.ring) FX.ring(P.x, P.y + 0.05, P.z, 0x7dff9d, 0.55, 4);
+        if (typeof FX.groundWave === 'function') FX.groundWave(P.x, P.y, P.z, { mode: 'radial', radius: 3.6, color: 0x7dff9d });
+        if (FX.addShake) FX.addShake(0.5);
+      }
+      if (typeof Sfx !== 'undefined' && Sfx.hit) Sfx.hit();
+    } else if (skillId === 'roar') {
+      if (this.animator) this.animator.playOnce('roar', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined') {
+        if (FX.shockwave) FX.shockwave(P.x, P.y + 1.45, P.z, 0xffd08a, 6);
+        if (FX.ring) FX.ring(P.x, P.y + 1.45, P.z, 0xffa23c, 0.55, 5);
+        if (FX.text) FX.text(new THREE.Vector3(P.x, P.y + 2.5, P.z), 'AAARGH!', '#ffb347');
+        if (FX.addShake) FX.addShake(0.8);
+      }
+      if (typeof Sfx !== 'undefined') {
+        if (Sfx.shout) Sfx.shout(); else if (Sfx.roar) Sfx.roar(); else if (Sfx.hit) Sfx.hit();
+      }
+    } else if (skillId === 'herb') {
+      if (this.animator) this.animator.playOnce('skill_heal', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined') {
+        if (FX.ring) FX.ring(P.x, P.y + 0.05, P.z, 0x8fe07a, 0.6, 2.6);
+        if (FX.text) FX.text(new THREE.Vector3(P.x, P.y + 2.1, P.z), '💚 HEAL', '#8fe07a');
+      }
+    } else if (skillId === 'dodge') {
+      if (this.animator) this.animator.playOnce('dash', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined' && FX.dash) {
+        const dir = new THREE.Vector3(Math.sin(f), 0, Math.cos(f));
+        FX.dash(new THREE.Vector3(P.x, P.y + 0.8, P.z), dir);
+      }
+    } else if (skillId === 'djump') {
+      if (this.animator) this.animator.playOnce('jump', 1.0, () => {
+        if (this.animator) this.animator.setAnimation(this.moving ? 'walk' : 'idle');
+      });
+      if (typeof FX !== 'undefined') {
+        if (FX.debris) FX.debris(new THREE.Vector3(P.x, P.y + 0.3, P.z), 0xbfe4ff, 6, 1.6);
+        if (FX.ring) FX.ring(P.x, P.y + 0.2, P.z, 0x8fe0ff, 0.5, 2.2);
+      }
+      if (typeof Sfx !== 'undefined' && Sfx.jump) Sfx.jump();
+    }
+  }
+
   update(dt) {
     if (!this.mesh) return;
 
@@ -678,13 +754,40 @@ const Network = {
 
       case 'block_update':
         if (typeof World !== 'undefined' && World.setBlock) {
-          const { x, y, z, id } = msg;
+          const { x, y, z, id, oldId } = msg;
+          const prevId = (oldId !== undefined && oldId !== null) ? oldId : World.getBlock(x, y, z);
           World._fromNetwork = true;
           World.setBlock(x, y, z, id);
           if (World.networkOverrides) {
             World.networkOverrides[`${x},${y},${z}`] = id;
           }
           World._fromNetwork = false;
+
+          // Jika blok dihancurkan (berubah menjadi AIR 0), putar efek hancur autentik di semua layar pemain
+          if (id === 0 && prevId !== 0 && World.playBlockBreakFx) {
+            World.playBlockBreakFx(x, y, z, prevId);
+          }
+        }
+        break;
+
+      case 'block_hit':
+        if (typeof World !== 'undefined' && World.onRemoteBlockHit) {
+          World.onRemoteBlockHit(msg.x, msg.y, msg.z, msg.id, msg.stage, msg.prog);
+        }
+        break;
+
+      case 'player_skill':
+        if (msg.netId !== this.netId) {
+          const rp = this.remotePlayers.get(msg.netId);
+          if (rp && rp.playSkill) {
+            rp.playSkill(msg.skillId, msg.x, msg.y, msg.z, msg.facing);
+          }
+        }
+        break;
+
+      case 'entity_fx':
+        if (typeof MobNet !== 'undefined' && MobNet.onEntityFx) {
+          MobNet.onEntityFx(msg.fx, msg.data);
         }
         break;
 
@@ -883,11 +986,43 @@ const Network = {
     }));
   },
 
-  sendBlockChange(x, y, z, id) {
+  sendBlockChange(x, y, z, id, oldId) {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
     this.ws.send(JSON.stringify({
       type: 'block_change',
-      x, y, z, id
+      x, y, z, id,
+      oldId: oldId !== undefined ? oldId : null
+    }));
+  },
+
+  sendBlockHit(x, y, z, id, stage, prog) {
+    if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    this.ws.send(JSON.stringify({
+      type: 'block_hit',
+      x, y, z, id,
+      stage: stage || 0,
+      prog: prog || 0
+    }));
+  },
+
+  sendSkill(skillId, x, y, z, facing) {
+    if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    this.ws.send(JSON.stringify({
+      type: 'player_skill',
+      skillId,
+      x: x !== undefined ? x : (typeof Player !== 'undefined' ? Player.pos.x : 0),
+      y: y !== undefined ? y : (typeof Player !== 'undefined' ? Player.pos.y : 0),
+      z: z !== undefined ? z : (typeof Player !== 'undefined' ? Player.pos.z : 0),
+      facing: facing !== undefined ? facing : (typeof Player !== 'undefined' ? (Player.facing || 0) : 0)
+    }));
+  },
+
+  sendEntityFx(fx, data) {
+    if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    this.ws.send(JSON.stringify({
+      type: 'entity_fx',
+      fx,
+      data: data || {}
     }));
   },
 
