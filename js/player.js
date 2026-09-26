@@ -15,11 +15,50 @@ const COMBOS=[
   /* pamungkas: jeda akhir paling panjang — animasi hantaman harus tuntas dulu */
   {dur:0.72,hit:0.34,dmg:2.4,vert:true,knock:7,rec:0.30},
 ];
+/* =========================================================================
+   CHARACTER PROFILE & COSMETICS (SHARED 1 MODEL ACROSS ALL MODES)
+   ========================================================================= */
+const CharacterProfile = {
+  KEY: 'forecraft_character_model_v1',
+  get(){
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if(raw) return JSON.parse(raw);
+    } catch(e){}
+    let s1 = null;
+    try { s1 = JSON.parse(localStorage.getItem('forest_survival_slot_1') || 'null'); } catch(e){}
+    return {
+      hairStyle: (s1 && s1.hairStyle !== undefined) ? s1.hairStyle : 4,
+      hairColor: (s1 && s1.hairColor !== undefined) ? s1.hairColor : 0x2c1f14,
+      name: (s1 && s1.name) ? s1.name : (localStorage.getItem('forecraft_mp_name') || 'Ranger'),
+      cosmetics: {}
+    };
+  },
+  save(data){
+    try {
+      const cur = this.get();
+      const updated = Object.assign(cur, data || {});
+      localStorage.setItem(this.KEY, JSON.stringify(updated));
+      return updated;
+    } catch(e){}
+  },
+  apply(p){
+    const player = p || (typeof Player !== 'undefined' ? Player : null);
+    if(!player) return;
+    const prof = this.get();
+    if(prof.hairStyle !== undefined) player.hairStyle = prof.hairStyle;
+    if(prof.hairColor !== undefined) player.hairColor = prof.hairColor;
+    player.cosmetics = prof.cosmetics || {};
+    if(player.setHair) player.setHair(player.hairStyle, player.hairColor);
+  }
+};
+window.CharacterProfile = CharacterProfile;
+
 const Player={
   pos:new THREE.Vector3(),vel:new THREE.Vector3(),
   facing:0,onGround:false,inWater:false,dead:false,airJumped:false,
   hp:100,stamina:100,hunger:100,level:1,xp:0,kills:0,
-  name:'Ranger',hairStyle:4,hairColor:0x2c1f14,
+  name:'Ranger',hairStyle:4,hairColor:0x2c1f14,cosmetics:{},
   /* ---------- stat maksimum ikut level ----------
      Level 1 tetap 100 supaya keseimbangan awal tidak berubah; tiap level
      menambah kapasitas sesuai CFG. UI membaca fungsi ini untuk skala bar. */
@@ -55,6 +94,7 @@ const Player={
 
   /* ---------- model karakter Ranger Penjelajah detail ---------- */
   buildModel(){
+    if(typeof CharacterProfile!=='undefined')CharacterProfile.apply(this);
     if(typeof PlayerModelBuilder!=='undefined'){
       this.mesh=PlayerModelBuilder.build();
       this.rollG=PlayerModelBuilder.rollG;
@@ -76,6 +116,9 @@ const Player={
   setHair(style, color){
     if(style!==undefined)this.hairStyle=style;
     if(color!==undefined)this.hairColor=color;
+    if(typeof CharacterProfile!=='undefined'&&CharacterProfile.save){
+      CharacterProfile.save({hairStyle:this.hairStyle, hairColor:this.hairColor});
+    }
     if(typeof PlayerModelBuilder!=='undefined'&&PlayerModelBuilder.setHair){
       PlayerModelBuilder.setHair(this.hairStyle,this.hairColor,this.parts);
     }

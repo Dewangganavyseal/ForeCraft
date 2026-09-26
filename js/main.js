@@ -327,15 +327,20 @@ const Game={
   /* ---------- kembali ke main menu dari in-game ---------- */
   returnToMenu(){
     if(this.menuMode)return;
+    const wasMp=this.isMultiplayer;
+    this.menuMode=true;
+    this.started=false;
+    this.currentMode='menu';
+    this.isMultiplayer=false;
+    if(typeof RPG!=='undefined')RPG.slot=null;
 
-    if(this.isMultiplayer){
+    if(wasMp){
       if(typeof Network!=='undefined')Network.leave();
-      this.isMultiplayer=false;
       if(typeof Capture!=='undefined')Capture.clearActive(true);
     }else{
       /* simpan data permainan saat ini HANYA jika dalam mode Single Player */
       if(typeof SaveGame!=='undefined'&&SaveGame.now)SaveGame.now();
-      else if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
+      else if(typeof RPG!=='undefined'&&RPG.isSinglePlayerActive&&RPG.isSinglePlayerActive())RPG.save();
     }
 
     /* tutup UI / chat / panel aktif */
@@ -348,13 +353,22 @@ const Game={
     const loadEl=document.getElementById('loading');
     if(loadEl)loadEl.style.display='none';
 
-    /* bersihkan entitas in-game */
-    if(typeof NPCS!=='undefined'&&NPCS.list){
-      for(let i=NPCS.list.length-1;i>=0;i--){
-        const n=NPCS.list[i];
-        if(n&&n.mesh&&n.mesh.parent)n.mesh.parent.remove(n.mesh);
+    /* bersihkan entitas in-game & team rekan */
+    if(typeof NPCS!=='undefined'){
+      NPCS.team=[];
+      if(NPCS.list){
+        for(let i=NPCS.list.length-1;i>=0;i--){
+          const n=NPCS.list[i];
+          if(n&&n.mesh&&n.mesh.parent)n.mesh.parent.remove(n.mesh);
+        }
+        NPCS.list=[];
       }
-      NPCS.list=[];
+    }
+    if(typeof UI!=='undefined'){
+      UI.teamSig='';
+      const teamEl=document.getElementById('team');
+      if(teamEl)teamEl.innerHTML='';
+      if(UI.renderTeam)UI.renderTeam();
     }
     if(typeof Monsters!=='undefined'&&Monsters.list){
       for(let i=Monsters.list.length-1;i>=0;i--){
@@ -380,11 +394,32 @@ const Game={
 
   /* ---------- mulai game MULTIPLAYER (MMORPG) ---------- */
   beginMultiplayer(joinData){
+    this.currentMode='multiplayer';
     this.isMultiplayer=true;
     this.menuMode=false;
+    this.started=true;
+    if(typeof RPG!=='undefined')RPG.slot=null;
     document.body.classList.remove('in-menu');
     this.setMenuFade(0);
     if(Player.mesh)Player.mesh.visible=true;
+
+    /* Bersihkan seluruh team NPC & icon team sebelum sesi multiplayer */
+    if(typeof NPCS!=='undefined'){
+      NPCS.team=[];
+      if(Array.isArray(NPCS.list)){
+        for(let i=NPCS.list.length-1;i>=0;i--){
+          const n=NPCS.list[i];
+          if(n&&n.mesh&&n.mesh.parent)n.mesh.parent.remove(n.mesh);
+        }
+        NPCS.list=[];
+      }
+    }
+    if(typeof UI!=='undefined'){
+      UI.teamSig='';
+      const teamEl=document.getElementById('team');
+      if(teamEl)teamEl.innerHTML='';
+      if(UI.renderTeam)UI.renderTeam();
+    }
 
     /* Bersihkan seluruh mob liar & drop item lama sebelum sesi multiplayer */
     if(typeof Monsters!=='undefined'&&Array.isArray(Monsters.list)){
@@ -423,9 +458,11 @@ const Game={
     World.networkOverrides=Object.assign({},joinData.worldDiffs||{});
 
     const prof=joinData.profile||{};
-    Player.name=prof.name||'Ranger';
-    Player.hairStyle=(prof.hairStyle!==undefined)?prof.hairStyle:4;
-    Player.hairColor=(prof.hairColor!==undefined)?prof.hairColor:0x2c1f14;
+    Player.name=prof.name||(typeof CharacterProfile!=='undefined'?CharacterProfile.get().name:'Ranger')||'Ranger';
+    // 1 model karakter & kosmetik yang sama antara Single Player dan Multiplayer
+    if(typeof CharacterProfile!=='undefined'){
+      CharacterProfile.apply(Player);
+    }
     Player.level=prof.level||1;
     Player.hp=prof.hp!==undefined?prof.hp:Player.maxHp();
     Player.hunger=100;
@@ -487,7 +524,8 @@ const Game={
       Capture.load(prof.mobSlots||null, prof.deployedPet!==undefined?prof.deployedPet:-1);
     }
 
-    Player.setHair(Player.hairStyle,Player.hairColor);
+    if(typeof CharacterProfile!=='undefined')CharacterProfile.apply(Player);
+    else Player.setHair(Player.hairStyle,Player.hairColor);
     Player.refreshArmor();
 
     /* reset kamera ke posisi pemain */
@@ -536,13 +574,17 @@ const Game={
 
   /* ---------- mulai game ---------- */
   begin(save,slot){
+    this.currentMode='single';
+    this.isMultiplayer=false;
     this.menuMode=false;
+    this.started=true;
     document.body.classList.remove('in-menu');
     this.setMenuFade(0);                       // jangan sampai layar hitam terbawa ke game
     if(Player.mesh)Player.mesh.visible=true;
 
     if(slot)RPG.slot=slot;
     else if(save&&save.slot)RPG.slot=save.slot;
+    else RPG.slot=1;
 
     document.getElementById('start').classList.add('hidden');
     document.getElementById('loading').style.display='flex';
@@ -631,7 +673,11 @@ const Game={
     /* proficiency: muat dari save, atau reset untuk permainan baru */
     if(typeof Prof!=='undefined')Prof.load(save?save.prof:null);
 
-    Player.setHair(Player.hairStyle,Player.hairColor);
+    if(save && save.hairStyle !== undefined && typeof CharacterProfile !== 'undefined'){
+      CharacterProfile.save({ hairStyle: save.hairStyle, hairColor: save.hairColor, name: save.name });
+    }
+    if(typeof CharacterProfile !== 'undefined') CharacterProfile.apply(Player);
+    else Player.setHair(Player.hairStyle,Player.hairColor);
     Player.refreshArmor();
 
     /* pre-generate data sekitar spawn */
@@ -1045,21 +1091,10 @@ const MainMenu={
       <div class="menu-wrap">
         <h2 class="menu-head">📂 Load Game</h2>
         <div class="slot-list">${slots}</div>
-        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
-          <button class="big mm-back">← Kembali</button>
-          <button id="mm-restore-s1" class="big" style="background:#2a4365;border-color:#4299e1;" title="Pulihkan save utama Slot 1 (Lv 86) jika sempat tertimpa">🔄 Pulihkan Slot 1 (Lv 86)</button>
-        </div>
+        <button class="big mm-back">← Kembali</button>
       </div>`;
     if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(this.el,I18N.lang);
     this.el.querySelector('.mm-back').addEventListener('click',()=>this.showMain());
-    const restoreBtn=this.el.querySelector('#mm-restore-s1');
-    if(restoreBtn){
-      restoreBtn.addEventListener('click',()=>{
-        if(typeof ForecraftSave!=='undefined'&&ForecraftSave.restoreSlot1){
-          ForecraftSave.restoreSlot1();
-        }
-      });
-    }
     this.el.querySelectorAll('.slot-btn').forEach(b=>{
       b.addEventListener('click',()=>{
         const i=+b.dataset.slot;
@@ -1346,6 +1381,10 @@ const CharacterCustomizer={
       Player.name=playerName;
       Player.hairStyle=chosenStyle;
       Player.hairColor=chosenColor;
+      if(typeof CharacterProfile!=='undefined'){
+        CharacterProfile.save({ hairStyle: chosenStyle, hairColor: chosenColor, name: playerName });
+        CharacterProfile.apply(Player);
+      }
       RPG.customPlayer={
         name:playerName,
         hairStyle:chosenStyle,

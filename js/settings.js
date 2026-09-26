@@ -203,21 +203,24 @@ const Settings={
       if(typeof UIStudio!=='undefined')UIStudio.open();
     });
 
-    /* ===== SAVE MANUAL ===== */
-    const sv=document.createElement('div');
-    sv.className='set-sec';
-    sv.innerHTML=`
-      <div class="set-h">💾 ${L('settings_save')}</div>
-      <button class="big" id="set-save">💾 ${L('settings_save_now')}</button>`;
-    el.appendChild(sv);
-    sv.querySelector('#set-save').addEventListener('click',()=>{
-      /* pakai SaveGame.now(): ikut menyimpan furnitur & memberi info rekan */
-      if(typeof SaveGame!=='undefined'&&SaveGame.now){SaveGame.now();return;}
-      if(typeof RPG!=='undefined'){
-        RPG.save();
-        if(typeof UI!=='undefined'&&UI.toast)UI.toast('💾 '+L('settings_saved'));
-      }
-    });
+    /* ===== SAVE MANUAL (HANYA SINGLE PLAYER — MULTIPLAYER AUTO-SAVE SERVER) ===== */
+    const isMp = typeof Game !== 'undefined' && Game.isMultiplayer;
+    if (!isMp) {
+      const sv=document.createElement('div');
+      sv.className='set-sec';
+      sv.innerHTML=`
+        <div class="set-h">💾 ${L('settings_save')}</div>
+        <button class="big" id="set-save">💾 ${L('settings_save_now')}</button>`;
+      el.appendChild(sv);
+      sv.querySelector('#set-save').addEventListener('click',()=>{
+        /* pakai SaveGame.now(): ikut menyimpan furnitur & memberi info rekan */
+        if(typeof SaveGame!=='undefined'&&SaveGame.now){SaveGame.now();return;}
+        if(typeof RPG!=='undefined'){
+          RPG.save();
+          if(typeof UI!=='undefined'&&UI.toast)UI.toast('💾 '+L('settings_saved'));
+        }
+      });
+    }
 
     /* ===== TOMBOL MAIN MENU ===== */
     const mm=document.createElement('div');

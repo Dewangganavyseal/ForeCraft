@@ -20,8 +20,7 @@ const SaveGame={
 
   /* Simpan sekarang juga lalu beri umpan balik singkat. */
   now(){
-    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)) return;
-    if(typeof RPG==='undefined')return;
+    if(typeof RPG==='undefined'||!RPG.isSinglePlayerActive())return;
     RPG.save();
     if(typeof Furni!=='undefined'&&Furni.save)Furni.save();
     if(typeof Altar!=='undefined'&&Altar.save)Altar.save();

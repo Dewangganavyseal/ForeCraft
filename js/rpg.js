@@ -53,6 +53,16 @@ const RPG={
   META_KEY:'forest_survival_slots_meta',
   slotKey(i){return 'forest_survival_slot_'+i;},
 
+  isSinglePlayerActive(){
+    return typeof Game !== 'undefined' &&
+           Game.started === true &&
+           Game.menuMode === false &&
+           !Game.isMultiplayer &&
+           Game.currentMode === 'single' &&
+           typeof this.slot === 'number' &&
+           this.slot >= 1 && this.slot <= this.SLOT_MAX;
+  },
+
   initSlots(){
     /* migrasi save lama single-slot ke slot 1 */
     try{
@@ -1160,10 +1170,11 @@ const RPG={
     UI.renderSkills();UI.renderActiveSkills(true);
   },
   save(){
-    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)){
-      if(Game.isMultiplayer && typeof Network!=='undefined' && Network.sendPlayerSync)Network.sendPlayerSync();
+    if(typeof Game !== 'undefined' && Game.isMultiplayer){
+      if(typeof Network !== 'undefined' && Network.sendPlayerSync) Network.sendPlayerSync();
       return;
     }
+    if(!this.isSinglePlayerActive()) return;
     try{
       const data={
         slot:this.slot,

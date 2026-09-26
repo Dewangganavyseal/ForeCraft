@@ -658,7 +658,7 @@ const Capture={
     if(typeof UI!=='undefined'&&UI.renderTeam)UI.renderTeam();
     if(!silent&&typeof UI!=='undefined'&&UI.markInvDirty)UI.markInvDirty();
     this.renderMobBag();
-    if(typeof RPG!=='undefined'&&RPG.save)RPG.save();
+    if(typeof RPG!=='undefined'&&RPG.isSinglePlayerActive&&RPG.isSinglePlayerActive())RPG.save();
   },
 
   deploy(i){

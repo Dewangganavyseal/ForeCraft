@@ -520,7 +520,7 @@ const Farming={
 
   /* ---------- save / load ---------- */
   save(){
-    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)) return;
+    if(typeof RPG!=='undefined'&&!RPG.isSinglePlayerActive())return;
     try{
       const data=this.list.map(p=>({x:p.x,y:p.y,z:p.z,type:p.type,stage:p.stage,t:p.t}));
       localStorage.setItem(this.SAVE_KEY,JSON.stringify(data));

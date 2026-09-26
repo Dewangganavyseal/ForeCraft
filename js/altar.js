@@ -60,7 +60,7 @@ const Altar={
 
   /* ---------- persistensi: hanya menyimpan sel yang altarnya sudah dipakai ---------- */
   save(){
-    if(typeof Game!=='undefined' && (Game.isMultiplayer || !Game.started || Game.menuMode)) return;
+    if(typeof RPG!=='undefined'&&!RPG.isSinglePlayerActive())return;
     try{localStorage.setItem(this.SAVE_KEY,JSON.stringify({used:this.used}));}catch(e){}
   },
   load(){
