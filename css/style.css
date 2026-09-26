@@ -264,11 +264,23 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 #panel-bag.drag-lock, #panel-bag.drag-lock *{touch-action:none !important}
 .slot.press{border-color:#ffd24d;box-shadow:0 0 10px rgba(255,210,77,.35)}
 
-/* tooltip nama item saat tap biasa di layar sentuh (mobile tak punya hover) */
-.slot-tip{position:fixed;z-index:61;pointer-events:none;
-  background:rgba(18,16,22,.94);border:1px solid #5a4a6a;border-radius:8px;
-  padding:5px 10px;font-size:13px;color:#efe8ff;white-space:nowrap;
-  box-shadow:0 4px 14px rgba(0,0,0,.5);animation:tipIn .12s ease-out}
+/* tooltip nama & stat item saat hover (PC) atau tap biasa (mobile) */
+.slot-tip{position:fixed;z-index:9999;pointer-events:none;
+  background:linear-gradient(160deg,rgba(32,18,10,.98),rgba(18,10,6,.96));
+  border:2px solid #ea580c;border-radius:4px;
+  padding:8px 12px;font-size:12px;color:#efe8ff;white-space:nowrap;
+  box-shadow:0 6px 18px rgba(0,0,0,.7), inset 0 0 0 1px #541c08;
+  animation:tipIn .12s ease-out;display:flex;flex-direction:column;gap:4px}
+.slot-tip .st-head{display:flex;align-items:center;gap:6px;font-weight:700}
+.slot-tip .st-head .iico{width:20px;height:20px;object-fit:contain}
+.slot-tip .st-name{color:#ffd76b}
+.slot-tip .st-lvl{color:#8fe07a;font-style:normal;margin-left:auto;font-size:11px}
+.slot-tip .st-rarity{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.slot-tip .st-stat{font-size:11px;color:#cbd5e1;display:flex;align-items:center;gap:5px}
+.slot-tip .st-stat .st-ico{width:13px;height:13px;object-fit:contain}
+.slot-tip .st-fx{font-size:10.5px;color:#fed7aa;display:flex;align-items:center;gap:5px}
+.slot-tip .st-fx .eff-ico{width:13px;height:13px;object-fit:contain}
+.chip-ico{width:12px;height:12px;object-fit:contain;vertical-align:middle;margin-right:3px;display:inline-block}
 .slot-tip b{color:#ffd76b}
 .slot-tip i{color:#8fe07a;font-style:normal;margin-left:4px}
 @keyframes tipIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -2015,12 +2027,22 @@ body.in-menu #btn-uistudio{display:none !important}
   /* layar pendek/kecil: menu bisa digulir agar tombol tidak tertutup/terpotong */
   overflow-y:auto;justify-content:flex-start;padding:22px 0;overscroll-behavior:contain}
 .menu-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;
-  width:min(480px,94vw);margin:auto;
+  width:min(480px,94vw);margin:auto}
+.menu-wrap.mm-root{
+  background:none !important;
+  border:none !important;
+  box-shadow:none !important;
+  clip-path:none !important;
+  padding:20px 0 !important;
+  backdrop-filter:none !important;
+}
+.menu-wrap.mm-subpanel{
   background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
   border:4px solid #541c08;border-radius:0;
   clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
   box-shadow:0 12px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
-  padding:26px 24px;backdrop-filter:blur(8px)}
+  padding:26px 24px;backdrop-filter:blur(8px);
+}
 .menu-title{font-family:'Press Start 2P',monospace;
   font-size:clamp(26px,5.5vw,46px);color:#ffd24d;
   text-shadow:0 0 20px rgba(234,88,12,.5),0 4px 0 #541c08;

@@ -607,12 +607,22 @@ const Game={
     }
     Player.pos.copy(Player.spawnP);
 
+    // Identitas karakter selalu mengacu pada karakter aktif yang dipilih
+    const activeChar = (typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive) ? CharacterSlots.getActive() : null;
+    const curName = (activeChar && activeChar.name) ? activeChar.name : (save ? (save.name || 'Ranger') : 'Ranger');
+    const curHairStyle = (activeChar && activeChar.hairStyle !== undefined) ? activeChar.hairStyle : (save && save.hairStyle !== undefined ? save.hairStyle : 4);
+    const curHairColor = (activeChar && activeChar.hairColor !== undefined) ? activeChar.hairColor : (save && save.hairColor !== undefined ? save.hairColor : 0x2c1f14);
+
+    Player.name = curName;
+    Player.hairStyle = curHairStyle;
+    Player.hairColor = curHairColor;
+
     if(save){
-      Player.name=save.name||'Ranger';
-      Player.hairStyle=(save.hairStyle!==undefined)?save.hairStyle:4;
-      Player.hairColor=(save.hairColor!==undefined)?save.hairColor:0x2c1f14;
-      Player.hp=save.hp;Player.hunger=save.hunger;
-      Player.level=save.level;Player.xp=save.xp;Player.kills=save.kills||0;
+      Player.hp=(save.hp!==undefined)?save.hp:100;
+      Player.hunger=(save.hunger!==undefined)?save.hunger:100;
+      Player.level=(save.level!==undefined)?save.level:1;
+      Player.xp=(save.xp!==undefined)?save.xp:0;
+      Player.kills=save.kills||0;
       RPG.sp=save.sp||0;RPG.skills=save.skills||{};
       RPG.coin=save.coin||0;
       RPG.bagTier=clamp(save.bagTier||0,0,RPG.BAG_MAX_TIER);
@@ -626,6 +636,12 @@ const Game={
       while(RPG.furniBag.length<21)RPG.furniBag.push(null);
       RPG.selectedFurniSlot=(save&&typeof save.selectedFurniSlot==='number')?save.selectedFurniSlot:-1;
 
+      // Jika karakter baru masuk ke slot ini tanpa inventori, berikan starter items
+      if(!save.hotbar){
+        RPG.addItem('bread',2);
+        RPG.addItem(RPG.START_WEAPON,1);
+      }
+
       /* Migrasi perabot lama dari hotbar/tas ke tab furnitur */
       for(const arr of [RPG.hotbar, RPG.bag]){
         for(let i=0; i<arr.length; i++){
@@ -634,10 +650,10 @@ const Game={
             const left = RPG.addFurniItem(s.id, s.n);
             if(left <= 0) arr[i] = null;
             else s.n = left;
+          }
+        }
       }
-    }
-    if(typeof Env_Pigeon!=='undefined'&&Env_Pigeon.clear)Env_Pigeon.clear();
-      }
+      if(typeof Env_Pigeon!=='undefined'&&Env_Pigeon.clear)Env_Pigeon.clear();
 
       RPG.mobSlots=save.mobSlots||new Array(4).fill(null);
       RPG.deployedPet=(typeof save.deployedPet==='number')?save.deployedPet:-1;
@@ -654,9 +670,9 @@ const Game={
       if(save.pos)Player.pos.set(save.pos[0],save.pos[1],save.pos[2]);
       if(save.team&&NPCS.restoreTeam)NPCS.restoreTeam(save.team);
     }else{
-      Player.name=(RPG.customPlayer&&RPG.customPlayer.name)||'Ranger';
-      Player.hairStyle=(RPG.customPlayer&&RPG.customPlayer.hairStyle!==undefined)?RPG.customPlayer.hairStyle:4;
-      Player.hairColor=(RPG.customPlayer&&RPG.customPlayer.hairColor!==undefined)?RPG.customPlayer.hairColor:0x2c1f14;
+      Player.name=curName;
+      Player.hairStyle=curHairStyle;
+      Player.hairColor=curHairColor;
       RPG.addItem('bread',2);
       RPG.addItem(RPG.START_WEAPON,1);
       RPG.blockBag=new Array(21).fill(null);
@@ -672,11 +688,12 @@ const Game={
     /* proficiency: muat dari save, atau reset untuk permainan baru */
     if(typeof Prof!=='undefined')Prof.load(save?save.prof:null);
 
-    if(save && save.hairStyle !== undefined && typeof CharacterProfile !== 'undefined'){
-      CharacterProfile.save({ hairStyle: save.hairStyle, hairColor: save.hairColor, name: save.name });
+    if(typeof CharacterProfile !== 'undefined'){
+      CharacterProfile.save({ hairStyle: curHairStyle, hairColor: curHairColor });
+      CharacterProfile.apply(Player);
+    }else{
+      Player.setHair(Player.hairStyle,Player.hairColor);
     }
-    if(typeof CharacterProfile !== 'undefined') CharacterProfile.apply(Player);
-    else Player.setHair(Player.hairStyle,Player.hairColor);
     Player.refreshArmor();
 
     /* pre-generate data sekitar spawn */
@@ -923,7 +940,7 @@ const MainMenu={
     if(typeof Updater!=='undefined'&&Updater.locked)return;
     this.el.classList.remove('hidden');
     this.el.innerHTML=`
-      <div class="menu-wrap">
+      <div class="menu-wrap mm-root">
         <h1 class="menu-title">FORECRAFT</h1>
         <div class="menu-sub">Voxel Survival v${(typeof CFG!=='undefined'&&CFG.VERSION)?CFG.VERSION:'0.2.19'}</div>
         <div class="menu-btns">
@@ -1111,7 +1128,7 @@ const MainMenu={
     let slots='';
     for(let i=1;i<=RPG.SLOT_MAX;i++)slots+=this.slotHtml(i,'load');
     this.el.innerHTML=`
-      <div class="menu-wrap">
+      <div class="menu-wrap mm-subpanel">
         <h2 class="menu-head">📂 Load Game</h2>
         <div class="slot-list">${slots}</div>
         <button class="big mm-back">← Kembali</button>
@@ -1131,7 +1148,7 @@ const MainMenu={
     let slots='';
     for(let i=1;i<=RPG.SLOT_MAX;i++)slots+=this.slotHtml(i,'new');
     this.el.innerHTML=`
-      <div class="menu-wrap">
+      <div class="menu-wrap mm-subpanel">
         <h2 class="menu-head">🌱 New Game — pilih slot</h2>
         <div class="slot-list">${slots}</div>
         <button class="big mm-back">← Kembali</button>

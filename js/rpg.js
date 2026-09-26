@@ -137,22 +137,58 @@ const RPG={
   loadSlot(i){
     try{
       this.slot=i;
-      // Coba muat save khusus untuk karakter aktif saat ini bila ada
-      let activeName = '';
-      if(typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive){
-        const act = CharacterSlots.getActive();
-        if(act && act.name) activeName = act.name.toLowerCase();
+      const activeChar = (typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive) ? CharacterSlots.getActive() : null;
+      const activeName = (activeChar && activeChar.name) ? activeChar.name.toLowerCase() : (typeof Player !== 'undefined' && Player.name ? Player.name.toLowerCase() : 'ranger');
+
+      // 1. Cek save khusus untuk karakter aktif di slot i
+      const charSpecific = localStorage.getItem(this.slotKey(i) + '_' + activeName);
+      if(charSpecific) return JSON.parse(charSpecific);
+
+      // 2. Cek save umum di slot i
+      const baseRaw = localStorage.getItem(this.slotKey(i));
+      if(baseRaw){
+        const baseSave = JSON.parse(baseRaw);
+        const baseOwner = (baseSave.name || 'ranger').toLowerCase();
+
+        // Bila pemilik save umum sama dengan karakter aktif, gunakan save ini
+        if(baseOwner === activeName){
+          return baseSave;
+        }
+
+        // BILA BERBEDA (karakter ke-2 masuk ke dunia slot 1 untuk pertama kali):
+        // Karakter ke-2 bermain di DUNIA yang sama (seed, day, time, spawn),
+        // tetapi Level, XP, dan Inventori adalah FRESH milik karakter ke-2!
+        return {
+          slot: i,
+          name: activeChar ? activeChar.name : 'Ranger',
+          hairStyle: (activeChar && activeChar.hairStyle !== undefined) ? activeChar.hairStyle : 4,
+          hairColor: (activeChar && activeChar.hairColor !== undefined) ? activeChar.hairColor : 0x2c1f14,
+          seed: baseSave.seed,
+          time: baseSave.time || 0.32,
+          day: baseSave.day || 1,
+          hp: 100,
+          hunger: 100,
+          level: 1,
+          xp: 0,
+          kills: 0,
+          pos: baseSave.spawnP || null,
+          spawnP: baseSave.spawnP || null,
+          sp: 0,
+          skills: {},
+          hotbar: null,
+          bag: null,
+          blockBag: null,
+          furniBag: null,
+          equip: {},
+          coin: 0,
+          mobSlots: new Array(4).fill(null),
+          deployedPet: -1,
+          mobKills: {},
+          badges: {},
+          team: []
+        };
       }
-      if(!activeName && typeof Player !== 'undefined' && Player.name){
-        activeName = Player.name.toLowerCase();
-      }
-      if(activeName){
-        const charSpecific = localStorage.getItem(this.slotKey(i) + '_' + activeName);
-        if(charSpecific) return JSON.parse(charSpecific);
-      }
-      // Fallback ke save umum slot i
-      const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
-      return d;
+      return null;
     }catch(e){return null;}
   },
 
@@ -1249,9 +1285,24 @@ const RPG={
       const curName = (Player.name || 'Ranger');
       const charKey = curName.toLowerCase();
 
-      // Simpan save umum & save spesifik karakter
-      localStorage.setItem(this.slotKey(this.slot),JSON.stringify(data));
+      // Cek pemilik save dasar slot ini; jika pemiliknya karakter lain, amankan dulu save karakter tersebut
+      try{
+        const baseRaw = localStorage.getItem(this.slotKey(this.slot));
+        if(baseRaw){
+          const baseSave = JSON.parse(baseRaw);
+          const baseOwner = (baseSave.name || 'ranger').toLowerCase();
+          if(baseOwner && baseOwner !== charKey){
+            const prevKey = this.slotKey(this.slot) + '_' + baseOwner;
+            if(!localStorage.getItem(prevKey)){
+              localStorage.setItem(prevKey, baseRaw);
+            }
+          }
+        }
+      }catch(e){}
+
+      // Simpan save spesifik karakter & save slot aktif
       localStorage.setItem(this.slotKey(this.slot) + '_' + charKey, JSON.stringify(data));
+      localStorage.setItem(this.slotKey(this.slot), JSON.stringify(data));
 
       /* update info slot untuk main menu */
       const meta=this.slotsMeta();
@@ -1281,7 +1332,9 @@ const RPG={
           CharacterSlots.saveSlots(allSlots);
         }
       }
-    }catch(e){}
+    }catch(e){
+      console.error('[RPG.save error]:', e);
+    }
   },
 
   /* ---------- SISTEM TRACKING MOB KILLS & LENCANA (BADGES) ---------- */

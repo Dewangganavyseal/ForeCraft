@@ -47,11 +47,11 @@ const CharacterProfile = {
     try {
       const cur = this.get();
       const updated = Object.assign(cur, data || {});
-      localStorage.setItem(this.KEY, JSON.stringify(updated));
+      // Nama karakter permanen dan tidak boleh ditimpa dari save data slot
       if(typeof CharacterSlots!=='undefined'&&CharacterSlots.getActive){
         const act = CharacterSlots.getActive();
         if(act){
-          if(data.name) act.name = data.name;
+          updated.name = act.name;
           if(data.hairStyle !== undefined) act.hairStyle = data.hairStyle;
           if(data.hairColor !== undefined) act.hairColor = data.hairColor;
           if(data.cosmetics) act.cosmetics = data.cosmetics;
@@ -60,6 +60,7 @@ const CharacterProfile = {
           CharacterSlots.saveSlots(slots);
         }
       }
+      localStorage.setItem(this.KEY, JSON.stringify(updated));
       return updated;
     } catch(e){}
   },

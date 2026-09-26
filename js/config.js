@@ -1573,38 +1573,45 @@ function itemStats(id){
   const out=[];
   if(it.weapon){
     const w=it.weapon;
-    out.push({k:'ATK',   v:'+'+Math.round(w.dmg*mul),        e:'⚔️',css:'#ff8f6b'});
-    out.push({k:'Kecepatan',v:'×'+w.spd.toFixed(2),          e:'⏱️',css:'#ffe066'});
-    out.push({k:'Kritikal',v:Math.round(Math.min(0.6,w.crit*mul)*100)+'%',e:'🎯',css:'#ff6bd6'});
-    out.push({k:'Jangkauan',v:w.reach.toFixed(1)+' blok',    e:'📏',css:'#b8c0cc'});
+    out.push({k:'ATK',   v:'+'+Math.round(w.dmg*mul),        e:'',icon:'buttons/attack.png',css:'#ff8f6b'});
+    out.push({k:'Kecepatan',v:'×'+w.spd.toFixed(2),          e:'',icon:'buttons/eff_swift.png',css:'#ffe066'});
+    out.push({k:'Kritikal',v:Math.round(Math.min(0.6,w.crit*mul)*100)+'%',e:'',icon:'buttons/attack.png',css:'#ff6bd6'});
+    out.push({k:'Jangkauan',v:w.reach.toFixed(1)+' blok',    e:'',icon:'buttons/sword_wood.png',css:'#b8c0cc'});
   }
   if(it.armor){
-    out.push({k:'DEF',v:'+'+Math.round(it.armor.def*mul*100)+'%',e:'🛡️',css:'#8fe0ff'});
+    out.push({k:'DEF',v:'+'+Math.round(it.armor.def*mul*100)+'%',e:'',icon:'buttons/eff_guard.png',css:'#8fe0ff'});
     /* stat block hanya ada di tameng: peluang menangkis & porsi damage
        yang ditahan saat tangkisan berhasil */
     if(it.armor.blk!==undefined){
       out.push({k:'Block',v:Math.round(Math.min(0.55,it.armor.blk*mul)*100)+'%',
-        e:'🎲',css:'#9fd7ff'});
+        e:'',icon:'buttons/eff_guard.png',css:'#9fd7ff'});
       out.push({k:'Tahan',v:Math.round(Math.min(0.85,it.armor.bkp||0)*100)+'%',
-        e:'🧱',css:'#c8e6a0'});
+        e:'',icon:'buttons/eff_guard.png',css:'#c8e6a0'});
     }
     const slots=(typeof PLAYER_GEAR_SLOTS!=='undefined')?PLAYER_GEAR_SLOTS:ARMOR_SLOTS;
     if(slots.some(s=>s.id===it.armor.slot)){
       const sl=slots.find(s=>s.id===it.armor.slot);
-      out.push({k:'Slot',v:sl.name,e:sl.e,css:'#c9d2dc'});
+      out.push({k:'Slot',v:sl.name,e:'',css:'#c9d2dc'});
     }
   }
   if(it.food){
     const f=it.food;
-    if(f.hunger)out.push({k:'Kenyang',v:'+'+f.hunger,e:'🍖',css:'#ffc46b'});
-    if(f.hp)out.push({k:'HP',v:(f.hp>0?'+':'')+f.hp,e:'❤️',css:f.hp>0?'#8fe07a':'#ff7a6b'});
-    if(f.buff==='speed')out.push({k:'Buff',v:'Lari 20s',e:'💨',css:'#8fe0ff'});
+    if(f.hunger)out.push({k:'Kenyang',v:'+'+f.hunger,e:'',icon:'buttons/eat.png',css:'#ffc46b'});
+    if(f.hp)out.push({k:'HP',v:(f.hp>0?'+':'')+f.hp,e:'',icon:'buttons/ui_hp.png',css:f.hp>0?'#8fe07a':'#ff7a6b'});
+    if(f.buff==='speed')out.push({k:'Buff',v:'Lari 20s',e:'',icon:'buttons/eff_swift.png',css:'#8fe0ff'});
   }
   /* efek unik senjata / armor selalu ditaruh terakhir */
   const fx=(it.weapon&&it.weapon.fx)||(it.armor&&it.armor.fx);
-  if(fx&&EFFECTS[fx])
-    out.push({k:EFFECTS[fx].n,v:'',e:EFFECTS[fx].e,css:'#'+EFFECTS[fx].c.toString(16).padStart(6,'0'),
+  if(fx&&EFFECTS[fx]){
+    const fxMap = {
+      bleed:'buttons/eff_bleed.png', shock:'buttons/eff_shock.png', venomB:'buttons/eff_venom.png',
+      venom:'buttons/eff_venom.png', frost:'buttons/eff_frost.png', quake:'buttons/eff_quake.png',
+      swift:'buttons/eff_swift.png', guard:'buttons/eff_guard.png', greed:'buttons/eff_greed.png',
+      regen:'buttons/eff_regen.png', thorns:'buttons/eff_thorns.png'
+    };
+    out.push({k:EFFECTS[fx].n,v:'',e:'',icon:fxMap[fx]||'buttons/eff_guard.png',css:'#'+EFFECTS[fx].c.toString(16).padStart(6,'0'),
       desc:EFFECTS[fx].desc});
+  }
   return out;
 }
 

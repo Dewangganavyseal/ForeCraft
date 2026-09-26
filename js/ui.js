@@ -96,26 +96,11 @@ const UI={
     let tip=null;
     const hideTip=()=>{if(tip){tip.remove();tip=null;}};
     const showTip=(sl)=>{
-      hideTip();
       const g=+sl.dataset.g,i=+sl.dataset.i;
       const arr=g===0?RPG.hotbar:RPG.bag;
       const s=arr[i];
       if(!s||!ITEMS[s.id])return;
-      const it=ITEMS[s.id];
-      const r=sl.getBoundingClientRect();
-      tip=document.createElement('div');
-      tip.className='slot-tip';
-      tip.innerHTML=`<b>${it.e} ${it.n}</b>`+(s.lvl?` <i>+${s.lvl}</i>`:'');
-      document.body.appendChild(tip);
-      /* posisi: tepat di atas slot, terpusat; bila mentok layar atas → di bawah */
-      const w=tip.offsetWidth,h=tip.offsetHeight;
-      let tx=r.left+r.width/2-w/2, ty=r.top-h-8;
-      if(ty<4)ty=r.bottom+8;
-      tx=Math.max(4,Math.min(window.innerWidth-w-4,tx));
-      tip.style.left=tx+'px';tip.style.top=ty+'px';
-      /* tutup saat tap di mana pun (kecuali pada tooltip itu sendiri) */
-      const off=ev=>{if(tip&&!tip.contains(ev.target))hideTip();};
-      setTimeout(()=>document.addEventListener('pointerdown',off,{once:true}),0);
+      this.showItemTip(sl, s.id, s.lvl);
     };
     let d=null;
 
@@ -2441,8 +2426,10 @@ const UI={
           const it=ITEMS[s.id];
           d.innerHTML=`${this.itemIcon(s.id)}<span class="cnt">${s.n>1?s.n:''}</span>`+
             (s.lvl?`<span class="lvl">+${s.lvl}</span>`:'');
-          d.title=this.itemTip(s.id)+(s.lvl?`\n⚒️ Level tempa ${s.lvl}`:'')
-            +(s.mark?`\n🧭 ${s.mark.name} (${Math.round(s.mark.x)}, ${Math.round(s.mark.z)})`:'');
+          d.title=this.itemTip(s.id)+(s.lvl?`\nLevel tempa +${s.lvl}`:'')
+            +(s.mark?`\n[Arah] ${s.mark.name} (${Math.round(s.mark.x)}, ${Math.round(s.mark.z)})`:'');
+          d.addEventListener('mouseenter', () => this.showItemTip(d, s.id, s.lvl));
+          d.addEventListener('mouseleave', () => this.hideItemTip());
           /* Log Pass bertanda: bingkai merah + titik penanda */
           if(s.mark)d.classList.add('marked');
           /* bingkai slot memakai warna rarity agar item langka mudah dikenali */
@@ -3136,34 +3123,74 @@ const UI={
     });
   },
 
+  /* ---------- tooltip mengambang custom tanpa emoji ---------- */
+  showItemTip(targetEl, id, lvl){
+    this.hideItemTip();
+    const it=ITEMS[id];
+    if(!it||!targetEl)return;
+    const tip=document.createElement('div');
+    tip.className='slot-tip';
+    const mul=(it.rarity&&RARITY[it.rarity])?RARITY[it.rarity].mul:1;
+    let statLines = '';
+    if(it.weapon){
+      statLines += `<div class="st-stat"><img class="st-ico" src="buttons/attack.png"> ATK +${Math.round(it.weapon.dmg*mul)} · Spd ×${it.weapon.spd.toFixed(2)}</div>`;
+      statLines += `<div class="st-stat"><img class="st-ico" src="buttons/attack.png"> Crit ${Math.round(it.weapon.crit*100)}% · Jangkauan ${it.weapon.reach} blok</div>`;
+    }else if(it.armor){
+      statLines += `<div class="st-stat"><img class="st-ico" src="buttons/eff_guard.png"> DEF +${Math.round(it.armor.def*mul*100)}%</div>`;
+    }else if(it.food){
+      statLines += `<div class="st-stat"><img class="st-ico" src="buttons/eat.png"> Kenyang +${it.food.hunger||0}</div>`;
+      if(it.food.hp) statLines += `<div class="st-stat"><img class="st-ico" src="buttons/ui_hp.png"> HP +${it.food.hp}</div>`;
+    }
+    const fx = (it.weapon&&it.weapon.fx)||(it.armor&&it.armor.fx);
+    if(fx&&EFFECTS[fx]){
+      statLines += `<div class="st-fx">${this.effectIcon(fx)} ${EFFECTS[fx].n}: ${EFFECTS[fx].desc}</div>`;
+    }
+    const rarityBadge = (it.rarity&&RARITY[it.rarity])
+      ? `<span class="st-rarity" style="color:${RARITY[it.rarity].css}">${RARITY[it.rarity].n}</span>`
+      : '';
+    tip.innerHTML=`
+      <div class="st-head">${this.itemIcon(id)} <span class="st-name">${it.n}</span>`+(lvl?` <i class="st-lvl">+${lvl}</i>`:'')+`</div>
+      ${rarityBadge}
+      ${statLines}`;
+    document.body.appendChild(tip);
+    const r=targetEl.getBoundingClientRect();
+    const w=tip.offsetWidth,h=tip.offsetHeight;
+    let tx=r.left+r.width/2-w/2, ty=r.top-h-8;
+    if(ty<4)ty=r.bottom+8;
+    tx=Math.max(4,Math.min(window.innerWidth-w-4,tx));
+    tip.style.left=tx+'px';tip.style.top=ty+'px';
+    this._floatingTip = tip;
+    const off=ev=>{if(tip&&!tip.contains(ev.target))this.hideItemTip();};
+    setTimeout(()=>document.addEventListener('pointerdown',off,{once:true}),0);
+  },
+  hideItemTip(){
+    if(this._floatingTip){
+      this._floatingTip.remove();
+      this._floatingTip = null;
+    }
+  },
+
   /* ---------- tooltip item: rarity, stat senjata/armor, efek unik ---------- */
   itemTip(id){
-
     const it=ITEMS[id];
     if(!it)return '';
     const lines=[it.n];
     if(it.rarity&&RARITY[it.rarity])
-      lines.push(`${RARITY[it.rarity].e} ${RARITY[it.rarity].n} (×${RARITY[it.rarity].mul.toFixed(2)})`);
+      lines.push(`${RARITY[it.rarity].n} (×${RARITY[it.rarity].mul.toFixed(2)})`);
     if(it.weapon){
       const w=it.weapon;
-      lines.push(`⚔ ${w.dmg} damage · ${w.spd.toFixed(2)}× kecepatan`);
-      lines.push(`🎯 ${Math.round(w.crit*100)}% kritikal · jangkauan ${w.reach}`);
+      lines.push(`ATK: ${w.dmg} · Kecepatan: ${w.spd.toFixed(2)}×`);
+      lines.push(`Kritikal: ${Math.round(w.crit*100)}% · Jangkauan: ${w.reach} blok`);
       if(w.fx&&EFFECTS[w.fx])
-        lines.push(`${EFFECTS[w.fx].e} ${EFFECTS[w.fx].n}: ${EFFECTS[w.fx].desc}`);
+        lines.push(`[${EFFECTS[w.fx].n}]: ${EFFECTS[w.fx].desc}`);
       lines.push('Klik kanan untuk memakai');
     }else if(it.armor){
-      /* Angka DEF disamakan dengan panel stat (config.js itemStats): keduanya
-         mengalikan rarityMul. BUGFIX: tooltip ini dulu memakai def MENTAH,
-         sehingga item yang sama memperlihatkan dua angka berbeda tergantung
-         panel mana yang dilihat pemain. */
       const rm=(typeof RPG!=='undefined'&&RPG.rarityMul)?RPG.rarityMul(id):1;
-      lines.push(`🛡 +${Math.round(it.armor.def*rm*100)}% pertahanan`);
+      lines.push(`DEF: +${Math.round(it.armor.def*rm*100)}%`);
       if(it.armor.fx&&EFFECTS[it.armor.fx])
-        lines.push(`${EFFECTS[it.armor.fx].e} ${EFFECTS[it.armor.fx].n}: ${EFFECTS[it.armor.fx].desc}`);
-
+        lines.push(`[${EFFECTS[it.armor.fx].n}]: ${EFFECTS[it.armor.fx].desc}`);
       lines.push('Klik kanan untuk memakai');
     }
-
     return lines.join('\n');
   },
   /* ---------- ringkasan stat item untuk kartu resep ----------
@@ -3176,12 +3203,13 @@ const UI={
     const c=[];
     if(it.rarity&&RARITY[it.rarity]){
       const r=RARITY[it.rarity];
-      c.push(`<span class="chip" style="color:${r.css};border-color:${r.css}">${r.e} ${r.n}</span>`);
+      c.push(`<span class="chip" style="color:${r.css};border-color:${r.css}">${r.n}</span>`);
     }
     for(const s of itemStats(id)){
       const label=s.v?`${s.k} ${s.v}`:s.k;
+      const icoHtml = s.icon ? `<img class="chip-ico" src="${s.icon}" alt="">` : '';
       c.push(`<span class="chip" style="color:${s.css};border-color:${s.css}"`+
-        `${s.desc?` title="${s.desc}"`:''}>${s.e} ${label}</span>`);
+        `${s.desc?` title="${s.desc}"`:''}>${icoHtml}${label}</span>`);
     }
     return c.length?`<div class="stats">${c.join('')}</div>`:'';
   },
@@ -3541,19 +3569,33 @@ const UI={
         const rName=(ITEMS[r.out]&&ITEMS[r.out].n)||r.name;
         let lockReason='';
         if(!learned)lockReason=' — butuh '+RPG.recipeReqText(r);
-        else if(!hasSt)lockReason=' — butuh '+(st==='stove'?'🍲 Kompor / Tungku':'🔨 Meja Kerja');
+        else if(!hasSt)lockReason=' — butuh '+(st==='stove'?'Kompor / Tungku':'Meja Kerja');
         let btnText='Buat';
-        if(!learned)btnText='🔒';
-        else if(!hasSt)btnText=(st==='stove'?'🔒 Butuh Kompor':'🔒 Butuh Meja Kerja');
+        if(!learned)btnText='Terkunci';
+        else if(!hasSt)btnText=(st==='stove'?'Butuh Kompor':'Butuh Meja Kerja');
 
         /* input jumlah + tombol Buat. */
-        d.innerHTML=`<div class="out">${learned?this.itemIcon(r.out):'🔒'}</div>
+        d.innerHTML=`<div class="out">${learned?this.itemIcon(r.out):'<span class="lock-lbl">🔒</span>'}</div>
           <div class="info"><div class="nm">${rName}${lockReason}</div>
           ${statStr}
-          <div class="need">${learned?needStr:'🔒 '+RPG.recipeReqText(r)}</div></div>
+          <div class="need">${learned?needStr:'Terkunci: '+RPG.recipeReqText(r)}</div></div>
           ${unlocked?'<input type="number" class="craft-qty" min="1" max="64" value="1">':''}
           <button ${can?'':'disabled'}>${btnText}</button>`;
-        if(learned)d.querySelector('.out').title=this.itemTip(r.out);
+        if(learned){
+          const outEl=d.querySelector('.out');
+          if(outEl){
+            outEl.title=this.itemTip(r.out);
+            outEl.addEventListener('mouseenter',()=>this.showItemTip(outEl,r.out));
+            outEl.addEventListener('mouseleave',()=>this.hideItemTip());
+          }
+        }
+        d.querySelectorAll('.need span').forEach((sp, idx) => {
+          const reqId = Object.keys(r.need)[idx];
+          if(reqId){
+            sp.addEventListener('mouseenter',()=>this.showItemTip(sp,reqId));
+            sp.addEventListener('mouseleave',()=>this.hideItemTip());
+          }
+        });
         if(can){
           const btn=d.querySelector('button');
           const qtyEl=d.querySelector('.craft-qty');
