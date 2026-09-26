@@ -21,6 +21,15 @@ const COMBOS=[
 const CharacterProfile = {
   KEY: 'forecraft_character_model_v1',
   get(){
+    if(typeof CharacterSlots!=='undefined'&&CharacterSlots.getActive){
+      const act = CharacterSlots.getActive();
+      if(act) return {
+        name: act.name,
+        hairStyle: act.hairStyle,
+        hairColor: act.hairColor,
+        cosmetics: act.cosmetics || {}
+      };
+    }
     try {
       const raw = localStorage.getItem(this.KEY);
       if(raw) return JSON.parse(raw);
@@ -39,6 +48,18 @@ const CharacterProfile = {
       const cur = this.get();
       const updated = Object.assign(cur, data || {});
       localStorage.setItem(this.KEY, JSON.stringify(updated));
+      if(typeof CharacterSlots!=='undefined'&&CharacterSlots.getActive){
+        const act = CharacterSlots.getActive();
+        if(act){
+          if(data.name) act.name = data.name;
+          if(data.hairStyle !== undefined) act.hairStyle = data.hairStyle;
+          if(data.hairColor !== undefined) act.hairColor = data.hairColor;
+          if(data.cosmetics) act.cosmetics = data.cosmetics;
+          const slots = CharacterSlots.getSlots();
+          slots[CharacterSlots.getActiveIndex()] = act;
+          CharacterSlots.saveSlots(slots);
+        }
+      }
       return updated;
     } catch(e){}
   },

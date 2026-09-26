@@ -35,6 +35,7 @@ class RoomManager {
 
     this.initDirectories();
     this.initRooms();
+    this.initRegisteredNames();
     this.startPeriodicSave();
   }
 
@@ -42,6 +43,73 @@ class RoomManager {
     [DATA_DIR, WORLDS_DIR, PLAYERS_DIR].forEach(dir => {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     });
+  }
+
+  initRegisteredNames() {
+    this.registeredPath = path.join(DATA_DIR, 'registered_players.json');
+    this.registeredPlayers = {};
+    if (fs.existsSync(this.registeredPath)) {
+      try {
+        this.registeredPlayers = JSON.parse(fs.readFileSync(this.registeredPath, 'utf8'));
+      } catch (e) {
+        this.registeredPlayers = {};
+      }
+    }
+    // Scan seluruh player profiles di semua rooms untuk pre-populate database nama
+    let count = 0;
+    for (const room of this.rooms.values()) {
+      if (room.playerProfiles) {
+        for (const [pName, prof] of Object.entries(room.playerProfiles)) {
+          const lName = pName.toLowerCase();
+          if (!this.registeredPlayers[lName]) {
+            this.registeredPlayers[lName] = {
+              name: pName,
+              hairStyle: prof.hairStyle || 4,
+              hairColor: prof.hairColor || 0x2c1f14,
+              registeredAt: prof.lastUpdated || Date.now()
+            };
+            count++;
+          }
+        }
+      }
+    }
+    this.saveRegisteredPlayers();
+    console.log(`[RoomManager] Database nama pemain siap: ${Object.keys(this.registeredPlayers).length} nama terdaftar.`);
+  }
+
+  saveRegisteredPlayers() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(this.registeredPath, JSON.stringify(this.registeredPlayers, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[RoomManager] Gagal menyimpan registered_players.json:', e.message);
+    }
+  }
+
+  isNameRegistered(name) {
+    if (!name) return false;
+    const lName = String(name).trim().toLowerCase();
+    if (this.registeredPlayers && this.registeredPlayers[lName]) return true;
+    for (const room of this.rooms.values()) {
+      if (room.playerProfiles && room.playerProfiles[String(name).trim()]) return true;
+    }
+    return false;
+  }
+
+  registerPlayerName(name, meta = {}) {
+    if (!name) return false;
+    const cleanName = String(name).trim();
+    if (this.isNameRegistered(cleanName)) return false;
+    const lName = cleanName.toLowerCase();
+    this.registeredPlayers[lName] = {
+      name: cleanName,
+      hairStyle: meta.hairStyle || 4,
+      hairColor: meta.hairColor || 0x2c1f14,
+      registeredAt: Date.now()
+    };
+    this.saveRegisteredPlayers();
+    console.log(`[RoomManager] Registrasi nama pemain berhasil: "${cleanName}"`);
+    return true;
   }
 
   initRooms() {

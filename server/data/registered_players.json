@@ -1,0 +1,38 @@
+{
+  "denav": {
+    "name": "denav",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790381676066
+  },
+  "ranger": {
+    "name": "Ranger",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790440719451
+  },
+  "dnav": {
+    "name": "Dnav",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790430819060
+  },
+  "alpharanger": {
+    "name": "AlphaRanger",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790365178038
+  },
+  "betaranger": {
+    "name": "BetaRanger",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790365174862
+  },
+  "nanikore": {
+    "name": "Nanikore",
+    "hairStyle": 4,
+    "hairColor": 2891540,
+    "registeredAt": 1790443551608
+  }
+}

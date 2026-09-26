@@ -89,6 +89,56 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Cek ketersediaan nama karakter baru di server
+  if (urlPath === '/api/check-name') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const nameParam = parsedUrl.searchParams.get('name') || '';
+    const cleanName = nameParam.trim();
+    if (!cleanName || cleanName.length < 3) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ available: false, error: 'Nama minimal 3 karakter!' }));
+      return;
+    }
+    if (cleanName.length > 14) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ available: false, error: 'Nama maksimal 14 karakter!' }));
+      return;
+    }
+    const taken = roomManager.isNameRegistered(cleanName);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ available: !taken, name: cleanName, error: taken ? 'Nama sudah dipakai pemain lain!' : null }));
+    return;
+  }
+
+  // Daftarkan nama karakter baru secara resmi di server
+  if (urlPath === '/api/register-name' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body || '{}');
+        const cleanName = String(data.name || '').trim();
+        if (!cleanName || cleanName.length < 3 || cleanName.length > 14) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Nama harus 3-14 karakter!' }));
+          return;
+        }
+        const success = roomManager.registerPlayerName(cleanName, data);
+        if (!success) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Nama sudah dipakai pemain lain!' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, name: cleanName }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Request JSON tidak valid' }));
+      }
+    });
+    return;
+  }
+
   if (urlPath === '/api/server-info') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

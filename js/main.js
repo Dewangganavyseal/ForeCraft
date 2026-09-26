@@ -877,7 +877,14 @@ const MainMenu={
       }
     }
 
-    this.showMain();
+    // Tampilkan pemilihan 5 slot karakter SEBELUM masuk ke Main Menu
+    if(typeof CharacterSlots!=='undefined'&&CharacterSlots.showSelect){
+      CharacterSlots.showSelect(()=>{
+        this.showMain();
+      },{isInitial:true});
+    }else{
+      this.showMain();
+    }
   },
 
   fmtTime(t){
@@ -913,6 +920,7 @@ const MainMenu={
           <button id="mm-load" class="big">📂 Load Game</button>
           <button id="mm-new" class="big">🌱 New Game</button>
           <button id="mm-multi" class="big mm-multi">🌐 Multiplayer</button>
+          <button id="mm-char" class="big mm-char">🧍 Karakter</button>
           <button id="mm-music" class="big mm-music">🎵 Musik</button>
         </div>
       </div>`;
@@ -920,12 +928,18 @@ const MainMenu={
     this.el.querySelector('#mm-load').addEventListener('click',()=>this.showLoad());
     this.el.querySelector('#mm-new').addEventListener('click',()=>this.showNew());
     this.el.querySelector('#mm-multi').addEventListener('click',()=>this.showMultiplayer());
+    this.el.querySelector('#mm-char').addEventListener('click',()=>{
+      if(typeof CharacterSlots!=='undefined'&&CharacterSlots.showSelect){
+        CharacterSlots.showSelect(()=>this.showMain(),{canBack:true});
+      }
+    });
     this.el.querySelector('#mm-music').addEventListener('click',()=>this.showMusic());
   },
 
   /* ---------- menu MULTIPLAYER (10 Rooms, maks 50 player) ---------- */
   showMultiplayer(){
-    const defaultName = localStorage.getItem('forecraft_mp_name') || (typeof Player !== 'undefined' && Player.name) || 'Ranger';
+    const activeChar = (typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive()) ? CharacterSlots.getActive() : null;
+    const defaultName = (activeChar && activeChar.name) ? activeChar.name : (localStorage.getItem('forecraft_mp_name') || (typeof Player !== 'undefined' && Player.name) || 'Ranger');
     const defaultHost = (typeof Network !== 'undefined') ? Network.getServerHost() : '10.247.243.121:3000';
     this.el.innerHTML = `
       <div class="mp-wrap">
@@ -934,10 +948,11 @@ const MainMenu={
           <div class="mp-sub">Pilih Room Server · Maksimal 50 Pemain per Room · Cross-Platform (PC & Mobile)</div>
         </div>
         <div class="mp-name-bar">
-          <span class="mp-name-label">Karakter:</span>
-          <input type="text" id="mp-name-input" class="mp-name-input" maxlength="16" value="${defaultName}" placeholder="Nama...">
-          <span class="mp-name-label" style="margin-left:8px;">Server IP:</span>
-          <input type="text" id="mp-host-input" class="mp-name-input" style="width:170px;" value="${defaultHost}" placeholder="IP:Port">
+          <div class="mp-name-badge">
+            Karakter: <b class="mp-active-name">${defaultName}</b> <span class="mp-locked-tag">🔒 Terverifikasi</span>
+          </div>
+          <span class="mp-name-label" style="margin-left:auto;">Server IP:</span>
+          <input type="text" id="mp-host-input" class="mp-name-input" style="width:180px;" value="${defaultHost}" placeholder="IP:Port">
         </div>
         <div id="mp-room-list" class="mp-room-grid">
           <div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #a0b4cc;">
@@ -1026,9 +1041,8 @@ const MainMenu={
       listEl.querySelectorAll('.mp-btn-join').forEach(btn => {
         btn.addEventListener('click', () => {
           const roomId = Number(btn.dataset.room);
-          const nameInput = this.el.querySelector('#mp-name-input');
-          const rawName = (nameInput ? nameInput.value : '').trim();
-          const cleanName = rawName.substring(0, 16) || 'Ranger';
+          const activeChar = (typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive()) ? CharacterSlots.getActive() : null;
+          const cleanName = (activeChar && activeChar.name) ? activeChar.name : (localStorage.getItem('forecraft_mp_name') || (typeof Player !== 'undefined' && Player.name) || 'Ranger');
           localStorage.setItem('forecraft_mp_name', cleanName);
 
           const loadEl = document.getElementById('loading');
@@ -1132,16 +1146,17 @@ const MainMenu={
   startNew(i){
     RPG.slot=i;
     RPG.clearSlot(i);
-    /* Buka UI Kustomisasi Karakter (nama, gaya rambut, warna rambut)
-       sebelum masuk ke cutscene */
-    CharacterCustomizer.open(i,(customData)=>{
-      /* Selalu putar cutscene cerita sebelum masuk ke permainan baru */
-      if(typeof CutsceneIntro!=='undefined'){
-        CutsceneIntro.play(()=>Game.begin(null,i));
-      }else{
-        Game.begin(null,i);
-      }
-    });
+    // Terapkan karakter aktif yang sudah dipilih dari 5 slot karakter
+    if(typeof CharacterSlots!=='undefined'){
+      const activeChar = CharacterSlots.getActive();
+      if(activeChar) CharacterSlots.applyToPlayer(activeChar);
+    }
+    // Langsung putar cutscene cerita dan mulai gameplay!
+    if(typeof CutsceneIntro!=='undefined'){
+      CutsceneIntro.play(()=>Game.begin(null,i));
+    }else{
+      Game.begin(null,i);
+    }
   },
 
   confirm(msg,onOk){

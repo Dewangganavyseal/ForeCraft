@@ -135,15 +135,20 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 #xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#ca8a04,#eab308,#fde047);box-shadow:0 0 6px rgba(250,204,21,.85);transition:width .2s ease-out}
 #xp-pct{position:fixed;bottom:6px;left:8px;font-family:'Press Start 2P',monospace;font-size:7.5px;color:#fef08a;text-shadow:0 1px 3px #000, 0 0 4px rgba(0,0,0,.8);z-index:51;pointer-events:none;letter-spacing:.04em}
 
-#topright{position:absolute;top:12px;left:50%;transform:translateX(-50%);text-align:center;background:rgba(24,16,10,.82);border:1.5px solid #7c2d12;border-radius:8px;padding:6px 12px;backdrop-filter:blur(4px);z-index:12}
-#clock{font-size:15px;font-weight:600}
-#daynum{font-size:11px;opacity:.8}
+#topright{position:absolute;top:12px;left:50%;transform:translateX(-50%);text-align:center;
+  background:linear-gradient(160deg,rgba(36,20,12,.95),rgba(20,10,6,.92));
+  border:4px solid #541c08;border-radius:0;
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  box-shadow:0 6px 0 rgba(0,0,0,.5), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
+  padding:8px 16px 7px;backdrop-filter:blur(6px);z-index:12}
+#clock{font-size:14px;font-weight:700;color:#fff}
+#daynum{font-size:10px;opacity:.85;color:#fed7aa}
 
 /* ====== KOMPAS ARAH MATA ANGIN (di atas jam) ==============================
    Strip horizontal berisi label N/E/S/W + garis derajat yang bergeser sesuai
    arah pandang kamera. Penanda ▼ di tengah menunjukkan arah hadap saat ini. */
 #compass{position:relative;width:168px;height:20px;margin:0 auto 4px;
-  overflow:hidden;border-bottom:1px solid rgba(255,255,255,.18)}
+  overflow:hidden;border:1px solid #7c2d12;background:#140a06;border-radius:3px}
 #compass-strip{position:absolute;top:0;left:0;height:100%;white-space:nowrap;
   will-change:transform}
 #compass-strip span{display:inline-block;text-align:center;font-size:10.5px;
@@ -3463,6 +3468,161 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
   border-color: #ef4444;
+}
+
+/* ============ CHARACTER SLOTS & CREATOR (STEPPED PIXEL ORANGE THEME) ============ */
+.charslot-ov, .char-creator-ov, .charslot-confirm-ov{
+  position:fixed;inset:0;background:rgba(8,5,3,.88);backdrop-filter:blur(8px);
+  z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;
+  animation:tin .25s ease-out;
+}
+.charslot-box{
+  width:min(920px,96vw);max-height:92vh;overflow-y:auto;
+  background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;
+  box-shadow:0 12px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  padding:24px 28px;display:flex;flex-direction:column;gap:18px;
+}
+.charslot-header{text-align:center}
+.charslot-title{font-family:'Press Start 2P',monospace;font-size:16px;color:#ffd24d;text-shadow:0 2px 4px #000;letter-spacing:1px;margin-bottom:6px}
+.charslot-sub{font-size:11.5px;color:#fed7aa;opacity:.85}
+
+.charslot-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:8px 0}
+.charslot-card{
+  position:relative;background:rgba(20,10,6,.85);border:2px solid #7c2d12;
+  box-shadow:0 4px 0 rgba(0,0,0,.4), inset 0 0 0 1px rgba(234,88,12,.3);
+  padding:16px 10px 14px;display:flex;flex-direction:column;align-items:center;
+  text-align:center;gap:8px;border-radius:4px;transition:transform .15s, border-color .15s, box-shadow .15s;
+}
+.charslot-card:hover{transform:translateY(-2px);border-color:#ea580c;box-shadow:0 6px 14px rgba(0,0,0,.5), 0 0 12px rgba(234,88,12,.35)}
+.charslot-card.active{border-color:#ffd24d;box-shadow:0 0 14px rgba(255,210,77,.5), inset 0 0 8px rgba(234,88,12,.4)}
+.charslot-card.locked{background:rgba(15,10,8,.6);opacity:.85;border-style:dashed}
+
+.cs-badge-active{position:absolute;top:6px;right:6px;font-family:'Press Start 2P',monospace;font-size:7px;color:#000;background:#ffd24d;padding:2px 5px;border-radius:3px;font-weight:700}
+.cs-badge-gp{position:absolute;top:6px;right:6px;font-size:8px;color:#ffd24d;background:rgba(124,45,18,.8);border:1px solid #ea580c;padding:2px 4px;border-radius:3px;font-weight:700}
+.cs-card-num{font-family:'Press Start 2P',monospace;font-size:8.5px;color:#ea580c;letter-spacing:1px}
+.cs-card-name{font-family:'Press Start 2P',monospace;font-size:11px;color:#fff;word-break:break-word;margin:4px 0}
+.cs-card-info{font-size:10.5px;color:#fed7aa;display:flex;flex-direction:column;gap:3px}
+.cs-card-desc{font-size:10px;color:#cbd5e1;line-height:1.3;margin:6px 0}
+.cs-card-empty-icon{font-size:32px;color:#ea580c;line-height:1;margin:10px 0}
+
+.cs-card-actions{display:flex;gap:6px;width:100%;margin-top:auto}
+.cs-btn-select, .cs-btn-create, .cs-btn-unlock{
+  flex:1;padding:8px 6px;border-radius:4px;cursor:pointer;font-weight:700;font-size:11px;
+  background-color:#ea580c;border:1.5px solid #7c2d12;color:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.35), inset 0 1px 1px rgba(255,255,255,.3);transition:.12s;
+}
+.cs-btn-select:hover, .cs-btn-create:hover, .cs-btn-unlock:hover{background-color:#f97316;border-color:#ffd24d}
+.cs-btn-del{
+  padding:8px 10px;border-radius:4px;cursor:pointer;background:#b91c1c;border:1.5px solid #7f1d1d;color:#fff;
+  transition:.12s;box-shadow:0 2px 4px rgba(0,0,0,.35);
+}
+.cs-btn-del:hover{background:#dc2626}
+.charslot-footer{display:flex;justify-content:center;margin-top:8px}
+.cs-footer-back{
+  padding:10px 20px;border-radius:4px;cursor:pointer;font-weight:700;font-size:12px;
+  background:#261810;border:1.5px solid #7c2d12;color:#fed7aa;transition:.15s;
+}
+.cs-footer-back:hover{background:#382216;color:#fff;border-color:#ea580c}
+
+/* ============ CREATOR KARAKTER (KIRI 3D, KANAN KUSTOMISASI) ============ */
+.char-creator-box{
+  width:min(860px,96vw);max-height:92vh;overflow-y:auto;
+  background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;
+  box-shadow:0 12px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  padding:20px 24px;display:flex;flex-direction:column;gap:14px;
+}
+.char-creator-header{text-align:center;border-bottom:1px solid #7c2d12;padding-bottom:10px}
+.char-creator-header h2{font-family:'Press Start 2P',monospace;font-size:13px;color:#ffd24d;margin-bottom:4px}
+.char-creator-sub{font-size:11px;color:#fed7aa}
+
+.char-creator-body{display:flex;gap:20px;align-items:stretch}
+.char-creator-left{flex:0 0 320px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.char-3d-stage{
+  position:relative;width:300px;height:400px;background:radial-gradient(circle at 50% 40%,#3d2114,#140904 80%);
+  border:2px solid #7c2d12;border-radius:4px;box-shadow:inset 0 0 20px rgba(0,0,0,.7);overflow:hidden;
+}
+#creator-3d-cv{width:100%;height:100%;display:block;cursor:grab}
+#creator-3d-cv:active{cursor:grabbing}
+.char-3d-hint{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9.5px;color:#fed7aa;background:rgba(0,0,0,.5);padding:2px 0;pointer-events:none}
+
+.char-creator-right{flex:1 1 auto;display:flex;flex-direction:column;gap:14px;justify-content:center;min-width:0}
+.cc-form-group{display:flex;flex-direction:column;gap:6px}
+.cc-label{font-family:'Press Start 2P',monospace;font-size:9px;color:#ea580c;letter-spacing:.05em}
+.cc-name-row{display:flex;gap:8px}
+.cc-input{
+  flex:1;background:rgba(0,0,0,.6);border:2px solid #7c2d12;border-radius:4px;padding:9px 12px;
+  color:#fff;font-size:13px;font-weight:700;outline:none;transition:border-color .15s;
+}
+.cc-input:focus{border-color:#ffd24d;box-shadow:0 0 8px rgba(255,210,77,.35)}
+.cc-name-status{font-size:10.5px;color:#a0aec0}
+.cc-name-status.err{color:#ef4444;font-weight:700}
+.cc-name-status.wait{color:#ffd24d}
+
+.cc-nav-row{display:flex;align-items:center;gap:8px}
+.cc-nav-btn{
+  width:36px;height:36px;border-radius:4px;background:#ea580c;border:1.5px solid #7c2d12;color:#fff;
+  font-size:14px;cursor:pointer;display:grid;place-items:center;transition:.12s;
+}
+.cc-nav-btn:hover{background:#f97316;border-color:#ffd24d}
+.cc-nav-val{
+  flex:1;background:rgba(0,0,0,.5);border:1.5px solid #7c2d12;border-radius:4px;padding:8px 10px;
+  text-align:center;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+.cc-swatches-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cc-swatch{
+  height:32px;border-radius:4px;border:2px solid #541c08;cursor:pointer;
+  box-shadow:0 2px 4px rgba(0,0,0,.4);transition:.12s;
+}
+.cc-swatch:hover{transform:scale(1.08);border-color:#ffd24d}
+.cc-swatch.active{border-color:#fff;box-shadow:0 0 10px #ffd24d;transform:scale(1.08)}
+
+.cc-actions{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.cc-btn-primary{
+  padding:12px;border-radius:4px;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:10px;
+  background-color:#ea580c;border:2px solid #541c08;color:#fff;
+  box-shadow:0 4px 0 #541c08, inset 0 1px 1px rgba(255,255,255,.4);transition:.12s;
+}
+.cc-btn-primary:hover:not(:disabled){background-color:#f97316;border-color:#ffd24d;transform:translateY(-1px)}
+.cc-btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.cc-btn-secondary{
+  padding:9px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;
+  background:#261810;border:1.5px solid #7c2d12;color:#fed7aa;transition:.12s;
+}
+.cc-btn-secondary:hover{background:#382216;color:#fff}
+
+/* Dialog Confirm */
+.charslot-confirm-box{
+  background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;border-radius:0;
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  box-shadow:0 8px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c;padding:20px 24px;
+}
+.charslot-confirm-msg{font-size:13px;color:#fff;line-height:1.5;margin-bottom:14px;text-align:center}
+.charslot-confirm-btns{display:flex;gap:10px;justify-content:center}
+.cs-cbtn-ok{padding:8px 16px;background:#dc2626;border:1.5px solid #991b1b;color:#fff;border-radius:4px;font-weight:700;cursor:pointer}
+.cs-cbtn-cancel{padding:8px 16px;background:#261810;border:1.5px solid #7c2d12;color:#fed7aa;border-radius:4px;font-weight:700;cursor:pointer}
+
+/* Badge nama terkunci di multiplayer */
+.mp-name-badge{
+  display:inline-flex;align-items:center;gap:8px;background:rgba(20,10,6,.9);
+  border:1.5px solid #7c2d12;padding:6px 12px;border-radius:4px;font-size:12px;color:#fff;
+}
+.mp-active-name{color:#ffd24d;font-family:'Press Start 2P',monospace;font-size:10px}
+.mp-locked-tag{font-size:9px;background:rgba(234,88,12,.3);border:1px solid #ea580c;color:#fed7aa;padding:1px 6px;border-radius:3px}
+
+@media (max-width:760px){
+  .char-creator-body{flex-direction:column;align-items:center}
+  .char-creator-left{flex:none;width:100%}
+  .char-3d-stage{width:100%;height:240px}
+  .charslot-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:480px){
+  .charslot-grid{grid-template-columns:1fr}
 }
 
 
