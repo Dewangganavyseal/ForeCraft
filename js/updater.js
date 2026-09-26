@@ -7,7 +7,7 @@
  * Fitur:
  *  - Cek versi terbaru ke Server Lokal & GitHub sebelum masuk Main Menu
  *  - Jika versi tidak cocok / ada versi baru: tampilkan dialog New Version
- *  - Tombol Update: otomatis unduh APK / reload aset terbaru
+ *  - Tombol Update: otomatis unduh APK / reload aset terbaru bebas cache
  *  - Tombol Close: kunci game total (tidak bisa dimainkan meskipun offline)
  * =============================================================================
  */
@@ -20,6 +20,11 @@ const Updater = {
   locked: false,
   targetVersion: null,
   detectedInfo: null,
+
+  getCurrentVersion() {
+    if (typeof CFG !== 'undefined' && CFG.VERSION) return CFG.VERSION;
+    return '0.2.45';
+  },
 
   compare(v1, v2) {
     if (!v1 || !v2) return 0;
@@ -43,7 +48,7 @@ const Updater = {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ms);
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
@@ -58,7 +63,7 @@ const Updater = {
     if (typeof Network !== 'undefined' && Network.getServerHttpUrl) {
       try {
         const srvUrl = Network.getServerHttpUrl();
-        const data = await this.fetchWithTimeout(`${srvUrl}/api/version`, 2500);
+        const data = await this.fetchWithTimeout(`${srvUrl}/api/version?_t=${Date.now()}`, 2500);
         if (data && data.version) {
           return {
             version: data.version,
@@ -71,7 +76,7 @@ const Updater = {
 
     // 2. Coba hubungi GitHub raw package.json resmi (online 24/7 di internet)
     try {
-      const pkg = await this.fetchWithTimeout(this.GITHUB_RAW_PKG, 3200);
+      const pkg = await this.fetchWithTimeout(`${this.GITHUB_RAW_PKG}?_t=${Date.now()}`, 3200);
       if (pkg && pkg.version) {
         return {
           version: pkg.version,
@@ -85,7 +90,7 @@ const Updater = {
   },
 
   async init() {
-    const currentVer = (typeof CFG !== 'undefined' && CFG.VERSION) ? CFG.VERSION : '0.2.41';
+    const currentVer = this.getCurrentVersion();
     
     // Periksa apakah game sedang dalam kondisi terkunci (pernah ditutup tanpa update)
     const wasLocked = localStorage.getItem('forecraft_update_locked') === '1';
@@ -110,6 +115,16 @@ const Updater = {
       }
     }
 
+    // Bersihkan parameter query _v / _t dari URL jika versi sudah up-to-date
+    if (typeof window !== 'undefined' && window.location && window.location.search && window.history) {
+      if (window.location.search.includes('_v=') || window.location.search.includes('_t=')) {
+        try {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        } catch (e) {}
+      }
+    }
+
     // Lakukan pengecekan versi terbaru online sebelum membuka menu utama
     try {
       const latest = await this.queryLatestVersion();
@@ -127,7 +142,7 @@ const Updater = {
   },
 
   showModal(info, isLockedScreen = false) {
-    const currentVer = (typeof CFG !== 'undefined' && CFG.VERSION) ? CFG.VERSION : '0.2.41';
+    const currentVer = this.getCurrentVersion();
     const newVer = info.version || 'Terbaru';
 
     let overlay = document.getElementById('update-modal-ov');
@@ -194,21 +209,23 @@ const Updater = {
     });
   },
 
-  performUpdate(info, statusEl) {
+  async performUpdate(info, statusEl) {
     if (statusEl) {
       statusEl.style.display = 'block';
-      statusEl.textContent = 'Menyiapkan pengunduhan versi terbaru...';
+      statusEl.textContent = 'Menyiapkan pembaruan game...';
     }
 
-    const isMobile = (typeof IS_MOBILE !== 'undefined' && IS_MOBILE) ||
-      ('ontouchstart' in window) ||
-      (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    // 1. Bersihkan status lock lokal agar tidak terkunci saat memuat ulang
+    localStorage.removeItem('forecraft_update_locked');
+    localStorage.removeItem('forecraft_target_version');
 
-    const dlUrl = info.downloadUrl || this.GITHUB_APK_DOWNLOAD;
+    const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    const isFileProto = (window.location && window.location.protocol === 'file:');
 
-    if (isMobile) {
-      if (statusEl) statusEl.textContent = 'Membuka unduhan file APK terbaru... Silakan pasang setelah selesai.';
-      // Buka URL download langsung pada browser HP / sistem download Android
+    // Jika berjalan di dalam aplikasi Android APK native (Capacitor)
+    if (isNativeApp) {
+      if (statusEl) statusEl.textContent = 'Mengunduh file APK terbaru... Silakan instal setelah selesai.';
+      const dlUrl = info.downloadUrl || this.GITHUB_APK_DOWNLOAD;
       try {
         const link = document.createElement('a');
         link.href = dlUrl;
@@ -220,23 +237,43 @@ const Updater = {
       } catch (e) {
         window.location.href = dlUrl;
       }
-    } else {
-      // Pada Web / PC: bersihkan cache browser & service worker, lalu refresh ke versi terbaru
-      if (statusEl) statusEl.textContent = 'Membersihkan cache & memuat versi terbaru...';
-      setTimeout(() => {
-        try {
-          if ('caches' in window) {
-            caches.keys().then(names => Promise.all(names.map(name => caches.delete(name)))).then(() => {
-              window.location.reload(true);
-            });
-          } else {
-            window.location.reload(true);
-          }
-        } catch (e) {
-          window.location.reload(true);
-        }
-      }, 800);
+      return;
     }
+
+    // Jika berjalan dari file lokal PC (file:///.../index.html)
+    if (isFileProto) {
+      if (statusEl) {
+        statusEl.innerHTML = `
+          File game lokal di komputer Anda perlu diperbarui.<br>
+          <a href="${this.GITHUB_LATEST_RELEASE}" target="_blank" style="display:inline-block;margin-top:10px;padding:8px 16px;background:#ea580c;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold;">
+            📥 Buka Halaman Unduh GitHub
+          </a>
+        `;
+      }
+      try {
+        window.open(this.GITHUB_LATEST_RELEASE, '_blank');
+      } catch (e) {}
+      return;
+    }
+
+    // Jika berjalan di Web Browser (http:// atau https://):
+    // Bersihkan cache storage & paksa reload dengan query string anti-cache
+    if (statusEl) statusEl.textContent = 'Memperbarui aset game ke versi terbaru...';
+
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+      }
+    } catch (e) {}
+
+    // Buka kembali halaman dengan cache-busting timestamp unik agar browser TIDAK memakai cache lama
+    setTimeout(() => {
+      const targetVer = info.version || 'latest';
+      const now = Date.now();
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.location.replace(`${cleanUrl}?_v=${encodeURIComponent(targetVer)}&_t=${now}`);
+    }, 400);
   },
 
   performClose(targetVer) {
@@ -271,3 +308,4 @@ const Updater = {
 };
 
 window.Updater = Updater;
+

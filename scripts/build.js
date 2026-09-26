@@ -9,7 +9,18 @@ if (fs.existsSync(wwwDir)) {
 }
 fs.mkdirSync(wwwDir, { recursive: true });
 
-fs.copyFileSync(path.join(rootDir, 'index.html'), path.join(wwwDir, 'index.html'));
+let version = '0.2.45';
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+  if (pkg.version) version = pkg.version;
+} catch (e) {}
+
+let html = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
+// Tambahkan query parameter versi anti-cache ke seluruh file JS & CSS internal
+html = html.replace(/(src="js\/[^"]+\.js)(")/g, `$1?v=${version}$2`);
+html = html.replace(/(href="css\/[^"]+\.css)(")/g, `$1?v=${version}$2`);
+fs.writeFileSync(path.join(wwwDir, 'index.html'), html, 'utf8');
+
 if (fs.existsSync(path.join(rootDir, 'Walkthrough_Studio.html'))) {
   fs.copyFileSync(path.join(rootDir, 'Walkthrough_Studio.html'), path.join(wwwDir, 'Walkthrough_Studio.html'));
 }
