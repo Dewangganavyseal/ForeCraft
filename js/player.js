@@ -87,7 +87,7 @@ const Player={
   maxHp(){return 100+CFG.HP_PER_LVL*(this.level-1);},
   maxStamina(){return 100+CFG.STAM_PER_LVL*(this.level-1);},
 
-  buffSpeed:0,splashT:0,rippleT:0,stamRegenT:0,hitStop:0,
+  buffSpeed:0,splashT:0,rippleT:0,stamRegenT:0,hitStop:0,comboCount:0,comboTimer:0,
   /* KELAPARAN: damage kelaparan (2 HP/detik) dikumpulkan lalu dilepas sebagai
      satu "pukulan" tiap STARVE_TICK detik supaya ada umpan balik yang terasa
      (getar + vignette + suara + angka), bukan HP menyusut tanpa tanda. */
@@ -656,9 +656,15 @@ const Player={
      if(this.comboGap>0)return;
      if(this.tapGap>0)return;
      this.tapGap=0.10;
-     /* memukul biasa kini TIDAK lagi menguras/membutuhkan stamina (hanya dodge & skill) */
-      let next=(this.attack.sinceEnd<0.95*RPG.comboWindowMult()&&this.attack.combo<4)?this.attack.combo+1:0;
-      this.attack={active:true,combo:next,t:0,hitDone:false,queued:false,sinceEnd:0,
+      /* combo bertambah terus, jika jeda > 2 detik combo terputus */
+      if((this.comboTimer||0) > 0){
+        this.comboCount = (this.comboCount || 0) + 1;
+      } else {
+        this.comboCount = 1;
+      }
+      this.comboTimer = 2.0; // Window 2 detik sebelum combo putus
+      let next = (this.comboCount - 1) % 5;
+      this.attack={active:true,combo:next,count:this.comboCount,t:0,hitDone:false,queued:false,sinceEnd:0,
         moveMul:0.45,recover:false};
       /* auto-aim ke monster terdekat; pet tidak ikut dibidik */
       let best=null,bd=4.2;
@@ -886,8 +892,13 @@ const Player={
     /* damage dasar kini berasal dari pedang yang digenggam (bukan angka tetap) */
     let dmg=RPG.weaponDmg()*C.dmg;
     if(ci===4)dmg*=RPG.slamMult();
-    /* critical dari stat pedang: damage ganda + umpan balik visual */
-    const crit=Math.random()<RPG.critChance();
+    /* Combo scaling: bonus damage seiring rangkaian combo (+2% per combo, cap +100%) */
+    if((this.comboCount||0) > 1){
+      dmg *= (1 + Math.min(1.0, (this.comboCount - 1) * 0.02));
+    }
+    /* critical: setiap kelipatan 10 combo (10, 20, 30...), serangan KRITIKAL dijamin 100% muncul */
+    const isGuaranteedCrit = ((this.comboCount||0) > 0 && (this.comboCount % 10 === 0));
+    const crit = isGuaranteedCrit || (Math.random()<RPG.critChance());
     if(crit)dmg*=2;
     const reach=RPG.weaponReach();
     let hitAny=false;
@@ -915,8 +926,9 @@ const Player={
       const impactPower=((crit?1.6:1)+ci*0.25)*(this.unarmed?0.6:1);
       FX.impact(m.pos.clone().add(new THREE.Vector3(0,1,0)),impactColor,impactPower);
       if(crit){
-        FX.text(m.pos.clone().add(new THREE.Vector3(0,2.1,0)),'CRIT!','#ffe066');
-        FX.addShake(0.45);
+        const critText = isGuaranteedCrit ? `⚡COMBO x${this.comboCount} CRIT!` : 'CRIT!';
+        FX.text(m.pos.clone().add(new THREE.Vector3(0,2.1,0)),critText,isGuaranteedCrit?'#ffd24d':'#ffe066');
+        FX.addShake(isGuaranteedCrit ? 0.65 : 0.45);
       }
     }
 
@@ -1010,7 +1022,11 @@ const Player={
       World.hitBlock(blkHit.x,blkHit.y,blkHit.z,(1+spd)*chop);
     }
     World.harvestPlants(this.pos,1.7);
-    if(hitAny){UI.showCombo(ci+1);FX.addShake(ci===4?0.35:0.12);}
+    if(hitAny){
+      const isMega = (this.comboCount > 0 && this.comboCount % 10 === 0);
+      if(typeof UI!=='undefined'&&UI.showCombo) UI.showCombo(this.comboCount, isMega);
+      FX.addShake(isMega ? 0.6 : (ci===4?0.35:0.12));
+    }
     if(ci===4)FX.ring(this.pos.x+Math.sin(this.facing)*1.3,this.pos.y+0.1,this.pos.z+Math.cos(this.facing)*1.3,0xffd24d,0.4,2.4);
   },
   takeDamage(n,src){
@@ -1258,6 +1274,13 @@ const Player={
     this.comboGap=Math.max(0,(this.comboGap||0)-dt);
     this.tapGap=Math.max(0,(this.tapGap||0)-dt);
     A.sinceEnd+=dt;
+    if(this.comboTimer > 0){
+      this.comboTimer -= dt;
+      if(this.comboTimer <= 0){
+        this.comboCount = 0;
+        this.comboTimer = 0;
+      }
+    }
     /* hit-stop: tahan animasi & gerak sesaat biar pukulan terasa berat */
     if(this.hitStop>0)dt*=0.15;
 

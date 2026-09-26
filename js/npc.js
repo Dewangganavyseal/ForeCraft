@@ -297,16 +297,18 @@ const NPCS={
       return h&&h.x===v.x&&h.z===v.z;};
     const hasMerchant=this.list.some(o=>!o.dead&&o.role.id==='merchant'&&atVillage(o));
     const hasDMaster=this.list.some(o=>!o.dead&&o.role.id==='dungeonmaster'&&atVillage(o));
-    const hasFarmer=this.list.some(o=>!o.dead&&o.role.id==='farmer'&&atVillage(o));
+    // Batasan ketat: per ladang maksimal 1 farmer di desa
+    const maxFarmers = (v.farms && Array.isArray(v.farms) && v.farms.length > 0) ? v.farms.length : 1;
+    const farmerCount = this.list.filter(o=>!o.dead&&o.role.id==='farmer'&&atVillage(o)).length;
     let role;
     if(here===0){role=NPC_ROLES[0];}                    // penjaga
     else if(!hasMerchant){role=NPC_ROLES.find(r=>r.id==='merchant')||NPC_ROLES[0];}
     else if(!hasDMaster){role=NPC_ROLES.find(r=>r.id==='dungeonmaster')||NPC_ROLES[0];}
-    else if(!hasFarmer){role=NPC_ROLES.find(r=>r.id==='farmer')||NPC_ROLES[0];}
+    else if(farmerCount < maxFarmers){role=NPC_ROLES.find(r=>r.id==='farmer')||NPC_ROLES[0];}
     else{
       /* arketipe `rare:true` (pengembara) & non-rekrut (penjaga/pedagang)
-          dikecualikan dari undian penduduk biasa. */
-      const pool=NPC_ROLES.slice(1).filter(r=>!r.rare&&r.recruit);
+          dikecualikan dari undian penduduk biasa. Petani juga dikeluarkan bila kuota ladang sudah penuh. */
+      const pool=NPC_ROLES.slice(1).filter(r=>!r.rare&&r.recruit&&(farmerCount < maxFarmers || r.id!=='farmer'));
       let total=0;
 
       for(const r of pool)total+=(r.weight!==undefined?r.weight:1);
@@ -315,6 +317,16 @@ const NPCS={
       for(const r of pool){
         pick-=(r.weight!==undefined?r.weight:1);
         if(pick<=0){role=r;break;}
+      }
+    }
+    // Jika role adalah farmer dan desa punya ladang yang sesuai indeksnya, tempatkan di dekat ladang tersebut
+    if(role&&role.id==='farmer'&&v.farms&&v.farms[farmerCount]){
+      const fm=v.farms[farmerCount];
+      x=fm.x+Math.floor(fm.w/2)+0.5;
+      z=fm.z+Math.floor(fm.d/2)+0.5;
+      const bx=Math.floor(x),bz=Math.floor(z);
+      for(let ly=CFG.WORLD_H-1;ly>=0;ly--){
+        if(World.isFloor(World.getBlock(bx,ly,bz))){ y=ly+1; break; }
       }
     }
     const n=this.make(role,x,y,z,{x:v.x,z:v.z},null,v);

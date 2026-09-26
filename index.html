@@ -24,12 +24,12 @@
     <!-- ============ KONSEP 2: PIXEL QUEST HUD (1:1 PORT DARI NEW MODEL/Hud HP bar.html) ============ -->
     <div class="hud-pixel" id="hudPixel">
       <div class="px-frame" id="pxFrame">
-        <div class="px-top">
-          <span id="player-hud-name">RANGER</span>
-          <span class="px-blink">▮</span>
-        </div>
         <div class="px-body">
           <div class="px-left">
+            <!-- Nama karakter tepat di tengah (center) di atas thumbnail lingkaran -->
+            <div class="px-name-box">
+              <span id="player-hud-name">RANGER</span>
+            </div>
             <!-- BINGKAI POTRET PEMAIN: render setengah badan dari model karakter 3D di dalam medallion pixel emas -->
             <button id="portrait" class="px-portrait" type="button" title="Karakter — lihat stat lengkap">
               <div class="px-pframe">

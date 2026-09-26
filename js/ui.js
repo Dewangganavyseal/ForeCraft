@@ -23,18 +23,96 @@ const UI={
     if(typeof PixelHUD!=='undefined'&&PixelHUD.init)PixelHUD.init();
 
     const hb=document.getElementById('hotbar');
-    for(let i=0;i<7;i++){
-      const d=document.createElement('div');d.className='hslot';
-      d.innerHTML=`<span class="key">${i+1}</span><span class="emo"></span><span class="cnt"></span><span class="lvl"></span>`;
-      const selectSlot=e=>{
-        if(UI.open)return;
-        e.preventDefault();
-        /* klik slot yang sedang terpilih = kosongkan tangan / unequip */
-        RPG.sel=(RPG.sel===i)?-1:i;
+    let hbDrag = null;
+
+    const endHbDrag = (e) => {
+      if(!hbDrag) return;
+      window.removeEventListener('pointermove', onHbMove);
+      window.removeEventListener('pointerup', endHbDrag);
+      window.removeEventListener('pointercancel', endHbDrag);
+      if(hbDrag.ghost) hbDrag.ghost.remove();
+      hbDrag.slotEl.classList.remove('dragging');
+      document.querySelectorAll('#hotbar .hslot.drop-target').forEach(el=>el.classList.remove('drop-target'));
+
+      if(hbDrag.isDragging){
+        // Cek apakah dilepas di atas slot hotbar lain untuk ditukar posisinya
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('#hotbar .hslot');
+        if(targetEl){
+          const targetIdx = parseInt(targetEl.dataset.idx, 10);
+          const srcIdx = hbDrag.slotIdx;
+          if(!isNaN(targetIdx) && targetIdx !== srcIdx && targetIdx >= 0 && targetIdx < 7){
+            const temp = RPG.hotbar[srcIdx];
+            RPG.hotbar[srcIdx] = RPG.hotbar[targetIdx];
+            RPG.hotbar[targetIdx] = temp;
+            if(RPG.sel === srcIdx) RPG.sel = targetIdx;
+            else if(RPG.sel === targetIdx) RPG.sel = srcIdx;
+            this.renderHotbar();
+            if(this.markInvDirty) this.markInvDirty();
+            if(typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
+          }
+        }
+        // Jika dilepas di luar hotbar: JANGAN dibuang (hanya bisa dibuang di dalam bag)
         this.renderHotbar();
-      };
-      d.addEventListener('touchstart',selectSlot,{passive:false});
-      d.addEventListener('click',selectSlot);
+      } else {
+        // Klik / tap biasa: pasang atau lepas equip slot
+        if(!UI.open){
+          const idx = hbDrag.slotIdx;
+          RPG.sel = (RPG.sel === idx) ? -1 : idx;
+          this.renderHotbar();
+          if(typeof Sfx !== 'undefined' && Sfx.click) Sfx.click();
+        }
+      }
+      hbDrag = null;
+    };
+
+    const onHbMove = (e) => {
+      if(!hbDrag) return;
+      const dist = Math.hypot(e.clientX - hbDrag.startX, e.clientY - hbDrag.startY);
+      if(!hbDrag.isDragging && dist > 7){
+        const s = RPG.hotbar[hbDrag.slotIdx];
+        if(!s) return; // slot kosong tidak di-drag
+        hbDrag.isDragging = true;
+        hbDrag.slotEl.classList.add('dragging');
+        const ghost = document.createElement('div');
+        ghost.className = 'slot-ghost';
+        ghost.innerHTML = this.itemIcon(s.id);
+        document.body.appendChild(ghost);
+        hbDrag.ghost = ghost;
+      }
+      if(hbDrag.isDragging && hbDrag.ghost){
+        hbDrag.ghost.style.left = (e.clientX - 24) + 'px';
+        hbDrag.ghost.style.top = (e.clientY - 24) + 'px';
+        document.querySelectorAll('#hotbar .hslot.drop-target').forEach(el=>el.classList.remove('drop-target'));
+        const hoverEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('#hotbar .hslot');
+        if(hoverEl && hoverEl !== hbDrag.slotEl){
+          hoverEl.classList.add('drop-target');
+        }
+      }
+    };
+
+    for(let i=0;i<7;i++){
+      const d=document.createElement('div');d.className='hslot';d.dataset.idx=i;
+      d.innerHTML=`<span class="key">${i+1}</span><span class="emo"></span><span class="cnt"></span><span class="lvl"></span>`;
+      d.addEventListener('pointerdown', (e) => {
+        if(e.button !== 0 && e.pointerType === 'mouse') return;
+        hbDrag = {
+          slotIdx: i,
+          slotEl: d,
+          startX: e.clientX,
+          startY: e.clientY,
+          isDragging: false,
+          ghost: null
+        };
+        window.addEventListener('pointermove', onHbMove, { passive: false });
+        window.addEventListener('pointerup', endHbDrag, { passive: false });
+        window.addEventListener('pointercancel', endHbDrag, { passive: false });
+      });
+      // Hover tooltip desktop tanpa emoji
+      d.addEventListener('mouseenter', () => {
+        const s = RPG.hotbar[i];
+        if(s) this.showItemTip(d, s.id, s.lvl);
+      });
+      d.addEventListener('mouseleave', () => this.hideItemTip());
       hb.appendChild(d);this.hotEls.push(d);
     }
     document.querySelectorAll('[data-close]').forEach(b=>
@@ -557,13 +635,16 @@ const UI={
     clearTimeout(this._chestPopT);
     this._chestPopT=setTimeout(()=>el.classList.remove('show'),4200);
   },
-  showCombo(n){
+  showCombo(n, isMega){
     const c=document.getElementById('combo');
-    c.textContent='COMBO x'+n;
+    if(!c)return;
+    c.textContent = isMega ? `⚡ COMBO x${n} CRIT!` : `COMBO x${n}`;
+    c.style.color = isMega ? '#ff3b30' : '#ffd24d';
+    c.style.textShadow = isMega ? '0 0 16px rgba(255,59,48,0.9), 0 2px 0 #000' : '0 0 12px rgba(255,170,0,0.8), 0 2px 0 #000';
     c.style.opacity=1;
     c.classList.remove('pop');void c.offsetWidth;c.classList.add('pop');
     clearTimeout(this._ct);
-    this._ct=setTimeout(()=>c.style.opacity=0,900);
+    this._ct=setTimeout(()=>c.style.opacity=0, 1800);
   },
   /* ---------- HUD ---------- */
   updateHUD(){
@@ -1505,9 +1586,22 @@ const UI={
     }
   },
   renderHotbar(){
+    const prevSel = this._lastHotbarSel !== undefined ? this._lastHotbarSel : -1;
+    const curSel = RPG.sel;
+    const selChanged = (prevSel !== curSel);
+    this._lastHotbarSel = curSel;
+
     for(let i=0;i<7;i++){
       const s=RPG.hotbar[i],el=this.hotEls[i];
-      el.classList.toggle('sel',i===RPG.sel);
+      const isEquipped = (i===curSel);
+      el.classList.toggle('sel',isEquipped);
+
+      if(isEquipped && selChanged){
+        el.classList.remove('equip-pop');
+        void el.offsetWidth;
+        el.classList.add('equip-pop');
+      }
+
       const emo=el.querySelector('.emo');
       const icon=s?this.itemIcon(s.id):'';
       if(emo._icon!==icon){emo._icon=icon;emo.innerHTML=icon;this.applyItemIcons(emo);}
@@ -1521,7 +1615,9 @@ const UI={
       const it=s?ITEMS[s.id]:null;
       const rar=(it&&it.rarity)||'common';
       ['r-common','r-uncommon','r-rare','r-epic','r-legendary','r-mythic'].forEach(c=>el.classList.remove(c));
-      if(s&&RARITY[rar]){
+      if(isEquipped){
+        el.style.borderColor='#ff7a00';
+      }else if(s&&RARITY[rar]){
         el.classList.add('r-'+rar);
         el.style.borderColor=RARITY[rar].css;
       }else{

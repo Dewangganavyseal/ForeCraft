@@ -1439,24 +1439,24 @@ const NPC_ROLES=[
    sellPrice(id) : harga jual item oleh pemain (setengah harga beli, atau nilai
                    dasar resource). Dipakai UI panel toko. */
 const SHOP_GOODS=[
-  {id:'bread',      price:6},
-  {id:'cmeat',      price:10},
-  {id:'bandage',    price:14},
-  {id:'potion_stam',price:16},
-  {id:'pie',        price:22},
-  {id:'sugar',      price:11},
-  {id:'cake',       price:28},
-  {id:'fish',       price:8},
-  {id:'cfish',      price:12},
-  {id:'leather',    price:9},
-  {id:'iron_ingot', price:18},
-  {id:'gold_ingot', price:30},
+  {id:'bread',      price:18},
+  {id:'cmeat',      price:30},
+  {id:'bandage',    price:42},
+  {id:'potion_stam',price:48},
+  {id:'pie',        price:66},
+  {id:'sugar',      price:33},
+  {id:'cake',       price:84},
+  {id:'fish',       price:24},
+  {id:'cfish',      price:36},
+  {id:'leather',    price:27},
+  {id:'iron_ingot', price:54},
+  {id:'gold_ingot', price:90},
   /* PEDAGANG HANYA MENJUAL SENJATA & ARMOR LEVEL RENDAH / COMMON */
-  {id:'sword_wood', price:15},
-  {id:'shield_wood',price:18},
-  {id:'cap_leather', price:12},
-  {id:'vest_leather',price:20},
-  {id:'boots_leather',price:12},
+  {id:'sword_wood', price:45},
+  {id:'shield_wood',price:54},
+  {id:'cap_leather', price:36},
+  {id:'vest_leather',price:60},
+  {id:'boots_leather',price:36},
 ];
 /* nilai dasar koin per item saat dijual (fallback bila tak ada di toko) */
 const SHOP_VALUE={
@@ -1483,8 +1483,8 @@ function sellPrice(id){
 }
 
 /* ================= UPGRADE TAS (dijual pedagang) =================
-   Harga naik tiap tingkatan. Tiap tingkat +7 slot kantong, maks 5 tingkat. */
-const BAG_PRICES=[50,120,250,500,900];
+   Harga naik tiap tingkatan (3x lipat). Tiap tingkat +7 slot kantong, maks 5 tingkat. */
+const BAG_PRICES=[150,360,750,1500,2700];
 const BAG_ITEM={n:'Tas Kulit Besar',e:'🎒'};   // ikon & nama item 'bag' di toko
 
 /* Generator stok pedagang: tiap pedagang di desa punya barang ACAK.

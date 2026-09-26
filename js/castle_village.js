@@ -155,9 +155,10 @@ const CastleVillage = (() => {
     return npc;
   }
 
-  /* role basic berikutnya yang belum diklaim kastil ini (bergiliran) */
+  /* role basic berikutnya yang belum diklaim kastil ini (bergiliran, maks 1 farmer per ladang) */
   function nextBasicRole(claimedIds) {
-    const pool = ['guard', 'hunter', 'miner', 'farmer', 'herbal', 'warrior', 'guardian'];
+    const farmerCount = claimedIds.filter(id => id === 'farmer').length;
+    const pool = ['guard', 'hunter', 'miner', (farmerCount < 1 ? 'farmer' : null), 'herbal', 'warrior', 'guardian'].filter(Boolean);
     const used = {};
     for (const id of claimedIds) used[id] = (used[id] || 0) + 1;
     let best = pool[0], bestN = 1e9;
