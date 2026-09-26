@@ -653,22 +653,65 @@ const FX={
     this.group.add(sp);
     this.texts.push({sp,life:0.95,max:0.95});
   },
-  dash(pos, dir){
-    const windC=0xdff5ff;
+  dash(pos, dir, sourceMesh){
+    const src = sourceMesh || (typeof Player !== 'undefined' ? Player.mesh : null);
+    if(src && this.group){
+      const opacities = [0.45, 0.28, 0.14];
+      const dists = [0.45, 0.95, 1.45];
+      for(let i=0; i<3; i++){
+        try{
+          const ghost = src.clone(true);
+          const baseOp = opacities[i];
+          const mat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: baseOp,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+          ghost.traverse(c=>{
+            if(c.isMesh){
+              c.material = mat;
+              c.castShadow = false;
+              c.receiveShadow = false;
+            }
+          });
+          ghost.position.copy(pos).sub(dir.clone().multiplyScalar(dists[i]));
+          if(src.rotation) ghost.rotation.y = src.rotation.y;
+          ghost.renderOrder = 7;
+          this.group.add(ghost);
+
+          const maxLife = 0.25 + i * 0.05;
+          this.trails.push({
+            mesh: ghost,
+            life: maxLife,
+            max: maxLife,
+            onUpdate: (dt, frac)=>{
+              mat.opacity = baseOp * frac;
+            },
+            onDispose: ()=>{
+              mat.dispose();
+            }
+          });
+        }catch(err){}
+      }
+    }
+
+    const windC = 0xffffff;
     for(let k=0;k<3;k++){
       const streak=new THREE.Mesh(
-        new THREE.BoxGeometry(0.05,0.05,rand(0.9,1.8)),
-        new THREE.MeshBasicMaterial({color:windC,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false})
+        new THREE.BoxGeometry(0.04,0.04,rand(0.8,1.6)),
+        new THREE.MeshBasicMaterial({color:windC,transparent:true,opacity:0.75,blending:THREE.AdditiveBlending,depthWrite:false})
       );
-      const side=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(-0.6,0.6));
+      const side=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(-0.5,0.5));
       streak.position.copy(pos).add(side).add(new THREE.Vector3(0,rand(0.3,1.2),0));
       streak.rotation.y=Math.atan2(dir.x,dir.z);
       streak.userData.origScale=streak.scale.z;
       streak.renderOrder=8;
       this.group.add(streak);
-      this.trails.push({mesh:streak,life:0.18,max:0.18,v:dir.clone().multiplyScalar(rand(-4,-8)),isParticle:true});
+      this.trails.push({mesh:streak,life:0.16,max:0.16,v:dir.clone().multiplyScalar(rand(-4,-8)),isParticle:true});
     }
-    this.ring(pos.x-dir.x*0.4,pos.y+0.2,pos.z-dir.z*0.4,0x88e2ff,0.25,2.4);
+    // Lingkaran di bawah dihilangkan sesuai permintaan user
   },
   /* ---------- DROP ITEM ----------
      Konstanta jeda ambil: item yang jatuh dari tas pemain tidak bisa langsung

@@ -46,16 +46,18 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
 #stats{position:absolute;top:12px;left:12px;display:inline-flex;align-items:flex-start;pointer-events:none;z-index:11}
 
-/* ============ KONSEP 2 : PIXEL QUEST HUD (1:1 PORT DARI NEW MODEL/Hud HP bar.html) ============ */
+/* ============ KONSEP 2 : PIXEL QUEST HUD (ORANGE THEME FORECRAFT) ============ */
 .hud-pixel{font-family:'Press Start 2P',monospace;pointer-events:none}
-.px-frame{position:relative;padding:12px 14px 14px;background:#1d1440;border:4px solid #0c0725;
-  box-shadow:0 6px 0 rgba(0,0,0,.45),inset 0 0 0 2px #4a3a7e,inset 0 4px 0 rgba(255,255,255,.1);
+.px-frame{position:relative;padding:12px 14px 14px;
+  background:linear-gradient(160deg,#24140c,#160b06);
+  border:4px solid #541c08;
+  box-shadow:0 6px 0 rgba(0,0,0,.5),inset 0 0 0 2px #ea580c,inset 0 4px 0 rgba(255,255,255,.18);
   clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
   pointer-events:auto}
 .px-frame::after{content:"";position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 .px-frame.hitflash::after{animation:flashHit .35s}
-.px-top{display:flex;justify-content:space-between;font-size:8px;color:#b9a7ff;margin-bottom:10px;letter-spacing:1px}
-.px-blink{animation:blinkHard 1s steps(2) infinite;color:#ffd23f}
+.px-top{display:flex;justify-content:space-between;font-size:8px;color:#fed7aa;margin-bottom:10px;letter-spacing:1px}
+.px-blink{animation:blinkHard 1s steps(2) infinite;color:#ea580c}
 .px-body{display:flex;gap:12px;align-items:center}
 .px-left{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
 
@@ -65,7 +67,7 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 #portrait.px-portrait:active{transform:scale(.94)}
 .px-pframe{position:relative;width:68px;height:68px;background:linear-gradient(#ffe08a,#c9932e);
   clip-path:var(--pxcircle);animation:pxBob 1.6s steps(2) infinite}
-.px-pinner{position:absolute;inset:5px;background:radial-gradient(circle at 40% 30%,#2f2358,#171034 75%);
+.px-pinner{position:absolute;inset:5px;background:radial-gradient(circle at 40% 30%,#3d2114,#1a0c06 75%);
   clip-path:var(--pxcircle);overflow:hidden;display:grid;place-items:center}
 #portrait-cv{display:block;width:100%;height:100%;pointer-events:none;image-rendering:pixelated;transition:filter .4s}
 .px-pflash{position:absolute;inset:5px;clip-path:var(--pxcircle);background:#fff;opacity:0;pointer-events:none}
@@ -85,14 +87,14 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 .px-ico svg{width:100%;height:100%;display:block}
 .heart{position:relative;width:18px;height:16px;display:inline-block}
 .heart .hb{position:absolute;left:0;top:0;width:18px;height:16px}
-.heart .base path{fill:#342659}
+.heart .base path{fill:#2e140d}
 .heart .fillpart{position:absolute;left:0;top:0;height:16px;width:0;overflow:hidden;transition:width .22s steps(4)}
 .heart .fillpart .top path{fill:#ff5470;filter:drop-shadow(0 0 3px rgba(255,84,112,.55))}
 .heart.full .fillpart{width:100%}
 .heart.half .fillpart{width:10px}
 .heart.pop{animation:heartPop .35s cubic-bezier(.3,1.8,.4,1)}
-.pxbar{flex:1;display:flex;gap:2px;height:16px;padding:2px;background:#0c0725;position:relative}
-.pxbar i{flex:1;background:#241a4a;transform-origin:bottom}
+.pxbar{flex:1;display:flex;gap:2px;height:16px;padding:2px;background:#140a06;border:1px solid #451a03;position:relative}
+.pxbar i{flex:1;background:#2d170e;transform-origin:bottom}
 .pxbar.st i.on{background:#45d6ff;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(0,0,0,.3)}
 .pxbar.hg i.on{background:#ffb703;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(0,0,0,.3)}
 .pxbar.low i.on{background:#ffd23f!important}
@@ -196,20 +198,37 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 #hint{display:none!important}
 
 /* ==== Panels ==== */
-.panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,94vw);max-height:86vh;overflow-y:auto;background:rgba(20,16,12,.95);border:2px solid #7c2d12;border-radius:14px;padding:18px 22px;z-index:30;box-shadow:0 12px 50px rgba(0,0,0,.75);backdrop-filter:blur(6px)}
-.panel h2{font-family:'Press Start 2P',monospace;font-size:14px;color:#ea580c;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.panel{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(560px,94vw);max-height:86vh;
+  display:flex;flex-direction:column;overflow:hidden;padding:0;
+  background:linear-gradient(160deg,rgba(32,18,10,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;
+  border-radius:0;
+  box-shadow:0 8px 0 rgba(0,0,0,.55), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  z-index:30;backdrop-filter:blur(6px);
+}
+.panel h2{
+  flex:0 0 auto;position:relative;top:auto;z-index:3;margin:0;
+  padding:14px 20px 12px;border-radius:0;
+  background:linear-gradient(rgba(36,20,12,.99),rgba(22,12,7,.95));
+  border-bottom:2px solid #7c2d12;
+  font-family:'Press Start 2P',monospace;font-size:13px;color:#ffd24d;
+  display:flex;justify-content:space-between;align-items:center;
+}
 .panel .x{
   position:relative;z-index:4;
   display:inline-flex;align-items:center;justify-content:center;
   width:28px;height:28px;padding:0;
-  border-radius:8px;
+  border-radius:4px;
   background-color:#ea580c;
-  border:1.5px solid #7c2d12;
+  border:2px solid #541c08;
   color:#ffffff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif !important;
   font-size:16px;font-weight:900;line-height:1;
   cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,0.3);
+  box-shadow:0 2px 4px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,0.4);
   transition:transform .12s,background .15s,border-color .15s;
   margin-left:auto;
 }
@@ -1181,11 +1200,6 @@ img.block-3d-ico,img.furni-3d-ico{
      - sisa isi panel masuk ke area scroll sendiri (flex:1, overflow-y:auto)
    Dengan begitu header selalu berada PALING ATAS panel dan tidak pernah
    menutupi item apa pun saat scroll. */
-.panel{display:flex;flex-direction:column;overflow:hidden;padding:0}
-.panel h2{flex:0 0 auto;position:relative;top:auto;z-index:3;margin:0;
-  padding:16px 22px 12px;border-radius:14px 14px 0 0;
-  background:linear-gradient(rgba(20,28,20,.99),rgba(14,20,14,.95));
-  border-bottom:1px solid rgba(140,200,120,.25)}
 /* semua anak panel SELAIN header dibungkus area scroll oleh JS (.panel-body).
    Fallback: bila belum dibungkus, beri padding & scroll pada anak langsung. */
 .panel>.panel-body{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;
@@ -1201,15 +1215,15 @@ img.block-3d-ico,img.furni-3d-ico{
 #bag-float-menu{position:fixed;left:0;top:0;
   display:none;flex-direction:column;gap:8px;z-index:35}
 #bag-float-menu.show{display:flex}
-#bag-float-menu .bag-menu-btn{width:50px;height:50px;border-radius:14px;
-  border:2px solid #7c2d12;background-color:#ea580c;
+#bag-float-menu .bag-menu-btn{width:48px;height:48px;border-radius:4px;
+  border:2px solid #541c08;background-color:#ea580c;
   color:#ffffff;line-height:1;
-  cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,0.35);backdrop-filter:blur(4px);
+  cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.5), inset 0 0 0 1.5px #ffd24d;backdrop-filter:blur(4px);
   transition:transform .12s, border-color .15s, box-shadow .15s;
   display:flex;align-items:center;justify-content:center;padding:0}
 #bag-float-menu .bag-menu-btn:hover{
   border-color:#ffd24d;
-  box-shadow:0 8px 20px rgba(0,0,0,.6), 0 0 12px rgba(234,88,12,0.45);
+  box-shadow:0 6px 12px rgba(0,0,0,.6), 0 0 10px rgba(234,88,12,0.45);
   transform:translateY(-2px);
 }
 #bag-float-menu .menu-ico{width:28px;height:28px;object-fit:contain;display:block}
@@ -1240,19 +1254,26 @@ img.block-3d-ico,img.furni-3d-ico{
   #bag-float-menu .menu-ico{width:20px;height:20px}
 }
 
-/* ====== TAB KATEGORI CRAFTING (baris tetap di bawah header) ============== */
-#craft-tabs{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;
-  padding:10px 22px;background:rgba(20,16,12,.96);
-  border-bottom:1px solid #7c2d12}
-.craft-tab{font-size:11.5px;font-weight:700;letter-spacing:.02em;
-  padding:7px 11px;border-radius:9px;cursor:pointer;
+/* ====== TAB KATEGORI CRAFTING (1 baris horizontal rapi) ============== */
+#craft-tabs{flex:0 0 auto;display:flex;flex-direction:row;flex-wrap:nowrap;
+  justify-content:space-between;gap:6px;overflow-x:auto;overflow-y:hidden;
+  padding:10px 16px;background:rgba(20,16,12,.96);
+  border-bottom:1px solid #7c2d12;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+#craft-tabs::-webkit-scrollbar{display:none}
+.craft-tab{flex:1 1 0;min-width:0;white-space:nowrap;
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  font-size:11px;font-weight:700;letter-spacing:.01em;
+  padding:7px 6px;border-radius:4px;cursor:pointer;
   background-color:#ea580c;color:#ffffff;
-  border:1.5px solid #7c2d12;transition:.15s}
+  border:1.5px solid #7c2d12;
+  box-shadow:0 2px 4px rgba(0,0,0,.35), inset 0 1px 1px rgba(255,255,255,.25);
+  transition:.15s}
 .craft-tab:hover:not(:disabled){background-color:#f97316;color:#ffffff;border-color:#9a3412}
 .craft-tab.active{background-color:#c2410c;
-  color:#ffffff;border-color:#7c2d12;box-shadow:0 2px 10px rgba(194,65,12,.4)}
+  color:#ffffff;border-color:#ffd24d;box-shadow:0 0 10px rgba(234,88,12,.5), inset 0 1px 2px rgba(255,255,255,.4)}
 .craft-tab:disabled{opacity:.35;cursor:default}
-.craft-tab i{font-style:normal;opacity:.75;font-size:10px}
+.craft-tab i{font-style:normal;opacity:.8;font-size:9.5px;margin-left:2px}
+.craft-tab .tab-ico{width:16px;height:16px;object-fit:contain;flex-shrink:0}
 
 /* ====== TAB KATEGORI KANTONG / TAS ====================================== */
 #bag-cat-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 9px}
@@ -2315,9 +2336,10 @@ body.touch .tmate .tord,body.touch .tmate .tmode{font-size:10px;padding:0 3px}
 }
 
 /* ---- panel crafting: list & kategori lebih ringkas di layar sempit ---- */
-body.touch #craft-tabs{padding:6px 10px;gap:4px}
-body.touch .craft-tab{font-size:9px;padding:5px 7px}
-body.touch .craft-tab i{font-size:8px}
+body.touch #craft-tabs{padding:6px 8px;gap:3px;flex-wrap:nowrap;overflow-x:auto}
+body.touch .craft-tab{font-size:8.5px;padding:5px 4px;gap:2px}
+body.touch .craft-tab i{font-size:7.5px}
+body.touch .craft-tab .tab-ico{width:13px;height:13px}
 body.touch .panel>.panel-body{padding:8px 10px 12px}
 body.touch #recipes{gap:5px}
 body.touch .recipe{padding:5px 8px;gap:7px;border-radius:7px}
@@ -2544,37 +2566,38 @@ body.touch .qbar{height:3px}
 
 /* ---- PANEL KARAKTER ---- */
 #panel-char{width:min(680px,96vw)}
-.char-tabs{display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:8px}
-.char-tab-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);color:#cfdcc4;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
-.char-tab-btn:hover{background:rgba(255,255,255,.12);color:#fff}
-.char-tab-btn.active{background:linear-gradient(135deg,#2e7d32,#1b5e20);border-color:#81c784;color:#fff;box-shadow:0 2px 8px rgba(46,125,50,.4)}
+.char-tabs{display:flex;gap:8px;padding:10px 18px;background:rgba(24,13,8,.96);border-bottom:2px solid #7c2d12;box-sizing:border-box;width:100%}
+.char-tab-btn{flex:1 1 0;min-width:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;border-radius:4px;font-size:11.5px;font-weight:700;letter-spacing:.02em;cursor:pointer;background-color:#ea580c;color:#ffffff;border:1.5px solid #7c2d12;box-shadow:0 2px 4px rgba(0,0,0,.35), inset 0 1px 1px rgba(255,255,255,.3);transition:transform .12s,background .15s,border-color .15s,box-shadow .15s}
+.char-tab-btn:hover{background-color:#f97316;color:#ffffff;border-color:#ffd24d;transform:translateY(-1px)}
+.char-tab-btn.active{background-color:#c2410c;color:#ffffff;border-color:#ffd24d;box-shadow:0 0 12px rgba(234,88,12,.55), inset 0 1px 2px rgba(255,255,255,.45)}
 #char-layout{display:flex;gap:16px;align-items:stretch}
 /* kolom kiri: daftar stat (scroll sendiri bila panjang) */
 #char-stats{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;max-height:420px;overflow-y:auto;padding-right:4px}
 #char-badges{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;padding-right:4px}
-.badge-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);transition:all .2s}
-.badge-card.unlocked{background:linear-gradient(90deg,rgba(46,125,50,.18),rgba(20,40,20,.3));border-color:rgba(129,199,132,.45);box-shadow:0 0 10px rgba(76,175,80,.15)}
+.badge-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;background:rgba(0,0,0,.35);border:1px solid rgba(234,88,12,.2);transition:all .2s}
+.badge-card.unlocked{background:linear-gradient(90deg,rgba(234,88,12,.18),rgba(40,20,10,.35));border-color:rgba(234,88,12,.55);box-shadow:0 0 10px rgba(234,88,12,.2)}
 .badge-card.mythic{background:linear-gradient(90deg,rgba(186,24,27,.24),rgba(40,10,15,.35));border-color:rgba(229,57,53,.55);box-shadow:0 0 12px rgba(229,57,53,.25)}
 .badge-card.locked{opacity:.6;filter:grayscale(0.6)}
-.badge-icon{width:36px;height:36px;border-radius:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.badge-card.unlocked .badge-icon{border-color:#81c784;box-shadow:0 0 8px rgba(129,199,132,.35)}
-.badge-card.mythic .badge-icon{border-color:#e53935;box-shadow:0 0 10px rgba(229,57,53,.45)}
+.badge-icon{width:38px;height:38px;border-radius:4px;background:rgba(0,0,0,.5);border:1.5px solid rgba(234,88,12,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.badge-card.unlocked .badge-icon{border-color:#ea580c;box-shadow:0 0 10px rgba(234,88,12,.4)}
+.badge-card.mythic .badge-icon{border-color:#ef4444;box-shadow:0 0 12px rgba(239,68,68,.45)}
+.badge-custom-icon{width:26px;height:26px;object-fit:contain;display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))}
 .badge-info{flex:1 1 auto;min-width:0}
 .badge-title{font-size:12.5px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px}
-.badge-tag{font-size:9.5px;padding:1px 6px;border-radius:4px;background:#e53935;color:#fff;text-transform:uppercase;letter-spacing:.5px}
-.badge-desc{font-size:11px;color:#a4b0a6;margin-top:2px;line-height:1.3}
+.badge-tag{font-size:9.5px;padding:1px 6px;border-radius:3px;background:#e53935;color:#fff;text-transform:uppercase;letter-spacing:.5px}
+.badge-desc{font-size:11px;color:#cbd5e1;margin-top:2px;line-height:1.3}
 .badge-progress{font-size:11px;font-weight:700;color:#ffd54f;flex-shrink:0;text-align:right}
-.badge-status{font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,.1);color:#ccc}
-.badge-status.done{background:rgba(76,175,80,.25);color:#a5d6a7;border:1px solid rgba(129,199,132,.4)}
+.badge-status{font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.1);color:#ccc}
+.badge-status.done{background:rgba(234,88,12,.28);color:#fed7aa;border:1px solid rgba(234,88,12,.5)}
 /* kolom kanan: viewport 3D karakter, menempel di atas */
 #char-view{flex:0 0 auto;width:250px;position:relative;align-self:flex-start;
-  border-radius:12px;overflow:hidden;
-  background:linear-gradient(180deg,rgba(46,62,44,.7),rgba(10,16,10,.9));
-  border:1px solid rgba(140,200,120,.28)}
+  border-radius:4px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(38,22,14,.85),rgba(18,10,6,.95));
+  border:2px solid #7c2d12;box-shadow:inset 0 0 16px rgba(0,0,0,.6)}
 #char-cv{display:block;width:100%;height:340px;touch-action:none;cursor:grab}
 #char-cv:active{cursor:grabbing}
 #char-view-hint{position:absolute;left:0;right:0;bottom:0;text-align:center;
-  font-size:10px;color:#c8d8b8;background:rgba(0,0,0,.45);padding:3px 0;
+  font-size:10px;color:#fed7aa;background:rgba(0,0,0,.6);padding:4px 0;
   pointer-events:none}
 /* baris stat */
 .cs-head{margin:10px 0 4px;font-size:11px;letter-spacing:1px;

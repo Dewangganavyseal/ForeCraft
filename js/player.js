@@ -499,7 +499,7 @@ const Player={
     const mv=Input.moveVec();
     const dir=(mv.x||mv.z)?new THREE.Vector3(mv.x,0,mv.z).normalize()
       :new THREE.Vector3(Math.sin(this.facing),0,Math.cos(this.facing));
-    this.dodge.active=true;this.dodge.t=0;this.dodge.dir.copy(dir);
+    this.dodge.active=true;this.dodge.t=0;this.dodge.dir.copy(dir);this.dodge._ghostStep=0;
     this.dodge.cd=RPG.dodgeCD();
     /* dodge memutus serangan: bersihkan juga buffer & pengali gerak supaya
        kecepatan tidak tertinggal di nilai "sedang menyerang" */
@@ -1248,13 +1248,17 @@ const Player={
       if(p>=1){
         D.active=false;
         this.rollG.rotation.x=0;
+        D._ghostStep=0;
       }else{
         const spd=lerp(21, 9, p);
         this.vel.x=D.dir.x*spd;
         this.vel.z=D.dir.z*spd;
         this.facing=Math.atan2(D.dir.x,D.dir.z);
         this.rollG.rotation.x=0;
-        if(Math.random()<0.75)FX.dash(this.pos, D.dir);
+        if(!D._ghostStep || (D._ghostStep === 1 && p > 0.42)){
+          D._ghostStep = (D._ghostStep || 0) + 1;
+          if(typeof FX!=='undefined'&&FX.dash)FX.dash(this.pos, D.dir, this.mesh);
+        }
       }
     }
 
