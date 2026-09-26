@@ -78,7 +78,9 @@ class RoomManager {
         maxPlayers: 50,
         clients: new Map(), // netId -> { ws, netId, name, pos, rot, stats, lastMoveTime, lastAtkTime, lastBlockTime }
         worldDiffs,
-        playerProfiles
+        playerProfiles,
+        mobs: new Map(),
+        drops: new Map()
       });
     }
     console.log(`[RoomManager] Inisialisasi 10 Rooms aktif (Maks 50 player/room).`);
@@ -155,6 +157,8 @@ class RoomManager {
       hairStyle: profile.hairStyle || 4,
       hairColor: profile.hairColor || 0x2c1f14,
       equip: profile.equip || {},
+      heldId: null,
+      weaponId: null,
       moving: false,
       isFirstSpawn: !profile.pos,
       lastMoveTime: Date.now(),
@@ -165,6 +169,7 @@ class RoomManager {
       chatResetT: Date.now()
     };
 
+    const isHost = (room.clients.size === 0);
     room.clients.set(netId, clientState);
     this.playerSocketMap.set(ws, { roomId, netId, name: cleanName });
 
@@ -183,6 +188,8 @@ class RoomManager {
           hairStyle: otherClient.hairStyle,
           hairColor: otherClient.hairColor,
           equip: otherClient.equip,
+          heldId: otherClient.heldId || null,
+          weaponId: otherClient.weaponId || null,
           moving: otherClient.moving
         });
       }
@@ -195,9 +202,12 @@ class RoomManager {
       roomId,
       roomName: room.name,
       seed: room.seed,
+      isHost,
       profile,
       worldDiffs: room.worldDiffs,
-      players: existingPlayers
+      players: existingPlayers,
+      mobs: Array.from(room.mobs.values()),
+      drops: Array.from(room.drops.values())
     });
 
     // Broadcast ke pemain lain di room bahwa pemain baru bergabung
@@ -214,6 +224,8 @@ class RoomManager {
         hairStyle: clientState.hairStyle,
         hairColor: clientState.hairColor,
         equip: clientState.equip,
+        heldId: null,
+        weaponId: null,
         moving: false
       }
     }, netId);
@@ -273,6 +285,9 @@ class RoomManager {
     client.moving = !!msg.moving;
     client.running = !!msg.running;
     client.inWater = !!msg.inWater;
+    if (msg.heldId !== undefined) client.heldId = msg.heldId;
+    if (msg.weaponId !== undefined) client.weaponId = msg.weaponId;
+    if (msg.equip) client.equip = msg.equip;
     client.lastMoveTime = now;
   }
 
@@ -337,7 +352,7 @@ class RoomManager {
       type: 'player_attack',
       netId: meta.netId,
       combo: msg.combo || 1,
-      weaponId: msg.weaponId || null
+      weaponId: msg.weaponId || client.weaponId || null
     }, meta.netId);
   }
 
@@ -424,6 +439,118 @@ class RoomManager {
     }
   }
 
+  handleMobSpawn(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const mob = msg.mob;
+    if (!mob || !mob.netId) return;
+
+    room.mobs.set(mob.netId, mob);
+    this.broadcastToRoom(meta.roomId, {
+      type: 'mob_spawn',
+      mob
+    }, meta.netId);
+  }
+
+  handleMobSync(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    if (!Array.isArray(msg.mobs)) return;
+
+    for (const m of msg.mobs) {
+      if (!m.netId) continue;
+      const existing = room.mobs.get(m.netId);
+      if (existing) {
+        if (m.pos) existing.pos = m.pos;
+        if (m.rot !== undefined) existing.rot = m.rot;
+        if (m.hp !== undefined) existing.hp = m.hp;
+        if (m.state) existing.state = m.state;
+      } else {
+        room.mobs.set(m.netId, m);
+      }
+    }
+
+    this.broadcastToRoom(meta.roomId, {
+      type: 'mob_sync',
+      mobs: msg.mobs
+    }, meta.netId);
+  }
+
+  handleMobDamage(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const { netId, dmg, dir, kb, srcNetId } = msg;
+    if (!netId) return;
+
+    const mob = room.mobs.get(netId);
+    if (mob && typeof dmg === 'number') {
+      mob.hp = Math.max(0, (mob.hp || 100) - dmg);
+    }
+
+    this.broadcastToRoom(meta.roomId, {
+      type: 'mob_damage',
+      netId,
+      dmg,
+      dir,
+      kb,
+      srcNetId: srcNetId || meta.netId
+    }, meta.netId);
+  }
+
+  handleMobDeath(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const { netId, pos, killerNetId } = msg;
+    if (!netId) return;
+
+    room.mobs.delete(netId);
+    this.broadcastToRoom(meta.roomId, {
+      type: 'mob_death',
+      netId,
+      pos,
+      killerNetId: killerNetId || meta.netId
+    });
+  }
+
+  handleDropSpawn(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const drop = msg.drop;
+    if (!drop || !drop.dropId) return;
+
+    room.drops.set(drop.dropId, drop);
+    this.broadcastToRoom(meta.roomId, {
+      type: 'drop_spawn',
+      drop
+    }, meta.netId);
+  }
+
+  handleDropPickup(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const dropId = msg.dropId;
+    if (!dropId) return;
+
+    room.drops.delete(dropId);
+    this.broadcastToRoom(meta.roomId, {
+      type: 'drop_pickup',
+      dropId,
+      netId: meta.netId
+    });
+  }
+
   handleDisconnect(ws) {
     const meta = this.playerSocketMap.get(ws);
     if (!meta) return;
@@ -452,6 +579,28 @@ class RoomManager {
       name: meta.name
     });
 
+    // Jika room masih ada pemain, periksa apakah host perlu dimigrasikan
+    if (room.clients.size > 0) {
+      let minNetId = Infinity;
+      let newHostClient = null;
+      for (const [otherNetId, otherClient] of room.clients.entries()) {
+        if (otherNetId < minNetId) {
+          minNetId = otherNetId;
+          newHostClient = otherClient;
+        }
+      }
+      if (newHostClient) {
+        this.send(newHostClient.ws, {
+          type: 'host_migrated',
+          isHost: true
+        });
+        console.log(`[Room ${meta.roomId}] Host dimigrasikan ke "${newHostClient.name}" (netId: ${newHostClient.netId})`);
+      }
+    } else {
+      room.mobs.clear();
+      room.drops.clear();
+    }
+
     console.log(`[Room ${meta.roomId}] Player left: "${meta.name}" (netId: ${meta.netId}). Sisa: ${room.clients.size}/${room.maxPlayers}`);
   }
 
@@ -471,7 +620,10 @@ class RoomManager {
           inWater: client.inWater,
           level: client.level || 1,
           hp: client.hp !== undefined ? client.hp : 100,
-          maxHp: client.maxHp || 100
+          maxHp: client.maxHp || 100,
+          heldId: client.heldId || null,
+          weaponId: client.weaponId || null,
+          equip: client.equip || {}
         });
       }
 

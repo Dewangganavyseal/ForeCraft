@@ -164,9 +164,63 @@ class RemotePlayer {
     if (Array.isArray(rot)) {
       this.targetYaw = rot[0];
     }
-    this.moving = !!moving;
+    this.setMoving(!!moving);
     this.running = !!running;
     this.inWater = !!inWater;
+  }
+
+  setMoving(moving) {
+    if (this.moving && !moving) {
+      this.walkT = 0;
+      if (this.parts && this.parts.legL) {
+        this.parts.legL.rotation.x = 0;
+        this.parts.legR.rotation.x = 0;
+        if (this.parts.armL) this.parts.armL.rotation.x = 0;
+        if (this.parts.armR) this.parts.armR.rotation.x = 0;
+      }
+      if (this.animator && !(this.animator.currentAnim || '').startsWith('combo')) {
+        this.animator.setAnimation('idle');
+      }
+    }
+    this.moving = !!moving;
+  }
+
+  setEquip(heldId, weaponId) {
+    const key = (weaponId || '') + '|' + (heldId || '');
+    if (key === this._equipKey) return;
+    this._equipKey = key;
+    try {
+      const id = weaponId || heldId;
+      if (!id) return;
+      if (!this.parts || !this.parts.armR) return;
+      const fore = this.parts.armR.userData ? this.parts.armR.userData.fore : null;
+      if (!fore) return;
+      for (let i = fore.children.length - 1; i >= 0; i--) {
+        const c = fore.children[i];
+        if (c.name && (c.name.startsWith('Weapon_') || c.name.startsWith('Sword_') || c.name.startsWith('Held_'))) fore.remove(c);
+      }
+      let mesh = null;
+      if (weaponId && typeof WeaponManager !== 'undefined' && WeaponManager.buildWeapon) {
+        mesh = WeaponManager.buildWeapon(weaponId);
+      } else if (typeof HeldModels !== 'undefined' && HeldModels.build) {
+        mesh = HeldModels.build(id);
+        const hold = mesh.userData.hold || {};
+        const hp = hold.pos || [0, -0.29, 0.02];
+        const hr = hold.rot || [Math.PI / 2, 0, 0];
+        mesh.position.set(hp[0], hp[1], hp[2]);
+        mesh.rotation.set(hr[0], hr[1], hr[2]);
+      }
+      if (mesh) { fore.add(mesh); this.parts.sword = mesh; }
+    } catch (e) {}
+  }
+
+  showChatBubble(text) {
+    try {
+      if (typeof FX !== 'undefined' && FX.text && typeof THREE !== 'undefined') {
+        const bubble = String(text).length > 45 ? String(text).slice(0, 45) + '…' : String(text);
+        FX.text(this.pos.clone().add(new THREE.Vector3(0, 2.4, 0)), bubble, '#eaffea');
+      }
+    } catch (e) {}
   }
 
   playAttack(combo) {
@@ -254,11 +308,13 @@ const Network = {
   roomId: null,
   roomName: '',
   netId: null,
+  isHost: false,
   remotePlayers: new Map(), // netId -> RemotePlayer
   lastSendTime: 0,
   sendInterval: 50, // 20Hz update rate
   lastSyncedPos: null,
   lastSyncedYaw: null,
+  lastMovingSent: false,
   discoveredHost: null,
   isDiscovering: false,
 
@@ -464,7 +520,8 @@ const Network = {
         this.roomId = msg.roomId;
         this.roomName = msg.roomName;
         this.netId = msg.netId;
-        console.log(`[Network] Berhasil bergabung ke [Room ${msg.roomId}] ${msg.roomName}. NetId: ${this.netId}`);
+        this.isHost = !!msg.isHost;
+        console.log(`[Network] Berhasil bergabung ke [Room ${msg.roomId}] ${msg.roomName}. NetId: ${this.netId} Host: ${this.isHost}`);
 
         // Bersihkan pemain lama jika ada
         this.clearRemotePlayers();
@@ -476,9 +533,20 @@ const Network = {
           }
         }
 
+        // Mob & drop yang sudah ada di room (sinkron awal host-authoritative)
+        if (typeof MobNet !== 'undefined' && MobNet.onJoinSnapshot) {
+          MobNet.onJoinSnapshot(msg.mobs, msg.drops);
+        }
+
         if (onJoinSuccess) {
           onJoinSuccess(msg);
         }
+        break;
+
+      case 'host_migrated':
+        this.isHost = true;
+        console.log('[Network] Kamu sekarang host room (migrasi host).');
+        if (typeof UI !== 'undefined' && UI.toast) UI.toast('👑 Kamu menjadi Host room');
         break;
 
       case 'join_error':
@@ -488,6 +556,8 @@ const Network = {
       case 'player_joined':
         if (msg.player && msg.player.netId !== this.netId) {
           this.addRemotePlayer(msg.player);
+          const rp = this.remotePlayers.get(msg.player.netId);
+          if (rp && (msg.player.heldId || msg.player.weaponId)) rp.setEquip(msg.player.heldId, msg.player.weaponId);
           if (typeof UI !== 'undefined' && UI.toast) {
             UI.toast(`👋 ${msg.player.name} bergabung ke dunia!`);
           }
@@ -514,6 +584,7 @@ const Network = {
             const rp = this.remotePlayers.get(sp.netId);
             if (rp) {
               rp.setTargetPos(sp.pos, sp.rot, sp.moving, sp.running, sp.inWater);
+              if (sp.heldId !== undefined || sp.weaponId !== undefined) rp.setEquip(sp.heldId, sp.weaponId);
               let changed = false;
               if (sp.level !== undefined && sp.level !== rp.level) {
                 rp.level = sp.level;
@@ -530,6 +601,10 @@ const Network = {
               if (changed) rp.updateNameplateVisual();
             }
           }
+        }
+        // Sinkron mob dari host (dirender sebagai mob remote non-AI)
+        if (Array.isArray(msg.mobs) && typeof MobNet !== 'undefined' && MobNet.onHostSnapshot) {
+          MobNet.onHostSnapshot(msg.mobs);
         }
         break;
 
@@ -561,6 +636,7 @@ const Network = {
         if (msg.netId !== this.netId) {
           const rp = this.remotePlayers.get(msg.netId);
           if (rp) {
+            if (msg.weaponId) rp.setEquip(rp._heldId || null, msg.weaponId);
             rp.playAttack(msg.combo);
           }
         }
@@ -572,16 +648,41 @@ const Network = {
           const cls = msg.sender === 'SYSTEM' ? 'sys' : (msg.netId === this.netId ? 'me' : 'other');
           Chat.pushLog(`${prefix} ${msg.text}`, cls);
 
-          // Gelembung chat di atas kepala pemain remote
-          if (msg.netId && msg.netId !== this.netId) {
-            const rp = this.remotePlayers.get(msg.netId);
-            if (rp && typeof FX !== 'undefined' && FX.text) {
-              const bubble = `[${msg.sender}] ${msg.text}`;
-              FX.text(rp.pos.clone().add(new THREE.Vector3(0, 2.4, 0)),
-                bubble.length > 45 ? bubble.slice(0, 45) + '…' : bubble, '#eaffea');
+          // Bubble lokal untuk pengirim sendiri, remote untuk pemain lain
+          if (msg.netId === this.netId) {
+            if (typeof Player !== 'undefined' && Player.pos && typeof FX !== 'undefined' && FX.text) {
+              FX.text(Player.pos.clone().add(new THREE.Vector3(0, 2.4, 0)),
+                String(msg.text).length > 45 ? String(msg.text).slice(0, 45) + '…' : String(msg.text), '#eaffea');
             }
+          } else if (msg.netId) {
+            const rp = this.remotePlayers.get(msg.netId);
+            if (rp) rp.showChatBubble(`[${msg.sender}] ${msg.text}`);
           }
         }
+        break;
+
+      case 'mob_spawn':
+        if (typeof MobNet !== 'undefined' && MobNet.onSpawn) MobNet.onSpawn(msg.mob);
+        break;
+
+      case 'mob_sync':
+        if (typeof MobNet !== 'undefined' && MobNet.onSync) MobNet.onSync(msg.mobs);
+        break;
+
+      case 'mob_damage':
+        if (typeof MobNet !== 'undefined' && MobNet.onDamage) MobNet.onDamage(msg);
+        break;
+
+      case 'mob_death':
+        if (typeof MobNet !== 'undefined' && MobNet.onDeath) MobNet.onDeath(msg);
+        break;
+
+      case 'drop_spawn':
+        if (typeof MobNet !== 'undefined' && MobNet.onDropSpawn) MobNet.onDropSpawn(msg.drop);
+        break;
+
+      case 'drop_pickup':
+        if (typeof MobNet !== 'undefined' && MobNet.onDropPickup) MobNet.onDropPickup(msg);
         break;
 
       case 'snap_pos':
@@ -596,6 +697,7 @@ const Network = {
   addRemotePlayer(data) {
     if (!data || !data.netId || this.remotePlayers.has(data.netId)) return;
     const rp = new RemotePlayer(data);
+    if (data.heldId || data.weaponId) rp.setEquip(data.heldId, data.weaponId);
     this.remotePlayers.set(data.netId, rp);
   },
 
@@ -610,25 +712,34 @@ const Network = {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
     this.lastSyncedPos = [x, y, z];
     this.lastSyncedYaw = yaw || 0;
+    this.lastMovingSent = !!moving;
+    const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
+    const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
     this.ws.send(JSON.stringify({
       type: 'move',
       pos: [x, y, z],
       rot: [yaw || 0, pitch || 0],
       moving: !!moving,
       running: false,
-      inWater: false
+      inWater: false,
+      heldId: heldId,
+      weaponId: weaponId
     }));
   },
 
   sendTeleport(x, y, z) {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
     this.lastSyncedPos = [x, y, z];
+    const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
+    const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
     this.ws.send(JSON.stringify({
       type: 'move',
       pos: [x, y, z],
       rot: [typeof Player !== 'undefined' ? (Player.facing || 0) : 0, 0],
       moving: false,
-      teleport: true
+      teleport: true,
+      heldId: heldId,
+      weaponId: weaponId
     }));
   },
 
@@ -673,6 +784,8 @@ const Network = {
       blockBag: RPG.blockBag,
       furniBag: RPG.furniBag,
       equip: RPG.equip,
+      heldId: RPG.heldId ? RPG.heldId() : null,
+      weaponId: RPG.equip ? (RPG.equip.weapon || null) : null,
       coin: RPG.coin,
       skills: RPG.skills,
       prof: typeof Prof !== 'undefined' ? Prof.serialize() : {},
@@ -758,6 +871,9 @@ const Network = {
     // Resolusi tabrakan (collision) fisik antar pemain
     this.resolvePlayerCollisions();
 
+    // Sinkron mob & drop host-authoritative
+    if (typeof MobNet !== 'undefined' && MobNet.update) MobNet.update(dt);
+
     const now = performance.now();
 
     // Sinkronisasi status lengkap (Level, HP, XP, Inventory) tiap 3.5 detik
@@ -774,26 +890,37 @@ const Network = {
         const px = Player.pos.x, py = Player.pos.y, pz = Player.pos.z;
         const yaw = Player.facing || 0;
 
-        // Cek jika ada pergerakan atau rotasi
+        // Cek jika ada pergerakan atau rotasi — moving:false WAJIB dikirim
+        // sekali saat pemain berhenti agar kaki remote ikut berhenti.
         const moved = !this.lastSyncedPos ||
           Math.abs(px - this.lastSyncedPos[0]) > 0.01 ||
           Math.abs(py - this.lastSyncedPos[1]) > 0.01 ||
           Math.abs(pz - this.lastSyncedPos[2]) > 0.01 ||
           Math.abs(yaw - (this.lastSyncedYaw || 0)) > 0.02;
 
-        if (moved) {
+        const mv = (typeof Input !== 'undefined' && Input.moveVec) ? Input.moveVec() : { x: 0, z: 0 };
+        const isMoving = (mv.x !== 0 || mv.z !== 0) || !!(Player.vel && Math.hypot(Player.vel.x, Player.vel.z) > 0.1);
+        const stopped = !isMoving && this.lastMovingSent;
+        const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
+        const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
+        const equipChanged = heldId !== this._lastHeldId || weaponId !== this._lastWeaponId;
+
+        if (moved || stopped || equipChanged) {
           this.lastSyncedPos = [px, py, pz];
           this.lastSyncedYaw = yaw;
+          this.lastMovingSent = isMoving;
+          this._lastHeldId = heldId;
+          this._lastWeaponId = weaponId;
 
-          const mv = (typeof Input !== 'undefined' && Input.moveVec) ? Input.moveVec() : { x: 0, z: 0 };
-          const isMoving = (mv.x !== 0 || mv.z !== 0) || !!(Player.vel && Math.hypot(Player.vel.x, Player.vel.z) > 0.1);
           this.ws.send(JSON.stringify({
             type: 'move',
             pos: [px, py, pz],
             rot: [yaw, 0],
             moving: isMoving,
             running: !!(typeof Input !== 'undefined' && Input.shift),
-            inWater: !!Player.inWater
+            inWater: !!Player.inWater,
+            heldId: heldId,
+            weaponId: weaponId
           }));
         }
       }

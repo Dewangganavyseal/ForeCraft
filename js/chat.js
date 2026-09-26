@@ -232,6 +232,17 @@ const Chat={
     /* ---- pesan biasa: log + gelembung teks di atas kepala pemain ---- */
     if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
       Network.sendChat(text);
+      // Echo lokal langsung (server broadcast exclude pengirim, jadi tanpa ini
+      // pengirim tidak melihat pesannya sendiri). Bubble tampil saat pesan
+      // 'chat' sendiri kembali? Tidak — server exclude, jadi tampilkan kini.
+      const pName = (typeof Player!=='undefined'&&Player.name) ||
+                    (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
+                    'Kamu';
+      this.pushLog(text,'me');
+      if(typeof FX!=='undefined'&&FX.text&&typeof Player!=='undefined'&&Player.pos){
+        FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.4,0)),
+          text.length>45?text.slice(0,45)+'…':text,'#eaffea');
+      }
       return;
     }
     const pName = (typeof Player!=='undefined'&&Player.name) ||

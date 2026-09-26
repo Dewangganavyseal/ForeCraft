@@ -927,6 +927,18 @@ const Monsters={
 
   hurt(m,dmg,dir,knock,src){
     if(m.dead)return;
+    /* MOB REMOTE (netMob): pukulan dari sumber lokal non-remote (pemain/NPC/pet
+       sendiri) diteruskan ke host via MobNet; damage ASLI diterapkan saat pesan
+       mob_damage kembali (src.remote). Tanpa ini tiap klien menghitung kill/XP/
+       loot sendiri sehingga XP & drop berlipat. */
+    if(m.netMob&&!(src&&src.remote)){
+      if(typeof MobNet!=='undefined'&&MobNet.isMp()&&!MobNet.isHost()){
+        MobNet.send({type:'mob_damage',netId:m.netId,dmg:dmg,
+          dir:(dir&&dir.x!==undefined)?[dir.x,dir.y,dir.z]:null,kb:knock||0,
+          srcNetId:(typeof Network!=='undefined')?Network.netId:null});
+      }
+      return;
+    }
     /* Mob yang sedang dalam minigame tangkap tidak boleh menerima damage,
        supaya proses tangkap tidak dirusak oleh NPC, pet, DoT, atau serangan lain. */
     if(m.catchActive)return;
@@ -1335,6 +1347,27 @@ const Monsters={
     for(let i=this.list.length-1;i>=0;i--){
       const m=this.list[i];
       if(!m)continue;
+
+      /* MOB REMOTE MULTIPLAYER (netMob): boneka milik host — AI, fisika, dan
+         despawn jarak lokal DIMATIKAN. Gerak di-lerp oleh MobNet.update dari
+         snapshot host; damage/kill tetap bisa lewat Monsters.hurt. */
+      if(m.netMob){
+        if(m.dead){
+          m.deathT+=dt;
+          m.mesh.scale.setScalar(Math.max(0.001,(m.baseScale||1)*(1-m.deathT*2)));
+          m.mesh.rotation.x=m.deathT*2;
+          if(m.deathT>0.55){
+            Game.scene.remove(m.mesh);
+            this.list.splice(i,1);
+            if(typeof MobNet!=='undefined')MobNet.mobs.delete(m.netId);
+          }
+          continue;
+        }
+        if(m.hpT>0)m.hpT-=dt;
+        if(m.flash>0)m.flash-=dt;
+        this.animate(m,dt);
+        continue;
+      }
 
       /* Ikan laut predator dikendalikan sepenuhnya oleh FishSys (renang 3D & fisika air) */
       if(m.isFish){

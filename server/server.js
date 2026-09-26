@@ -159,6 +159,30 @@ wss.on('connection', (ws) => {
         roomManager.handleChat(ws, msg);
         break;
 
+      case 'mob_spawn':
+        roomManager.handleMobSpawn(ws, msg);
+        break;
+
+      case 'mob_sync':
+        roomManager.handleMobSync(ws, msg);
+        break;
+
+      case 'mob_damage':
+        roomManager.handleMobDamage(ws, msg);
+        break;
+
+      case 'mob_death':
+        roomManager.handleMobDeath(ws, msg);
+        break;
+
+      case 'drop_spawn':
+        roomManager.handleDropSpawn(ws, msg);
+        break;
+
+      case 'drop_pickup':
+        roomManager.handleDropPickup(ws, msg);
+        break;
+
       case 'sync_player':
         roomManager.handlePlayerSync(ws, msg);
         break;
