@@ -3265,6 +3265,121 @@ body.touch #portrait{width:58px;height:58px}
   }
 }
 
+/* ============ Auto Update Modal & Locked Screen ============ */
+#update-modal-ov {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.94);
+  backdrop-filter: blur(10px);
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+#update-modal-box {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #f97316;
+  box-shadow: 0 0 40px rgba(249, 115, 22, 0.35);
+  border-radius: 18px;
+  padding: 26px 22px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  color: #f8fafc;
+  animation: popIn 0.25s ease-out;
+  box-sizing: border-box;
+}
+
+#update-modal-box .u-badge {
+  display: inline-block;
+  background: #f97316;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+#update-modal-box h2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 15px;
+  color: #fef08a;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+#update-modal-box .u-versions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#update-modal-box .u-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  margin: 0 0 20px 0;
+}
+
+#update-modal-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+#update-btn-update {
+  flex: 1;
+  background: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+  color: #ffffff;
+  border: 1.5px solid #fdba74;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+#update-btn-update:hover {
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  transform: translateY(-1px);
+}
+
+#update-btn-close {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+#update-btn-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+
 
 
 

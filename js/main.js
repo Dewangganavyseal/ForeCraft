@@ -700,7 +700,8 @@ const Game={
     const chatActive=(typeof Chat!=='undefined')&&Chat.active;
     const studioActive=(typeof UIStudio!=='undefined')&&UIStudio.active;
     const modalActive=(typeof UI!=='undefined')&&UI.modalOpen&&UI.modalOpen();
-    const canAct=!UI.open&&!chatActive&&!studioActive&&!modalActive&&!Player.dead;
+    const isLocked=(typeof Updater!=='undefined')&&Updater.locked;
+    const canAct=!UI.open&&!chatActive&&!studioActive&&!modalActive&&!isLocked&&!Player.dead;
     const qJump=Input.jumpQ,qAtk=Input.attackQ,qDodge=Input.dodgeQ;
     Input.jumpQ=false;Input.attackQ=false;Input.dodgeQ=false;
 
@@ -795,9 +796,24 @@ const Game={
 const MainMenu={
   el:null,
 
-  init(){
+  async init(){
     this.el=document.getElementById('start');
     if(!this.el)return;
+
+    // Cek pembaruan versi sebelum masuk ke Main Menu
+    if(typeof Updater!=='undefined'&&Updater.init){
+      try{
+        const blocked=await Updater.init();
+        if(blocked){
+          // Pembaruan tersedia atau game terkunci: tahan di dialog pembaruan
+          this.el.classList.add('hidden');
+          return;
+        }
+      }catch(e){
+        console.warn('[MainMenu] Updater check bypassed:', e);
+      }
+    }
+
     this.showMain();
   },
 
@@ -824,6 +840,7 @@ const MainMenu={
   },
 
   showMain(){
+    if(typeof Updater!=='undefined'&&Updater.locked)return;
     this.el.classList.remove('hidden');
     this.el.innerHTML=`
       <div class="menu-wrap">

@@ -30,7 +30,8 @@ const MIME_TYPES = {
   '.ogg': 'audio/ogg',
   '.ttf': 'font/ttf',
   '.woff': 'font/woff',
-  '.woff2': 'font/woff2'
+  '.woff2': 'font/woff2',
+  '.apk': 'application/vnd.android.package-archive'
 };
 
 const roomManager = new RoomManager();
@@ -62,6 +63,26 @@ const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
 
   // API Endpoints
+  if (urlPath === '/api/version') {
+    let pkgVersion = '0.2.41';
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+      if (pkg.version) pkgVersion = pkg.version;
+    } catch (e) {}
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({
+      version: pkgVersion,
+      apkUrl: '/ForecraftOnline.apk',
+      githubRelease: 'https://github.com/Dewangganavyseal/ForeCraft/releases/latest',
+      githubRepo: 'https://github.com/Dewangganavyseal/ForeCraft'
+    }));
+    return;
+  }
+
   if (urlPath === '/api/rooms') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ rooms: roomManager.getRoomsList() }));
