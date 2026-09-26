@@ -12,6 +12,7 @@ chat-export-*.json
 opencode.json
 opencode-config.bat
 *.bat
+!START_SERVER.bat
 
 # ============ Backup & Checkpoints ============
 save_*.json
