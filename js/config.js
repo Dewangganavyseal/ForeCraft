@@ -1843,4 +1843,8 @@ function NPC_REJOIN_LINE(){
   return NPC_REJOIN_LINES[(Math.random()*NPC_REJOIN_LINES.length)|0];
 }
 
+window.CFG = CFG;
+window.B = B;
+window.BIOME = BIOME;
+
 

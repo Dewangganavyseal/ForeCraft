@@ -110,7 +110,7 @@ const World={
   groundAt(x,z,fromY){
     /* radius sampling disamakan dengan radius tabrakan pemain (0.28) supaya
        kolom dinding di sebelah tidak ikut terbaca sebagai lantai */
-    const r=0.26;let g=0;
+    const r=0.28;let g=0;
     const yTop=(fromY===undefined)?CFG.WORLD_H-1
               :clamp(Math.floor(fromY+0.02),0,CFG.WORLD_H-1);
     /* ALTAR RITUAL: strukturnya mesh, bukan blok dunia, jadi permukaannya tidak

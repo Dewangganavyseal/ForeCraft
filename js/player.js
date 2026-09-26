@@ -315,7 +315,13 @@ const Player={
       Sfx.jump();
       if(typeof Prof!=='undefined')Prof.gain('agility',2,1);
       if(this.inWater)FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2);}
-    else if(this.inWater){this.vel.y=3.6;}
+    else if(this.inWater){
+      this.vel.y=CFG.PLAYER.jump*0.92;
+      this._waterJump=true;
+      Sfx.jump();
+      if(typeof Prof!=='undefined')Prof.gain('agility',2,1);
+      FX.ripple(this.pos.x,CFG.WATER_Y,this.pos.z,0xdff2fa,2);
+    }
     /* LOMPAT GANDA (skill 'djump'): sekali lagi tekan lompat saat di udara,
        vel.y di-reset (sedikit lebih kuat dari lompatan pertama) sehingga total
        lompatan mencapai ~3 blok — cukup untuk memanjat tebing 3 blok. Hanya
@@ -1204,7 +1210,7 @@ const Player={
     const moving=(mv.x!==0||mv.z!==0);
     const sprint=Input.sprintHeld()&&moving&&this.stamina>1&&!this.inWater&&!sailing;
     let spd=CFG.PLAYER.speed*RPG.speedMult()*(sprint?CFG.PLAYER.sprint/CFG.PLAYER.speed:1);
-    if(this.inWater)spd*=RPG.skillVal('swim')>0?0.9:0.55;
+    if(this.inWater&&!this._waterJump)spd*=RPG.skillVal('swim')>0?0.9:0.55;
     if(this.buffSpeed>0)spd*=1.18;
     if(A.active)spd*=(A.moveMul!==undefined?A.moveMul:0.45);
     if(D.active)spd=0;
@@ -1312,7 +1318,8 @@ const Player={
     this.vel.y-=CFG.GRAV*(this.inWater?0.3:1)*dt;
     if(this.inWater){
       if(this.pos.y<CFG.WATER_Y-0.55)this.vel.y+=19*dt;
-      this.vel.y=clamp(this.vel.y,-3,3.5);
+      const maxUp=this._waterJump?CFG.PLAYER.jump:3.5;
+      this.vel.y=clamp(this.vel.y,-3,maxUp);
       if(!wasInWater){
         /* baru masuk air: suara kecebur — besar bila jatuh cepat, kecil bila
            melangkah/nyemplung pelan */
@@ -1322,16 +1329,19 @@ const Player={
         Sfx.splash(big);
       }
     }
+    if(this.onGround||this.vel.y<=0||(!this.inWater&&this.pos.y>=CFG.WATER_Y)){
+      this._waterJump=false;
+    }
     /* horizontal + step-up
        Batas pencarian lantai = setinggi kepala (pos.y+1.8). Tanpa batas ini
        ambang atas pintu terbaca sebagai lantai setinggi atap sehingga pemain
        tertahan "dinding tak terlihat" di depan pintu yang jelas terbuka. */
-    const headY=this.pos.y+1.8;
-    /* posisi acuan SEBELUM gerak & sebelum gravitasi diterapkan ke pos.y.
-       py0 dipakai sebagai patokan tinggi langkah supaya batas naik-lantai
-       tidak ikut bergeser saat pos.y turun karena gravitasi (lihat BUGFIX
-       di bawah). */
     const px0=this.pos.x,pz0=this.pos.z,py0=this.pos.y;
+    const waterBase=(typeof CFG!=='undefined'&&CFG.WATER_Y)?CFG.WATER_Y:4.82;
+    const inOrNearWater=this.inWater||wasInWater||(this.pos.y<waterBase+0.3&&World.inWaterAt(this.pos.x,waterBase-0.2,this.pos.z));
+    const refBaseY=inOrNearWater?Math.max(py0,waterBase):py0;
+    const maxStep=inOrNearWater?1.45:1.02;
+    const headY=Math.max(py0,refBaseY)+1.8;
     /* Penjaga horizontal: selain batas langkah (groundAt) & rintangan batang/
        dinding (blockedAt), `headroomOK` memastikan posisi TUJUAN tidak akan
        menaruh tubuh pemain DI DALAM blok lantai padat. Tanpa ini, kasus sudut
@@ -1339,10 +1349,12 @@ const Player={
        ("terhisap terrain"); headroomOK menolak gerak itu di hulu. */
     const nx=this.pos.x+this.vel.x*dt;
     const gX=World.groundAt(nx,this.pos.z,headY);
-    if(gX<=py0+1.02&&!World.blockedAt(nx,this.pos.y,this.pos.z,0.28)&&World.headroomOK(nx,this.pos.z,Math.max(gX,py0)))this.pos.x=nx;else this.vel.x=0;
+    const checkYX=Math.max(this.pos.y,gX);
+    if(gX<=refBaseY+maxStep&&!World.blockedAt(nx,checkYX,this.pos.z,0.28)&&World.headroomOK(nx,this.pos.z,Math.max(gX,py0)))this.pos.x=nx;else this.vel.x=0;
     const nz=this.pos.z+this.vel.z*dt;
     const gZ=World.groundAt(this.pos.x,nz,headY);
-    if(gZ<=py0+1.02&&!World.blockedAt(this.pos.x,this.pos.y,nz,0.28)&&World.headroomOK(this.pos.x,nz,Math.max(gZ,py0)))this.pos.z=nz;else this.vel.z=0;
+    const checkYZ=Math.max(this.pos.y,gZ);
+    if(gZ<=refBaseY+maxStep&&!World.blockedAt(this.pos.x,checkYZ,nz,0.28)&&World.headroomOK(this.pos.x,nz,Math.max(gZ,py0)))this.pos.z=nz;else this.vel.z=0;
     this.pos.y+=this.vel.y*dt;
 
     /* ---------- resolusi tabrakan vertikal ----------
@@ -1369,11 +1381,12 @@ const Player={
           pemain didorong keluar ke permukaan terdekat. Ini menutup sisa kasus
           (terdorong ke sudut struktur, posisi save lama, dsb.) yang lolos dari
           resolusi biasa. */
-    const refY=Math.max(py0,this.pos.y)+1.8;
+    const refY=Math.max(py0,this.pos.y,refBaseY)+1.8;
     let g=World.groundAt(this.pos.x,this.pos.z,refY);
     /* Batalkan gerak bila permukaan terlalu tinggi untuk dilangkahi, KECUALI
        bila pemain sedang melompat/mendarat di atas permukaan (kaki sudah dekat g) */
-    if(g>Math.max(py0,this.pos.y)+1.05&&this.pos.y<g-0.25){
+    const maxStepY=inOrNearWater?1.45:1.05;
+    if(g>Math.max(py0,this.pos.y,refBaseY)+maxStepY&&this.pos.y<g-0.25){
       this.pos.x=px0;this.pos.z=pz0;
       this.vel.x=0;this.vel.z=0;
       g=World.groundAt(px0,pz0,refY);
@@ -1386,12 +1399,12 @@ const Player={
       if(!wasG&&fall>1.8&&!this.inWater)Sfx.land(clamp((fall-1.8)/9,0,1));
       this.pos.y=g;
       if(this.vel.y<0)this.vel.y=0;
-      this.onGround=true;this.airJumped=false;
+      this.onGround=true;this.airJumped=false;this._waterJump=false;
     }else if(this.pos.y<=g&&this.vel.y<=0){
       /* tepat menyentuh tanah */
       const fall=-this.vel.y;
       if(!wasG&&fall>1.8&&!this.inWater)Sfx.land(clamp((fall-1.8)/9,0,1));
-      this.pos.y=g;this.vel.y=0;this.onGround=true;this.airJumped=false;
+      this.pos.y=g;this.vel.y=0;this.onGround=true;this.airJumped=false;this._waterJump=false;
     }
     /* garansi: kaki tidak boleh berada di dalam blok padat (anti-terhisap) */
     const ub=World.unburyY(this.pos.x,this.pos.z,this.pos.y);
