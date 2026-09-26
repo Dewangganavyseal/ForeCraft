@@ -229,46 +229,67 @@ const Chat={
       return;
     }
 
-    /* ---- pesan biasa: log + gelembung teks di atas kepala pemain ---- */
+    /* ---- pesan biasa: kirim ke server multiplayer bila aktif ---- */
     if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
       Network.sendChat(text);
-      // Echo lokal langsung (server broadcast exclude pengirim, jadi tanpa ini
-      // pengirim tidak melihat pesannya sendiri). Bubble tampil saat pesan
-      // 'chat' sendiri kembali? Tidak — server exclude, jadi tampilkan kini.
-      const pName = (typeof Player!=='undefined'&&Player.name) ||
-                    (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
-                    'Kamu';
-      this.pushLog(text,'me');
-      if(typeof FX!=='undefined'&&FX.text&&typeof Player!=='undefined'&&Player.pos){
-        FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.4,0)),
-          text.length>45?text.slice(0,45)+'…':text,'#eaffea');
-      }
+      this.close();
       return;
     }
     const pName = (typeof Player!=='undefined'&&Player.name) ||
                   (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
                   'Kamu';
     this.pushLog(text,'me');
-    if(typeof FX!=='undefined'&&FX.text){
+    if(typeof Network!=='undefined'&&Network.showSpeechBubble&&typeof Player!=='undefined'&&Player.mesh){
+      Network.showSpeechBubble(Player.mesh, text, pName);
+    }else if(typeof FX!=='undefined'&&FX.text){
       const bubble = `[${pName}] ${text}`;
       FX.text(Player.pos.clone().add(new THREE.Vector3(0,2.4,0)),
         bubble.length>45?bubble.slice(0,45)+'…':bubble,'#eaffea');
     }
+    this.close();
   },
-  pushLog(text,cls){
+  pushLog(text,cls,senderName){
+    if(!this.logEl)return;
     const d=document.createElement('div');
     d.className='chat-line '+(cls||'');
     if(cls==='me'){
-      const pName = (typeof Player!=='undefined'&&Player.name) ||
+      const pName = senderName || (typeof Player!=='undefined'&&Player.name) ||
                     (typeof RPG!=='undefined'&&RPG.customPlayer&&RPG.customPlayer.name) ||
                     'Kamu';
-      const b=document.createElement('b');b.textContent=pName+': ';
-      d.appendChild(b);d.appendChild(document.createTextNode(text));
-    }else d.innerHTML=text;              // baris sistem (aman: kita yang buat)
+      const b=document.createElement('b');
+      b.textContent=`[${pName}]: `;
+      d.appendChild(b);
+      d.appendChild(document.createTextNode(text));
+    }else if(cls==='other'){
+      const pName = senderName || 'Player';
+      const b=document.createElement('b');
+      b.textContent=`[${pName}]: `;
+      b.style.color='#38bdf8';
+      d.appendChild(b);
+      d.appendChild(document.createTextNode(text));
+    }else{
+      d.innerHTML=text;              // baris sistem (aman: kita yang buat)
+    }
     this.logEl.appendChild(d);
     while(this.logEl.childElementCount>this.MAX_LOG)
       this.logEl.firstElementChild.remove();
     this.logEl.scrollTop=this.logEl.scrollHeight;
+
+    // Pastikan berada di tab chat jika ada pesan baru
+    if(cls==='me'||cls==='other'){
+      if(this.tab!=='chat'){
+        this.setTab('chat');
+      }
+    }
+
+    // Tampilkan log chat sementara (peek) selama 5 detik jika box tertutup
+    if(!this.active&&this.box){
+      this.box.classList.add('peek');
+      if(this._peekTimer)clearTimeout(this._peekTimer);
+      this._peekTimer=setTimeout(()=>{
+        if(!this.active&&this.box)this.box.classList.remove('peek');
+      },5000);
+    }
   },
 
   /* ------------------------------ sistem teleportasi --------------------- */

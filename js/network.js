@@ -170,62 +170,84 @@ class RemotePlayer {
   }
 
   setMoving(moving) {
-    if (this.moving && !moving) {
+    this.moving = !!moving;
+    if (!this.moving) {
       this.walkT = 0;
       if (this.parts && this.parts.legL) {
-        this.parts.legL.rotation.x = 0;
-        this.parts.legR.rotation.x = 0;
-        if (this.parts.armL) this.parts.armL.rotation.x = 0;
-        if (this.parts.armR) this.parts.armR.rotation.x = 0;
+        this.parts.legL.rotation.set(0, 0, 0);
+        if (this.parts.legL.userData && this.parts.legL.userData.shin) this.parts.legL.userData.shin.rotation.set(0, 0, 0);
       }
+      if (this.parts && this.parts.legR) {
+        this.parts.legR.rotation.set(0, 0, 0);
+        if (this.parts.legR.userData && this.parts.legR.userData.shin) this.parts.legR.userData.shin.rotation.set(0, 0, 0);
+      }
+      if (this.parts && this.parts.armL) this.parts.armL.rotation.x = 0;
+      if (this.parts && this.parts.armR) this.parts.armR.rotation.x = 0;
       if (this.animator && !(this.animator.currentAnim || '').startsWith('combo')) {
         this.animator.setAnimation('idle');
       }
     }
-    this.moving = !!moving;
   }
 
   setEquip(heldId, weaponId) {
     const key = (weaponId || '') + '|' + (heldId || '');
     if (key === this._equipKey) return;
     this._equipKey = key;
+    this._heldId = heldId;
+    this._weaponId = weaponId;
+
     try {
-      const id = weaponId || heldId;
-      if (!id) return;
       if (!this.parts || !this.parts.armR) return;
       const fore = this.parts.armR.userData ? this.parts.armR.userData.fore : null;
       if (!fore) return;
+
+      // Bersihkan model senjata & held item lama dari tangan kanan
       for (let i = fore.children.length - 1; i >= 0; i--) {
         const c = fore.children[i];
-        if (c.name && (c.name.startsWith('Weapon_') || c.name.startsWith('Sword_') || c.name.startsWith('Held_'))) fore.remove(c);
+        if (c.name && (c.name.startsWith('Weapon_') || c.name.startsWith('Sword_') || c.name.startsWith('Held_'))) {
+          fore.remove(c);
+          c.traverse(o => {
+            if (o.geometry) o.geometry.dispose();
+            if (o.material && !(o.material.userData && o.material.userData.heldShared)) o.material.dispose();
+          });
+        }
       }
+
+      this.parts.sword = null;
+      if (this.animator) this.animator.sword = null;
+
+      const effectiveWeapon = weaponId || (heldId && (heldId.startsWith('sword_') || (typeof ITEMS !== 'undefined' && ITEMS[heldId] && ITEMS[heldId].weapon)) ? heldId : null);
+
       let mesh = null;
-      if (weaponId && typeof WeaponManager !== 'undefined' && WeaponManager.buildWeapon) {
-        mesh = WeaponManager.buildWeapon(weaponId);
-      } else if (typeof HeldModels !== 'undefined' && HeldModels.build) {
-        mesh = HeldModels.build(id);
+      if (effectiveWeapon && typeof WeaponManager !== 'undefined' && WeaponManager.buildWeapon) {
+        mesh = WeaponManager.buildWeapon(effectiveWeapon);
+        // Normalisasi orientasi pedang di tangan agar bilah menghadap ke depan
+        mesh.position.set(0, -0.29, 0.02);
+        mesh.rotation.set(Math.PI / 2, Math.PI / 2, 0);
+      } else if (heldId && typeof HeldModels !== 'undefined' && HeldModels.build) {
+        mesh = HeldModels.build(heldId);
         const hold = mesh.userData.hold || {};
         const hp = hold.pos || [0, -0.29, 0.02];
         const hr = hold.rot || [Math.PI / 2, 0, 0];
         mesh.position.set(hp[0], hp[1], hp[2]);
         mesh.rotation.set(hr[0], hr[1], hr[2]);
+        if (hold.scale) mesh.scale.setScalar(hold.scale);
       }
-      if (mesh) { fore.add(mesh); this.parts.sword = mesh; }
-    } catch (e) {}
-  }
 
-  showChatBubble(text) {
-    try {
-      if (typeof FX !== 'undefined' && FX.text && typeof THREE !== 'undefined') {
-        const bubble = String(text).length > 45 ? String(text).slice(0, 45) + '…' : String(text);
-        FX.text(this.pos.clone().add(new THREE.Vector3(0, 2.4, 0)), bubble, '#eaffea');
+      if (mesh) {
+        fore.add(mesh);
+        this.parts.sword = mesh;
+        if (this.animator) this.animator.sword = mesh;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[RemotePlayer] Gagal pasang equip:', e);
+    }
   }
 
   playAttack(combo) {
+    const c = combo || 1;
     if (this.animator) {
-      const animName = 'combo' + (combo || 1);
+      const animName = 'combo' + Math.min(5, Math.max(1, c));
       this.animator.playOnce(animName, 1.0, () => {
         if (this.animator) {
           const nextAnim = this.moving ? (this.running ? 'sprint' : 'walk') : 'idle';
@@ -233,9 +255,34 @@ class RemotePlayer {
         }
       });
     }
-    if (typeof Sfx !== 'undefined' && Sfx.swing) {
-      Sfx.swing();
+
+    // Audio ayunan senjata
+    if (typeof Sfx !== 'undefined') {
+      if (this.parts && this.parts.sword && Sfx.swing) {
+        Sfx.swing(Math.max(0, c - 1));
+      } else if (Sfx.punch) {
+        Sfx.punch(Math.max(0, c - 1));
+      }
     }
+
+    // Efek visual tebasan (slash trail VFX)
+    try {
+      if (typeof FX !== 'undefined' && typeof THREE !== 'undefined') {
+        const fxPos = new THREE.Vector3();
+        if (this.parts && this.parts.sword) {
+          this.parts.sword.getWorldPosition(fxPos);
+        } else {
+          fxPos.copy(this.pos).add(new THREE.Vector3(0, 1.1, 0));
+        }
+
+        if (this.parts && this.parts.sword && FX.trail) {
+          const vert = (typeof COMBOS !== 'undefined' && COMBOS[c - 1]) ? COMBOS[c - 1].vert : false;
+          FX.trail(fxPos, this.yaw, vert, Math.max(0, c - 1));
+        } else if (FX.punch) {
+          FX.punch(fxPos, this.yaw, Math.max(0, c - 1));
+        }
+      }
+    } catch (e) {}
   }
 
   update(dt) {
@@ -260,20 +307,24 @@ class RemotePlayer {
     this.yaw += dy * Math.min(dt * 12, 1.0);
     this.mesh.rotation.y = this.yaw;
 
+    // Deteksi apakah remote player benar-benar sedang melangkah
+    const distToTarget = Math.hypot(this.targetPos.x - this.pos.x, this.targetPos.z - this.pos.z);
+    const isMovingActual = this.moving && distToTarget > 0.03;
+
     // Animasi gerak tungkai (kaki & tangan)
     if (this.animator) {
       const isAttacking = this.animator.currentAnim && this.animator.currentAnim.startsWith('combo');
       if (!isAttacking) {
-        const nextAnim = this.moving ? (this.running ? 'sprint' : 'walk') : 'idle';
+        const nextAnim = isMovingActual ? (this.running ? 'sprint' : 'walk') : 'idle';
         if (this.animator.currentAnim !== nextAnim) {
           this.animator.setAnimation(nextAnim);
         }
       }
-      this.animator.moveSpeed = this.moving ? (this.running ? 8.0 : 4.5) : 0;
+      this.animator.moveSpeed = isMovingActual ? (this.running ? 8.0 : 4.5) : 0;
       this.animator.update(dt);
     } else if (this.parts && this.parts.legL && this.parts.legR) {
       // Manual limb swing jika animator tidak aktif
-      if (this.moving) {
+      if (isMovingActual) {
         this.walkT += dt * (this.running ? 14 : 9);
         const swing = Math.sin(this.walkT) * 0.55;
         this.parts.legL.rotation.x = swing;
@@ -281,10 +332,12 @@ class RemotePlayer {
         if (this.parts.armL) this.parts.armL.rotation.x = -swing * 0.7;
         if (this.parts.armR) this.parts.armR.rotation.x = swing * 0.7;
       } else {
-        this.parts.legL.rotation.x *= 0.8;
-        this.parts.legR.rotation.x *= 0.8;
-        if (this.parts.armL) this.parts.armL.rotation.x *= 0.8;
-        if (this.parts.armR) this.parts.armR.rotation.x *= 0.8;
+        this.parts.legL.rotation.x *= 0.6;
+        this.parts.legR.rotation.x *= 0.6;
+        if (Math.abs(this.parts.legL.rotation.x) < 0.01) this.parts.legL.rotation.x = 0;
+        if (Math.abs(this.parts.legR.rotation.x) < 0.01) this.parts.legR.rotation.x = 0;
+        if (this.parts.armL) this.parts.armL.rotation.x *= 0.6;
+        if (this.parts.armR) this.parts.armR.rotation.x *= 0.6;
       }
     }
   }
@@ -602,9 +655,12 @@ const Network = {
             }
           }
         }
-        // Sinkron mob dari host (dirender sebagai mob remote non-AI)
+        // Sinkron mob & drop dari host (dirender sebagai entitas remote)
         if (Array.isArray(msg.mobs) && typeof MobNet !== 'undefined' && MobNet.onHostSnapshot) {
           MobNet.onHostSnapshot(msg.mobs);
+        }
+        if (Array.isArray(msg.drops) && typeof MobNet !== 'undefined' && MobNet.onHostDropsSnapshot) {
+          MobNet.onHostDropsSnapshot(msg.drops);
         }
         break;
 
@@ -644,19 +700,19 @@ const Network = {
 
       case 'chat':
         if (typeof Chat !== 'undefined') {
-          const prefix = msg.sender === 'SYSTEM' ? '⚠️ [SYSTEM]' : `[MP] ${msg.sender}:`;
-          const cls = msg.sender === 'SYSTEM' ? 'sys' : (msg.netId === this.netId ? 'me' : 'other');
-          Chat.pushLog(`${prefix} ${msg.text}`, cls);
+          const isMe = (msg.netId === this.netId);
+          Chat.pushLog(msg.text, isMe ? 'me' : 'other', msg.sender);
 
-          // Bubble lokal untuk pengirim sendiri, remote untuk pemain lain
-          if (msg.netId === this.netId) {
-            if (typeof Player !== 'undefined' && Player.pos && typeof FX !== 'undefined' && FX.text) {
-              FX.text(Player.pos.clone().add(new THREE.Vector3(0, 2.4, 0)),
-                String(msg.text).length > 45 ? String(msg.text).slice(0, 45) + '…' : String(msg.text), '#eaffea');
+          // Gelembung chat 3D di atas kepala karakter
+          if (isMe) {
+            if (typeof Player !== 'undefined' && Player.mesh) {
+              this.showSpeechBubble(Player.mesh, msg.text, msg.sender);
             }
           } else if (msg.netId) {
             const rp = this.remotePlayers.get(msg.netId);
-            if (rp) rp.showChatBubble(`[${msg.sender}] ${msg.text}`);
+            if (rp && rp.mesh) {
+              this.showSpeechBubble(rp.mesh, msg.text, msg.sender);
+            }
           }
         }
         break;
@@ -694,6 +750,90 @@ const Network = {
     }
   },
 
+  showSpeechBubble(parentMesh, text, senderName) {
+    if (!parentMesh) return;
+    try {
+      // Hapus bubble lama jika masih ada
+      if (parentMesh.userData && parentMesh.userData.speechBubble) {
+        const old = parentMesh.userData.speechBubble;
+        parentMesh.remove(old);
+        if (old.material) {
+          if (old.material.map) old.material.map.dispose();
+          old.material.dispose();
+        }
+        parentMesh.userData.speechBubble = null;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 384;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const fullText = (senderName ? `[${senderName}]: ` : '') + String(text).trim();
+      const cleanText = fullText.length > 36 ? fullText.substring(0, 36) + '…' : fullText;
+
+      // Background Speech Bubble Putih Rounded
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.beginPath();
+      ctx.roundRect(14, 10, w - 28, h - 34, 16);
+      ctx.fill();
+
+      // Border luar
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Segitiga ekor bubble di bawah tengah
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - 14, h - 25);
+      ctx.lineTo(w / 2, h - 8);
+      ctx.lineTo(w / 2 + 14, h - 25);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Teks chat tebal & jelas
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillStyle = '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cleanText, w / 2, 37);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(3.2, 0.8, 1);
+      sprite.position.set(0, 2.85, 0);
+      sprite.renderOrder = 30;
+
+      parentMesh.add(sprite);
+      parentMesh.userData.speechBubble = sprite;
+
+      // Hapus setelah 4.5 detik
+      setTimeout(() => {
+        if (parentMesh.userData && parentMesh.userData.speechBubble === sprite) {
+          parentMesh.remove(sprite);
+          try {
+            if (sprite.material) {
+              if (sprite.material.map) sprite.material.map.dispose();
+              sprite.material.dispose();
+            }
+          } catch (err) {}
+          parentMesh.userData.speechBubble = null;
+        }
+      }, 4500);
+    } catch (e) {
+      console.warn('[Network] Gagal membuat bubble chat:', e);
+    }
+  },
+
   addRemotePlayer(data) {
     if (!data || !data.netId || this.remotePlayers.has(data.netId)) return;
     const rp = new RemotePlayer(data);
@@ -714,14 +854,14 @@ const Network = {
     this.lastSyncedYaw = yaw || 0;
     this.lastMovingSent = !!moving;
     const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
-    const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
+    const weaponId = (typeof RPG !== 'undefined' && RPG.weaponId) ? RPG.weaponId() : null;
     this.ws.send(JSON.stringify({
       type: 'move',
       pos: [x, y, z],
       rot: [yaw || 0, pitch || 0],
       moving: !!moving,
-      running: false,
-      inWater: false,
+      running: !!(typeof Input !== 'undefined' && Input.sprintHeld && Input.sprintHeld()),
+      inWater: !!(typeof Player !== 'undefined' && Player.inWater),
       heldId: heldId,
       weaponId: weaponId
     }));
@@ -731,7 +871,7 @@ const Network = {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
     this.lastSyncedPos = [x, y, z];
     const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
-    const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
+    const weaponId = (typeof RPG !== 'undefined' && RPG.weaponId) ? RPG.weaponId() : null;
     this.ws.send(JSON.stringify({
       type: 'move',
       pos: [x, y, z],
@@ -753,10 +893,11 @@ const Network = {
 
   sendAttack(combo, weaponId) {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    const wid = weaponId || (typeof RPG !== 'undefined' && RPG.weaponId ? RPG.weaponId() : null);
     this.ws.send(JSON.stringify({
       type: 'attack',
       combo: combo || 1,
-      weaponId: weaponId || null
+      weaponId: wid
     }));
   },
 
@@ -785,7 +926,7 @@ const Network = {
       furniBag: RPG.furniBag,
       equip: RPG.equip,
       heldId: RPG.heldId ? RPG.heldId() : null,
-      weaponId: RPG.equip ? (RPG.equip.weapon || null) : null,
+      weaponId: RPG.weaponId ? RPG.weaponId() : null,
       coin: RPG.coin,
       skills: RPG.skills,
       prof: typeof Prof !== 'undefined' ? Prof.serialize() : {},
@@ -899,10 +1040,12 @@ const Network = {
           Math.abs(yaw - (this.lastSyncedYaw || 0)) > 0.02;
 
         const mv = (typeof Input !== 'undefined' && Input.moveVec) ? Input.moveVec() : { x: 0, z: 0 };
-        const isMoving = (mv.x !== 0 || mv.z !== 0) || !!(Player.vel && Math.hypot(Player.vel.x, Player.vel.z) > 0.1);
+        const inputActive = (Math.abs(mv.x) > 0.05 || Math.abs(mv.z) > 0.05);
+        const velActive = !!(Player.vel && Math.hypot(Player.vel.x, Player.vel.z) > 0.35);
+        const isMoving = inputActive || velActive;
         const stopped = !isMoving && this.lastMovingSent;
         const heldId = (typeof RPG !== 'undefined' && RPG.heldId) ? RPG.heldId() : null;
-        const weaponId = (typeof RPG !== 'undefined' && RPG.equip) ? (RPG.equip.weapon || null) : null;
+        const weaponId = (typeof RPG !== 'undefined' && RPG.weaponId) ? RPG.weaponId() : null;
         const equipChanged = heldId !== this._lastHeldId || weaponId !== this._lastWeaponId;
 
         if (moved || stopped || equipChanged) {
@@ -917,7 +1060,7 @@ const Network = {
             pos: [px, py, pz],
             rot: [yaw, 0],
             moving: isMoving,
-            running: !!(typeof Input !== 'undefined' && Input.shift),
+            running: !!(typeof Input !== 'undefined' && Input.sprintHeld && Input.sprintHeld()),
             inWater: !!Player.inWater,
             heldId: heldId,
             weaponId: weaponId

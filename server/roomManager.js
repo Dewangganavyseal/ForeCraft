@@ -252,17 +252,8 @@ class RoomManager {
       return; // Abaikan posisi tidak masuk akal
     }
 
-    // Penanganan spawn awal & teleport terotorisasi
-    if (client.isFirstSpawn || msg.teleport) {
-      client.isFirstSpawn = false;
-      client.pos = [nx, ny, nz];
-      client.rot = Array.isArray(msg.rot) ? msg.rot : [0, 0];
-      client.lastMoveTime = now;
-      return;
-    }
-
     // Anti-Cheat: Validasi kecepatan pergerakan (Speed Hack / Teleport Check)
-    if (client.pos) {
+    if (client.pos && !client.isFirstSpawn && !msg.teleport) {
       const dx = nx - client.pos[0];
       const dy = ny - client.pos[1];
       const dz = nz - client.pos[2];
@@ -280,6 +271,7 @@ class RoomManager {
       }
     }
 
+    client.isFirstSpawn = false;
     client.pos = [nx, ny, nz];
     client.rot = Array.isArray(msg.rot) ? msg.rot : [0, 0];
     client.moving = !!msg.moving;
@@ -629,7 +621,9 @@ class RoomManager {
 
       const payload = JSON.stringify({
         type: 'snapshot',
-        players: playerStates
+        players: playerStates,
+        mobs: Array.from(room.mobs.values()),
+        drops: Array.from(room.drops.values())
       });
 
       for (const client of room.clients.values()) {

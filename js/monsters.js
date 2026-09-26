@@ -423,7 +423,13 @@ const Monsters={
     // Coba hingga 8 kali titik acak agar peluang spawn sukses tinggi dan mob tidak sepi
     for(let attempt=0; attempt<8; attempt++){
       const a=Math.random()*Math.PI*2, d=rand(18,30); // Jarak pas: tidak di depan mata pemain & tidak langsung despawn
-      const x=Player.pos.x+Math.sin(a)*d, z=Player.pos.z+Math.cos(a)*d;
+      let center = Player.pos;
+      if(typeof Network!=='undefined'&&Network.active&&Network.remotePlayers.size>0&&Math.random()<0.5){
+        const rps=Array.from(Network.remotePlayers.values());
+        const chosen=rps[Math.floor(Math.random()*rps.length)];
+        if(chosen&&chosen.pos)center=chosen.pos;
+      }
+      const x=center.x+Math.sin(a)*d, z=center.z+Math.cos(a)*d;
       const h=this.findClearSpawnGround(x,z,0.7);
       if(h===null)continue;
       /* JANGAN spawn di dalam / menempel bangunan desa, dan REDAM spawn di
@@ -1476,8 +1482,23 @@ const Monsters={
         d.scale.setScalar(s);
       }
 
-      const dp=m.pos.distanceTo(Player.pos);
-      if(!m.pet&&dp>55){Game.scene.remove(m.mesh);this.list.splice(i,1);continue;}
+      let dp=m.pos.distanceTo(Player.pos);
+      if(typeof Network!=='undefined'&&Network.active&&Network.remotePlayers.size>0){
+        for(const rp of Network.remotePlayers.values()){
+          if(rp&&rp.pos){
+            const d2=m.pos.distanceTo(rp.pos);
+            if(d2<dp)dp=d2;
+          }
+        }
+      }
+      if(!m.pet&&dp>60){
+        Game.scene.remove(m.mesh);
+        this.list.splice(i,1);
+        if(typeof MobNet!=='undefined'&&MobNet.isMp()&&m.netId){
+          MobNet.send({type:'mob_death',netId:m.netId,despawn:true});
+        }
+        continue;
+      }
       /* TELEGRAPH HANTAMAN GOLEM diproses di sini, di luar cabang AI, supaya
          golem PET juga benar-benar melepas hantamannya. Dulu windup hanya
          diturunkan di dalam ai() (jalur mob liar), jadi golem peliharaan

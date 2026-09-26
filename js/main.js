@@ -384,6 +384,26 @@ const Game={
     this.setMenuFade(0);
     if(Player.mesh)Player.mesh.visible=true;
 
+    /* Bersihkan seluruh mob liar & drop item lama sebelum sesi multiplayer */
+    if(typeof Monsters!=='undefined'&&Array.isArray(Monsters.list)){
+      for(let i=Monsters.list.length-1;i>=0;i--){
+        const m=Monsters.list[i];
+        if(m&&!m.pet&&m.mesh&&m.mesh.parent)m.mesh.parent.remove(m.mesh);
+      }
+      Monsters.list=Monsters.list.filter(m=>m&&m.pet);
+    }
+    if(typeof FX!=='undefined'&&Array.isArray(FX.drops)){
+      for(let i=FX.drops.length-1;i>=0;i--){
+        const d=FX.drops[i];
+        if(d&&d.mesh&&FX.disposeDrop)FX.disposeDrop(d.mesh,d.isModel);
+      }
+      FX.drops=[];
+    }
+    if(typeof MobNet!=='undefined'){
+      MobNet.mobs.clear();
+      MobNet.drops.clear();
+    }
+
     document.getElementById('start').classList.add('hidden');
     const loadEl=document.getElementById('loading');
     if(loadEl){
@@ -488,6 +508,10 @@ const Game={
     this.started=true;
     if(typeof Network!=='undefined'){
       Network.active=true;
+      if(typeof MobNet!=='undefined'){
+        MobNet.wrap();
+        if(joinData.mobs||joinData.drops)MobNet.onJoinSnapshot(joinData.mobs,joinData.drops);
+      }
       Network.sendMove(Player.pos.x,Player.pos.y,Player.pos.z,Player.yaw,Player.pitch,false);
       Network.sendPlayerSync();
     }

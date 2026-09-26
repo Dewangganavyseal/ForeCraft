@@ -1529,6 +1529,8 @@ body.touch #questtrack{
 #chat{position:absolute;top:110px;left:12px;width:min(300px,62vw);
   display:none;flex-direction:column;gap:4px;z-index:14;pointer-events:auto}
 #chat.show{display:flex}
+#chat.peek{display:flex !important;pointer-events:none !important}
+#chat.peek #chat-row, #chat.peek #chat-tabs{display:none !important}
 
 /* Tab Chat & Notifikasi */
 #chat-tabs{display:flex;gap:4px;margin-bottom:2px}
