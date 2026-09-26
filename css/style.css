@@ -147,8 +147,9 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 /* ====== KOMPAS ARAH MATA ANGIN (di atas jam) ==============================
    Strip horizontal berisi label N/E/S/W + garis derajat yang bergeser sesuai
    arah pandang kamera. Penanda ▼ di tengah menunjukkan arah hadap saat ini. */
-#compass{position:relative;width:168px;height:20px;margin:0 auto 4px;
+#compass{position:relative;width:168px;height:20px;margin:0 auto 3px;
   overflow:hidden;border:1px solid #7c2d12;background:#140a06;border-radius:3px}
+#compass-coords{font-family:'Press Start 2P',monospace;font-size:7px;color:#fed7aa;letter-spacing:.04em;margin:1px auto 3px;text-shadow:0 1px 2px #000;line-height:1.2}
 #compass-strip{position:absolute;top:0;left:0;height:100%;white-space:nowrap;
   will-change:transform}
 #compass-strip span{display:inline-block;text-align:center;font-size:10.5px;
@@ -1003,8 +1004,26 @@ img.block-3d-ico,img.furni-3d-ico{
 .tagline{opacity:.8;margin-bottom:18px;font-size:14px}
 .feats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:26px}
 .feats span{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);padding:6px 12px;border-radius:16px;font-size:12px}
-.big{font-family:'Press Start 2P',monospace;font-size:13px;background:#3f6d3a;border:2px solid #7fbf6a;color:#fff;padding:15px 28px;border-radius:10px;cursor:pointer;margin:6px}
-.big:hover{background:#4f8749;box-shadow:0 0 18px rgba(120,220,100,.35)}
+.big{
+  font-family:'Press Start 2P',monospace;font-size:12px;
+  background:linear-gradient(180deg,#f97316 0%,#ea580c 55%,#c2410c 100%);
+  border:2px solid #541c08;color:#ffffff;
+  padding:14px 24px;border-radius:4px;cursor:pointer;margin:4px 0;
+  box-shadow:0 4px 0 #541c08, inset 0 1px 2px rgba(255,255,255,0.45);
+  text-shadow:0 2px 3px rgba(0,0,0,0.65);
+  transition:transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s, background 0.15s;
+  outline:none;position:relative;
+}
+.big:hover{
+  background:linear-gradient(180deg,#fb923c 0%,#f97316 55%,#ea580c 100%);
+  border-color:#ffd24d;
+  transform:translateY(-2px);
+  box-shadow:0 8px 16px rgba(234,88,12,0.5), 0 5px 0 #541c08, inset 0 1px 2px rgba(255,255,255,0.6);
+}
+.big:active{
+  transform:translateY(2px) scale(0.97);
+  box-shadow:0 1px 0 #541c08, inset 0 2px 4px rgba(0,0,0,0.4);
+}
 #start-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #death-stats{opacity:.85;margin-bottom:18px;font-size:14px}
 #levelup{position:fixed;top:34%;left:50%;transform:translateX(-50%);font-family:'Press Start 2P',monospace;font-size:26px;color:#ffd24d;text-shadow:0 0 20px rgba(255,200,60,.9);opacity:0;pointer-events:none;z-index:35}
@@ -1996,36 +2015,53 @@ body.in-menu #btn-uistudio{display:none !important}
   /* layar pendek/kecil: menu bisa digulir agar tombol tidak tertutup/terpotong */
   overflow-y:auto;justify-content:flex-start;padding:22px 0;overscroll-behavior:contain}
 .menu-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;
-  width:min(460px,92vw);margin:auto}
+  width:min(480px,94vw);margin:auto;
+  background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;border-radius:0;
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  box-shadow:0 12px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255,255,255,.18);
+  padding:26px 24px;backdrop-filter:blur(8px)}
 .menu-title{font-family:'Press Start 2P',monospace;
-  font-size:clamp(28px,6vw,54px);color:#e6ebee;
-  text-shadow:0 0 24px rgba(140,200,255,.25),0 3px 0 #000;
+  font-size:clamp(26px,5.5vw,46px);color:#ffd24d;
+  text-shadow:0 0 20px rgba(234,88,12,.5),0 4px 0 #541c08;
   letter-spacing:2px;margin-bottom:2px}
-.menu-sub{font-size:12px;letter-spacing:4px;text-transform:uppercase;
-  color:rgba(230,235,238,.65);margin-bottom:14px}
-.menu-head{font-family:'Press Start 2P',monospace;font-size:clamp(14px,2.6vw,20px);
-  color:#dfe6ea;text-shadow:0 2px 0 #000;margin-bottom:10px}
-.menu-btns{display:flex;flex-direction:column;gap:10px;width:min(300px,86vw)}
+.menu-sub{font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  color:#fed7aa;opacity:.85;margin-bottom:14px}
+.menu-head{font-family:'Press Start 2P',monospace;font-size:clamp(13px,2.5vw,18px);
+  color:#ffd24d;text-shadow:0 2px 0 #000;margin-bottom:10px}
+.menu-btns{display:flex;flex-direction:column;gap:10px;width:min(320px,88vw)}
 .slot-list{display:flex;flex-direction:column;gap:8px;width:100%}
-.slot-btn{display:flex;flex-direction:column;gap:3px;text-align:left;
-  background:rgba(10,14,16,.62);border:1px solid rgba(255,255,255,.16);
-  border-radius:10px;padding:10px 12px;color:#e8eef2;cursor:pointer;
-  transition:background .15s,border-color .15s,transform .08s}
-.slot-btn:hover:not(:disabled){background:rgba(143,224,122,.14);border-color:#8fe07a}
-.slot-btn:active:not(:disabled){transform:scale(.985)}
+.slot-btn{display:flex;flex-direction:column;gap:4px;text-align:left;
+  background:rgba(20,10,6,.85);border:2px solid #7c2d12;
+  border-radius:4px;padding:12px 14px;color:#fed7aa;cursor:pointer;
+  box-shadow:0 3px 0 rgba(0,0,0,.4), inset 0 0 0 1px rgba(234,88,12,.25);
+  transition:transform .12s cubic-bezier(0.34,1.56,0.64,1), border-color .15s, background .15s, box-shadow .15s}
+.slot-btn:hover:not(:disabled){background:rgba(234,88,12,.2);border-color:#ffd24d;transform:translateY(-2px);box-shadow:0 6px 12px rgba(0,0,0,.5), 0 0 10px rgba(234,88,12,.4)}
+.slot-btn:active:not(:disabled){transform:translateY(1px) scale(.98)}
 .slot-btn:disabled{opacity:.45;cursor:not-allowed}
-.slot-btn .s-title{font-weight:800;font-size:14px}
-.slot-btn .s-info{font-size:12px;opacity:.8}
+.slot-btn .s-title{font-family:'Press Start 2P',monospace;font-size:11px;color:#ffd24d;letter-spacing:1px}
+.slot-btn .s-info{font-size:11px;color:#e2e8f0;opacity:.95}
 .slot-btn.empty .s-info{opacity:.5}
+.s-char-rows{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.s-char-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,0.5);border:1px solid rgba(234,88,12,0.5);
+  padding:3px 8px;border-radius:3px;font-size:11px;
+}
+.scb-name{color:#fff;font-weight:700}
+.scb-lvl{color:#ffd24d;font-family:'Press Start 2P',monospace;font-size:8px}
+.s-meta-row{font-size:10px;color:#fed7aa;opacity:.8;margin-top:2px}
 .mm-back{margin-top:12px}
 /* kotak pengaturan musik di main menu */
-.mus-box{width:min(320px,86vw);background:rgba(10,14,16,.62);border:1px solid rgba(255,255,255,.16);
-  border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;text-align:left}
-.mus-box .tip{font-size:11px;opacity:.7;margin-top:4px}
-.mus-row input[type="range"]{flex:1;pointer-events:auto;accent-color:#9fd77f;cursor:pointer}
-/* tombol Musik di menu utama (agak berbeda dari Load/New) */
-.mm-music{background:#3a5a6d;border-color:#6fa8bf}
-.mm-music:hover{background:#46708a}
+.mus-box{width:min(340px,88vw);background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;border-radius:0;
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  box-shadow:0 8px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c;
+  padding:16px 18px;display:flex;flex-direction:column;gap:8px;text-align:left}
+.mus-box .tip{font-size:11px;opacity:.8;color:#fed7aa;margin-top:4px}
+.mus-row input[type="range"]{flex:1;pointer-events:auto;accent-color:#ea580c;cursor:pointer}
+/* tombol Musik & Karakter & Multi di menu utama konsisten oranye */
+.mm-music, .mm-char, .mm-multi{background:linear-gradient(180deg,#f97316 0%,#ea580c 55%,#c2410c 100%);border-color:#541c08}
 /* ---------- optimasi layar pendek / kecil ----------
    Menu dibuat lebih ringkas supaya semua tombol (termasuk slot & kembali)
    muat dan tidak tertutup di perangkat kecil. */
@@ -2033,22 +2069,24 @@ body.in-menu #btn-uistudio{display:none !important}
   #start{padding:14px 0}
   .menu-title{font-size:clamp(20px,5.5vw,36px)}
   .menu-sub{margin-bottom:8px;letter-spacing:3px}
-  .menu-wrap{gap:10px}
+  .menu-wrap{gap:10px;padding:18px 16px}
   .menu-btns{gap:8px}
-  .big{padding:11px 20px;font-size:12px;margin:4px}
+  .big{padding:11px 18px;font-size:11px;margin:3px 0}
   .slot-list{gap:6px}
   .slot-btn{padding:8px 10px;gap:2px}
-  .slot-btn .s-title{font-size:13px}
-  .slot-btn .s-info{font-size:11px}
+  .slot-btn .s-title{font-size:10px}
+  .slot-btn .s-info{font-size:10px}
   .mm-back{margin-top:8px}
   .mus-box{padding:10px 12px}
 }
 .mm-confirm{position:absolute;inset:0;z-index:5;display:flex;
-  align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
-.mm-confirm-box{background:#1a1e23;border:1px solid rgba(255,255,255,.2);
-  border-radius:14px;padding:18px;width:min(340px,88vw);text-align:center;
-  box-shadow:0 12px 40px rgba(0,0,0,.5)}
-.mm-msg{font-size:14px;line-height:1.5;margin-bottom:14px;color:#eef2f5}
+  align-items:center;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+.mm-confirm-box{background:linear-gradient(160deg,rgba(36,20,12,.98),rgba(18,10,6,.96));
+  border:4px solid #541c08;border-radius:0;
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  box-shadow:0 8px 0 rgba(0,0,0,.6), inset 0 0 0 2px #ea580c;
+  padding:20px;width:min(360px,88vw);text-align:center}
+.mm-msg{font-size:13.5px;line-height:1.5;margin-bottom:14px;color:#fff}
 .mm-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 
 /* =========================================================================
@@ -3158,29 +3196,30 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
    FORECRAFT ONLINE - MULTIPLAYER MENU & ROOM BROWSER
    ========================================================================= */
 .mm-multi {
-  background: linear-gradient(135deg, #1565c0, #0d47a1) !important;
-  border-color: #64b5f6 !important;
-  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.45) !important;
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 55%, #c2410c 100%) !important;
+  border-color: #541c08 !important;
+  box-shadow: 0 4px 0 #541c08, inset 0 1px 2px rgba(255, 255, 255, 0.45) !important;
   color: #fff !important;
 }
 .mm-multi:hover {
-  background: linear-gradient(135deg, #1976d2, #1565c0) !important;
-  border-color: #90caf9 !important;
-  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6) !important;
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 55%, #ea580c 100%) !important;
+  border-color: #ffd24d !important;
+  box-shadow: 0 8px 18px rgba(234, 88, 12, 0.5), 0 5px 0 #541c08, inset 0 1px 2px rgba(255, 255, 255, 0.6) !important;
 }
 
 .mp-wrap {
-  width: min(850px, 94vw);
-  max-height: 88vh;
+  width: min(880px, 94vw);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: rgba(18, 22, 28, 0.94);
-  border: 2px solid #2e435e;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  background: linear-gradient(160deg, rgba(36, 20, 12, 0.98), rgba(18, 10, 6, 0.96));
+  border: 4px solid #541c08;
+  border-radius: 0;
+  clip-path: polygon(0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px));
+  padding: 22px;
+  box-shadow: 0 12px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 2px #ea580c, inset 0 4px 0 rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(8px);
-  color: #e0e8f0;
+  color: #fed7aa;
   box-sizing: border-box;
 }
 
@@ -3190,57 +3229,59 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
   align-items: center;
   gap: 4px;
   margin-bottom: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 2px solid #7c2d12;
   padding-bottom: 12px;
 }
 .mp-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 20px;
-  color: #64b5f6;
-  text-shadow: 0 2px 8px rgba(33, 150, 243, 0.5);
+  font-size: 18px;
+  color: #ffd24d;
+  text-shadow: 0 2px 8px rgba(234, 88, 12, 0.6);
   margin: 0;
 }
 .mp-sub {
-  font-size: 12px;
-  color: #a0b4cc;
+  font-size: 11px;
+  color: #fed7aa;
+  opacity: .85;
 }
 
 .mp-name-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 16px;
-  background: rgba(0, 0, 0, 0.35);
+  margin-bottom: 14px;
+  background: rgba(0, 0, 0, 0.4);
   padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  border: 1px solid #7c2d12;
 }
 .mp-name-label {
   font-weight: bold;
-  font-size: 13px;
-  color: #ffd24d;
+  font-size: 12px;
+  color: #fed7aa;
 }
 .mp-name-input {
-  background: #101824;
-  border: 1px solid #3c5478;
+  background: #140a06;
+  border: 1.5px solid #7c2d12;
   color: #ffffff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 13px;
   font-family: inherit;
   outline: none;
   width: 180px;
   transition: border-color 0.2s;
 }
 .mp-name-input:focus {
-  border-color: #64b5f6;
-  box-shadow: 0 0 8px rgba(100, 181, 246, 0.4);
+  border-color: #ffd24d;
+  box-shadow: 0 0 8px rgba(255, 210, 77, 0.4);
 }
 
 .mp-room-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 12px;
   overflow-y: auto;
   max-height: 48vh;
@@ -3249,25 +3290,26 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
 }
 
 .mp-room-card {
-  background: rgba(28, 36, 48, 0.85);
-  border: 1px solid #314663;
-  border-radius: 12px;
+  background: rgba(20, 10, 6, 0.85);
+  border: 2px solid #7c2d12;
+  border-radius: 4px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 8px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(234, 88, 12, 0.25);
   transition: transform 0.15s, border-color 0.2s, background 0.2s;
 }
 .mp-room-card:hover {
   transform: translateY(-2px);
-  border-color: #64b5f6;
-  background: rgba(36, 48, 64, 0.95);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  border-color: #ffd24d;
+  background: rgba(36, 18, 10, 0.95);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), 0 0 12px rgba(234, 88, 12, 0.35);
 }
 .mp-room-card.is-full {
   opacity: 0.6;
-  border-color: #4a2828;
+  border-color: #4a1818;
 }
 
 .mp-room-top {
@@ -3277,19 +3319,19 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
 }
 .mp-room-name {
   font-weight: bold;
-  font-size: 14px;
-  color: #ffffff;
+  font-size: 13.5px;
+  color: #ffd24d;
 }
 .mp-room-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   padding: 3px 8px;
-  border-radius: 12px;
+  border-radius: 4px;
   font-weight: bold;
 }
 .mp-badge-online {
-  background: rgba(76, 175, 80, 0.2);
-  color: #81c784;
-  border: 1px solid rgba(76, 175, 80, 0.4);
+  background: rgba(234, 88, 12, 0.25);
+  color: #fed7aa;
+  border: 1px solid rgba(234, 88, 12, 0.5);
 }
 .mp-badge-full {
   background: rgba(244, 67, 54, 0.2);
@@ -3299,7 +3341,7 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
 
 .mp-room-desc {
   font-size: 11px;
-  color: #a8b8cc;
+  color: #cbd5e1;
   line-height: 1.35;
 }
 .mp-room-foot {
@@ -3310,24 +3352,26 @@ body.touch #portrait:not(.px-portrait){width:58px;height:58px}
 }
 .mp-room-seed {
   font-size: 10px;
-  color: #728ca6;
+  color: #fed7aa;
+  opacity: 0.8;
   font-family: monospace;
 }
 .mp-btn-join {
-  background: linear-gradient(135deg, #2e7d32, #1b5e20);
-  border: 1px solid #81c784;
+  background: #ea580c;
+  border: 1.5px solid #541c08;
+  border-radius: 4px;
   color: #fff;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: bold;
+  box-shadow: 0 3px 0 #541c08, inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 7px 12px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: 0.12s;
 }
-.mp-btn-join:hover {
-  background: linear-gradient(135deg, #388e3c, #2e7d32);
-  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
-  transform: scale(1.03);
+.mp-btn-join:hover:not(:disabled) {
+  background: #f97316;
+  border-color: #ffd24d;
+  transform: translateY(-1px);
 }
 .mp-btn-join:disabled {
   background: #333333;

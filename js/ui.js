@@ -739,6 +739,15 @@ const UI={
     const off=360*PPD+deg*PPD-this.COMPASS_W/2;
     strip.style.transform=`translateX(${-off}px)`;
     this.renderCompassMark(deg);
+
+    // Tampilkan koordinat pemain real-time di bawah kompas
+    const coordEl=document.getElementById('compass-coords');
+    if(coordEl&&typeof Player!=='undefined'&&Player.pos){
+      const cx=Math.round(Player.pos.x);
+      const cy=Math.round(Player.pos.y);
+      const cz=Math.round(Player.pos.z);
+      coordEl.textContent=`X: ${cx}  Y: ${cy}  Z: ${cz}`;
+    }
   },
 
   /* ---------- PENANDA LOG PASS DI KOMPAS ----------

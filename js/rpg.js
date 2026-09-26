@@ -92,20 +92,66 @@ const RPG={
   slotInfo(i){
     if(!this.hasSlot(i))return null;
     const meta=this.slotsMeta()[i-1];
-    if(meta)return meta;
-    /* fallback dari isi save */
-    try{
-      const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
-      if(!d)return null;
-      return{name:d.name||'Ranger',level:d.level||1,day:d.day||1,time:d.time||0.32};
-    }catch(e){return null;}
+    let res = meta ? Object.assign({}, meta) : null;
+    if(!res){
+      try{
+        const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
+        if(!d)return null;
+        res = {name:d.name||'Ranger',level:d.level||1,day:d.day||1,time:d.time||0.32};
+      }catch(e){return null;}
+    }
+
+    // Pastikan daftar characters lengkap: masukkan karakter save utama
+    if(!res.characters) res.characters = {};
+    if(res.name && !res.characters[res.name.toLowerCase()]){
+      res.characters[res.name.toLowerCase()] = {
+        name: res.name,
+        level: res.level || 1,
+        day: res.day || 1
+      };
+    }
+    // Scan apakah ada karakter lain yang punya save tersendiri di slot ini
+    if(typeof CharacterSlots !== 'undefined' && CharacterSlots.getSlots){
+      const allSlots = CharacterSlots.getSlots();
+      for(const cs of allSlots){
+        if(!cs || !cs.name) continue;
+        const ck = cs.name.toLowerCase();
+        if(!res.characters[ck]){
+          try{
+            const charRaw = localStorage.getItem(this.slotKey(i) + '_' + ck);
+            if(charRaw){
+              const cd = JSON.parse(charRaw);
+              res.characters[ck] = {
+                name: cs.name,
+                level: cd.level || cs.level || 1,
+                day: cd.day || 1
+              };
+            }
+          }catch(e){}
+        }
+      }
+    }
+    return res;
   },
 
   loadSlot(i){
     try{
-      const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
-      if(!d)return null;
       this.slot=i;
+      // Coba muat save khusus untuk karakter aktif saat ini bila ada
+      let activeName = '';
+      if(typeof CharacterSlots !== 'undefined' && CharacterSlots.getActive){
+        const act = CharacterSlots.getActive();
+        if(act && act.name) activeName = act.name.toLowerCase();
+      }
+      if(!activeName && typeof Player !== 'undefined' && Player.name){
+        activeName = Player.name.toLowerCase();
+      }
+      if(activeName){
+        const charSpecific = localStorage.getItem(this.slotKey(i) + '_' + activeName);
+        if(charSpecific) return JSON.parse(charSpecific);
+      }
+      // Fallback ke save umum slot i
+      const d=JSON.parse(localStorage.getItem(this.slotKey(i))||'null');
       return d;
     }catch(e){return null;}
   },
@@ -1200,17 +1246,41 @@ const RPG={
            karena akan dibangkitkan lagi oleh generator desa */
         team:(typeof NPCS!=='undefined'&&NPCS.serializeTeam)?NPCS.serializeTeam():[],
       };
+      const curName = (Player.name || 'Ranger');
+      const charKey = curName.toLowerCase();
+
+      // Simpan save umum & save spesifik karakter
       localStorage.setItem(this.slotKey(this.slot),JSON.stringify(data));
+      localStorage.setItem(this.slotKey(this.slot) + '_' + charKey, JSON.stringify(data));
+
       /* update info slot untuk main menu */
       const meta=this.slotsMeta();
-      meta[this.slot-1]={
-        name:Player.name||'Ranger',
-        level:Player.level,
-        day:Weather.day,
-        time:Weather.time,
-        updated:Date.now(),
+      if(!meta[this.slot-1]) meta[this.slot-1] = {};
+      const curSlot = meta[this.slot-1];
+      if(!curSlot.characters) curSlot.characters = {};
+      curSlot.characters[charKey] = {
+        name: curName,
+        level: Player.level || 1,
+        day: Weather.day || 1,
+        time: Weather.time || 0.32,
+        updated: Date.now()
       };
+      curSlot.name = curName;
+      curSlot.level = Player.level;
+      curSlot.day = Weather.day;
+      curSlot.time = Weather.time;
+      curSlot.updated = Date.now();
       this.saveSlotsMeta(meta);
+
+      // Sinkronkan level karakter ke CharacterSlots
+      if(typeof CharacterSlots !== 'undefined' && CharacterSlots.getActiveIndex){
+        const allSlots = CharacterSlots.getSlots();
+        const actIdx = CharacterSlots.getActiveIndex();
+        if(allSlots[actIdx] && allSlots[actIdx].name.toLowerCase() === charKey){
+          allSlots[actIdx].level = Player.level;
+          CharacterSlots.saveSlots(allSlots);
+        }
+      }
     }catch(e){}
   },
 

@@ -201,7 +201,6 @@ const CharacterSlots = {
               <div class="cs-card-num">SLOT 0${slotNum}</div>
               <div class="cs-card-name">${char.name}</div>
               <div class="cs-card-info">
-                <span>⭐ Lv ${char.level || 1}</span>
                 <span>✂️ ${this.getHairName(char.hairStyle)}</span>
               </div>
               <div class="cs-card-actions">

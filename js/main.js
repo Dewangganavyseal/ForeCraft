@@ -897,15 +897,25 @@ const MainMenu={
   slotHtml(i,mode){
     const info=RPG.slotInfo(i);
     const occupied=!!info;
-    let desc='Slot kosong';
+    let descHtml='<span class="s-empty">Slot kosong</span>';
     if(occupied){
-      const pName=info.name?`${info.name} · `:'';
-      desc=`${pName}Lv ${info.level||1} · Hari ${info.day||1} · ${this.fmtTime(info.time)}`;
+      const chars = (info.characters && Object.keys(info.characters).length)
+        ? Object.values(info.characters)
+        : [{ name: info.name || 'Ranger', level: info.level || 1 }];
+
+      // Tampilkan nama dan level untuk setiap karakter yang dibuat/bermain di slot ini
+      const charBadges = chars.map(c =>
+        `<span class="s-char-badge"><b class="scb-name">${c.name}</b> <span class="scb-lvl">Lv ${c.level}</span></span>`
+      ).join(' ');
+
+      descHtml = `
+        <div class="s-char-rows">${charBadges}</div>
+        <div class="s-meta-row">Hari ${info.day||1} · ${this.fmtTime(info.time)}</div>`;
     }
     const dis=(mode==='load'&&!occupied)?'disabled':'';
     return `<button class="slot-btn ${occupied?'':'empty'}" data-slot="${i}" ${dis}>
-      <span class="s-title">Slot ${i}</span>
-      <span class="s-info">${desc}</span>
+      <span class="s-title">Slot 0${i}</span>
+      <div class="s-info">${descHtml}</div>
     </button>`;
   },
 
