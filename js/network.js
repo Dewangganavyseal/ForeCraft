@@ -447,9 +447,11 @@ const Network = {
   discoveredHost: null,
   isDiscovering: false,
 
+  DEFAULT_DOMAIN: 'forecraft.helloworld.my.id',
+
   isSecureHost(host) {
     if (!host) return false;
-    return host.includes('trycloudflare.com') || host.includes('.ngrok') || host.includes('.loca.lt') || host.startsWith('https://') || host.startsWith('wss://') || (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:');
+    return host.includes('helloworld.my.id') || host.includes('trycloudflare.com') || host.includes('.ngrok') || host.includes('.loca.lt') || host.startsWith('https://') || host.startsWith('wss://') || (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:');
   },
 
   getServerHost() {
@@ -467,13 +469,13 @@ const Network = {
     if (loc && loc.host && loc.host !== 'localhost' && !loc.host.startsWith('127.0.0.1') && !loc.protocol.startsWith('capacitor') && !loc.protocol.startsWith('file')) {
       return loc.host;
     }
-    return '10.247.243.121:3000';
+    return this.DEFAULT_DOMAIN;
   },
 
   setServerHost(host) {
     if (!host) return;
     let clean = host.trim();
-    const match = clean.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/) || clean.match(/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?::[0-9]+)?)/);
+    const match = clean.match(/([a-zA-Z0-9-.]+\.helloworld\.my\.id)/) || clean.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/) || clean.match(/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(?::[0-9]+)?)/);
     if (match) {
       clean = match[1];
     } else {
@@ -503,6 +505,20 @@ const Network = {
     if (this.isDiscovering) return this.getServerHost();
     this.isDiscovering = true;
 
+    // 1. Coba hubungi domain resmi permanen forecraft.helloworld.my.id terlebih dahulu
+    try {
+      const ctl = new AbortController();
+      const tid = setTimeout(() => ctl.abort(), 2600);
+      const res = await fetch(`https://${this.DEFAULT_DOMAIN}/api/rooms`, { signal: ctl.signal });
+      clearTimeout(tid);
+      if (res.ok) {
+        this.discoveredHost = this.DEFAULT_DOMAIN;
+        console.log('[Network] Server resmi aktif & terhubung:', this.discoveredHost);
+        return this.discoveredHost;
+      }
+    } catch (e) {}
+
+    // 2. Fallback ke sistem auto-discovery ntfy
     try {
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), 3500);
@@ -512,7 +528,7 @@ const Network = {
       clearTimeout(tid);
       if (res.ok) {
         const text = await res.text();
-        const matches = text.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/g);
+        const matches = text.match(/([a-zA-Z0-9-.]+\.helloworld\.my\.id|[a-zA-Z0-9-]+\.trycloudflare\.com)/g);
         if (matches && matches.length > 0) {
           const latestDomain = matches[matches.length - 1];
           this.discoveredHost = latestDomain;

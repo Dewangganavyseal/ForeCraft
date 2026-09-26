@@ -8,6 +8,8 @@ let currentPublicUrl = null;
 let heartbeatTimer = null;
 
 const DISCOVERY_TOPIC = 'forecraft_online_dewan_v1';
+const CUSTOM_DOMAIN = 'forecraft.helloworld.my.id';
+const TUNNEL_TOKEN = 'eyJhIjoiYzJhNDg0ZjNiMmVkMDFkM2QzMzlmZDBkZGMxN2U4YzYiLCJ0IjoiYTRlYTFlNGItNDZlYS00NzA2LTgyM2UtMzgyNDg0ZDgxYWM1IiwicyI6Ik5tTXhaalEyWkdFdFpESXpNaTAwTnpNMUxUZ3lNek10TTJVME9HWmhNVGhpWkdKaiJ9';
 
 function publishDiscovery(domain) {
   if (!domain) return;
@@ -38,6 +40,68 @@ function startTunnel(port = 3000) {
     console.warn('[Tunnel] cloudflared.exe tidak ditemukan di:', binaryPath);
     console.warn('[Tunnel] Server berjalan dalam mode Local LAN.');
     return;
+  }
+
+  // Jika token tunnel resmi Cloudflare tersedia, gunakan named tunnel permanen
+  if (TUNNEL_TOKEN) {
+    console.log(`[Tunnel] Menghubungkan ke Cloudflare Named Tunnel (${CUSTOM_DOMAIN})...`);
+    try {
+      tunnelProcess = spawn(binaryPath, ['tunnel', 'run', '--token', TUNNEL_TOKEN], {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      currentPublicUrl = CUSTOM_DOMAIN;
+      const fullUrl = `https://${CUSTOM_DOMAIN}`;
+
+      try {
+        fs.writeFileSync(path.join(__dirname, 'public_url.txt'), fullUrl, 'utf8');
+      } catch (err) {}
+
+      console.log('\n====================================================');
+      console.log('🌐 FORECRAFT ONLINE - SERVER RESMI PERMANEN AKTIF! ');
+      console.log('====================================================');
+      console.log(` > Domain Resmi      : ${CUSTOM_DOMAIN}`);
+      console.log(` > Akses Web / HTTPS : ${fullUrl}`);
+      console.log(` > Akses WSS Game    : wss://${CUSTOM_DOMAIN}`);
+      console.log(' > Status Jaringan   : Cloudflare Edge (Singapore / Indonesia)');
+      console.log('====================================================\n');
+
+      publishDiscovery(CUSTOM_DOMAIN);
+
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        if (currentPublicUrl) publishDiscovery(currentPublicUrl);
+      }, 60000);
+
+      tunnelProcess.stdout.on('data', (d) => {
+        const s = d.toString();
+        if (s.includes('Registered tunnel connection')) {
+          console.log('[Tunnel] Koneksi tunnel Cloudflare terdaftar & siap.');
+        }
+      });
+
+      tunnelProcess.stderr.on('data', (d) => {
+        const s = d.toString();
+        if (s.includes('Registered tunnel connection')) {
+          console.log('[Tunnel] Koneksi tunnel Cloudflare terdaftar & siap.');
+        }
+      });
+
+      tunnelProcess.on('exit', (code) => {
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        currentPublicUrl = null;
+        console.log(`[Tunnel] Proses tunnel berhenti (code: ${code})`);
+      });
+
+      tunnelProcess.on('error', (err) => {
+        console.warn('[Tunnel] Gagal menjalankan cloudflared token:', err.message);
+      });
+
+      return;
+    } catch (err) {
+      console.warn('[Tunnel] Gagal named tunnel, fallback ke quick tunnel:', err.message);
+    }
   }
 
   console.log('[Tunnel] Menghubungkan ke Cloudflare Quick Tunnel untuk akses publik...');
