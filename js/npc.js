@@ -360,6 +360,10 @@ const NPCS={
     return b[0]+Math.floor(Math.random()*(b[1]-b[0]+1));
   },
   make(role,x,y,z,home,lvlOverride,village){
+    if(typeof role === 'string' && typeof NPC_ROLES !== 'undefined'){
+      const rObj = NPC_ROLES.find(r => r.id === role);
+      if(rObj) role = rObj;
+    }
     const {mesh,parts}=this.buildModel(role);
     mesh.position.set(x,y,z);
     Game.scene.add(mesh);
@@ -506,6 +510,11 @@ const NPCS={
      ========================================================================= */
   talk(n){
     if(!n||n.dead)return;
+    /* Rekan tim pemain lain tidak bisa diajak bicara/direkrut */
+    if(n.remoteTeamMember || (n.teamOwnerNetId && typeof Network!=='undefined' && Network.active && n.teamOwnerNetId !== Network.netId)){
+      UI.bubble.show(n, `Saya adalah rekan tim dari <b>${n.teamOwnerName||'pemain lain'}</b>!`);
+      return;
+    }
     /* NPC non-tim berhenti seketika dan memperhatikan pemain saat diajak bicara */
     if(!this.isTeam(n)){
       n.talking=true;
@@ -766,6 +775,8 @@ const NPCS={
   },
   hurt(n,dmg,src){
     if(n.dead)return;
+    /* Rekan tim pemain kebal terhadap serangan pemain lain */
+    if((this.isTeam(n) || n.remoteTeamMember) && (src === Player || (src && src.remote))) return;
     /* DUNGEON MASTER tidak boleh terdorong dari lapaknya: serangan monster
        tidak merugikannya (dia penjaga toko, bukan kombatan) — iklas di tempat. */
     if(n.shopSpot){
@@ -2666,4 +2677,5 @@ const NPCS={
     }
   },
 };
+window.NPCS = NPCS;
 

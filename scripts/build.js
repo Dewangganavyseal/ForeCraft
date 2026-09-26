@@ -9,7 +9,7 @@ if (fs.existsSync(wwwDir)) {
 }
 fs.mkdirSync(wwwDir, { recursive: true });
 
-let version = '0.2.45';
+let version = '0.2.48';
 try {
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
   if (pkg.version) version = pkg.version;

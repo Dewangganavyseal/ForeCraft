@@ -470,9 +470,13 @@ const Game={
       Player.pos.copy(Player.spawnP);
     }
 
-    // Bersihkan quest singleplayer agar tidak mencemari sesi multiplayer
+    // Muat quest multiplayer pemain dari profile server atau penyimpanan lokal room
     if(typeof Quest!=='undefined'){
-      Quest.clearSave();
+      if(prof.quests){
+        Quest.deserialize(prof.quests);
+      }else{
+        Quest.load();
+      }
     }
 
     if(typeof Prof!=='undefined')Prof.load(prof.prof||null);

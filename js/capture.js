@@ -268,7 +268,7 @@ const Capture={
     if(!slot||slot.id!=='rope')return null;
     let best=null,bd=12;
     for(const m of Monsters.list){
-      if(m.dead||m.pet||(m.catchCooldown||0)>0||m.catchActive)continue;
+      if(m.dead||m.pet||m.remotePet||(m.ownerNetId && typeof Network!=='undefined'&&Network.active && m.ownerNetId!==Network.netId)||(m.catchCooldown||0)>0||m.catchActive)continue;
       if(m.noCatch||m.isMini||m.type==='kelabang'||m.type==='kelabang_part')continue; // kelabang & tarantula mini tidak bisa ditangkap
       const hpLimit = m.boss ? 0.26 : 0.2001; // Mini boss HP tebal: beri toleransi wajar 26%
       if(m.hp/m.maxhp > hpLimit)continue;
@@ -282,6 +282,10 @@ const Capture={
   start(m){
     if(this.active)return;
     if(!m||m.dead)return;
+    if(m.pet||m.remotePet||(m.ownerNetId && typeof Network!=='undefined'&&Network.active && m.ownerNetId!==Network.netId)){
+      UI.toast(`🚫 Pet ini milik ${m.ownerName||'pemain lain'}!`);
+      return;
+    }
     if(m.noCatch||m.isMini||m.type==='kelabang'||m.type==='kelabang_part'){UI.toast('🚫 Tidak bisa ditangkap!');return;}
     if(!this.canCatch()){UI.toast('🪢 Pelajari skill Pawang Pemula dulu!');return;}
     if(RPG.mobSlots.findIndex(s=>!s)<0){

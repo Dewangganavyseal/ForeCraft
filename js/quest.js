@@ -662,13 +662,32 @@ const Quest={
      PENYIMPANAN
      --------------------------------------------------------------------------- */
   getSaveKey(){
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      const pName=(typeof Player!=='undefined'&&Player.name)||'Ranger';
+      return `forecraft_mp_quest_r${Network.roomId||1}_${pName}`;
+    }
     const slot = (typeof RPG !== 'undefined' && RPG.slot) ? RPG.slot : 1;
     return `forest_survival_quest_slot_${slot}`;
   },
+  serialize(){
+    return {
+      a:this.active.map(a=>({i:a.id,h:a.have||0})),
+      d:this.done||{}
+    };
+  },
+  deserialize(o){
+    if(!o)return;
+    if(Array.isArray(o.a))
+      this.active=o.a.filter(x=>this.def(x.i)).map(x=>({id:x.i,have:x.h||0}));
+    else this.active=[];
+    if(o.d&&typeof o.d==='object')this.done=o.d;
+    else this.done={};
+    this.renderTracker();
+    this.refresh();
+  },
   save(){
     try{
-      localStorage.setItem(this.getSaveKey(),JSON.stringify({
-        a:this.active.map(a=>({i:a.id,h:a.have||0})),d:this.done}));
+      localStorage.setItem(this.getSaveKey(),JSON.stringify(this.serialize()));
     }catch(e){}
   },
   load(){
@@ -680,12 +699,7 @@ const Quest={
         return;
       }
       const o=JSON.parse(raw);
-      if(!o){ this.active=[];this.done={}; return; }
-      if(Array.isArray(o.a))
-        this.active=o.a.filter(x=>this.def(x.i)).map(x=>({id:x.i,have:x.h||0}));
-      else this.active=[];
-      if(o.d&&typeof o.d==='object')this.done=o.d;
-      else this.done={};
+      this.deserialize(o);
     }catch(e){
       this.active=[];this.done={};
     }
@@ -889,4 +903,5 @@ Furni.DEFS.board={
     Quest.board=null;
     UI.toggle('quest');
   });
+  window.Quest = Quest;
 })();

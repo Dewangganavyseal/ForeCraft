@@ -118,7 +118,7 @@ const server = http.createServer((req, res) => {
 
   // Khusus index.html: suntikkan query parameter versi ke seluruh script tag JS & CSS agar browser & Cloudflare tidak pernah memakai cache lama
   if (safePath === '/index.html') {
-    let pkgVersion = '0.2.47';
+    let pkgVersion = '0.2.48';
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
       if (pkg.version) pkgVersion = pkg.version;

@@ -37,6 +37,8 @@ class RemotePlayer {
     this.parts = {};
     this.animator = null;
     this.nameplate = null;
+    this.remotePet = null;
+    this.remoteTeam = new Map(); // name -> npcInstance
 
     this.buildModel();
     this.buildNameplate();
@@ -416,9 +418,130 @@ class RemotePlayer {
         if (this.parts.armR) this.parts.armR.rotation.x *= 0.6;
       }
     }
+
+    // Update animasi pet remote
+    if (this.remotePet && typeof Monsters !== 'undefined' && Monsters.animate) {
+      try { Monsters.animate(this.remotePet, dt); } catch (e) {}
+    }
+    // Update animasi tim remote
+    if (this.remoteTeam && typeof NPCS !== 'undefined' && NPCS.animate) {
+      for (const npc of this.remoteTeam.values()) {
+        try { NPCS.animate(npc, dt); } catch (e) {}
+      }
+    }
+  }
+
+  updateRemotePet(petData) {
+    if (!petData) {
+      if (this.remotePet) {
+        if (this.remotePet.mesh && Game.scene) Game.scene.remove(this.remotePet.mesh);
+        this.remotePet.dead = true;
+        this.remotePet = null;
+      }
+      return;
+    }
+
+    if (!this.remotePet || this.remotePet.type !== petData.type) {
+      if (this.remotePet && this.remotePet.mesh && Game.scene) {
+        Game.scene.remove(this.remotePet.mesh);
+        this.remotePet.dead = true;
+      }
+      const pPos = new THREE.Vector3(petData.pos ? petData.pos[0] : this.pos.x, petData.pos ? petData.pos[1] : this.pos.y, petData.pos ? petData.pos[2] : this.pos.z);
+      if (typeof Monsters !== 'undefined' && Monsters.make) {
+        const m = Monsters.make(petData.type, pPos, !!petData.boss);
+        if (m) {
+          m.pet = true;
+          m.remotePet = true;
+          m.ownerNetId = this.netId;
+          m.ownerName = this.name;
+          m.lvl = petData.lvl || 1;
+          m.hp = petData.hp || 100;
+          m.maxhp = petData.maxhp || 100;
+          m.saddle = !!petData.saddle;
+          this.remotePet = m;
+        }
+      }
+    } else {
+      const rp = this.remotePet;
+      if (petData.pos) {
+        rp.pos.x += (petData.pos[0] - rp.pos.x) * 0.45;
+        rp.pos.y += (petData.pos[1] - rp.pos.y) * 0.45;
+        rp.pos.z += (petData.pos[2] - rp.pos.z) * 0.45;
+        if (rp.mesh) rp.mesh.position.copy(rp.pos);
+      }
+      if (petData.rot !== undefined && rp.mesh) {
+        rp.mesh.rotation.y = petData.rot;
+      }
+      if (petData.hp !== undefined) rp.hp = petData.hp;
+      rp.saddle = !!petData.saddle;
+    }
+
+    // Jika sedang menunggangi pet, posisikan remote player di atas sadel pet
+    if (petData.riding && this.remotePet && this.remotePet.mesh) {
+      const mh = (typeof meshHeight === 'function') ? meshHeight(this.remotePet.type) : 1.5;
+      const rideY = this.remotePet.pos.y + mh * (this.remotePet.sizeMul || 1) * 0.75;
+      this.pos.set(this.remotePet.pos.x, rideY, this.remotePet.pos.z);
+      this.mesh.position.copy(this.pos);
+      if (this.animator && this.animator.currentAnim !== 'ride_idle' && this.animator.currentAnim !== 'ride_move') {
+        this.animator.setAnimation(this.moving ? 'ride_move' : 'ride_idle');
+      }
+    }
+  }
+
+  updateRemoteTeam(teamList) {
+    if (!Array.isArray(teamList) || typeof NPCS === 'undefined') return;
+    const activeNames = new Set();
+    for (const t of teamList) {
+      if (!t || !t.name) continue;
+      activeNames.add(t.name);
+      let npc = this.remoteTeam.get(t.name);
+      if (!npc) {
+        const pPos = new THREE.Vector3(t.pos ? t.pos[0] : this.pos.x, t.pos ? t.pos[1] : this.pos.y, t.pos ? t.pos[2] : this.pos.z);
+        npc = NPCS.make(t.roleId || 'warrior', pPos.x, pPos.y, pPos.z);
+        if (npc) {
+          npc.name = t.name;
+          npc.remoteTeamMember = true;
+          npc.teamOwnerNetId = this.netId;
+          npc.teamOwnerName = this.name;
+          npc.level = t.level || 1;
+          npc.hp = t.hp || 100;
+          npc.maxhp = t.maxhp || 100;
+          this.remoteTeam.set(t.name, npc);
+        }
+      } else {
+        if (t.pos) {
+          npc.pos.x += (t.pos[0] - npc.pos.x) * 0.45;
+          npc.pos.y += (t.pos[1] - npc.pos.y) * 0.45;
+          npc.pos.z += (t.pos[2] - npc.pos.z) * 0.45;
+          if (npc.mesh) npc.mesh.position.copy(npc.pos);
+        }
+        if (t.rot !== undefined && npc.mesh) npc.mesh.rotation.y = t.rot;
+        if (t.hp !== undefined) npc.hp = t.hp;
+        if (t.swing) npc.swing = t.swing;
+      }
+    }
+
+    for (const [name, npc] of this.remoteTeam.entries()) {
+      if (!activeNames.has(name)) {
+        if (npc.mesh && Game.scene) Game.scene.remove(npc.mesh);
+        npc.dead = true;
+        this.remoteTeam.delete(name);
+      }
+    }
   }
 
   destroy() {
+    if (this.remotePet) {
+      if (this.remotePet.mesh && Game.scene) Game.scene.remove(this.remotePet.mesh);
+      this.remotePet.dead = true;
+      this.remotePet = null;
+    }
+    for (const npc of this.remoteTeam.values()) {
+      if (npc.mesh && Game.scene) Game.scene.remove(npc.mesh);
+      npc.dead = true;
+    }
+    this.remoteTeam.clear();
+
     if (this.mesh && this.mesh.parent) {
       this.mesh.parent.remove(this.mesh);
     }
@@ -730,6 +853,8 @@ const Network = {
             if (rp) {
               rp.setTargetPos(sp.pos, sp.rot, sp.moving, sp.running, sp.inWater);
               if (sp.heldId !== undefined || sp.weaponId !== undefined) rp.setEquip(sp.heldId, sp.weaponId);
+              if (sp.pet !== undefined) rp.updateRemotePet(sp.pet);
+              if (sp.team !== undefined) rp.updateRemoteTeam(sp.team);
               let changed = false;
               if (sp.level !== undefined && sp.level !== rp.level) {
                 rp.level = sp.level;
@@ -957,6 +1082,8 @@ const Network = {
     if (!data || !data.netId || this.remotePlayers.has(data.netId)) return;
     const rp = new RemotePlayer(data);
     if (data.heldId || data.weaponId) rp.setEquip(data.heldId, data.weaponId);
+    if (data.pet) rp.updateRemotePet(data.pet);
+    if (data.team) rp.updateRemoteTeam(data.team);
     this.remotePlayers.set(data.netId, rp);
   },
 
@@ -965,6 +1092,34 @@ const Network = {
       rp.destroy();
     }
     this.remotePlayers.clear();
+  },
+
+  getPetPayload() {
+    return (typeof Capture !== 'undefined' && Capture.pet && !Capture.pet.dead) ? {
+      type: Capture.pet.type,
+      boss: !!Capture.pet.boss,
+      lvl: Capture.pet.lvl || 1,
+      hp: Capture.pet.hp,
+      maxhp: Capture.pet.maxhp,
+      saddle: !!Capture.pet.saddle,
+      riding: !!Capture.riding,
+      pos: [Capture.pet.pos.x, Capture.pet.pos.y, Capture.pet.pos.z],
+      rot: Capture.pet.mesh ? Capture.pet.mesh.rotation.y : 0
+    } : null;
+  },
+
+  getTeamPayload() {
+    return (typeof NPCS !== 'undefined' && NPCS.team) ? NPCS.team.filter(n => !n.dead).map(n => ({
+      roleId: n.role.id,
+      name: n.name,
+      level: n.level,
+      hp: n.hp,
+      maxhp: n.maxhp,
+      order: n.order || 'follow',
+      pos: [n.pos.x, n.pos.y, n.pos.z],
+      rot: n.mesh ? n.mesh.rotation.y : 0,
+      swing: n.swing || 0
+    })) : [];
   },
 
   sendMove(x, y, z, yaw, pitch, moving) {
@@ -982,7 +1137,9 @@ const Network = {
       running: !!(typeof Input !== 'undefined' && Input.sprintHeld && Input.sprintHeld()),
       inWater: !!(typeof Player !== 'undefined' && Player.inWater),
       heldId: heldId,
-      weaponId: weaponId
+      weaponId: weaponId,
+      pet: this.getPetPayload(),
+      team: this.getTeamPayload()
     }));
   },
 
@@ -1082,7 +1239,10 @@ const Network = {
       skills: RPG.skills,
       prof: typeof Prof !== 'undefined' ? Prof.serialize() : {},
       hairStyle: Player.hairStyle,
-      hairColor: Player.hairColor
+      hairColor: Player.hairColor,
+      quests: (typeof Quest !== 'undefined' && Quest.serialize) ? Quest.serialize() : null,
+      pet: this.getPetPayload(),
+      team: this.getTeamPayload()
     };
 
     this.ws.send(JSON.stringify({
@@ -1214,7 +1374,9 @@ const Network = {
             running: !!(typeof Input !== 'undefined' && Input.sprintHeld && Input.sprintHeld()),
             inWater: !!Player.inWater,
             heldId: heldId,
-            weaponId: weaponId
+            weaponId: weaponId,
+            pet: this.getPetPayload(),
+            team: this.getTeamPayload()
           }));
         }
       }

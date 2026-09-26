@@ -962,9 +962,20 @@ const Monsters={
     if(m.pet&&src&&src!==Player&&src.role)return;
     /* PLAYER tidak bisa melukai pet; hanya monster liar yang bisa.
        src kosong = skill pemain (slam/whirl), bleed/venom, thorns, dsb. */
-    if(m.pet&&(!src||src===Player))return;
+    if(m.pet&&(!src||src===Player||(src&&src.remote)))return;
     /* siapa sumber serangan terakhir (untuk XP/drop & ternak kabur) */
     m.lastSrc=src;
+    /* Catat kontribusi damage per pemain untuk sistem pembagian EXP proporsional */
+    if(!m.dmgContrib) m.dmgContrib = {};
+    let contribId = null;
+    if(src && src.remote && src.netId) {
+      contribId = src.netId;
+    } else if(!src || src === Player || (this.isAllySrc && this.isAllySrc(src))) {
+      contribId = (typeof Network !== 'undefined' && Network.active) ? Network.netId : 'local';
+    }
+    if(contribId) {
+      m.dmgContrib[contribId] = (m.dmgContrib[contribId] || 0) + Math.min(dmg, Math.max(0, m.hp));
+    }
     /* akumulasi damage pemain untuk kontribusi XP saat monster mati.
        src kosong = skill pemain (slam/whirl), bleed/venom senjata, atau
        thorns — semuanya dihitung sebagai damage pemain. Damage dibatasi
@@ -1145,7 +1156,8 @@ const Monsters={
     const xpShare=clamp(pShare+aShare*this.ALLY_XP_SHARE,0,1);
     /* XP_MOB_MUL: kurangi XP yang didapat pemain per pembunuhan mob (0.80 = -20%) */
     const XP_MOB_MUL=0.80;
-    if(xpShare>0){
+    const isMp = (typeof Game !== 'undefined' && Game.isMultiplayer && typeof Network !== 'undefined' && Network.active);
+    if(!isMp && xpShare>0){
       /* efek 'greed' (set emas) menambah XP yang diperoleh.
          xpGapMul: mob yang jauh lebih rendah levelnya memberi XP makin kecil
          (mob lv75 vs pemain lv83 gap 8 = 88%; mob lv10 vs lv83 gap 73 = 20%).
@@ -4489,3 +4501,4 @@ function meshHeight(type){
     type==='reaper'?2.9:
     type==='wolf'?1.35:type==='scorpion'?0.85:type==='rabbit'?0.7:type==='fish'?1.8:0.9;
 }
+window.Monsters = Monsters;

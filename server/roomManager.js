@@ -190,6 +190,8 @@ class RoomManager {
           equip: otherClient.equip,
           heldId: otherClient.heldId || null,
           weaponId: otherClient.weaponId || null,
+          pet: otherClient.pet || null,
+          team: otherClient.team || [],
           moving: otherClient.moving
         });
       }
@@ -280,6 +282,8 @@ class RoomManager {
     if (msg.heldId !== undefined) client.heldId = msg.heldId;
     if (msg.weaponId !== undefined) client.weaponId = msg.weaponId;
     if (msg.equip) client.equip = msg.equip;
+    if (msg.pet !== undefined) client.pet = msg.pet;
+    if (msg.team !== undefined) client.team = msg.team;
     client.lastMoveTime = now;
   }
 
@@ -448,6 +452,7 @@ class RoomManager {
     if (data.prof) profile.prof = data.prof;
     if (data.hairStyle !== undefined) profile.hairStyle = data.hairStyle;
     if (data.hairColor !== undefined) profile.hairColor = data.hairColor;
+    if (data.quests) profile.quests = data.quests;
     profile.lastUpdated = Date.now();
 
     room.playerProfiles[meta.name] = profile;
@@ -542,7 +547,7 @@ class RoomManager {
     if (!meta) return;
     const room = this.rooms.get(meta.roomId);
     if (!room) return;
-    const { netId, pos, killerNetId } = msg;
+    const { netId, pos, killerNetId, rewards, mobType, boss } = msg;
     if (!netId) return;
 
     room.mobs.delete(netId);
@@ -550,7 +555,10 @@ class RoomManager {
       type: 'mob_death',
       netId,
       pos,
-      killerNetId: killerNetId || meta.netId
+      killerNetId: killerNetId || meta.netId,
+      rewards: rewards || {},
+      mobType: mobType || null,
+      boss: !!boss
     });
   }
 
@@ -657,7 +665,9 @@ class RoomManager {
           maxHp: client.maxHp || 100,
           heldId: client.heldId || null,
           weaponId: client.weaponId || null,
-          equip: client.equip || {}
+          equip: client.equip || {},
+          pet: client.pet || null,
+          team: client.team || []
         });
       }
 

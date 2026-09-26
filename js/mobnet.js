@@ -156,11 +156,25 @@ const MobNet = {
         const pos = m ? [m.pos.x, m.pos.y, m.pos.z] : null;
         const r = origKill(m);
         if (hadNet && this.isMp() && this.isHost()) {
+          const rewards = {};
+          const tot = m.maxhp || 100;
+          if (m.dmgContrib) {
+            for (const [pId, d] of Object.entries(m.dmgContrib)) {
+              const ratio = Math.min(1, d / tot);
+              if (ratio > 0.01) {
+                const xp = Math.max(1, Math.round(m.xp * ratio * 0.80));
+                rewards[pId] = { xp, ratio };
+              }
+            }
+          }
           this.send({
             type: 'mob_death',
             netId: m.netId,
             pos: pos,
-            killerNetId: Network.netId
+            killerNetId: Network.netId,
+            rewards,
+            mobType: m.type,
+            boss: !!m.boss
           });
           if (m.netId) this.mobs.delete(m.netId);
         }
@@ -349,6 +363,26 @@ const MobNet = {
 
   onDeath(msg) {
     if (!msg || !msg.netId) return;
+
+    // Bagikan reward EXP proporsional kepada semua pemain yang berkontribusi damage
+    if (msg.rewards && typeof Network !== 'undefined' && Network.netId && typeof Player !== 'undefined') {
+      const myReward = msg.rewards[Network.netId];
+      if (myReward && myReward.xp) {
+        Player.addXP(myReward.xp);
+        Player.kills = (Player.kills || 0) + 1;
+        const pct = Math.round((myReward.ratio || 1) * 100);
+        if (typeof FX !== 'undefined' && FX.text && Player.pos) {
+          FX.text(Player.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), `+${myReward.xp} XP (${pct}% Kontribusi)`, '#8fd4ff');
+        }
+        if (typeof RPG !== 'undefined' && RPG.onMobKilled) {
+          RPG.onMobKilled(msg.mobType || 'monster', !!msg.boss);
+        }
+        if (typeof Prof !== 'undefined' && Prof.gain) {
+          Prof.gain('combat', Math.max(1, Math.round(8 * (myReward.ratio || 1))), 1);
+        }
+      }
+    }
+
     if (this.isHost()) {
       if (typeof Monsters !== 'undefined') {
         const m = Monsters.list.find(o => o && o.netId === msg.netId);

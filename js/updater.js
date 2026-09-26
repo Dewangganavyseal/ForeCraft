@@ -23,7 +23,7 @@ const Updater = {
 
   getCurrentVersion() {
     if (typeof CFG !== 'undefined' && CFG.VERSION) return CFG.VERSION;
-    return '0.2.47';
+    return '0.2.48';
   },
 
   compare(v1, v2) {
