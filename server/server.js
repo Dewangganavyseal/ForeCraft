@@ -116,6 +116,37 @@ const server = http.createServer((req, res) => {
 
   const fullPath = path.join(ROOT_DIR, safePath);
 
+  // Khusus index.html: suntikkan query parameter versi ke seluruh script tag JS & CSS agar browser & Cloudflare tidak pernah memakai cache lama
+  if (safePath === '/index.html') {
+    let pkgVersion = '0.2.47';
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+      if (pkg.version) pkgVersion = pkg.version;
+    } catch (e) {}
+
+    fs.readFile(fullPath, 'utf8', (err, html) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading index.html');
+        return;
+      }
+
+      html = html.replace(/(src="js\/[^"?]+)(\.js)(")/g, `$1$2?v=${pkgVersion}$3`);
+      html = html.replace(/(href="css\/[^"?]+)(\.css)(")/g, `$1$2?v=${pkgVersion}$3`);
+
+      const buf = Buffer.from(html, 'utf8');
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': buf.length,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      res.end(buf);
+    });
+    return;
+  }
+
   fs.stat(fullPath, (err, stats) => {
     if (err || !stats.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });

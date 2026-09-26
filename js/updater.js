@@ -23,7 +23,7 @@ const Updater = {
 
   getCurrentVersion() {
     if (typeof CFG !== 'undefined' && CFG.VERSION) return CFG.VERSION;
-    return '0.2.45';
+    return '0.2.47';
   },
 
   compare(v1, v2) {
@@ -97,12 +97,23 @@ const Updater = {
     const savedTarget = localStorage.getItem('forecraft_target_version');
 
     if (wasLocked && savedTarget) {
-      // Jika versi lokal saat ini sudah sama atau lebih tinggi dari target, lepaskan kunci
+      // Cek apakah versi saat ini sudah mencapai target
       if (this.compare(currentVer, savedTarget) >= 0) {
         localStorage.removeItem('forecraft_update_locked');
         localStorage.removeItem('forecraft_target_version');
         this.locked = false;
       } else {
+        // Cek secara online apakah versi saat ini sebenarnya sudah yang terbaru
+        try {
+          const latest = await this.queryLatestVersion();
+          if (latest && this.compare(currentVer, latest.version) >= 0) {
+            localStorage.removeItem('forecraft_update_locked');
+            localStorage.removeItem('forecraft_target_version');
+            this.locked = false;
+            return false;
+          }
+        } catch (e) {}
+
         // Game masih terkunci! Meskipun sedang OFFLINE, game tidak boleh dimainkan!
         this.locked = true;
         this.targetVersion = savedTarget;
@@ -117,7 +128,7 @@ const Updater = {
 
     // Bersihkan parameter query _v / _t dari URL jika versi sudah up-to-date
     if (typeof window !== 'undefined' && window.location && window.location.search && window.history) {
-      if (window.location.search.includes('_v=') || window.location.search.includes('_t=')) {
+      if (window.location.search.includes('_v=') || window.location.search.includes('_t=') || window.location.search.includes('v=')) {
         try {
           const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
@@ -258,7 +269,7 @@ const Updater = {
 
     // Jika berjalan di Web Browser (http:// atau https://):
     // Bersihkan cache storage & paksa reload dengan query string anti-cache
-    if (statusEl) statusEl.textContent = 'Memperbarui aset game ke versi terbaru...';
+    if (statusEl) statusEl.textContent = 'Memuat versi terbaru bebas cache...';
 
     try {
       if ('caches' in window) {
@@ -267,13 +278,17 @@ const Updater = {
       }
     } catch (e) {}
 
-    // Buka kembali halaman dengan cache-busting timestamp unik agar browser TIDAK memakai cache lama
+    // Tutup overlay modal agar tidak terlihat mengulang
+    const overlay = document.getElementById('update-modal-ov');
+    if (overlay) overlay.style.display = 'none';
+
+    // Buka kembali halaman dengan parameter query versi & timestamp baru
     setTimeout(() => {
-      const targetVer = info.version || 'latest';
+      const targetVer = info.version || '0.2.47';
       const now = Date.now();
       const cleanUrl = window.location.origin + window.location.pathname;
-      window.location.replace(`${cleanUrl}?_v=${encodeURIComponent(targetVer)}&_t=${now}`);
-    }, 400);
+      window.location.replace(`${cleanUrl}?v=${encodeURIComponent(targetVer)}&_t=${now}`);
+    }, 200);
   },
 
   performClose(targetVer) {
