@@ -20,16 +20,56 @@
   <div id="stats">
     <!-- Tombol ⚙️ Pengaturan: satu pintu untuk Musik, SFX, Custom UI & Simpan -->
     <button id="btn-gear" class="mini-btn btn-img" title="Pengaturan"><img src="buttons/gear.png" alt="" style="width:20px;height:20px;pointer-events:none;display:block;margin:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></button>
-    <!-- BINGKAI POTRET PEMAIN: render setengah badan dari model karakter yang
-         sedang dipakai (termasuk armor/tameng). Diketuk → panel Karakter. -->
-    <button id="portrait" type="button" title="Karakter — lihat stat lengkap">
-      <canvas id="portrait-cv" width="128" height="128"></canvas>
-      <span id="portrait-lv">1</span>
-    </button>
-    <div id="stats-bars">
-      <div class="bar hp"><span class="ico"><img class="hud-ico" src="buttons/ui_hp.png" alt="" onerror="this.outerHTML='❤️'"></span><div class="track"><div id="hp-fill"></div><span class="bar-num" id="hp-num">100</span></div></div>
-      <div class="bar st"><span class="ico"><img class="hud-ico" src="buttons/ui_stam.png" alt="" onerror="this.outerHTML='⚡'"></span><div class="track"><div id="st-fill"></div><span class="bar-num" id="st-num">100</span></div></div>
-      <div class="bar hu"><span class="ico"><img class="hud-ico" src="buttons/ui_hunger.png" alt="" onerror="this.outerHTML='🍖'"></span><div class="track"><div id="hu-fill"></div><span class="bar-num" id="hu-num">100</span></div></div>
+    
+    <!-- ============ KONSEP 2: PIXEL QUEST HUD (1:1 PORT DARI NEW MODEL/Hud HP bar.html) ============ -->
+    <div class="hud-pixel" id="hudPixel">
+      <div class="px-frame" id="pxFrame">
+        <div class="px-top">
+          <span id="player-hud-name">RANGER</span>
+          <span class="px-blink">▮</span>
+        </div>
+        <div class="px-body">
+          <div class="px-left">
+            <!-- BINGKAI POTRET PEMAIN: render setengah badan dari model karakter 3D di dalam medallion pixel emas -->
+            <button id="portrait" class="px-portrait" type="button" title="Karakter — lihat stat lengkap">
+              <div class="px-pframe">
+                <div class="px-pinner">
+                  <canvas id="portrait-cv" width="128" height="128"></canvas>
+                </div>
+                <i class="px-pflash" id="pxPflash"></i>
+              </div>
+              <div class="px-lvl">LV·<span id="portrait-lv">1</span></div>
+            </button>
+          </div>
+          <div class="px-right">
+            <!-- HP: 10 Hati Pixel dengan Pop & Blink Kritis -->
+            <div class="px-row hearts" id="hearts" title="HP"></div>
+            <!-- Stamina: Ikon Petir + 20 Blok Pixel -->
+            <div class="px-row">
+              <span class="px-ico" title="Stamina"><svg viewBox="0 0 12 16"><path d="M7 0 L1 9 h4 L4 16 L11 6 H7 Z" fill="#45d6ff"/></svg></span>
+              <div class="pxbar st" id="pxSt" title="Stamina"></div>
+            </div>
+            <!-- Lapar: Ikon Daging + 20 Blok Pixel -->
+            <div class="px-row">
+              <span class="px-ico hg-ico" title="Lapar / Hunger"><svg viewBox="0 0 16 16">
+                <path d="M4 1h5v2h3v2h2v4h-2v3h-3v2H6v-2H3v-2H1V6h2V3h1z" fill="#ffb703"/>
+                <path d="M10 10h2v2h2v2h-2v2h-2v-2H8v-2h2z" fill="#f5f0e6"/>
+              </svg></span>
+              <div class="pxbar hg" id="pxHg" title="Lapar / Hunger"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden compatibility tags untuk selector lama -->
+    <div style="display:none!important;" aria-hidden="true">
+      <div id="hp-fill"></div>
+      <div id="st-fill"></div>
+      <div id="hu-fill"></div>
+      <span id="hp-num">100</span>
+      <span id="st-num">100</span>
+      <span id="hu-num">100</span>
     </div>
   </div>
   <!-- Garis bar EXP kuning tipis full ujung ke ujung di bagian paling bawah layar + persentase di kiri bawah -->
@@ -445,6 +485,7 @@
 
 <script src="js/camera.js"></script>
 <script src="js/rpg.js"></script>
+<script src="js/pixel_hud.js"></script>
 <script src="js/ui.js"></script>
 <!-- Bingkai potret HUD + panel Karakter (stat detail & model full body).
      Butuh Player/RPG/UI, dan dipanggil UI.updateHUD tiap frame. -->

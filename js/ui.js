@@ -20,6 +20,8 @@ const UI={
       p.appendChild(body);                 // body di bawah header/tab
     });
 
+    if(typeof PixelHUD!=='undefined'&&PixelHUD.init)PixelHUD.init();
+
     const hb=document.getElementById('hotbar');
     for(let i=0;i<7;i++){
       const d=document.createElement('div');d.className='hslot';
@@ -595,6 +597,10 @@ const UI={
     if(stNumEl)stNumEl.textContent=Math.ceil(Player.stamina)+'/'+mSt;
     const huNumEl=document.getElementById('hu-num');
     if(huNumEl)huNumEl.textContent=Math.ceil(Player.hunger);
+
+    if(typeof PixelHUD!=='undefined'&&PixelHUD.update){
+      PixelHUD.update(Player.hp,mHp,Player.stamina,mSt,Player.hunger,Player.dead,Player.name,Player.level);
+    }
 
     const need=CFG.playerXpNeed(Player.level);
     const xpPercent=clamp(Math.floor((Player.xp/need)*100),0,100);

@@ -1,3 +1,6 @@
+:root{
+  --pxcircle:polygon(31% 0,69% 0,69% 6%,81% 6%,81% 12%,88% 12%,88% 19%,94% 19%,94% 31%,100% 31%,100% 69%,94% 69%,94% 81%,88% 81%,88% 88%,81% 88%,81% 94%,69% 94%,69% 100%,31% 100%,31% 94%,19% 94%,19% 88%,12% 88%,12% 81%,6% 81%,6% 69%,0 69%,0 31%,6% 31%,6% 19%,12% 19%,12% 12%,19% 12%,19% 6%,31% 6%);
+}
 @font-face{
   font-family:'Press Start 2P';
   font-style:normal;
@@ -41,26 +44,86 @@ body.perf-hud *{backdrop-filter:none!important;-webkit-backdrop-filter:none!impo
 
 /* ==== HUD ==== */
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
-#stats{position:absolute;top:12px;left:12px;display:flex;flex-direction:row;align-items:flex-start;gap:8px}
-#stats-bars{display:flex;flex-direction:column;gap:4px;min-width:0}
+#stats{position:absolute;top:12px;left:12px;display:inline-flex;align-items:flex-start;pointer-events:none;z-index:11}
+
+/* ============ KONSEP 2 : PIXEL QUEST HUD (1:1 PORT DARI NEW MODEL/Hud HP bar.html) ============ */
+.hud-pixel{font-family:'Press Start 2P',monospace;pointer-events:none}
+.px-frame{position:relative;padding:12px 14px 14px;background:#1d1440;border:4px solid #0c0725;
+  box-shadow:0 6px 0 rgba(0,0,0,.45),inset 0 0 0 2px #4a3a7e,inset 0 4px 0 rgba(255,255,255,.1);
+  clip-path:polygon(0 8px,4px 8px,4px 4px,8px 4px,8px 0,calc(100% - 8px) 0,calc(100% - 8px) 4px,calc(100% - 4px) 4px,calc(100% - 4px) 8px,100% 8px,100% calc(100% - 8px),calc(100% - 4px) calc(100% - 8px),calc(100% - 4px) calc(100% - 4px),calc(100% - 8px) calc(100% - 4px),calc(100% - 8px) 100%,8px 100%,8px calc(100% - 4px),4px calc(100% - 4px),4px calc(100% - 8px),0 calc(100% - 8px));
+  pointer-events:auto}
+.px-frame::after{content:"";position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.px-frame.hitflash::after{animation:flashHit .35s}
+.px-top{display:flex;justify-content:space-between;font-size:8px;color:#b9a7ff;margin-bottom:10px;letter-spacing:1px}
+.px-blink{animation:blinkHard 1s steps(2) infinite;color:#ffd23f}
+.px-body{display:flex;gap:12px;align-items:center}
+.px-left{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
+
+/* potret pixel terpadu dengan 3D canvas Forecraft */
+#portrait.px-portrait{position:relative;width:68px;border:none;background:none;padding:0;cursor:pointer;outline:none;display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;pointer-events:auto;transition:transform .12s}
+#portrait.px-portrait:hover .px-pframe{filter:brightness(1.1)}
+#portrait.px-portrait:active{transform:scale(.94)}
+.px-pframe{position:relative;width:68px;height:68px;background:linear-gradient(#ffe08a,#c9932e);
+  clip-path:var(--pxcircle);animation:pxBob 1.6s steps(2) infinite}
+.px-pinner{position:absolute;inset:5px;background:radial-gradient(circle at 40% 30%,#2f2358,#171034 75%);
+  clip-path:var(--pxcircle);overflow:hidden;display:grid;place-items:center}
+#portrait-cv{display:block;width:100%;height:100%;pointer-events:none;image-rendering:pixelated;transition:filter .4s}
+.px-pflash{position:absolute;inset:5px;clip-path:var(--pxcircle);background:#fff;opacity:0;pointer-events:none}
+.px-pflash.dmg{background:rgba(255,60,80,.7)}
+.px-pflash.go{animation:flashHit .4s}
+#portrait.px-portrait.hurt .px-pframe{animation:pxShake .35s steps(4)}
+.px-lvl{font-family:'Press Start 2P',monospace;font-size:7px;color:#3a2604;background:linear-gradient(#ffe08a,#d9a53c);padding:4px 7px;letter-spacing:1px;line-height:1;
+  clip-path:polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));pointer-events:none}
+#portrait-lv{font-family:'Press Start 2P',monospace;font-size:7px;color:#3a2604;pointer-events:none}
+.hud-pixel.ko .px-pinner canvas{filter:grayscale(1) brightness(.7)}
+
+/* baris kanan: HP hati, stamina, hunger */
+.px-right{display:flex;flex-direction:column;gap:8px;width:214px}
+.px-row{display:flex;align-items:center;gap:8px}
+.px-row.hearts{gap:3px;justify-content:center;position:relative}
+.px-ico{width:16px;height:16px;flex:none}
+.px-ico svg{width:100%;height:100%;display:block}
+.heart{position:relative;width:18px;height:16px;display:inline-block}
+.heart .hb{position:absolute;left:0;top:0;width:18px;height:16px}
+.heart .base path{fill:#342659}
+.heart .fillpart{position:absolute;left:0;top:0;height:16px;width:0;overflow:hidden;transition:width .22s steps(4)}
+.heart .fillpart .top path{fill:#ff5470;filter:drop-shadow(0 0 3px rgba(255,84,112,.55))}
+.heart.full .fillpart{width:100%}
+.heart.half .fillpart{width:10px}
+.heart.pop{animation:heartPop .35s cubic-bezier(.3,1.8,.4,1)}
+.pxbar{flex:1;display:flex;gap:2px;height:16px;padding:2px;background:#0c0725;position:relative}
+.pxbar i{flex:1;background:#241a4a;transform-origin:bottom}
+.pxbar.st i.on{background:#45d6ff;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(0,0,0,.3)}
+.pxbar.hg i.on{background:#ffb703;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(0,0,0,.3)}
+.pxbar.low i.on{background:#ffd23f!important}
+.pxbar.crit i.on{background:#ff4d4d!important;animation:blinkHard .5s steps(2) infinite}
+.hud-pixel.crit .px-row.hearts{animation:blinkHard .55s steps(2) infinite}
+.hud-pixel.lowhg .hg-ico{animation:wiggleY .7s ease-in-out infinite}
+
+/* floating numbers & sparkle */
+.fl{position:absolute;left:50%;top:-6px;z-index:30;pointer-events:none;font:800 9px 'Press Start 2P',monospace;
+  animation:flUp .95s ease-out forwards;text-shadow:0 0 8px currentColor}
+.fl.bad{color:#ff5d75}.fl.good{color:#7dff9b}.fl.info{color:#7ce7ff}
+.sp{position:absolute;width:5px;height:5px;border-radius:50%;pointer-events:none;z-index:26;
+  background:var(--spc,#aef7c8);animation:spGo .7s ease-out forwards}
+
+/* keyframes juicy */
+@keyframes flashHit{0%{opacity:.85}100%{opacity:0}}
+@keyframes flUp{0%{opacity:0;transform:translate(-50%,8px) scale(.5)}18%{opacity:1;transform:translate(-50%,-4px) scale(1.18)}100%{opacity:0;transform:translate(-50%,-38px) scale(1)}}
+@keyframes heartPop{40%{transform:scale(1.35) rotate(-7deg)}}
+@keyframes blockPop{0%{transform:scaleY(.2);filter:brightness(2.2)}70%{transform:scaleY(1.25)}100%{transform:scaleY(1)}}
+@keyframes blinkHard{50%{opacity:.3}}
+@keyframes pxBob{50%{transform:translateY(-2px)}}
+@keyframes pxShake{0%,100%{transform:translate(0,0)}25%{transform:translate(-4px,2px)}50%{transform:translate(4px,-2px)}75%{transform:translate(-3px,1px)}}
+@keyframes spGo{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}}
+@keyframes wiggleY{50%{transform:translateY(-3px) rotate(-8deg)}}
+
+/* Fallback & compatibility styles */
 .bar{display:flex;align-items:center;gap:6px;background:rgba(24,16,10,.82);border:1.5px solid #7c2d12;border-radius:8px;padding:3px 6px;backdrop-filter:blur(4px)}
 .bar .ico{display:flex;align-items:center;justify-content:center;font-size:13px;width:18px}
 .bar .track{position:relative;width:154px;background:rgba(0,0,0,.68);border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
 .bar .track div{height:100%;width:100%;border-radius:5px;transition:width .15s}
 .bar-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;color:#fff;text-shadow:0 1px 2px #000, 0 0 4px #000;pointer-events:none;z-index:2;line-height:1}
-
-/* BAR HP: diperbesar melebar vertikal */
-.bar.hp{padding:4px 7px;border-color:#7c2d12}
-.bar.hp .ico{width:20px;font-size:16px}
-.bar.hp .track{height:18px;border-radius:6px}
-.bar.hp .bar-num{font-size:8.5px;letter-spacing:.02em}
-
-/* BAR STAMINA & HUNGER: lebih kecil dibawahnya, ukuran seragam */
-.bar.st, .bar.hu{padding:2px 6px}
-.bar.st .ico, .bar.hu .ico{width:16px;font-size:11px}
-.bar.st .track, .bar.hu .track{height:9px;border-radius:5px}
-.bar.st .bar-num, .bar.hu .bar-num{font-size:6.5px}
-
 #hp-fill{background:linear-gradient(90deg,#b91c1c,#ef4444,#f87171)}
 #st-fill{background:linear-gradient(90deg,#d97706,#f59e0b,#fbbf24)}
 #hu-fill{background:linear-gradient(90deg,#9a3412,#ea580c,#fb923c)}
@@ -1526,7 +1589,7 @@ body.touch #questtrack{
    sampai pemain menekan ENTER; selama terbuka, kelas .show dipasang dan
    body mendapat kelas chat-open (dipakai untuk menggeser toast).
    ========================================================================= */
-#chat{position:absolute;top:110px;left:12px;width:min(300px,62vw);
+#chat{position:absolute;top:154px;left:12px;width:min(300px,62vw);
   display:none;flex-direction:column;gap:4px;z-index:14;pointer-events:auto}
 #chat.show{display:flex}
 #chat.peek{display:flex !important;pointer-events:none !important}
@@ -1772,7 +1835,7 @@ body.touch #toast{max-width:54vw}
   body.touch #m-buttons{max-width:138px;gap:5px;top:56px}
   body.touch #team{top:200px}
   body.touch #toast{top:112px}
-  body.touch #chat{top:98px;width:min(230px,56vw)}
+  body.touch #chat{top:132px;width:min(230px,56vw)}
 }
 @media (max-width:400px){
   #xpwrap{width:150px}
@@ -2455,19 +2518,19 @@ body.touch .qbar{height:3px}
    ========================================================================= */
 #stats{flex-direction:row;align-items:flex-start;gap:8px}
 #stats-bars{display:flex;flex-direction:column;gap:5px;min-width:0}
-#portrait{flex:0 0 auto;pointer-events:auto;position:relative;
+#portrait:not(.px-portrait){flex:0 0 auto;pointer-events:auto;position:relative;
   width:62px;height:62px;padding:0;cursor:pointer;
   border-radius:12px;overflow:hidden;
   background-color:#ea580c;
   border:2px solid #7c2d12;
   box-shadow:0 3px 10px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.35);
   transition:transform .12s,border-color .2s,box-shadow .2s}
-#portrait:hover{border-color:#9a3412;
+#portrait:not(.px-portrait):hover{border-color:#9a3412;
   box-shadow:0 3px 14px rgba(0,0,0,.55),0 0 12px rgba(234,88,12,.45)}
-#portrait:active{transform:scale(.94)}
-#portrait-cv{display:block;width:100%;height:100%}
+#portrait:not(.px-portrait):active{transform:scale(.94)}
+#portrait:not(.px-portrait) #portrait-cv{display:block;width:100%;height:100%}
 /* label level kecil di sudut bawah potret */
-#portrait-lv{position:absolute;right:2px;bottom:1px;
+#portrait-lv:not(.px-lvl *){position:absolute;right:2px;bottom:1px;
   font-family:'Press Start 2P',monospace;font-size:8px;color:#ffe08a;
   background:rgba(0,0,0,.6);border-radius:5px;padding:2px 4px;line-height:1;
   pointer-events:none}
@@ -2540,8 +2603,8 @@ body.touch .qbar{height:3px}
   .cs-row{font-size:12px;padding:4px 6px}
 }
 @media (max-width:600px){
-  #portrait{width:52px;height:52px;border-radius:10px}
-  #portrait-lv{font-size:7px;padding:1px 3px}
+  #portrait:not(.px-portrait){width:52px;height:52px;border-radius:10px}
+  #portrait-lv:not(.px-lvl *){font-size:7px;padding:1px 3px}
   #stats{gap:6px}
   #stats-bars{gap:4px}
   #char-cv{height:220px}
@@ -2550,19 +2613,19 @@ body.touch .qbar{height:3px}
   .cs-row .cs-vl{font-size:11px}
 }
 @media (max-width:400px){
-  #portrait{width:46px;height:46px}
+  #portrait:not(.px-portrait){width:46px;height:46px}
   #stats{gap:5px}
   #char-cv{height:190px}
 }
 /* layar pendek (landscape ponsel): potret & viewport dipendekkan */
 @media (max-height:480px){
-  #portrait{width:46px;height:46px}
+  #portrait:not(.px-portrait){width:46px;height:46px}
   #char-cv{height:170px}
 }
 /* sentuh: tombol potret sedikit lebih besar agar mudah diketuk */
-body.touch #portrait{width:58px;height:58px}
+body.touch #portrait:not(.px-portrait){width:58px;height:58px}
 @media (max-width:600px){
-  body.touch #portrait{width:50px;height:50px}
+  body.touch #portrait:not(.px-portrait){width:50px;height:50px}
 }
 
 /* ================= PANEL ALTAR (ingredient ritual) ================= */.altar-ings{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
