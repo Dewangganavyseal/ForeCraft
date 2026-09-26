@@ -255,7 +255,7 @@ class RoomManager {
     }
 
     // Anti-Cheat: Validasi kecepatan pergerakan (Speed Hack / Teleport Check)
-    if (client.pos && !client.isFirstSpawn && !msg.teleport) {
+    if (client.pos && !client.isFirstSpawn && !msg.teleport && !msg.respawn) {
       const dx = nx - client.pos[0];
       const dy = ny - client.pos[1];
       const dz = nz - client.pos[2];
@@ -423,6 +423,69 @@ class RoomManager {
       text,
       time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
     });
+  }
+
+  handlePlayerDeath(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const client = room.clients.get(meta.netId);
+    if (!client) return;
+
+    client.hp = 0;
+    client.moving = false;
+    client.running = false;
+    client.dead = true;
+
+    this.broadcastToRoom(meta.roomId, {
+      type: 'player_updated',
+      netId: meta.netId,
+      hp: 0
+    }, meta.netId);
+
+    console.log(`[Room ${meta.roomId}] Player died: "${meta.name}" (netId: ${meta.netId})`);
+  }
+
+  handleRespawn(ws, msg) {
+    const meta = this.playerSocketMap.get(ws);
+    if (!meta) return;
+    const room = this.rooms.get(meta.roomId);
+    if (!room) return;
+    const client = room.clients.get(meta.netId);
+    if (!client) return;
+
+    if (!Array.isArray(msg.pos) || msg.pos.length !== 3) return;
+    const [nx, ny, nz] = msg.pos;
+
+    // Reset posisi dan status hidup di server
+    client.dead = false;
+    client.pos = [nx, ny, nz];
+    client.rot = Array.isArray(msg.rot) ? msg.rot : [0, 0];
+    client.moving = false;
+    client.running = false;
+    client.hp = Math.max(1, Math.round((client.maxHp || 100) * 0.7));
+    client.lastMoveTime = Date.now();
+
+    // Update profile
+    const profile = room.playerProfiles[meta.name];
+    if (profile) {
+      profile.pos = client.pos;
+      profile.rot = client.rot;
+      profile.hp = client.hp;
+      this.dirtyPlayers.add(meta.roomId);
+    }
+
+    // Beritahukan ke pemain lain di room bahwa pemain ini telah respawn
+    this.broadcastToRoom(meta.roomId, {
+      type: 'player_respawned',
+      netId: meta.netId,
+      pos: client.pos,
+      rot: client.rot,
+      hp: client.hp
+    }, meta.netId);
+
+    console.log(`[Room ${meta.roomId}] Player respawned: "${meta.name}" at [${nx.toFixed(1)}, ${ny.toFixed(1)}, ${nz.toFixed(1)}]`);
   }
 
   handlePlayerSync(ws, msg) {

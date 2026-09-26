@@ -893,6 +893,21 @@ const Network = {
         }
         break;
 
+      case 'player_respawned':
+        if (msg.netId !== this.netId) {
+          const rp = this.remotePlayers.get(msg.netId);
+          if (rp) {
+            if (Array.isArray(msg.pos)) {
+              rp.pos.set(msg.pos[0], msg.pos[1], msg.pos[2]);
+              rp.targetPos.set(msg.pos[0], msg.pos[1], msg.pos[2]);
+              if (rp.mesh) rp.mesh.position.copy(rp.pos);
+            }
+            if (msg.hp !== undefined) rp.hp = msg.hp;
+            rp.updateNameplateVisual();
+          }
+        }
+        break;
+
       case 'block_update':
         if (typeof World !== 'undefined' && World.setBlock) {
           const { x, y, z, id, oldId } = msg;
@@ -1159,6 +1174,25 @@ const Network = {
     }));
   },
 
+  sendPlayerDeath() {
+    if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    this.ws.send(JSON.stringify({
+      type: 'player_death'
+    }));
+  },
+
+  sendRespawn(x, y, z) {
+    if (!this.active || !this.ws || this.ws.readyState !== 1) return;
+    this.lastSyncedPos = [x, y, z];
+    this.lastSyncedYaw = (typeof Player !== 'undefined' ? Player.facing : 0) || 0;
+    this.lastMovingSent = false;
+    this.ws.send(JSON.stringify({
+      type: 'respawn',
+      pos: [x, y, z],
+      rot: [this.lastSyncedYaw, 0]
+    }));
+  },
+
   sendBlockChange(x, y, z, id, oldId) {
     if (!this.active || !this.ws || this.ws.readyState !== 1) return;
     this.ws.send(JSON.stringify({
@@ -1339,6 +1373,7 @@ const Network = {
       this.lastSendTime = now;
 
       if (this.ws && this.ws.readyState === 1 && typeof Player !== 'undefined' && Player.pos) {
+        if (Player.dead) return; // JANGAN kirim paket pergerakan saat pemain sedang mati!
         const px = Player.pos.x, py = Player.pos.y, pz = Player.pos.z;
         const yaw = Player.facing || 0;
 

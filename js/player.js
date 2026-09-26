@@ -1085,6 +1085,10 @@ const Player={
     const dEl=document.getElementById('death');
     dEl.classList.remove('hidden');
     if(typeof I18N!=='undefined'&&I18N.lang!=='id')I18N.localizeTree(dEl,I18N.lang);
+
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendPlayerDeath();
+    }
   },
   /* ---------- TITIK RESPAWN ACAK ----------
      Permintaan pemain: mati TIDAK lagi mengembalikan ke titik awal yang sama.
@@ -1137,6 +1141,16 @@ const Player={
     this.pos.set(this.spawnP.x,gy,this.spawnP.z);
     this.vel.set(0,0,0);
     this.onGround=true;
+
+    if(typeof Game!=='undefined'){
+      Game.camTarget.set(this.pos.x, this.pos.y+1.3, this.pos.z);
+      if(typeof Cam!=='undefined'&&Cam.update)Cam.update(0.016, Game.camTarget);
+    }
+
+    if(typeof Game!=='undefined'&&Game.isMultiplayer&&typeof Network!=='undefined'&&Network.active){
+      Network.sendRespawn(this.pos.x, this.pos.y, this.pos.z);
+    }
+
     if(UI.toast)UI.toast('✨ Kau terbangun kembali di titik awal petualanganmu.');
     document.getElementById('death').classList.add('hidden');
   },

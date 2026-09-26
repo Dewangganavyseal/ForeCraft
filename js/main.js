@@ -497,15 +497,14 @@ const Game={
       boots:savedEq.boots||null,shield:savedEq.shield||null};
     if(savedEq.weapon)RPG.addItem(savedEq.weapon,1);
 
-    // Penentuan spawn bersama di Biome Hutan
+    // Penentuan spawn bersama di Biome Hutan (titik spawn awal masuk server)
     const forestBase = this.findForestSpawn(this.seed);
+    const sp = this.findMultiplayerPlayerSpawn(forestBase);
+    Player.spawnP.set(sp.x, sp.y, sp.z);
+
     if(prof.pos&&Array.isArray(prof.pos)&&prof.pos.length===3&&(prof.pos[0]!==0||prof.pos[1]!==20||prof.pos[2]!==0)){
       Player.pos.set(prof.pos[0],prof.pos[1],prof.pos[2]);
-      Player.spawnP.copy(Player.pos);
     }else{
-      // Pemain masuk di 1 area yang sama dalam radius 20 blok agar tidak bertumpuk
-      const sp=this.findMultiplayerPlayerSpawn(forestBase);
-      Player.spawnP.set(sp.x,sp.y,sp.z);
       Player.pos.copy(Player.spawnP);
     }
 

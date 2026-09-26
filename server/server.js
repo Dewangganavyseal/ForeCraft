@@ -253,6 +253,14 @@ wss.on('connection', (ws) => {
         roomManager.handlePlayerSync(ws, msg);
         break;
 
+      case 'player_death':
+        roomManager.handlePlayerDeath(ws, msg);
+        break;
+
+      case 'respawn':
+        roomManager.handleRespawn(ws, msg);
+        break;
+
       case 'leave':
         roomManager.handleDisconnect(ws);
         break;
